@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>イベント出欠確認アプリ</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Noto Sans JP -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Flatpickr CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        /* Base font for the entire body */
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Custom scrollbar styles */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background-color: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #c4c4c4;
+            border-radius: 10px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: #a8a8a8;
+        }
+
+        /* Ensure stacking context for scroll container and table */
+        .overflow-x-auto {
+            position: relative;
+            z-index: 1; /* Explicitly set z-index */
+        }
+
+        table {
+            position: relative; /* Table itself generates stacking context */
+            z-index: 1; /* Explicitly set z-index */
+            border-collapse: separate; /* Required for sticky to work correctly */
+            border-spacing: 0; /* Remove border spacing */
+        }
+
+        /* Basic styles for sticky headers */
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 10; /* Normal headers z-index: 10 */
+            background-color: #f9fafb; /* Ensure background color */
+        }
+
+        /* Styles for fixing member names and header columns */
+        /* This class is responsible for the fixed leftmost column */
+        .sticky-first-col {
+            position: sticky;
+            left: 0;
+            background-color: white; /* Ensure background is not transparent when fixed */
+            box-shadow: 3px 0 8px rgba(0,0,0,0.3); /* Stronger shadow to emphasize fixed nature */
+        }
+
+        /* Special style for member header (top-left corner cell) */
+        /* This ensures the top-left corner is fixed in both directions */
+        th.sticky-header.sticky-first-col {
+            top: 0; /* Fix to top */
+            left: 0; /* Fix to left */
+            z-index: 30; /* Higher z-index than other sticky elements to be on top */
+            box-shadow: 3px 0 8px rgba(0,0,0,0.3), 0 3px 8px rgba(0,0,0,0.3); /* Shadow on both right and bottom */
+        }
+
+        /* Style for member body (member name cell in each row) */
+        td.sticky-first-col {
+            z-index: 20; /* Higher than normal cells, lower than top-left header */
+        }
+
+        /* Modal overlay styles */
+        .modal {
+            display: none; /* Hidden by default, controlled by JS */
+            position: fixed;
+            z-index: 100; /* High z-index to appear on top */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto; /* Enable scrolling if content overflows */
+            background-color: rgba(0,0,0,0.4); /* Semi-transparent background */
+            display: flex; /* Use flexbox for centering */
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Modal content box styles */
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            max-width: 90%;
+            width: 500px;
+        }
+
+        /* Status cell interaction styles */
+        .status-cell {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .status-cell:hover {
+            transform: scale(1.1);
+        }
+
+        /* Status circle shared styles */
+        .status-circle {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        /* Specific status circle colors */
+        .status-circle.maru-maru {
+            background-color: #4ade80; /* Green-400 */
+            color: white;
+        }
+
+        .status-circle.maru {
+            background-color: #a7f3d0; /* Emerald-200 */
+            color: #065f46; /* Emerald-800 */
+        }
+
+        .status-circle.sankaku {
+            background-color: #fde68a; /* Amber-200 */
+            color: #92400e; /* Amber-800 */
+        }
+
+        .status-circle.batsu {
+            background-color: #fecaca; /* Red-200 */
+            color: #b91c1c; /* Red-800 */
+        }
+
+        .status-circle.hatena {
+            background-color: #e5e7eb; /* Gray-200 */
+            color: #4b5563; /* Gray-600 */
+        }
+
+        /* Fade-in animation for modals */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Scale-in animation for modal content */
+        @keyframes scaleIn {
+            from { transform: scale(0.95); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        /* Delete button visibility on hover */
+        .delete-btn {
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        tr:hover .delete-btn,
+        th:hover .delete-btn {
+            opacity: 1;
+        }
+
+
+        /* Loading spinner styles */
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Event group background colors */
+        .event-group-color-0 { background-color: #e0f2fe; border: 1px solid #90cdf4; } /* Blue light */
+        .event-group-color-1 { background-color: #ecfdf5; border: 1px solid #a7f3d0; } /* Green light */
+        .event-group-color-2 { background-color: #fffbeb; border: 1px solid #fcd34d; } /* Yellow light */
+        .event-group-color-3 { background-color: #fef2f2; border: 1px solid #fca5a5; } /* Red light */
+        .event-group-color-4 { background-color: #f3e8ff; border: 1px solid #d8b4fe; } /* Purple light */
+        .event-group-color-5 { background-color: #f0fdf4; border: 1px solid #86efac; } /* Emerald light */
+
+        /* Responsive adjustments for mobile */
+        @media (max-width: 640px) {
+            .status-circle {
+                width: 30px;
+                height: 30px;
+                font-size: 0.8rem;
+            }
+
+            /* On mobile, delete buttons remain visible */
+            .delete-btn {
+                opacity: 1; /* Always visible on mobile */
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-50 text-gray-800 min-h-screen">
+    <div id="app" class="p-4 md:p-8 max-w-7xl mx-auto">
+        <header class="mb-6">
+            <h1 class="text-3xl font-bold text-gray-900">イベント出欠確認</h1>
+            <p class="text-gray-600 mt-1">イベントへの参加可否をリアルタイムで共有できます</p>
+            <div class="mt-2 text-sm text-gray-500">
+                <span id="user-id-display">ユーザーID: ロード中...</span>
+            </div>
+        </header>
+
+        <!-- Legend (凡例) -->
+        <div class="bg-white p-4 rounded-xl shadow-sm mb-6 border border-gray-100">
+            <h2 class="text-lg font-semibold mb-3">凡例</h2>
+            <div class="flex flex-wrap gap-4">
+                <div class="flex items-center">
+                    <div class="status-circle maru-maru mr-2">◎</div>
+                    <span>参加可能でぜひ参加したい</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="status-circle maru mr-2">〇</div>
+                    <span>参加可能</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="status-circle sankaku mr-2">△</div>
+                    <span>検討中（一部可能・調整可能）</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="status-circle batsu mr-2">×</div>
+                    <span>対応不可</span>
+                </div>
+                <div class="flex items-center">
+                    <div class="status-circle hatena mr-2">？</div>
+                    <span>現段階だと未定</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons (操作ボタン) -->
+        <div class="flex flex-wrap gap-3 mb-6">
+            <!-- Add Member Button -->
+            <button id="add-member-btn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                メンバー追加
+            </button>
+            <button id="add-event-btn" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition-colors shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                イベント追加
+            </button>
+            <!-- Removed Save button as saving is now automatic -->
+        </div>
+
+        <!-- Attendance Table (出欠表) -->
+        <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+            <div class="overflow-x-auto custom-scrollbar">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead id="attendance-table-header">
+                        <!-- Table header will be dynamically generated by JavaScript -->
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200" id="attendance-table-body">
+                        <!-- Table content will be dynamically generated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Message when no data (データがない場合のメッセージ) -->
+            <div id="no-data-message" class="p-8 text-center text-gray-500 hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <p class="text-lg font-medium">データがありません</p>
+                <p class="mt-1">メンバーとイベントを追加してください</p>
+            </div>
+            
+            <!-- Loading Spinner (ローディングスピナー) -->
+            <div id="loading-spinner" class="flex justify-center items-center py-8 hidden">
+                <div class="loading-spinner"></div>
+                <p class="ml-3 text-gray-600">データを読み込み中...</p>
+            </div>
+        </div>
+
+        <!-- Save Confirmation Message (保存完了メッセージ) -->
+        <div id="save-message" class="fixed bottom-4 right-4 bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded shadow-md hidden">
+            <div class="flex">
+                <div class="py-1">
+                    <svg class="h-6 w-6 text-green-500 mr-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="font-bold">保存しました</p>
+                    <p class="text-sm">出欠情報が正常に保存されました。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Member Modal (メンバー追加モーダル) -->
+    <div id="add-member-modal" class="modal hidden">
+        <div class="modal-content scale-in">
+            <h3 class="text-xl font-bold mb-4">メンバーを追加</h3>
+            <form id="add-member-form">
+                <div class="mb-4">
+                    <label for="new-member-name" class="block text-sm font-medium text-gray-700 mb-1">名前</label>
+                    <input type="text" id="new-member-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" required>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" class="cancel-modal-btn bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors">
+                        キャンセル
+                    </button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors">
+                        追加する
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Event Modal (イベント追加モーダル) -->
+    <div id="add-event-modal" class="modal hidden">
+        <div class="modal-content scale-in">
+            <h3 class="text-xl font-bold mb-4">イベントを追加</h3>
+            <form id="add-event-form">
+                <div class="mb-4">
+                    <label for="new-event-name" class="block text-sm font-medium text-gray-700 mb-1">イベント名</label>
+                    <input type="text" id="new-event-name" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" required>
+                </div>
+                <div class="mb-4">
+                    <label for="new-event-date" class="block text-sm font-medium text-gray-700 mb-1">日付</label>
+                    <!-- Set type to text for Flatpickr application -->
+                    <input type="text" id="new-event-date" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="例: 8/15(木)" required>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">時間 (開始 - 終了)</label>
+                    <div class="flex gap-2">
+                        <input type="time" id="new-event-start-time" class="w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" required>
+                        <span class="flex items-center text-gray-500">-</span>
+                        <input type="time" id="new-event-end-time" class="w-1/2 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" required>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3">
+                    <button type="button" class="cancel-modal-btn bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors">
+                        キャンセル
+                    </button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-6 rounded-lg transition-colors">
+                        追加する
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Attendance Status Selection Modal (出欠選択モーダル) -->
+    <div id="status-modal" class="modal hidden">
+        <div class="modal-content scale-in">
+            <h3 class="text-xl font-bold mb-4">参加状況を選択</h3>
+            <p class="mb-6"><span id="modal-member-name" class="font-medium">メンバー</span>さんの<span id="modal-event-name" class="font-medium">イベント</span>への参加状況を選択してください</p>
+
+            <div class="grid grid-cols-5 gap-3 mb-6">
+                <button class="status-option flex flex-col items-center p-3 rounded-lg transition-colors hover:bg-green-50" data-status="maru-maru">
+                    <div class="status-circle maru-maru mb-2">◎</div>
+                    <span class="text-sm">ぜひ参加</span>
+                </button>
+                <button class="status-option flex flex-col items-center p-3 rounded-lg transition-colors hover:bg-green-50" data-status="maru">
+                    <div class="status-circle maru mb-2">〇</div>
+                    <span class="text-sm">参加可能</span>
+                </button>
+                <button class="status-option flex flex-col items-center p-3 rounded-lg transition-colors hover:bg-yellow-50" data-status="sankaku">
+                    <div class="status-circle sankaku mb-2">△</div>
+                    <span class="text-sm">検討中</span>
+                </button>
+                <button class="status-option flex flex-col items-center p-3 rounded-lg transition-colors hover:bg-red-50" data-status="batsu">
+                    <div class="status-circle batsu mb-2">×</div>
+                    <span class="text-sm">不可</span>
+                </button>
+                <button class="status-option flex flex-col items-center p-3 rounded-lg transition-colors hover:bg-gray-50" data-status="hatena">
+                    <div class="status-circle hatena mb-2">？</div>
+                    <span class="text-sm">未定</span>
+                </button>
+            </div>
+
+            <button class="cancel-modal-btn text-gray-600 hover:text-gray-800 font-medium transition-colors">
+                キャンセル
+            </button>
+
+            <input type="hidden" id="modal-row-index" value="">
+            <input type="hidden" id="modal-col-index" value="">
+        </div>
+    </div>
+
+    <!-- Delete Member Confirmation Modal (メンバー削除確認モーダル) -->
+    <div id="delete-member-modal" class="modal hidden">
+        <div class="modal-content scale-in">
+            <h3 class="text-xl font-bold mb-4">メンバーを削除</h3>
+            <p class="mb-6"><span id="delete-member-name" class="font-medium">メンバー</span>さんを削除してもよろしいですか？</p>
+
+            <div class="flex justify-center gap-3">
+                <button id="confirm-delete-member" class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-6 rounded-lg transition-colors">
+                    削除する
+                </button>
+                <button type="button" class="cancel-modal-btn bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors">
+                    キャンセル
+                </button>
+            </div>
+
+            <input type="hidden" id="delete-member-index" value="">
+        </div>
+    </div>
+
+    <!-- Delete Event Confirmation Modal (イベント削除確認モーダル) -->
+    <div id="delete-event-modal" class="modal hidden">
+        <div class="modal-content scale-in">
+            <h3 class="text-xl font-bold mb-4">イベントを削除</h3>
+            <p class="mb-6"><span id="delete-event-name" class="font-medium">イベント</span>を削除してもよろしいですか？</p>
+
+            <div class="flex justify-center gap-3">
+                <button id="confirm-delete-event" class="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-6 rounded-lg transition-colors">
+                    削除する
+                </button>
+                <button type="button" class="cancel-modal-btn bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors">
+                        キャンセル
+                    </button>
+                </div>
+                
+                <input type="hidden" id="delete-event-index" value="">
+            </div>
+        </div>
+        
+        <!-- Flatpickr JS -->
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+        <!-- Flatpickr Japanese localization -->
+        <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ja.js"></script>
+        <!-- Firebase SDKs -->
+        <script type="module">
+            // Import necessary Firebase functions
+            import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+            import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+            import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+            // Data management arrays
+            let members = []; // Array to store member objects
+            let events = []; // Array to store event objects
+            let attendanceData = []; // 2D array to store attendance status (member x event)
+
+            // Firebase Global Variables (Provided by Canvas environment)
+            // __app_id: The current app ID as a string. MANDATORY.
+            // __firebase_config: Firebase config as a string. MANDATORY.
+            // __initial_auth_token: Firebase custom auth token string. MANDATORY.
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+            // Initialize Firebase services
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            const auth = getAuth(app);
+
+            let currentUserId = null; // Stores the current user's UID
+            let isAuthReady = false; // Flag to ensure Firestore operations happen after authentication
+
+            // Get DOM elements
+            const attendanceTableHeader = document.getElementById('attendance-table-header');
+            const attendanceTableBody = document.getElementById('attendance-table-body');
+            const noDataMessage = document.getElementById('no-data-message');
+            const addMemberBtn = document.getElementById('add-member-btn'); // Re-enabled
+            const addEventBtn = document.getElementById('add-event-btn');
+            // Removed saveBtn as saving is now automatic
+            // const saveBtn = document.getElementById('save-btn');
+            const addMemberModal = document.getElementById('add-member-modal'); // Re-enabled
+            const addEventModal = document.getElementById('add-event-modal');
+            const statusModal = document.getElementById('status-modal');
+            const deleteMemberModal = document.getElementById('delete-member-modal'); // Re-enabled
+            const deleteEventModal = document.getElementById('delete-event-modal');
+            const saveMessage = document.getElementById('save-message');
+            const addMemberForm = document.getElementById('add-member-form'); // Re-enabled
+            const addEventForm = document.getElementById('add-event-form');
+            const cancelModalBtns = document.querySelectorAll('.cancel-modal-btn');
+            const statusOptions = document.querySelectorAll('.status-option');
+            const confirmDeleteMemberBtn = document.getElementById('confirm-delete-member'); // Re-enabled
+            const confirmDeleteEventBtn = document.getElementById('confirm-delete-event');
+            const userIdDisplay = document.getElementById('user-id-display');
+            const loadingSpinner = document.getElementById('loading-spinner');
+
+            // Flatpickr instance holder
+            let flatpickrInstance;
+
+            // Firestore document reference for the current user's data
+            let dataDocRef;
+
+            // Observe Firebase authentication state changes
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    // User is signed in
+                    currentUserId = user.uid;
+                } else {
+                    // User is signed out
+                    // If initialAuthToken is defined, sign in with custom token
+                    if (initialAuthToken) {
+                        try {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                            currentUserId = auth.currentUser.uid;
+                        } catch (error) {
+                            console.error("Error signing in with custom token:", error);
+                            // Fallback to anonymous sign-in if custom token fails
+                            await signInAnonymously(auth);
+                            currentUserId = auth.currentUser.uid;
+                        }
+                    } else {
+                        // If no initialAuthToken, sign in anonymously
+                        await signInAnonymously(auth);
+                        currentUserId = auth.currentUser.uid;
+                    }
+                }
+                userIdDisplay.textContent = `ユーザーID: ${currentUserId}`; // Display user ID
+                // Set the Firestore document reference specific to the user
+                dataDocRef = doc(db, `artifacts/${appId}/users/${currentUserId}/attendanceApp/data`);
+                isAuthReady = true; // Mark authentication as ready
+                fetchAndListenData(); // Fetch and listen to data once auth is ready
+            });
+
+            // Renders the entire attendance table
+            function renderTable() {
+                // Display message if no members or events exist
+                if (members.length === 0 && events.length === 0) {
+                    noDataMessage.classList.remove('hidden');
+                    noDataMessage.querySelector('p:last-child').textContent = 'メンバーとイベントを追加してください';
+                    attendanceTableHeader.innerHTML = ''; // Clear header
+                    attendanceTableBody.innerHTML = ''; // Clear body
+                    return;
+                }
+                // If data exists, hide the no data message
+                noDataMessage.classList.add('hidden');
+
+                // Render table header and body
+                renderTableHeader();
+                renderTableBody();
+            }
+
+            // Map to assign consistent colors to event groups
+            const eventColorMap = new Map();
+            let nextColorIndex = 0;
+            const colorClasses = [
+                'event-group-color-0',
+                'event-group-color-1',
+                'event-group-color-2',
+                'event-group-color-3',
+                'event-group-color-4',
+                'event-group-color-5'
+            ];
+
+            // Get a unique color class for an event group (based on event name)
+            function getEventGroupColorClass(eventName) {
+                if (!eventColorMap.has(eventName)) {
+                    eventColorMap.set(eventName, colorClasses[nextColorIndex % colorClasses.length]);
+                    nextColorIndex++;
+                }
+                return eventColorMap.get(eventName);
+            }
+
+            // Renders the table header
+            function renderTableHeader() {
+                attendanceTableHeader.innerHTML = ''; // Clear previous header
+
+                const headerRow = document.createElement('tr');
+                headerRow.className = 'bg-gray-50';
+
+                // Header for member names column
+                const memberHeader = document.createElement('th');
+                memberHeader.className = 'sticky-header sticky-first-col px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-gray-200';
+                memberHeader.textContent = 'メンバー';
+                headerRow.appendChild(memberHeader);
+
+                // Headers for each event column
+                events.forEach((event, index) => {
+                    const eventHeader = document.createElement('th');
+                    const groupColorClass = getEventGroupColorClass(event.name); // Get group color
+                    eventHeader.className = `sticky-header px-6 py-3 text-center text-xs font-medium text-gray-700 uppercase tracking-wider border-r border-gray-200 min-w-[180px] relative ${groupColorClass}`;
+
+                    // Delete event button
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'delete-btn absolute top-1 right-1 text-red-500 hover:text-red-700 transition-colors';
+                    deleteBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    `;
+                    deleteBtn.dataset.index = index;
+                    deleteBtn.addEventListener('click', function(e) {
+                        e.stopPropagation(); // Prevent sorting/other event on header click
+                        openDeleteEventModal(index);
+                    });
+
+                    // Event details in the header, now including start and end times
+                    eventHeader.innerHTML = `<div class="flex flex-col items-center justify-center">${event.name}<br>${event.date} ${event.startTime}-${event.endTime}</div>`;
+                    eventHeader.appendChild(deleteBtn);
+                    headerRow.appendChild(eventHeader);
+                });
+
+                attendanceTableHeader.appendChild(headerRow);
+            }
+
+            // Renders the table body
+            function renderTableBody() {
+                attendanceTableBody.innerHTML = ''; // Clear previous body
+
+                members.forEach((member, rowIndex) => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-50 transition-colors';
+
+                    // Cell for member name
+                    const nameCell = document.createElement('td');
+                    nameCell.className = 'sticky-first-col px-6 py-4 whitespace-nowrap border-r border-gray-200 relative';
+                    
+                    nameCell.innerHTML = `
+                        <div class="flex items-center">
+                            <div class="text-sm font-medium text-gray-900">${member.name}</div>
+                        </div>
+                    `;
+                    // Re-enabled member delete button
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'delete-btn absolute top-1/2 right-2 transform -translate-y-1/2 text-red-500 hover:text-red-700 transition-colors';
+                    deleteBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    `;
+                    deleteBtn.dataset.index = rowIndex;
+                    deleteBtn.addEventListener('click', function(e) {
+                        e.stopPropagation(); // Prevent click event on cell
+                        openDeleteMemberModal(rowIndex);
+                    });
+                    nameCell.appendChild(deleteBtn);
+                    row.appendChild(nameCell);
+
+                    // Cells for each event's attendance status
+                    events.forEach((event, colIndex) => {
+                        const statusCell = document.createElement('td');
+                        const groupColorClass = getEventGroupColorClass(event.name); // Get group color
+                        statusCell.className = `px-6 py-4 whitespace-nowrap text-center border-r border-gray-200 ${groupColorClass}`;
+
+                        // Get current status, default to 'hatena' if not set
+                        const status = attendanceData[rowIndex] && attendanceData[rowIndex][colIndex] ? attendanceData[rowIndex][colIndex] : 'hatena';
+                        let statusSymbol = '';
+                        let statusClass = '';
+
+                        // Determine symbol and class based on status
+                        switch(status) {
+                            case 'maru-maru':
+                                statusSymbol = '◎';
+                                statusClass = 'maru-maru';
+                                break;
+                            case 'maru':
+                                statusSymbol = '〇';
+                                statusClass = 'maru';
+                                break;
+                            case 'sankaku':
+                                statusSymbol = '△';
+                                statusClass = 'sankaku';
+                                break;
+                            case 'batsu':
+                                statusSymbol = '×';
+                                statusClass = 'batsu';
+                                break;
+                            case 'hatena':
+                                statusSymbol = '？';
+                                statusClass = 'hatena';
+                                break;
+                        }
+
+                        statusCell.innerHTML = `
+                            <div class="status-cell" data-row="${rowIndex}" data-col="${colIndex}">
+                                <div class="status-circle ${statusClass}">${statusSymbol}</div>
+                            </div>
+                        `;
+
+                        row.appendChild(statusCell);
+                    });
+
+                    attendanceTableBody.appendChild(row);
+                });
+
+                // Add click event listeners to all status cells
+                document.querySelectorAll('.status-cell').forEach(cell => {
+                    cell.addEventListener('click', function() {
+                        const rowIndex = this.dataset.row;
+                        const colIndex = this.dataset.col;
+                        openStatusModal(rowIndex, colIndex);
+                    });
+                });
+            }
+            
+            // Synchronize the dimensions of attendanceData with members and events arrays
+            function syncAttendanceDataDimensions() {
+                // Adjust rows based on members count
+                while (attendanceData.length < members.length) {
+                    attendanceData.push(new Array(events.length).fill('hatena')); // Add new row filled with 'hatena'
+                }
+                if (attendanceData.length > members.length) {
+                    attendanceData.splice(members.length); // Remove excess rows
+                }
+
+                // Adjust columns in each row based on events count
+                for (let i = 0; i < attendanceData.length; i++) {
+                    // Ensure the row exists before accessing its length
+                    if (!attendanceData[i]) {
+                        attendanceData[i] = []; // Initialize if row is somehow missing
+                    }
+                    while (attendanceData[i].length < events.length) {
+                        attendanceData[i].push('hatena'); // Add new column filled with 'hatena'
+                    }
+                    if (attendanceData[i].length > events.length) {
+                        attendanceData[i].splice(events.length); // Remove excess columns
+                    }
+                }
+            }
+
+            // Fetches data from Firestore and sets up a real-time listener
+            function fetchAndListenData() {
+                // Skip if authentication or user ID is not ready
+                if (!isAuthReady || !currentUserId) {
+                    console.log("Authentication or User ID not ready. Skipping data fetch.");
+                    return;
+                }
+
+                loadingSpinner.classList.remove('hidden'); // Show loading spinner
+
+                onSnapshot(dataDocRef, (docSnap) => {
+                    loadingSpinner.classList.add('hidden'); // Hide spinner once data is loaded
+
+                    if (docSnap.exists()) {
+                        // Data exists, load it
+                        const data = docSnap.data();
+                        members = data.members || []; // Load members from Firestore
+                        events = data.events || [];
+                        // Parse JSON string back to 2D array
+                        attendanceData = data.attendance ? JSON.parse(data.attendance) : [];
+
+                        // Ensure attendanceData dimensions match the loaded members and events
+                        syncAttendanceDataDimensions();
+                        renderTable(); // Re-render table with new data
+                    } else {
+                        console.log("No data found in Firestore. Setting initial data.");
+                        members = [
+                            { id: crypto.randomUUID(), name: '山田太郎' },
+                            { id: crypto.randomUUID(), name: '佐藤花子' },
+                            { id: crypto.randomUUID(), name: '鈴木一郎' },
+                            { id: crypto.randomUUID(), name: '田中美咲' },
+                            { id: crypto.randomUUID(), name: '高橋健太' }
+                        ];
+                        events = [
+                            { id: crypto.randomUUID(), name: 'MMP発表会', date: '8/2(土)', startTime: '12:00', endTime: '15:00' },
+                            { id: crypto.randomUUID(), name: 'MMP発表会', date: '8/2(土)', startTime: '15:00', endTime: '18:00' },
+                            { id: crypto.randomUUID(), name: '万博視察', date: '8/10(日)', startTime: '10:00', endTime: '13:00' },
+                            { id: crypto.randomUUID(), name: '万博視察', date: '8/10(日)', startTime: '14:00', endTime: '17:00' }
+                        ];
+                        // Initialize attendanceData to match initial members and events
+                        syncAttendanceDataDimensions();
+                        saveDataToFirestore(); // Save initial data to Firestore
+                    }
+                }, (error) => {
+                    loadingSpinner.classList.add('hidden');
+                    console.error("Error fetching Firestore data:", error);
+                });
+            }
+
+            // Saves the current data (members, events, attendanceData) to Firestore
+            async function saveDataToFirestore() {
+                // Prevent saving if authentication or user ID is not ready
+                if (!isAuthReady || !currentUserId) {
+                    console.log("Authentication or User ID not ready. Cannot save data.");
+                    return;
+                }
+                try {
+                    // Ensure data consistency before saving
+                    syncAttendanceDataDimensions();
+
+                    await setDoc(dataDocRef, {
+                        members: members,
+                        events: events,
+                        attendance: JSON.stringify(attendanceData)
+                    });
+                    console.log("Data successfully saved to Firestore!");
+                    // Show save confirmation message
+                    saveMessage.classList.remove('hidden');
+                    setTimeout(() => {
+                        saveMessage.classList.add('hidden');
+                    }, 3000); // Hide after 3 seconds
+                } catch (error) {
+                    console.error("Error saving data to Firestore:", error);
+                    // Optionally display an error message to the user
+                }
+            }
+
+            // Sets up all event listeners for buttons and forms
+            function setupEventListeners() {
+                // Re-enabled Add member button click listener
+                addMemberBtn.addEventListener('click', function() {
+                    addMemberModal.classList.remove('hidden');
+                    document.getElementById('new-member-name').value = ''; // Clear input field
+                });
+
+                // Add event button click
+                addEventBtn.addEventListener('click', function() {
+                    addEventModal.classList.remove('hidden');
+                    // Clear and close Flatpickr instance and time inputs when modal opens
+                    if (flatpickrInstance) {
+                        flatpickrInstance.setDate(null);
+                        flatpickrInstance.close();
+                    }
+                    document.getElementById('new-event-start-time').value = '';
+                    document.getElementById('new-event-end-time').value = '';
+                });
+
+                // Close modal buttons
+                cancelModalBtns.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        addMemberModal.classList.add('hidden');
+                        addEventModal.classList.add('hidden');
+                        statusModal.classList.add('hidden');
+                        deleteMemberModal.classList.add('hidden');
+                        deleteEventModal.classList.add('hidden');
+                    });
+                });
+
+                // Close modal when clicking outside the content
+                [addMemberModal, addEventModal, statusModal, deleteMemberModal, deleteEventModal].forEach(modal => {
+                    modal.addEventListener('click', function(e) {
+                        if (e.target === modal) {
+                            modal.classList.add('hidden');
+                        }
+                    });
+                });
+
+                // Re-enabled Add member form submission listener
+                addMemberForm.addEventListener('submit', async function(e) {
+                    e.preventDefault(); // Prevent default form submission
+
+                    const newMemberName = document.getElementById('new-member-name').value.trim();
+                    if (!newMemberName) return; // Do nothing if name is empty
+
+                    // Create new member object with unique ID
+                    const newMember = {
+                        id: crypto.randomUUID(),
+                        name: newMemberName
+                    };
+
+                    members.push(newMember); // Add new member
+                    syncAttendanceDataDimensions(); // Adjust attendanceData rows
+                    await saveDataToFirestore(); // Save to Firestore
+
+                    addMemberModal.classList.add('hidden'); // Hide modal
+                    document.getElementById('new-member-name').value = ''; // Clear input
+                });
+
+                // Add event form submission
+                addEventForm.addEventListener('submit', async function(e) {
+                    e.preventDefault(); // Prevent default form submission
+
+                    const newEventName = document.getElementById('new-event-name').value.trim();
+                    const newEventDate = flatpickrInstance.input.value; // Get date from Flatpickr
+                    const newEventStartTime = document.getElementById('new-event-start-time').value.trim();
+                    const newEventEndTime = document.getElementById('new-event-end-time').value.trim();
+
+
+                    if (!newEventName || !newEventDate || !newEventStartTime || !newEventEndTime) return; // Do nothing if fields are empty
+
+                    // Create new event object with unique ID and start/end times
+                    const newEvent = {
+                        id: crypto.randomUUID(),
+                        name: newEventName,
+                        date: newEventDate,
+                        startTime: newEventStartTime,
+                        endTime: newEventEndTime
+                    };
+
+                    events.push(newEvent); // Add new event
+                    syncAttendanceDataDimensions(); // Adjust attendanceData columns
+                    await saveDataToFirestore(); // Save to Firestore
+
+                    // Note: renderTable() is implicitly called by onSnapshot after saveDataToFirestore()
+                    addEventModal.classList.add('hidden'); // Hide modal
+                    document.getElementById('new-event-name').value = ''; // Clear input
+                    document.getElementById('new-event-start-time').value = ''; // Clear start time
+                    document.getElementById('new-event-end-time').value = ''; // Clear end time
+                    flatpickrInstance.setDate(null); // Clear Flatpickr date
+                });
+
+                // Attendance status option selection
+                statusOptions.forEach(option => {
+                    option.addEventListener('click', async function() {
+                        const rowIndex = document.getElementById('modal-row-index').value;
+                        const colIndex = document.getElementById('modal-col-index').value;
+                        const newStatus = this.dataset.status;
+
+                        // Ensure the row exists before updating
+                        if (attendanceData[rowIndex]) {
+                            attendanceData[rowIndex][colIndex] = newStatus; // Update status
+                        } else {
+                            console.warn("Target row does not exist for update.");
+                            return;
+                        }
+                        
+                        await saveDataToFirestore(); // Save to Firestore
+                        statusModal.classList.add('hidden'); // Hide modal
+                    });
+                });
+
+                // Re-enabled confirm delete member button click listener
+                confirmDeleteMemberBtn.addEventListener('click', async function() {
+                    const memberIndex = parseInt(document.getElementById('delete-member-index').value);
+
+                    // Remove member from array
+                    members.splice(memberIndex, 1);
+                    // Remove corresponding row from attendanceData
+                    attendanceData.splice(memberIndex, 1);
+                    
+                    await saveDataToFirestore(); // Save to Firestore
+                    deleteMemberModal.classList.add('hidden'); // Hide modal
+                });
+
+                // Confirm delete event button click
+                confirmDeleteEventBtn.addEventListener('click', async function() {
+                    const eventIndex = parseInt(document.getElementById('delete-event-index').value);
+
+                    // Remove event from array
+                    events.splice(eventIndex, 1);
+
+                    // Remove corresponding column from attendanceData for all rows
+                    for (let i = 0; i < attendanceData.length; i++) {
+                        if (attendanceData[i]) { // Ensure row exists
+                            attendanceData[i].splice(eventIndex, 1);
+                        }
+                    }
+                    
+                    await saveDataToFirestore(); // Save to Firestore
+                    deleteEventModal.classList.add('hidden'); // Hide modal
+                });
+            }
+
+            // Opens the attendance status selection modal
+            function openStatusModal(rowIndex, colIndex) {
+                const member = members[rowIndex];
+                const event = events[colIndex];
+                
+                // Validate if member and event data exist
+                if (!member || !event) {
+                    console.warn("Member or event data not found. Cannot open modal.");
+                    return;
+                }
+
+                // Populate modal content with start and end times
+                document.getElementById('modal-member-name').textContent = member.name;
+                document.getElementById('modal-event-name').textContent = `${event.name} (${event.date} ${event.startTime}-${event.endTime})`;
+                document.getElementById('modal-row-index').value = rowIndex;
+                document.getElementById('modal-col-index').value = colIndex;
+
+                // Highlight current status in the modal
+                const currentStatus = attendanceData[rowIndex] && attendanceData[rowIndex][colIndex] ? attendanceData[rowIndex][colIndex] : 'hatena';
+                statusOptions.forEach(option => {
+                    if (option.dataset.status === currentStatus) {
+                        option.classList.add('ring-2', 'ring-blue-500'); // Add ring for highlight
+                    } else {
+                        option.classList.remove('ring-2', 'ring-blue-500'); // Remove ring
+                    }
+                });
+
+                statusModal.classList.remove('hidden'); // Show modal
+            }
+
+            // Re-enabled openDeleteMemberModal function
+            function openDeleteMemberModal(memberIndex) {
+                const member = members[memberIndex];
+                if (!member) {
+                    console.warn("Member to delete not found.");
+                    return;
+                }
+                document.getElementById('delete-member-name').textContent = member.name;
+                document.getElementById('delete-member-index').value = memberIndex;
+                deleteMemberModal.classList.remove('hidden'); // Show modal
+            }
+
+            // Opens the delete event confirmation modal
+            function openDeleteEventModal(eventIndex) {
+                const event = events[eventIndex];
+                if (!event) {
+                    console.warn("Event to delete not found.");
+                    return;
+                }
+                document.getElementById('delete-event-name').textContent = `${event.name} (${event.date} ${event.startTime}-${event.endTime})`;
+                document.getElementById('delete-event-index').value = eventIndex;
+                deleteEventModal.classList.remove('hidden'); // Show modal
+            }
+
+            // Initialization on DOMContentLoaded
+            document.addEventListener('DOMContentLoaded', () => {
+                setupEventListeners(); // Set up all event listeners
+                // Initialize Flatpickr for the date input field
+                flatpickrInstance = flatpickr("#new-event-date", {
+                    locale: "ja", // Set locale to Japanese
+                    dateFormat: "Y/m/d(D)", // Custom date format (e.g., 2023/08/15(火))
+                    altInput: true, // Show user-friendly date in input
+                    altFormat: "Y/m/d(D)",
+                    weekNumbers: true, // Display week numbers
+                    onReady: function(selectedDates, dateStr, instance) {
+                        // Customize weekday display for Japanese
+                        instance.l10n.weekdays.shorthand = ["日", "月", "火", "水", "木", "金", "土"];
+                        instance.l10n.weekdays.longhand = ["日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"];
+                    }
+                });
+            });
+        </script>
+    </body>
+    </html>
