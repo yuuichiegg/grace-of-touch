@@ -1,311 +1,299 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>eVTOL AR ビューア</title>
-  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Noto Sans JP', sans-serif; }
-    model-viewer {
-      width: 100%;
-      height: 60vh;
-      min-height: 300px;
-      background-color: #f1f5f9;
-      border-radius: 0.75rem;
-      --poster-color: transparent;
-    }
-    model-viewer::part(default-ar-button) {
-      bottom: 16px;
-      right: 16px;
-      border-radius: 9999px;
-    }
-    .loading-overlay {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: rgba(241, 245, 249, 0.85);
-      border-radius: 0.75rem;
-      pointer-events: none;
-      z-index: 10;
-    }
-    .spinner {
-      width: 48px;
-      height: 48px;
-      border: 4px solid #cbd5e1;
-      border-top-color: #3b82f6;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .tab-active {
-      background-color: #3b82f6;
-      color: white;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>eVTOL AR Viewer - Max Recognition</title>
+
+    <!-- A-Frame 1.4.2 (SRI Secured) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/aframe/1.4.2/aframe.min.js" integrity="sha512-Bne4Xw8QHgZz2V4A/M8zG5QkH6XbrZ4/qGhhkE6yW0LofE//yo1MkVmS11L1bci2j1JusvIfj3D57u2E1D/wA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+    <!-- glTFアニメーション再生用（モデル導入時に必要） -->
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
+
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+
+        a-scene, a-scene canvas {
+            position: fixed !important; top: 0 !important; left: 0 !important;
+            width: 100vw !important; height: 100vh !important; z-index: 10;
+        }
+        .a-enter-vr-button { display: none !important; }
+
+        /* AR.js生成videoに対するiOS黒画面対策（これが無いと背景が映りません） */
+        video, #arjs-video {
+            position: fixed !important; top: 0 !important; left: 0 !important;
+            width: 100vw !important; height: 100vh !important;
+            object-fit: cover !important; z-index: 1 !important;
+            pointer-events: none;
+        }
+
+        /* ── スタートアップ画面 ── */
+        #startup-screen {
+            position: fixed; inset: 0;
+            background: #0f172a; z-index: 99999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            color: #f8fafc; text-align: center; padding: 24px;
+            transition: opacity 0.5s ease;
+        }
+        #startup-screen h1 { font-size: 1.4rem; color: #38bdf8; margin-bottom: 12px; }
+        #startup-screen p  { font-size: 0.9rem; line-height: 1.65; color: #cbd5e1; margin-bottom: 20px; }
+
+        #start-btn {
+            background: #38bdf8; color: #0f172a; border: none;
+            padding: 16px 40px; font-size: 1.1rem; font-weight: bold;
+            border-radius: 99px; cursor: pointer;
+            box-shadow: 0 4px 20px rgba(56,189,248,0.45);
+            animation: pulse 2s infinite; pointer-events: all;
+        }
+        #show-marker-btn {
+            margin-top: 16px; background: transparent; color: #38bdf8;
+            border: 1.5px solid #38bdf8; padding: 12px 32px;
+            font-size: 0.95rem; font-weight: 600; border-radius: 99px; cursor: pointer;
+        }
+        @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+        /* ── HIROマーカーモーダル ── */
+        #marker-modal {
+            position: fixed; inset: 0; z-index: 999999;
+            background: rgba(0,0,0,0.88); display: none; flex-direction: column;
+            align-items: center; justify-content: center; padding: 24px;
+        }
+        #marker-modal.open { display: flex; }
+        #marker-modal h2 { color: #38bdf8; font-size: 1.1rem; margin-bottom: 6px; }
+        #marker-modal p  { color: #cbd5e1; font-size: 0.82rem; margin-bottom: 18px; text-align: center; line-height: 1.6; }
+
+        #hiro-marker-wrapper {
+            background: #fff; padding: 20px; border-radius: 8px;
+            box-shadow: 0 0 40px rgba(56,189,248,0.3); margin-bottom: 20px;
+        }
+        .hiro-img { width: 200px; height: 200px; display: block; object-fit: contain; }
+
+        .marker-btn-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+        .modal-btn {
+            padding: 12px 24px; border-radius: 99px; font-size: 0.9rem; font-weight: 600;
+            cursor: pointer; border: none;
+        }
+        .modal-btn.primary   { background: #38bdf8; color: #0f172a; }
+        .modal-btn.secondary { background: transparent; color: #38bdf8; border: 1.5px solid #38bdf8; }
+
+        /* ── UIレイヤー ── */
+        #ui-layer { position: fixed; inset: 0; pointer-events: none; z-index: 9999; display: none; }
+        #status-bar {
+            position: fixed; top: max(16px, env(safe-area-inset-top, 16px));
+            left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.82); color: #38bdf8;
+            padding: 10px 22px; border-radius: 99px; font-size: 0.85rem; font-weight: 600;
+            white-space: nowrap; border: 1px solid rgba(56,189,248,0.45); transition: color 0.3s;
+        }
+        #marker-hint {
+            position: fixed; bottom: max(80px, calc(env(safe-area-inset-bottom,0px) + 80px));
+            left: 20px; right: 20px; background: rgba(0,0,0,0.78); color: #fff;
+            padding: 14px 18px; border-radius: 14px; text-align: center;
+            font-size: 0.88rem; border: 1px solid rgba(56,189,248,0.3); pointer-events: none;
+        }
+        #show-marker-fab {
+            position: fixed; bottom: max(20px, env(safe-area-inset-bottom,20px)); right: 20px;
+            width: 56px; height: 56px; border-radius: 50%; background: #38bdf8; color: #0f172a;
+            border: none; font-size: 1.6rem; font-weight: bold; cursor: pointer; pointer-events: all;
+            box-shadow: 0 4px 20px rgba(56,189,248,0.55); display: flex; align-items: center; justify-content: center;
+        }
+
+        /* 印刷用CSS最適化 */
+        @media print {
+            body > *:not(#print-area) { display: none !important; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            #print-area {
+                display: flex !important; flex-direction: column; align-items: center;
+                padding: 40px; font-family: sans-serif; text-align: center;
+            }
+            #print-area h2 { font-size: 1.4rem; margin-bottom: 8px; color: #000; }
+            #print-area p  { font-size: 0.85rem; margin-bottom: 40px; color: #333; }
+            .hiro-img-print { width: 120mm; height: 120mm; display: block; }
+        }
+    </style>
 </head>
-<body class="bg-slate-100 min-h-screen">
+<body>
 
-  <!-- ヘッダー -->
-  <header class="bg-white shadow-sm sticky top-0 z-20">
-    <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div>
-        <h1 class="text-lg font-bold text-slate-800">eVTOL AR ビューア</h1>
-        <p class="text-xs text-slate-500">電動垂直離着陸機 3Dモデル</p>
-      </div>
-      <a href="main" class="text-sm text-blue-600 hover:underline flex items-center gap-1">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z" clip-rule="evenodd"/>
-        </svg>
-        出欠確認アプリ
-      </a>
+<div id="print-area" style="display:none;">
+    <h2>HIROマーカー — eVTOL AR Viewer</h2>
+    <p>このページを印刷し、平らな場所に置いてARカメラを向けてください。</p>
+    <img src="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png" alt="HIRO Marker" class="hiro-img-print" crossorigin="anonymous">
+</div>
+
+<div id="startup-screen">
+    <h1>✈️ eVTOL AR Viewer</h1>
+    <p>カメラを許可してARを開始してください。<br>HIROマーカーにスマホをかざすと<br>eVTOLがバーティポートから離着陸します。</p>
+    <button id="start-btn">▶ ARカメラを起動</button>
+    <button id="show-marker-btn">📄 HIROマーカーを表示/印刷</button>
+</div>
+
+<div id="marker-modal">
+    <h2>📄 HIROマーカー</h2>
+    <p>別のスマホ・PCに表示するか、印刷して<br>平らな場所に置いてください。</p>
+    <div id="hiro-marker-wrapper">
+        <img src="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png" alt="HIRO Marker" class="hiro-img" crossorigin="anonymous">
     </div>
-  </header>
-
-  <main class="max-w-2xl mx-auto px-4 py-6 space-y-5">
-
-    <!-- エラーバナー -->
-    <div id="errorBanner" class="hidden bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700">
-      <p class="font-semibold mb-1">モデルファイルが見つかりません</p>
-      <p>
-        <code class="bg-red-100 px-1 rounded">assets/</code> フォルダに
-        <code class="bg-red-100 px-1 rounded">joby.glb</code> または
-        <code class="bg-red-100 px-1 rounded">skydrive.glb</code> を配置してください。<br>
-        詳細は <code class="bg-red-100 px-1 rounded">assets/README.md</code> を参照。
-      </p>
+    <div class="marker-btn-row">
+        <button class="modal-btn primary"   id="print-btn">🖨️ 印刷する</button>
+        <button class="modal-btn secondary" id="close-modal-btn">✕ 閉じる</button>
     </div>
+</div>
 
-    <!-- モデル選択タブ -->
-    <div class="flex gap-2 bg-white p-1.5 rounded-xl shadow-sm">
-      <button id="tab-joby" onclick="switchModel('joby')"
-        class="flex-1 py-2.5 px-3 rounded-lg text-sm font-medium transition-colors tab-active focus:outline-none">
-        <span class="block font-semibold">Joby S4</span>
-        <span class="text-xs opacity-80">Joby Aviation</span>
-      </button>
-      <button id="tab-skydrive" onclick="switchModel('skydrive')"
-        class="flex-1 py-2.5 px-3 rounded-lg text-sm font-medium transition-colors text-slate-600 hover:bg-slate-100 focus:outline-none">
-        <span class="block font-semibold">SkyDrive SD-05</span>
-        <span class="text-xs opacity-80">SkyDrive Inc.</span>
-      </button>
-    </div>
+<div id="ui-layer">
+    <div id="status-bar">📷 マーカーを探しています...</div>
+    <div id="marker-hint">📄 HIROマーカーにスマホを向けてください</div>
+    <button id="show-marker-fab" title="HIROマーカーを表示">📄</button>
+</div>
 
-    <!-- 3Dモデル表示エリア -->
-    <div class="relative">
-      <model-viewer
-        id="viewer"
-        src="assets/joby.glb"
-        alt="Joby S4 eVTOL"
-        ar
-        ar-modes="webxr scene-viewer quick-look"
-        ar-scale="auto"
-        camera-controls
-        auto-rotate
-        animation-name="RotorSpin"
-        autoplay
-        shadow-intensity="1"
-        environment-image="neutral"
-        exposure="1">
-        <!-- ARボタンのカスタムスロット -->
-        <button slot="ar-button"
-          class="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-4 rounded-full shadow-lg flex items-center gap-2 transition-colors">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M2 12L12 2l10 10M5 9v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V9"/>
-          </svg>
-          ARで見る
-        </button>
-        <!-- ローディングオーバーレイ -->
-        <div class="loading-overlay" slot="progress-bar" id="loadingOverlay">
-          <div class="spinner mb-3"></div>
-          <p class="text-sm text-slate-500">モデル読み込み中…</p>
-        </div>
-      </model-viewer>
-    </div>
+<!-- 🚀 修正点1: detectionModeをmonoのみにし、不要属性を削除。さらに解析解像度を引き上げ -->
+<a-scene
+    vr-mode-ui="enabled: false"
+    arjs="sourceType: webcam; debugUIEnabled: true; detectionMode: mono; trackingMethod: best; sourceWidth: 1280; sourceHeight: 960; displayWidth: 1280; displayHeight: 960;"
+    renderer="antialias: true; alpha: true; precision: medium; colorManagement: true;"
+    loading-screen="enabled: false">
 
-    <!-- モデル情報カード -->
-    <div class="bg-white rounded-xl shadow-sm p-4 space-y-3">
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <h2 id="modelName" class="text-base font-bold text-slate-800">Joby S4</h2>
-          <p id="modelMaker" class="text-xs text-slate-500">Joby Aviation（米国）</p>
-        </div>
-        <span id="modelBadge"
-          class="shrink-0 bg-blue-100 text-blue-700 text-xs font-semibold px-2.5 py-1 rounded-full">
-          6 ローター
-        </span>
-      </div>
-      <p id="modelDesc" class="text-sm text-slate-600 leading-relaxed">
-        6枚のティルトローターを搭載する電動垂直離着陸機。最大巡航速度 320 km/h、航続距離 240 km を目標に開発中。
-        静粛性に優れ、都市内エアモビリティ向けに設計されている。
-      </p>
-      <dl class="grid grid-cols-3 gap-2 text-center text-xs border-t pt-3">
-        <div>
-          <dt class="text-slate-400 mb-0.5">最高速度</dt>
-          <dd id="specSpeed" class="font-semibold text-slate-700">320 km/h</dd>
-        </div>
-        <div>
-          <dt class="text-slate-400 mb-0.5">航続距離</dt>
-          <dd id="specRange" class="font-semibold text-slate-700">240 km</dd>
-        </div>
-        <div>
-          <dt class="text-slate-400 mb-0.5">定員</dt>
-          <dd id="specCapacity" class="font-semibold text-slate-700">4名</dd>
-        </div>
-      </dl>
-    </div>
+    <a-assets timeout="30000"></a-assets>
 
-    <!-- コントロールパネル -->
-    <div class="bg-white rounded-xl shadow-sm p-4">
-      <h3 class="text-sm font-semibold text-slate-700 mb-3">ローターアニメーション</h3>
-      <div class="flex gap-2">
-        <button id="btnPlay"
-          onclick="playRotor()"
-          class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/>
-          </svg>
-          再生
-        </button>
-        <button id="btnPause"
-          onclick="pauseRotor()"
-          class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium py-2 rounded-lg transition-colors flex items-center justify-center gap-1.5">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
-          </svg>
-          停止
-        </button>
-      </div>
-      <p id="animWarning" class="hidden mt-2 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-        モデル内に "RotorSpin" アニメーションが見つかりません。
-        Blender でエクスポートする際にアクション名を "RotorSpin" に設定してください。
-      </p>
-    </div>
+    <!-- 🚀 修正点2: type="pattern" を明示 -->
+    <a-marker type="pattern" preset="hiro" emitevents="true" id="main-marker">
 
-    <!-- AR 操作ガイド -->
-    <div class="bg-white rounded-xl shadow-sm p-4">
-      <h3 class="text-sm font-semibold text-slate-700 mb-3">AR / 3D 操作方法</h3>
-      <ul class="space-y-2 text-sm text-slate-600">
-        <li class="flex gap-2">
-          <span class="text-blue-500 mt-0.5">●</span>
-          <span><strong>3D 回転：</strong>1本指でドラッグ</span>
-        </li>
-        <li class="flex gap-2">
-          <span class="text-blue-500 mt-0.5">●</span>
-          <span><strong>ズーム：</strong>2本指でピンチ / マウスホイール</span>
-        </li>
-        <li class="flex gap-2">
-          <span class="text-blue-500 mt-0.5">●</span>
-          <span><strong>AR表示：</strong>「ARで見る」ボタンをタップ（対応端末のみ）</span>
-        </li>
-        <li class="flex gap-2">
-          <span class="text-blue-500 mt-0.5">●</span>
-          <span><strong>AR終了：</strong>画面端の × またはデバイスの戻るボタン</span>
-        </li>
-      </ul>
-      <p class="mt-3 text-xs text-slate-400">
-        AR 機能は WebXR 対応ブラウザ（Android Chrome / iOS Safari）が必要です。
-        PC ブラウザでは 3D 表示のみとなります。
-      </p>
-    </div>
+        <!-- ══ バーティポート ══ -->
+        <a-cylinder position="0 0.005 0" radius="0.85" height="0.015" color="#0d1b2a" opacity="0.95"></a-cylinder>
+        <a-torus position="0 0.015 0" radius="0.8" radius-tubular="0.022" color="#00d4ff" animation="property: material.color; type: color; from: #00d4ff; to: #ff6b35; dur: 1200; loop: true; dir: alternate"></a-torus>
+        <a-box position="-0.14 0.025 0" scale="0.055 0.008 0.42" color="#f39c12"></a-box>
+        <a-box position=" 0.14 0.025 0" scale="0.055 0.008 0.42" color="#f39c12"></a-box>
+        <a-box position="0 0.025 0"     scale="0.24  0.008 0.055" color="#f39c12"></a-box>
 
-  </main>
+        <!-- 管制タワー -->
+        <a-box position="0.95 0.22 0.95" scale="0.14 0.44 0.14" color="#1c2b3a"></a-box>
+        <a-box position="0.95 0.46 0.95" scale="0.32 0.04 0.32" color="#253545"></a-box>
+        <a-sphere position="0.95 0.5 0.95" radius="0.028" color="#ff2020" animation="property: material.opacity; from: 1; to: 0.05; dur: 700; loop: true; dir: alternate"></a-sphere>
 
-  <script>
-    const MODELS = {
-      joby: {
-        src: 'assets/joby.glb',
-        alt: 'Joby S4 eVTOL',
-        name: 'Joby S4',
-        maker: 'Joby Aviation（米国）',
-        badge: '6 ローター',
-        desc: '6枚のティルトローターを搭載する電動垂直離着陸機。最大巡航速度 320 km/h、航続距離 240 km を目標に開発中。静粛性に優れ、都市内エアモビリティ向けに設計されている。',
-        speed: '320 km/h',
-        range: '240 km',
-        capacity: '4名',
-      },
-      skydrive: {
-        src: 'assets/skydrive.glb',
-        alt: 'SkyDrive SD-05 eVTOL',
-        name: 'SkyDrive SD-05',
-        maker: 'SkyDrive Inc.（日本）',
-        badge: '12 ローター',
-        desc: '12基のローターを搭載した日本製 2人乗り eVTOL。2025年の大阪・関西万博での運航を目指して開発された空飛ぶクルマ。',
-        speed: '100 km/h',
-        range: '30 km',
-        capacity: '2名',
-      },
-    };
+        <!-- ══ Joby風 eVTOL（白・6ローター） ══ -->
+        <a-entity id="joby" position="0 0.05 0"
+            animation__takeoff="property: position; from: 0 0.05 0; to: 0 1.6 0; dur: 3000; easing: easeOutQuad; startEvents: start-joby; autoplay: false;"
+            animation__fly1="property: position; from: 0 1.6 0; to: 1.8 1.65 -1.8; dur: 5500; easing: linear; startEvents: animationcomplete__takeoff; autoplay: false;"
+            animation__fly2="property: position; from: 1.8 1.65 -1.8; to: -1.8 1.75 1.8; dur: 6500; easing: linear; startEvents: animationcomplete__fly1; autoplay: false;"
+            animation__land="property: position; from: -1.8 1.75 1.8; to: 0 0.05 0; dur: 4000; easing: easeInQuad; startEvents: animationcomplete__fly2; autoplay: false;"
+            animation__reset="property: position; from: 0 0.05 0; to: 0 0.05 0; dur: 1500; startEvents: animationcomplete__land; autoplay: false;">
+            <a-box scale="0.46 0.13 0.68" color="#ecf0f1"></a-box>
+            <a-box position="0 0.075 0.19" scale="0.38 0.1 0.32" color="#5dade2" opacity="0.82"></a-box>
+            <a-box position="0 0.02 0" scale="1.85 0.03 0.19" color="#bdc3c7"></a-box>
+            <a-entity position=" 0.72 0.14  0.18"><a-box scale="0.29 0.015 0.035" color="#95a5a6" animation="property: rotation; to: 0 36000 0; dur: 550; easing: linear; loop: true;"></a-box></a-entity>
+            <a-entity position="-0.72 0.14  0.18"><a-box scale="0.29 0.015 0.035" color="#95a5a6" animation="property: rotation; to: 0 -36000 0; dur: 550; easing: linear; loop: true;"></a-box></a-entity>
+            <a-entity position=" 0.72 0.14 -0.06"><a-box scale="0.29 0.015 0.035" color="#95a5a6" animation="property: rotation; to: 0 36000 0; dur: 550; easing: linear; loop: true;"></a-box></a-entity>
+            <a-entity position="-0.72 0.14 -0.06"><a-box scale="0.29 0.015 0.035" color="#95a5a6" animation="property: rotation; to: 0 -36000 0; dur: 550; easing: linear; loop: true;"></a-box></a-entity>
+            <a-entity position=" 0.72 0.14 -0.30"><a-box scale="0.29 0.015 0.035" color="#95a5a6" animation="property: rotation; to: 0 36000 0; dur: 550; easing: linear; loop: true;"></a-box></a-entity>
+            <a-entity position="-0.72 0.14 -0.30"><a-box scale="0.29 0.015 0.035" color="#95a5a6" animation="property: rotation; to: 0 -36000 0; dur: 550; easing: linear; loop: true;"></a-box></a-entity>
+        </a-entity>
 
-    const viewer = document.getElementById('viewer');
-    const errorBanner = document.getElementById('errorBanner');
-    const loadingOverlay = document.getElementById('loadingOverlay');
-    const animWarning = document.getElementById('animWarning');
+        <!-- ══ SkyDrive風 eVTOL（赤・4ローター） ══ -->
+        <a-entity id="skydrive" position="1.85 0.05 1.85"
+            animation__takeoff2="property: position; from: 1.85 0.05 1.85; to: 1.85 1.4 1.85; dur: 2500; easing: easeOutQuad; startEvents: start-sky; autoplay: false;"
+            animation__fly3="property: position; from: 1.85 1.4 1.85; to: -1.85 1.4 -1.85; dur: 7500; easing: linear; startEvents: animationcomplete__takeoff2; autoplay: false;"
+            animation__fly4="property: position; from: -1.85 1.4 -1.85; to: 0 1.4 0; dur: 3500; easing: linear; startEvents: animationcomplete__fly3; autoplay: false;"
+            animation__land2="property: position; from: 0 1.4 0; to: 1.85 0.05 1.85; dur: 3000; easing: easeInQuad; startEvents: animationcomplete__fly4; autoplay: false;"
+            animation__reset2="property: position; from: 1.85 0.05 1.85; to: 1.85 0.05 1.85; dur: 1500; startEvents: animationcomplete__land2; autoplay: false;">
+            <a-box scale="0.4 0.17 0.4" color="#c0392b"></a-box>
+            <a-box position="0 0.12 0" scale="0.33 0.15 0.33" color="#85c1e9" opacity="0.78"></a-box>
+            <a-entity position=" 0.33 0.2  0.33"><a-box scale="0.24 0.015 0.035" color="#7f8c8d" animation="property: rotation; to: 0 -36000 0; dur: 650; easing: linear; loop: true;"></a-box></a-entity>
+            <a-entity position="-0.33 0.2  0.33"><a-box scale="0.24 0.015 0.035" color="#7f8c8d" animation="property: rotation; to: 0  36000 0; dur: 650; easing: linear; loop: true;"></a-box></a-entity>
+            <a-entity position=" 0.33 0.2 -0.33"><a-box scale="0.24 0.015 0.035" color="#7f8c8d" animation="property: rotation; to: 0 -36000 0; dur: 650; easing: linear; loop: true;"></a-box></a-entity>
+            <a-entity position="-0.33 0.2 -0.33"><a-box scale="0.24 0.015 0.035" color="#7f8c8d" animation="property: rotation; to: 0  36000 0; dur: 650; easing: linear; loop: true;"></a-box></a-entity>
+        </a-entity>
 
-    // ローディング完了時
-    viewer.addEventListener('load', () => {
-      loadingOverlay.style.display = 'none';
-      errorBanner.classList.add('hidden');
+    </a-marker>
+    <a-entity camera></a-entity>
+</a-scene>
 
-      // RotorSpin アニメーション存在確認
-      const anims = viewer.availableAnimations || [];
-      if (anims.length > 0 && !anims.includes('RotorSpin')) {
-        animWarning.classList.remove('hidden');
-        console.warn('RotorSpin animation not found. Available animations:', anims);
-      } else {
-        animWarning.classList.add('hidden');
-      }
+<script>
+(function () {
+    'use strict';
+
+    const startupScreen  = document.getElementById('startup-screen');
+    const startBtn       = document.getElementById('start-btn');
+    const showMarkerBtn  = document.getElementById('show-marker-btn');
+    const uiLayer        = document.getElementById('ui-layer');
+    const statusBar      = document.getElementById('status-bar');
+    const markerHint     = document.getElementById('marker-hint');
+    const markerModal    = document.getElementById('marker-modal');
+    const closeModalBtn  = document.getElementById('close-modal-btn');
+    const showMarkerFab  = document.getElementById('show-marker-fab');
+    const printBtn       = document.getElementById('print-btn');
+
+    if (!window.isSecureContext) {
+        startBtn.textContent = '⚠️ HTTPS環境が必要です';
+        startBtn.style.background = '#ff4444';
+        startBtn.disabled = true;
+    }
+
+    function openModal()  { markerModal.classList.add('open'); }
+    function closeModal() { markerModal.classList.remove('open'); }
+
+    showMarkerBtn.addEventListener('click', openModal);
+    showMarkerFab.addEventListener('click', openModal);
+    closeModalBtn.addEventListener('click', closeModal);
+    markerModal.addEventListener('click', (e) => { if (e.target === markerModal) closeModal(); });
+
+    printBtn.addEventListener('click', () => {
+        closeModal();
+        setTimeout(() => window.print(), 300);
     });
 
-    // モデル読み込みエラー時
-    viewer.addEventListener('error', () => {
-      loadingOverlay.style.display = 'none';
-      errorBanner.classList.remove('hidden');
+    /* ── iOS 黒画面回避ロジック ── */
+    function enforceVideoPolicies() {
+        document.querySelectorAll('video').forEach(video => {
+            video.setAttribute('playsinline', '');
+            video.setAttribute('webkit-playsinline', '');
+            video.setAttribute('autoplay', '');
+            video.setAttribute('muted', '');
+            video.muted = true;
+            video.play().catch(() => {});
+        });
+        requestAnimationFrame(enforceVideoPolicies);
+    }
+
+    startBtn.addEventListener('click', () => {
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+            .then(() => {
+                startupScreen.style.opacity = '0';
+                setTimeout(() => {
+                    startupScreen.style.display = 'none';
+                    uiLayer.style.display = 'block';
+                }, 500);
+                enforceVideoPolicies();
+            })
+            .catch(err => {
+                startBtn.textContent = `⚠️ カメラエラー: ${err.name}`;
+                startBtn.style.background = '#ff4444';
+            });
     });
 
-    function switchModel(key) {
-      const m = MODELS[key];
-      if (!m) return;
+    /* ── AR.js マーカー認識ステータス監視 ── */
+    const marker = document.getElementById('main-marker');
+    marker.addEventListener('markerFound', () => {
+        statusBar.textContent = '✅ eVTOL飛行中！';
+        statusBar.style.color = '#4ade80';
+        markerHint.style.display = 'none';
+    });
+    marker.addEventListener('markerLost', () => {
+        statusBar.textContent = '📷 マーカーを探しています...';
+        statusBar.style.color = '#38bdf8';
+        markerHint.style.display = 'block';
+    });
 
-      // ビューア更新
-      loadingOverlay.style.display = '';
-      errorBanner.classList.add('hidden');
-      animWarning.classList.add('hidden');
-      viewer.src = m.src;
-      viewer.alt = m.alt;
-      viewer.setAttribute('animation-name', 'RotorSpin');
+    document.querySelector('a-scene').addEventListener('loaded', () => {
+        const joby     = document.getElementById('joby');
+        const skydrive = document.getElementById('skydrive');
 
-      // 情報パネル更新
-      document.getElementById('modelName').textContent     = m.name;
-      document.getElementById('modelMaker').textContent    = m.maker;
-      document.getElementById('modelBadge').textContent    = m.badge;
-      document.getElementById('modelDesc').textContent     = m.desc;
-      document.getElementById('specSpeed').textContent     = m.speed;
-      document.getElementById('specRange').textContent     = m.range;
-      document.getElementById('specCapacity').textContent  = m.capacity;
+        joby.addEventListener('animationcomplete__reset', () => setTimeout(() => joby.emit('start-joby'), 1500));
+        skydrive.addEventListener('animationcomplete__reset2', () => setTimeout(() => skydrive.emit('start-sky'), 1500));
 
-      // タブスタイル更新
-      document.getElementById('tab-joby').className =
-        'flex-1 py-2.5 px-3 rounded-lg text-sm font-medium transition-colors focus:outline-none ' +
-        (key === 'joby' ? 'tab-active' : 'text-slate-600 hover:bg-slate-100');
-      document.getElementById('tab-skydrive').className =
-        'flex-1 py-2.5 px-3 rounded-lg text-sm font-medium transition-colors focus:outline-none ' +
-        (key === 'skydrive' ? 'tab-active' : 'text-slate-600 hover:bg-slate-100');
-    }
-
-    function playRotor() {
-      viewer.play({ repetitions: Infinity });
-    }
-
-    function pauseRotor() {
-      viewer.pause();
-    }
-  </script>
-
+        setTimeout(() => joby.emit('start-joby'),  800);
+        setTimeout(() => skydrive.emit('start-sky'), 4800);
+    });
+})();
+</script>
 </body>
 </html>
