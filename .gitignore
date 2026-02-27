@@ -1,0 +1,4 @@
+# eVTOL 3D モデルファイル（大容量バイナリ - Git 管理外）
+assets/*.glb
+assets/*.gltf
+assets/*.bin
