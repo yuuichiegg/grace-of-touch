@@ -1749,12 +1749,12 @@ const PandaZones={
         // Scatter slightly around zone center
         const lat=zone.lat+(Math.random()-0.5)*1.5;
         const lng=zone.lng+(Math.random()-0.5)*1.5;
-        const pos=this._latLngToPos(lat,lng,30);
+        const pos=this._latLngToPos(lat,lng,15);
         const normal=pos.clone().sub(this.earthCenter.clone()).normalize();
 
         // Panda body (simple white+black spheres) — scaled up for visibility from orbit
         const panda=new THREE.Group();
-        const S=5; // scale multiplier (5x original)
+        const S=2; // scale multiplier
 
         // Body (white)
         const bodyGeo=new THREE.SphereGeometry(6*S,8,8);
@@ -1823,7 +1823,7 @@ const PandaZones={
 
     // Zone labels
     this.ZONES.forEach(zone=>{
-      const pos=this._latLngToPos(zone.lat,zone.lng,100);
+      const pos=this._latLngToPos(zone.lat,zone.lng,40);
       const labelDiv=document.createElement('div');
       labelDiv.className='planet-label';
       labelDiv.style.fontSize='9px';
@@ -1847,7 +1847,7 @@ const PandaZones={
       const breathe=1.0+Math.sin(d._phase)*0.03;
       p.children[0].scale.setScalar(breathe);
       // Head bob
-      if(p.children[1])p.children[1].position.y=35+Math.sin(d._phase*1.3)*1.5;
+      if(p.children[1])p.children[1].position.y=14+Math.sin(d._phase*1.3)*0.6;
       // Arm sway
       if(p.children[4])p.children[4].rotation.z=0.5+Math.sin(d._phase*0.7)*0.15;
       if(p.children[5])p.children[5].rotation.z=-0.5-Math.sin(d._phase*0.7)*0.15;
