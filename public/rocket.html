@@ -855,9 +855,10 @@ const LaunchSequence = {
       case 'MAX-Q':
         this.rocketVelY+=dt*12;
         this.rocketY+=this.rocketVelY*dt;
-        // Max-Q camera shake
-        App.camera.position.x+=Math.sin(now*40)*0.15*(1-progress);
-        App.camera.position.z+=Math.cos(now*35)*0.12*(1-progress);
+        // Max-Q camera shake (subtle)
+        const mq=1-progress;
+        App.camera.position.x+=Math.sin(this.totalTime*40)*0.1*mq;
+        App.camera.position.z+=Math.cos(this.totalTime*35)*0.08*mq;
         break;
       case 'MECO':
         Rocket3D.flameUniforms.thrust.value=Math.max(0,1.0-progress*2);
@@ -1765,7 +1766,7 @@ const PandaZones={
 
         // Panda body (simple white+black spheres) — scaled up for visibility from orbit
         const panda=new THREE.Group();
-        const S=0.15; // realistic scale relative to Earth
+        const S=0.05; // tiny — realistic relative to Earth R=3000
 
         // Body (white)
         const bodyGeo=new THREE.SphereGeometry(6*S,8,8);
@@ -1858,7 +1859,7 @@ const PandaZones={
       const breathe=1.0+Math.sin(d._phase)*0.03;
       p.children[0].scale.setScalar(breathe);
       // Head bob
-      if(p.children[1])p.children[1].position.y=7*0.15+Math.sin(d._phase*1.3)*0.05;
+      if(p.children[1])p.children[1].position.y=7*0.05+Math.sin(d._phase*1.3)*0.02;
       // Arm sway
       if(p.children[4])p.children[4].rotation.z=0.5+Math.sin(d._phase*0.7)*0.15;
       if(p.children[5])p.children[5].rotation.z=-0.5-Math.sin(d._phase*0.7)*0.15;
@@ -2443,8 +2444,8 @@ const App={
     if(this.particles){
       const _alt=this.camera.position.distanceTo(new THREE.Vector3(0,-3030,0))-3000;
       const spaceFactor=Math.max(0,Math.min(1,(_alt-20)/80)); // 0 at surface, 1 at alt>100
-      this.particles.material.size=(0.4+bass*1.0+this._beatPulse*0.5)*spaceFactor;
-      this.particles.material.opacity=0.6*spaceFactor;
+      this.particles.material.size=(0.2+bass*0.3)*spaceFactor;
+      this.particles.material.opacity=0.3*spaceFactor;
     }
     if(this._starField){this._starField.material.size=2.0+treble*3.0;this._starField.rotation.y+=0.0001+energy*0.0003;}
     // Earth opacity kept stable (no music-driven transparency)
