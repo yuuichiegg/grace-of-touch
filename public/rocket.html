@@ -1321,47 +1321,16 @@ const SolarSystem={
     for(const[name,d]of Object.entries(this.BODY_DATA)){
       const group=new THREE.Group();
 
-      // Main sphere (semi-transparent surface to reveal interior)
+      // Main sphere (solid, opaque — for landing/collision)
       const geo=new THREE.SphereGeometry(d.radius,d.segments,d.segments);
       let mat;
       if(d.emissive){
         mat=new THREE.MeshBasicMaterial({color:d.color});
       }else{
-        mat=new THREE.MeshPhongMaterial({color:d.color,shininess:30,
-          transparent:true,opacity:0.85,side:THREE.DoubleSide});
+        mat=new THREE.MeshPhongMaterial({color:d.color,shininess:30});
       }
       const mesh=new THREE.Mesh(geo,mat);
       group.add(mesh);
-
-      // Internal structure: Mantle + Core (visible when camera enters planet)
-      if(!d.emissive){
-        // Mantle layer (~70% radius)
-        const mantleR=d.radius*0.7;
-        const mantleGeo=new THREE.SphereGeometry(mantleR,24,24);
-        const mantleColors={Moon:0xaa6633,Mercury:0x884422,Venus:0xcc7744,
-          Mars:0xbb5533,Jupiter:0xcc8844,Saturn:0xbb9955};
-        const mantleMat=new THREE.MeshBasicMaterial({
-          color:mantleColors[name]||0xcc6633,side:THREE.DoubleSide,
-          transparent:true,opacity:0.7});
-        group.add(new THREE.Mesh(mantleGeo,mantleMat));
-
-        // Outer core (~35% radius, metallic)
-        const outerCoreR=d.radius*0.35;
-        const outerCoreGeo=new THREE.SphereGeometry(outerCoreR,16,16);
-        const outerCoreMat=new THREE.MeshBasicMaterial({
-          color:0xff6622,side:THREE.DoubleSide,transparent:true,opacity:0.8});
-        group.add(new THREE.Mesh(outerCoreGeo,outerCoreMat));
-
-        // Inner core (~15% radius, bright iron)
-        const innerCoreR=d.radius*0.15;
-        const innerCoreGeo=new THREE.SphereGeometry(innerCoreR,12,12);
-        const innerCoreMat=new THREE.MeshBasicMaterial({
-          color:0xffcc44,emissive:0xff8800,emissiveIntensity:0.5});
-        group.add(new THREE.Mesh(innerCoreGeo,innerCoreMat));
-        // Core glow light
-        const coreLight=new THREE.PointLight(0xff6600,0.5,d.radius*0.8);
-        group.add(coreLight);
-      }
 
       // Sun: corona glow + point light
       if(d.emissive){
@@ -2335,6 +2304,29 @@ const App={
     this.velocity.multiplyScalar(this.friction);
     this.camera.position.add(this.velocity);
 
+    // Collision: push camera out of Earth surface
+    const _ec=new THREE.Vector3(0,-3030,0);
+    const _ed=this.camera.position.distanceTo(_ec);
+    if(_ed<3005){
+      const n=this.camera.position.clone().sub(_ec).normalize();
+      this.camera.position.copy(_ec).addScaledVector(n,3005);
+      // Bounce velocity outward
+      const vDot=this.velocity.dot(n);
+      if(vDot<0)this.velocity.addScaledVector(n,-vDot*1.2);
+    }
+    // Collision: push camera out of planets
+    for(const[name,body]of Object.entries(SolarSystem.bodies)){
+      const bp=body.group.position;
+      const br=body.data.radius+5;
+      const dist=this.camera.position.distanceTo(bp);
+      if(dist<br){
+        const n=this.camera.position.clone().sub(bp).normalize();
+        this.camera.position.copy(bp).addScaledVector(n,br);
+        const vDot=this.velocity.dot(n);
+        if(vDot<0)this.velocity.addScaledVector(n,-vDot*1.2);
+      }
+    }
+
     // Third person camera: ship follows player, camera behind ship
     PlayerShip.update(this.camera.position,this.camera.quaternion,this.velocity,dt);
     SpaceElevator.update(now);
@@ -2401,7 +2393,7 @@ const App={
     if(MusicEngine.beat)this._beatPulse=1.0;this._beatPulse*=0.92;
     if(this.particles)this.particles.material.size=1.2+bass*2.5+this._beatPulse*1.5;
     if(this._starField){this._starField.material.size=2.0+treble*3.0;this._starField.rotation.y+=0.0001+energy*0.0003;}
-    if(this.earth&&this.earth.material)this.earth.material.opacity=0.6+energy*0.4;
+    // Earth opacity kept stable (no music-driven transparency)
   },
 
   _updateParticles(t){
