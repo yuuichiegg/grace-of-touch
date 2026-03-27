@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>統合版 地震情報ビューア (総合防災AI版) - v6.6</title>
+
+    <!-- Leaflet.js CSS and Script -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        /* Custom styles for a polished look */
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .leaflet-popup-content {
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .plate-tooltip {
+            background-color: rgba(0, 0, 0, 0.7) !important;
+            border: none !important;
+            box-shadow: none !important;
+            color: white !important;
+            font-weight: bold;
+            font-size: 14px;
+            padding: 4px 8px !important;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 1rem auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Modal styles with smooth animation */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s;
+        }
+
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal-container {
+            background-color: white;
+            padding: 0;
+            border-radius: 0.5rem;
+            width: 90%;
+            max-width: 500px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .modal-overlay.visible .modal-container {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            flex-shrink: 0;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .modal-body {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        .modal-footer {
+            flex-shrink: 0;
+            text-align: right;
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .modal-container h2 {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .modal-container h3 {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal-container p,
+        .modal-container ul {
+            font-size: 0.9rem;
+            line-height: 1.8;
+            margin-bottom: 1rem;
+        }
+
+        .modal-container li {
+            margin-left: 1.5rem;
+            list-style-type: disc;
+        }
+
+        /* Floating Toolbox */
+        #toolbox {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: white;
+            border-radius: 999px;
+            padding: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: flex;
+            gap: 8px;
+        }
+
+        .tool-button {
+            background-color: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tool-button:hover {
+            background-color: #e5e7eb;
+            transform: translateY(-2px);
+        }
+
+        .tool-button:disabled {
+            cursor: not-allowed;
+            background-color: #e5e7eb;
+            opacity: 0.5;
+        }
+
+        .tool-button svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .map-pin-mode {
+            cursor: crosshair !important;
+        }
+
+        /* Styles for the new drone status modal */
+        #drone-status-modal .modal-container {
+            width: 90%;
+            max-width: 350px;
+            /* Adjust width for a more compact dashboard look */
+            max-height: 80vh;
+            /* Allow it to be taller if needed */
+            padding: 0;
+            /* Remove internal padding as modal-body has it */
+        }
+
+        #drone-status-modal .modal-body {
+            padding: 1rem 1.5rem;
+            /* Consistent padding */
+        }
+
+        #drone-status-modal h4 {
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        #drone-status-modal #mission-log {
+            font-family: monospace;
+            font-size: 11px;
+            background-color: #2d3748;
+            color: #a0aec0;
+            padding: 8px;
+            border-radius: 4px;
+            height: 100px;
+            overflow-y: auto;
+            margin-top: 8px;
+        }
+
+        /* Color differentiation for drone modals and buttons */
+        #drone-narrative-modal .modal-header {
+            background-color: #3b82f6;
+            /* Blue-500 */
+            color: white;
+            border-bottom: 1px solid #2563eb;
+            /* Blue-600 */
+        }
+
+        #drone-status-modal .modal-header {
+            background-color: #ef4444;
+            /* Red-500 */
+            color: white;
+            border-bottom: 1px solid #dc2626;
+            /* Red-600 */
+        }
+
+        #show-drone-narrative-button svg {
+            color: #2563eb;
+            /* Blue-600 */
+        }
+
+        #show-drone-status-button svg {
+            color: #dc2626;
+            /* Red-600 */
+        }
+
+        .drone-icon {
+            transition: all 1s linear;
+        }
+
+        .list-item-hover:hover {
+            background-color: #f0f9ff;
+        }
+
+        .analysis-disclaimer {
+            background-color: #fffbeb;
+            border-left: 4px solid #fbbf24;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Custom Leaflet controls for location */
+        .leaflet-bar a.leaflet-control-location,
+        .leaflet-bar a.leaflet-control-pindrop {
+            background-size: 18px 18px;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        .leaflet-bar a.leaflet-control-location {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23333"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>');
+        }
+
+        .leaflet-bar a.leaflet-control-pindrop {
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23333"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>');
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 text-gray-800"><a href="/" id="gt-back" style="position:fixed;top:12px;left:12px;z-index:99999;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);border:1px solid rgba(0,255,255,0.2);border-radius:8px;padding:6px 14px;text-decoration:none;color:rgba(0,255,255,0.8);font-family:Orbitron,monospace;font-size:10px;letter-spacing:0.1em;transition:all 0.3s;" onmouseover="this.style.background='rgba(0,255,255,0.12)';this.style.borderColor='rgba(0,255,255,0.5)'" onmouseout="this.style.background='rgba(0,0,0,0.6)';this.style.borderColor='rgba(0,255,255,0.2)'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>PORTAL</a>
+
+    <div id="map-container" class="w-screen h-screen relative">
+        <div id="map"></div>
+    </div>
+
+    <div id="toolbox">
+        <button id="mode-toggle-button" class="tool-button" title="モード切替"></button>
+        <button id="filter-button" class="tool-button" title="フィルター">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.572a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z" />
+            </svg>
+        </button>
+        <button id="ai-tools-button" class="tool-button" title="AI防災ツール">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM18 15.75l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 18l-1.035.259a3.375 3.375 0 00-2.456 2.456L18 21.75l-.259-1.035a3.375 3.375 0 00-2.456-2.456L14.25 18l1.035-.259a3.375 3.375 0 002.456-2.456L18 15.75z" />
+            </svg>
+        </button>
+        <button id="info-share-button" class="tool-button" title="情報共有">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </button>
+        <button id="drone-request-button" class="tool-button" title="ドローン支援要請">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                stroke="currentColor">
+                <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+            </svg>
+        </button>
+        <button id="show-drone-narrative-button" class="tool-button hidden" title="ドローンミッション情報を表示">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                stroke="currentColor" class="w-6 h-6 text-blue-600">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M18 10.5H6a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25h12a2.25 2.25 0 002.25-2.25v-6.75A2.25 2.25 0 0018 10.5z" />
+            </svg>
+        </button>
+        <button id="show-drone-status-button" class="tool-button hidden" title="ドローン状況を表示">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                stroke="currentColor" class="w-6 h-6 text-red-600">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" />
+            </svg>
+        </button>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-container"></div>
+    <div id="drone-request-input-modal" class="modal-overlay hidden">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="text-xl font-bold"> ドローン支援要請 (シミュレーション)</h2>
+            </div>
+            <div class="modal-body"></div>
+            <div class="modal-footer">
+                <button
+                    class="modal-close bg-gray-500 text-white font-bold py-2 px-4 rounded-md hover:bg-gray-600">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="drone-narrative-modal" class="modal-overlay hidden">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="text-xl font-bold text-white bg-blue-500">ドローンミッション情報</h2>
+            </div>
+            <div class="modal-body"></div>
+            <div class="modal-footer">
+                <button
+                    class="modal-close bg-gray-500 text-white font-bold py-2 px-4 rounded-md hover:bg-gray-600">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="drone-status-modal" class="modal-overlay hidden">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="text-xl font-bold text-white bg-red-500">ドローンミッション状況</h2>
+            </div>
+            <div class="modal-body">
+                <div class="text-sm space-y-1">
+                    <p>速度: <span id="drone-speed-modal">0.0</span> km/h</p>
+                    <p>高度: <span id="drone-altitude-modal">0.0</span> m</p>
+                    <p>バッテリー: <span id="drone-battery-modal">100.0</span> %</p>
+                    <p>風速: <span id="drone-wind-speed-modal">0.0</span> m/s</p>
+                    <p>障害物検知: <span id="drone-obstacle-detection-modal">なし</span></p>
+                    <p>ETA: <span id="drone-eta-modal">計算中...</span></p>
+                </div>
+                <h5 class="md:text-md font-bold mt-4">ミッションログ</h5>
+                <div id="mission-log-modal" class="text-xs"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancel-drone-mission-modal"
+                    class="bg-red-500 text-white font-bold py-2 px-4 rounded-md hover:bg-red-600">ミッションキャンセル</button>
+                <button
+                    class="modal-close bg-gray-500 text-white font-bold py-2 px-4 rounded-md hover:bg-gray-600">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main application logic -->
+    <script type="module">
+        document.addEventListener('DOMContentLoaded', () => {
+            const USGS_API_URL = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_week.geojson';
+            const P2P_API_BASE_URL = 'https://api.p2pquake.net/v2/history?codes=551&limit=';
+            const TECTONIC_PLATES_URL = 'https://raw.githubusercontent.com/fraxen/tectonicplates/master/GeoJSON/PB2002_plates.json';
+
+            let currentMode = 'japan';
+            let allEarthquakeData = [];
+            let filteredEarthquakeData = [];
+            let userCoords = null;
+            let userAddress = null;
+            let droneAnimationId = null;
+            let locationMarker = null;
+            let droneMarkers = [];
+            let lastDroneMission = null;
+            let lastDroneNarrative = null;
+            let currentDroneState = {
+                speed: 0, altitude: 0, battery: 100, windSpeed: 0,
+                obstacleDetected: false, targetSpeed: 50, targetAltitude: 100, targetWindSpeed: 5
+            };
+
+            const modalContainer = document.getElementById('modal-container');
+            const showDroneNarrativeButton = document.getElementById('show-drone-narrative-button');
+            const droneNarrativeModalEl = document.getElementById('drone-narrative-modal');
+            const droneRequestInputModalEl = document.getElementById('drone-request-input-modal');
+            const droneStatusModalEl = document.getElementById('drone-status-modal');
+            const showDroneStatusButton = document.getElementById('show-drone-status-button');
+
+            const map = L.map('map');
+            const quakeLayer = L.layerGroup().addTo(map);
+            const platesLayer = L.layerGroup();
+            const tsunamiLayer = L.layerGroup().addTo(map);
+            const notesLayer = L.layerGroup().addTo(map);
+            const droneLayer = L.layerGroup().addTo(map);
+
+            const gsiTile = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
+                attribution: "<a href='https://maps.gsi.go.jp/development/ichiran.html' target='_blank'>地理院タイル</a>"
+            }).addTo(map);
+
+            L.control.layers({ "地理院タイル": gsiTile }, {
+                "地震情報": quakeLayer, "プレート": platesLayer, "津波浸水予測": tsunamiLayer,
+                "共有情報": notesLayer, "ドローン": droneLayer
+            }).addTo(map);
+
+            // --- GPS Control ---
+            L.Control.Location = L.Control.extend({
+                onAdd: (map) => {
+                    const button = L.DomUtil.create('a', 'leaflet-bar leaflet-control leaflet-control-location');
+                    button.href = '#'; button.title = '現在地に移動';
+                    L.DomEvent.on(button, 'click', (e) => { e.preventDefault(); map.locate({ setView: true, maxZoom: 16 }); });
+                    return button;
+                }
+            });
+            new L.Control.Location({ position: 'topleft' }).addTo(map);
+
+            // --- Data Fetching ---
+            const fetchData = async () => {
+                try {
+                    const url = currentMode === 'world' ? USGS_API_URL : P2P_API_BASE_URL + '100';
+                    const response = await fetch(url);
+                    const data = await response.json();
+
+                    if (currentMode === 'japan') {
+                        allEarthquakeData = data.map(q => ({
+                            id: q.id, time: new Date(q.time).getTime(),
+                            displayPlace: q.earthquake.hypocenter.name,
+                            earthquake: {
+                                hypocenter: {
+                                    latitude: parseFloat(q.earthquake.hypocenter.latitude),
+                                    longitude: parseFloat(q.earthquake.hypocenter.longitude),
+                                    magnitude: parseFloat(q.earthquake.hypocenter.magnitude),
+                                    depth: parseFloat(q.earthquake.hypocenter.depth)
+                                },
+                                shindo: { value: q.earthquake.maxScale }
+                            }
+                        }));
+                    }
+                    renderEarthquakes();
+                } catch (e) { console.error(e); }
+            };
+
+            const renderEarthquakes = () => {
+                quakeLayer.clearLayers();
+                allEarthquakeData.forEach(q => {
+                    const { latitude, longitude, magnitude } = q.earthquake.hypocenter;
+                    const radius = Math.pow(1.8, magnitude) * (currentMode === 'world' ? 3000 : 500);
+                    L.circle([latitude, longitude], {
+                        radius, color: '#111', weight: 1, fillColor: '#f00', fillOpacity: 0.6
+                    }).addTo(quakeLayer).bindPopup(`<strong>${q.displayPlace}</strong><br>M${magnitude}`);
+                });
+            };
+
+            // --- Drone Logic ---
+            const animateDrone = (marker, route, duration, missionLog) => {
+                let startT = null;
+                const latlngs = route.getLatLngs();
+                const step = (timestamp) => {
+                    if (!startT) startT = timestamp;
+                    const progress = timestamp - startT;
+                    const ratio = Math.min(progress / duration, 1);
+                    const pos = L.latLng(
+                        latlngs[0].lat + ratio * (latlngs[1].lat - latlngs[0].lat),
+                        latlngs[0].lng + ratio * (latlngs[1].lng - latlngs[0].lng)
+                    );
+                    marker.setLatLng(pos);
+                    if (ratio < 1) droneAnimationId = requestAnimationFrame(step);
+                };
+                droneAnimationId = requestAnimationFrame(step);
+            };
+
+            // UI Event Listeners
+            document.getElementById('drone-request-button').addEventListener('click', () => {
+                droneRequestInputModalEl.classList.remove('hidden');
+                droneRequestInputModalEl.classList.add('visible');
+                droneRequestInputModalEl.querySelector('.modal-body').innerHTML = `
+                <div class="p-4">
+                    <p>ドローンによる物資配送シミュレーションを開始します。</p>
+                    <button id="start-drone-sim" class="mt-4 bg-sky-600 text-white p-2 rounded w-full">シミュレーション開始</button>
+                </div>
+            `;
+                document.getElementById('start-drone-sim').onclick = () => {
+                    droneRequestInputModalEl.classList.add('hidden');
+                    // Dummy mission
+                    const start = [35.6895, 139.6917]; // Tokyo
+                    const end = [35.7, 139.8];
+                    const route = L.polyline([start, end], { color: 'blue' }).addTo(droneLayer);
+                    const marker = L.marker(start, { icon: L.divIcon({ html: '🚁', className: 'text-3xl' }) }).addTo(droneLayer);
+                    animateDrone(marker, route, 10000, []);
+                    showDroneStatusButton.classList.remove('hidden');
+                };
+            });
+
+            document.querySelectorAll('.modal-close').forEach(b => b.onclick = (e) => e.target.closest('.modal-overlay').classList.add('hidden'));
+
+            // Initial
+            map.setView([36, 138], 5);
+            fetchData();
+        });
+    </script>
+</body>
+
+</html>

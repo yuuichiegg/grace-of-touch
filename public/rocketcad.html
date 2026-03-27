@@ -1,0 +1,1347 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Grace of Touch - RocketCraft CAD v4.10.2</title>
+    <meta name="description" content="Web-based 3D Rocket Modeling Tool with Fixes">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        html,
+        body,
+        #root {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #0f172a;
+            font-family: 'Segoe UI', sans-serif;
+            color: #e2e8f0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: none;
+        }
+
+        .app-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .canvas-wrapper {
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .pointer-events-auto {
+            pointer-events: auto;
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .app-header {
+            height: 50px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 12px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            background: rgba(15, 23, 42, 0.95);
+            z-index: 20;
+        }
+
+        @media (min-width: 640px) {
+            .app-header {
+                height: 60px;
+                padding: 0 24px;
+            }
+        }
+
+        .brand {
+            font-family: 'Times New Roman', serif;
+            font-size: 1rem;
+            font-weight: 700;
+            color: #f8fafc;
+            letter-spacing: 0.5px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            white-space: nowrap;
+        }
+
+        @media (min-width: 640px) {
+            .brand {
+                font-size: 1.25rem;
+            }
+        }
+
+        .global-scale-ctrl {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(30, 41, 59, 0.6);
+            padding: 2px 8px;
+            border-radius: 16px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            margin-left: 8px;
+        }
+
+        .global-scale-ctrl label {
+            font-size: 0.6rem;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+
+        .global-scale-ctrl input {
+            width: 50px;
+            height: 4px;
+            accent-color: #38bdf8;
+        }
+
+        @media (min-width: 640px) {
+            .global-scale-ctrl {
+                padding: 4px 10px;
+                gap: 8px;
+            }
+
+            .global-scale-ctrl input {
+                width: 80px;
+            }
+        }
+
+        .parts-panel {
+            position: absolute;
+            top: 70px;
+            left: 10px;
+            bottom: 10px;
+            width: 260px;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            z-index: 30;
+        }
+
+        @media (max-width: 640px) {
+            .parts-panel {
+                top: 0;
+                left: 0;
+                bottom: 0;
+                width: 85%;
+                max-width: 320px;
+                border-radius: 0 12px 12px 0;
+                border-left: none;
+                transform: translateX(-105%);
+                background: rgba(15, 23, 42, 0.98);
+            }
+
+            .parts-panel.open {
+                transform: translateX(0);
+            }
+        }
+
+        .panel-header {
+            padding: 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #38bdf8;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            background: rgba(30, 41, 59, 0.8);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .parts-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .prop-panel {
+            position: absolute;
+            top: 70px;
+            right: 10px;
+            width: 280px;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            max-height: calc(100% - 80px);
+            overflow-y: auto;
+            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+            z-index: 25;
+        }
+
+        @media (max-width: 640px) {
+            .prop-panel {
+                top: auto;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                width: 100%;
+                height: auto;
+                max-height: 45vh;
+                border-radius: 20px 20px 0 0;
+                border-bottom: none;
+                transform: translateY(110%);
+                padding: 16px 20px 40px 20px;
+                background: rgba(15, 23, 42, 0.95);
+                backdrop-filter: blur(16px);
+                box-shadow: 0 -4px 30px rgba(0, 0, 0, 0.5);
+            }
+
+            .prop-panel.visible {
+                transform: translateY(0);
+            }
+        }
+
+        .part-item {
+            padding: 10px 12px;
+            font-size: 0.85rem;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            transition: all 0.1s;
+            border: 1px solid transparent;
+            background: rgba(30, 41, 59, 0.5);
+        }
+
+        .part-item.selected {
+            background: rgba(14, 165, 233, 0.2);
+            border-color: rgba(14, 165, 233, 0.5);
+            color: #38bdf8;
+            font-weight: 600;
+        }
+
+        .part-icon {
+            width: 28px;
+            height: 28px;
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 6px;
+            color: #94a3b8;
+        }
+
+        .part-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .part-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-label {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            cursor: pointer;
+            height: 24px;
+            touch-action: pan-y;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            background: #334155;
+            border-radius: 3px;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%;
+            background: #f8fafc;
+            margin-top: -7px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+        }
+
+        input[type=text] {
+            background: #1e293b;
+            border: 1px solid #475569;
+            color: white;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        input[type=color] {
+            width: 100%;
+            height: 36px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            background: rgba(30, 41, 59, 0.5);
+            padding: 6px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+        }
+
+        .tool-btn {
+            flex: 1;
+            padding: 10px 0;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            color: #64748b;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tool-btn.active {
+            background: #0ea5e9;
+            color: white;
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+        }
+
+        .tool-btn.snap-active {
+            background: #10b981;
+            color: white;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+
+        .category-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+
+        .cat-tab {
+            padding: 8px 12px;
+            font-size: 0.7rem;
+            background: rgba(51, 65, 85, 0.5);
+            color: #94a3b8;
+            cursor: pointer;
+            border-radius: 6px;
+            white-space: nowrap;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        .cat-tab.active {
+            background: #0ea5e9;
+            color: white;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .add-btn-group {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .add-btn {
+            background: rgba(51, 65, 85, 0.6);
+            color: #cbd5e1;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            padding: 12px 4px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            height: 75px;
+            transition: background 0.1s;
+        }
+
+        .add-btn:active {
+            background: #475569;
+            transform: scale(0.98);
+        }
+
+        .add-btn svg {
+            width: 26px;
+            height: 26px;
+            fill: currentColor;
+            opacity: 0.9;
+        }
+
+        .add-btn span {
+            font-size: 0.6rem;
+            font-weight: 600;
+            opacity: 0.9;
+            text-align: center;
+            line-height: 1.1;
+        }
+
+        .header-btn {
+            background: rgba(51, 65, 85, 0.5);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: #e2e8f0;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-btn.primary {
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+            border: none;
+            color: white;
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.3);
+        }
+
+        .header-btn.fire {
+            background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+            border: none;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .header-btn.launch {
+            background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+            border: none;
+            color: white;
+            font-weight: bold;
+            box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+
+        .header-btn.magic {
+            background: linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%);
+            border: none;
+            color: white;
+            font-weight: 800;
+            box-shadow: 0 0 12px rgba(217, 70, 239, 0.25);
+        }
+
+        .header-btn.abort {
+            background: linear-gradient(135deg, #ef4444 0%, #f59e0b 100%);
+            border: none;
+            color: white;
+            font-weight: 900;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
+        }
+
+        .header-btn.launch:active,
+        .header-btn.magic:active,
+        .header-btn.abort:active {
+            transform: scale(0.95);
+        }
+
+        .drawer-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 28;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            backdrop-filter: blur(2px);
+        }
+
+        .drawer-backdrop.visible {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* Auto Build Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .modal-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-content {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            transform: scale(0.9);
+            transition: transform 0.2s;
+        }
+
+        .modal-overlay.open .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #f8fafc;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-section {
+            margin-bottom: 16px;
+        }
+
+        .modal-label {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .radio-btn {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #475569;
+            border-radius: 8px;
+            color: #cbd5e1;
+            text-align: center;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .radio-btn:hover {
+            background: #334155;
+        }
+
+        .radio-btn.active {
+            background: #0ea5e9;
+            color: white;
+            border-color: #0ea5e9;
+            box-shadow: 0 0 10px rgba(14, 165, 233, 0.3);
+        }
+
+        .build-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #8b5cf6 0%, #d946ef 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .build-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+
+    <!-- importmap: esm.sh 経由で ESM 直接読み込み (Babel 不要) -->
+    <script type="importmap">
+        {
+            "imports": {
+                "react": "https://esm.sh/react@18.2.0",
+                "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
+                "react-dom": "https://esm.sh/react-dom@18.2.0",
+                "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+                "three": "https://esm.sh/three@0.160.0",
+                "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.15.16?external=react,react-dom,three",
+                "@react-three/drei": "https://esm.sh/@react-three/drei@9.99.0?external=react,react-dom,three,@react-three/fiber",
+                "three/examples/jsm/exporters/STLExporter": "https://esm.sh/three@0.160.0/examples/jsm/exporters/STLExporter.js?external=three"
+            }
+        }
+    </script>
+    <!-- JSX トランスパイル用 Babel (importmap の後に読み込む) -->
+    <script src="https://unpkg.com/@babel/standalone@7.23.9/babel.min.js"></script>
+</head>
+
+<body><a href="/" id="gt-back" style="position:fixed;top:12px;left:12px;z-index:99999;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);border:1px solid rgba(0,255,255,0.2);border-radius:8px;padding:6px 14px;text-decoration:none;color:rgba(0,255,255,0.8);font-family:Orbitron,monospace;font-size:10px;letter-spacing:0.1em;transition:all 0.3s;" onmouseover="this.style.background='rgba(0,255,255,0.12)';this.style.borderColor='rgba(0,255,255,0.5)'" onmouseout="this.style.background='rgba(0,0,0,0.6)';this.style.borderColor='rgba(0,255,255,0.2)'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>PORTAL</a>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module" data-presets="react">
+        import React, { useState, useRef, useEffect, useMemo, Suspense, forwardRef } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import * as THREE from 'three';
+        import { Canvas, useThree, useFrame } from '@react-three/fiber';
+        import { OrbitControls, TransformControls, Grid, Environment, ContactShadows, GizmoHelper, GizmoViewport, Stars, Text } from '@react-three/drei';
+        import { STLExporter } from 'three/examples/jsm/exporters/STLExporter';
+
+        const generateUUID = () =>
+            (typeof crypto !== 'undefined' && crypto.randomUUID)
+                ? crypto.randomUUID().slice(0, 4)
+                : Math.random().toString(36).substring(2, 6);
+
+        // --- Audio Engine ---
+        const useEngineSound = (isFiring) => {
+            const audioCtx = useRef(null);
+            const gainNode = useRef(null);
+            useEffect(() => {
+                const initAudio = () => {
+                    if (!audioCtx.current) {
+                        const AudioContext = window.AudioContext || window.webkitAudioContext;
+                        if (!AudioContext) return;
+                        audioCtx.current = new AudioContext();
+
+                        const bufferSize = audioCtx.current.sampleRate * 2;
+                        const buffer = audioCtx.current.createBuffer(1, bufferSize, audioCtx.current.sampleRate);
+                        const data = buffer.getChannelData(0);
+                        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+                        const noise = audioCtx.current.createBufferSource();
+                        noise.buffer = buffer; noise.loop = true;
+
+                        const filter = audioCtx.current.createBiquadFilter();
+                        filter.type = 'lowpass';
+                        filter.frequency.value = 400;
+
+                        gainNode.current = audioCtx.current.createGain();
+                        gainNode.current.gain.value = 0;
+
+                        noise.connect(filter);
+                        filter.connect(gainNode.current);
+                        gainNode.current.connect(audioCtx.current.destination);
+                        noise.start();
+                    }
+                };
+
+                if (isFiring) {
+                    initAudio();
+                    if (audioCtx.current?.state === 'suspended') audioCtx.current.resume();
+                    if (gainNode.current && audioCtx.current) {
+                        const now = audioCtx.current.currentTime;
+                        gainNode.current.gain.cancelScheduledValues(now);
+                        gainNode.current.gain.setValueAtTime(gainNode.current.gain.value, now);
+                        gainNode.current.gain.linearRampToValueAtTime(0.65, now + 0.25);
+                    }
+                } else {
+                    if (gainNode.current && audioCtx.current) {
+                        const now = audioCtx.current.currentTime;
+                        gainNode.current.gain.cancelScheduledValues(now);
+                        gainNode.current.gain.setValueAtTime(gainNode.current.gain.value, now);
+                        gainNode.current.gain.linearRampToValueAtTime(0.0, now + 0.35);
+                    }
+                }
+            }, [isFiring]);
+        };
+
+        // --- High Resolution Procedural Fire Texture ---
+        const createFireTexture = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 2048;
+            const ctx = canvas.getContext('2d');
+
+            const grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            grd.addColorStop(0.00, 'rgba(210,245,255,1.00)');
+            grd.addColorStop(0.06, 'rgba(140,220,255,0.95)');
+            grd.addColorStop(0.18, 'rgba(255,250,210,0.80)');
+            grd.addColorStop(0.40, 'rgba(255,160,60,0.55)');
+            grd.addColorStop(0.65, 'rgba(255,80,20,0.25)');
+            grd.addColorStop(1.00, 'rgba(20,0,0,0.00)');
+            ctx.fillStyle = grd;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.globalCompositeOperation = 'lighter';
+            for (let i = 0; i < 260; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height * 0.55;
+                const w = 8 + Math.random() * 90;
+                const h = 120 + Math.random() * 720;
+                ctx.fillStyle = `rgba(255, ${170 + Math.random() * 70}, ${110 + Math.random() * 80}, ${Math.random() * 0.10})`;
+                ctx.fillRect(x, y, w, h);
+            }
+
+            ctx.globalCompositeOperation = 'screen';
+            for (let i = 0; i < 120; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height * 0.75;
+                const r = 30 + Math.random() * 160;
+                const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+                g.addColorStop(0, `rgba(255,255,255,${0.08 + Math.random() * 0.10})`);
+                g.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = g;
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.minFilter = THREE.LinearFilter;
+            tex.magFilter = THREE.LinearFilter;
+            tex.generateMipmaps = true;
+            tex.needsUpdate = true;
+            return tex;
+        };
+
+        // --- Smoke Texture for Launch ---
+        const createSmokeTexture = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            const grd = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+            grd.addColorStop(0, 'rgba(200, 200, 200, 0.8)');
+            grd.addColorStop(0.4, 'rgba(100, 100, 100, 0.4)');
+            grd.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = grd;
+            ctx.fillRect(0, 0, 256, 256);
+            return new THREE.CanvasTexture(canvas);
+        };
+
+        // --- Plume Material (Shader) ---
+        const usePlumeMaterial = (tex) => {
+            return useMemo(() => {
+                return new THREE.ShaderMaterial({
+                    transparent: true,
+                    depthWrite: false,
+                    depthTest: true,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.DoubleSide,
+                    uniforms: {
+                        uMap: { value: tex },
+                        uOpacity: { value: 0.55 },
+                        uCore: { value: 0.9 },
+                        uTime: { value: 0.0 },
+                    },
+                    vertexShader: `
+            varying vec2 vUv;
+            varying vec3 vN;
+            varying vec3 vV;
+            void main(){
+              vUv = uv;
+              vec4 mv = modelViewMatrix * vec4(position, 1.0);
+              vN = normalize(normalMatrix * normal);
+              vV = normalize(-mv.xyz);
+              gl_Position = projectionMatrix * mv;
+            }
+          `,
+                    fragmentShader: `
+            uniform sampler2D uMap;
+            uniform float uOpacity;
+            uniform float uCore;
+            uniform float uTime;
+            varying vec2 vUv;
+            varying vec3 vN;
+            varying vec3 vV;
+
+            float sat(float x){ return clamp(x, 0.0, 1.0); }
+            float noise2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+
+            void main(){
+              vec2 uv = vUv;
+              uv.y = fract(uv.y + uTime);
+              vec4 t = texture2D(uMap, uv);
+
+              float x = abs(vUv.x - 0.5) * 2.0;
+              float edge = smoothstep(1.0, 0.0, x);
+              float yFade = smoothstep(1.0, 0.08, vUv.y);
+              float facing = sat(dot(vN, vV));
+              float angleFade = smoothstep(0.05, 0.55, facing);
+
+              float core = pow(edge, 3.2) * uCore;
+              float n = noise2(vUv * 18.0 + vec2(uTime * 2.0, -uTime * 1.5));
+              float flick = 0.92 + n * 0.18;
+
+              float a = t.a * yFade * (0.12 + 0.88 * edge) * angleFade;
+              vec3 col = t.rgb;
+              col = mix(col, vec3(1.0), core * 0.45);
+              col *= (0.80 + 0.20 * edge) * flick;
+
+              gl_FragColor = vec4(col, sat(a) * uOpacity);
+            }
+          `,
+                });
+            }, [tex]);
+        };
+
+        // --- Realistic Volumetric Plume ---
+        const RealisticPlume = ({ position, scale, isFiring }) => {
+            const g = useRef();
+            const tex = useMemo(() => createFireTexture(), []);
+            const mat = usePlumeMaterial(tex);
+
+            useFrame((state, delta) => {
+                if (!g.current || !isFiring) return;
+                const t = state.clock.getElapsedTime();
+                mat.uniforms.uTime.value = (mat.uniforms.uTime.value + delta * 0.55) % 1;
+
+                const flick = 0.98 + Math.sin(t * 18.0) * 0.012 + (Math.random() * 0.01);
+                g.current.scale.set(scale * flick, scale * 1.25, scale * flick);
+                g.current.rotation.y = Math.sin(t * 1.5) * 0.01;
+            });
+
+            if (!isFiring) return null;
+
+            return (
+                <group ref={g} position={position}>
+                    {/* Inner core (tight, bright cylinder) */}
+                    <mesh position={[0, -3.2, 0]}>
+                        <cylinderGeometry args={[0.55, 0.35, 6.5, 36, 1, true]} />
+                        <primitive object={mat} attach="material" />
+                    </mesh>
+
+                    {/* Main plume volume: cone frustum */}
+                    <mesh position={[0, -16.0, 0]}>
+                        <cylinderGeometry args={[2.9, 1.2, 30.0, 44, 1, true]} />
+                        <primitive object={mat} attach="material" />
+                    </mesh>
+
+                    {/* Soft outer glow */}
+                    <mesh position={[0, -14.5, 0]}>
+                        <cylinderGeometry args={[4.6, 2.0, 24.0, 36, 1, true]} />
+                        <meshBasicMaterial color="#ff6a2a" transparent opacity={0.06} blending={THREE.NormalBlending} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+                    </mesh>
+
+                    {/* Mach diamonds (Rings) */}
+                    <group position={[0, -9.0, 0]}>
+                        {[0, 1, 2].map((i) => (
+                            <mesh key={i} position={[0, -i * 4.2, 0]}>
+                                <torusGeometry args={[1.0 + i * 0.35, 0.12, 10, 36]} />
+                                <meshBasicMaterial color="#bde9ff" transparent opacity={0.045} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+                            </mesh>
+                        ))}
+                    </group>
+                </group>
+            );
+        };
+
+
+        // --- LaunchStartSync Definition ---
+        const LaunchStartSync = ({ isLaunched, launchStartRef }) => {
+            useFrame((state) => {
+                if (isLaunched && launchStartRef.current == null) {
+                    launchStartRef.current = state.clock.getElapsedTime();
+                }
+            });
+            return null;
+        };
+
+        // --- HELPER FUNC ---
+        const calculateSnap = (newPos, currentParts, selectedPart) => {
+            let result = { pos: newPos.clone(), rot: selectedPart.rotation, props: { ...selectedPart.props }, snapped: false };
+            const SNAP_THRESHOLD = 3.0;
+
+            if (Math.abs(result.pos.x) < SNAP_THRESHOLD) result.pos.x = 0;
+            if (Math.abs(result.pos.z) < SNAP_THRESHOLD) result.pos.z = 0;
+
+            if (['image', 'text', 'solar', 'mount'].includes(selectedPart.type)) {
+                for (const otherPart of currentParts) {
+                    if (otherPart.id === selectedPart.id) continue;
+                    if (['cylinder', 'cone', 'engine', 'capsule', 'adapter'].includes(otherPart.type)) {
+                        const otherY = otherPart.position[1]; const otherH = otherPart.props.height || 10;
+                        if (result.pos.y >= otherY - otherH / 2 && result.pos.y <= otherY + otherH / 2) {
+                            let rTop = 0, rBottom = 0;
+                            if (otherPart.type === 'cone') { rTop = 0; rBottom = otherPart.props.radius; }
+                            else { rTop = otherPart.props.radiusTop || otherPart.props.radiusBottom * 0.4; rBottom = otherPart.props.radiusBottom; }
+
+                            const relY = (result.pos.y - otherY) / otherH; const t = relY + 0.5;
+                            const targetR = rBottom * (1 - t) + rTop * t;
+                            const distSq = (result.pos.x - otherPart.position[0]) ** 2 + (result.pos.z - otherPart.position[2]) ** 2;
+
+                            if (distSq < (targetR * 3) ** 2) {
+                                const angle = Math.atan2(result.pos.x - otherPart.position[0], result.pos.z - otherPart.position[2]);
+                                if (['image', 'text'].includes(selectedPart.type)) {
+                                    result.pos.x = otherPart.position[0]; result.pos.z = otherPart.position[2]; result.rot = [0, angle, 0];
+                                    const imgH = selectedPart.props.height || 10;
+                                    const tTop = Math.min(1, Math.max(0, ((result.pos.y + imgH / 2) - otherY) / otherH + 0.5));
+                                    const tBtm = Math.min(1, Math.max(0, ((result.pos.y - imgH / 2) - otherY) / otherH + 0.5));
+                                    const rImgTop = rBottom * (1 - tTop) + rTop * tTop;
+                                    const rImgBtm = rBottom * (1 - tBtm) + rTop * tBtm;
+                                    result.props.radiusTop = rImgTop + 0.2; result.props.radiusBottom = rImgBtm + 0.2; result.props.radius = (rImgTop + rImgBtm) / 2 + 0.2;
+                                } else {
+                                    const surfaceR = targetR + (selectedPart.type === 'mount' ? 0 : 1.0);
+                                    result.pos.x = otherPart.position[0] + surfaceR * Math.sin(angle);
+                                    result.pos.z = otherPart.position[2] + surfaceR * Math.cos(angle);
+                                    result.rot = [0, angle, 0];
+                                }
+                                result.snapped = true; return result;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!result.snapped) {
+                const movingH = selectedPart.props.height || 10;
+                const mBtm = result.pos.y - movingH / 2; const mTop = result.pos.y + movingH / 2;
+                for (const p of currentParts) {
+                    if (p.id === selectedPart.id) continue;
+                    const pH = p.props.height || 10; const pY = p.position[1];
+                    const pBtm = pY - pH / 2; const pTop = pY + pH / 2;
+                    if (Math.abs(mBtm - pTop) < SNAP_THRESHOLD) { result.pos.y = pTop + movingH / 2; result.pos.x = p.position[0]; result.pos.z = p.position[2]; break; }
+                    if (Math.abs(mTop - pBtm) < SNAP_THRESHOLD) { result.pos.y = pBtm - movingH / 2; result.pos.x = p.position[0]; result.pos.z = p.position[2]; break; }
+                }
+            }
+            return result;
+        };
+
+        // --- AUTOBUILD MODAL DEFINITION ---
+        const AutoBuildModal = ({ isOpen, onClose, onBuild }) => {
+            const [payload, setPayload] = useState('satellite');
+            const [dest, setDest] = useState('orbit');
+            const [booster, setBooster] = useState('none');
+
+            if (!isOpen) return null;
+            return (
+                <div className={`modal-overlay ${isOpen ? 'open' : ''}`}>
+                    <div className="modal-content">
+                        <div className="modal-title"><span>🚀 Auto-Builder</span><button onClick={onClose} className="text-sm text-slate-400">✕</button></div>
+                        <div className="modal-section"><span className="modal-label">PAYLOAD</span><div className="radio-group"><div className={`radio-btn ${payload === 'satellite' ? 'active' : ''}`} onClick={() => setPayload('satellite')}>📡 Satellite</div><div className={`radio-btn ${payload === 'crew' ? 'active' : ''}`} onClick={() => setPayload('crew')}>👨‍🚀 Crew</div></div></div>
+                        <div className="modal-section"><span className="modal-label">DESTINATION</span><div className="radio-group"><div className={`radio-btn ${dest === 'orbit' ? 'active' : ''}`} onClick={() => setDest('orbit')}>Orbit</div><div className={`radio-btn ${dest === 'moon' ? 'active' : ''}`} onClick={() => setDest('moon')}>Moon</div><div className={`radio-btn ${dest === 'mars' ? 'active' : ''}`} onClick={() => setDest('mars')}>Mars</div></div></div>
+                        <div className="modal-section"><span className="modal-label">BOOSTERS</span><div className="radio-group"><div className={`radio-btn ${booster === 'none' ? 'active' : ''}`} onClick={() => setBooster('none')}>None</div><div className={`radio-btn ${booster === 'solid' ? 'active' : ''}`} onClick={() => setBooster('solid')}>Solid</div><div className={`radio-btn ${booster === 'liquid' ? 'active' : ''}`} onClick={() => setBooster('liquid')}>Liquid</div></div></div>
+                        <button className="build-btn" onClick={() => onBuild({ payload, dest, booster })}>BUILD ROCKET</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const Icons = {
+            cone: <svg viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2z" /></svg>,
+            cylinder: <svg viewBox="0 0 24 24"><path d="M12 2c5.52 0 10 1.34 10 3v14c0 1.66-4.48 3-10 3S2 20.66 2 19V5c0-1.66 4.48-3 10-3zm0 2c-4.42 0-8 1.12-8 2.5S7.58 9 12 9s8-1.12 8-2.5S16.42 4 12 4z" opacity="0.9" /></svg>,
+            box: <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3z" /></svg>,
+            image: <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" /></svg>,
+            text: <svg viewBox="0 0 24 24"><path d="M5 4v3h5.5v12h3V7H19V4z" /></svg>,
+            engine: <svg viewBox="0 0 24 24"><path d="M12 2C8 2 8 8 8 8v8c0 2 2 4 4 4s4-2 4-4V8s0-6-4-6zm0 14c-1.1 0-2-.9-2-2V8h4v6c0 1.1-.9 2-2 2z" opacity="0.8" /><path d="M7 22h10v2H7z" /></svg>,
+            solar: <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v4h4V5H5zm6 0v4h4V5h-4zm6 0v4h4V5h-4zM5 11v4h4v-4H5zm6 0v4h4v-4h-4zm6 0v4h4v-4h-4zM5 17v4h4v-4H5zm6 0v4h4v-4h-4zm6 0v4h4v-4h-4z" /></svg>,
+            mount: <svg viewBox="0 0 24 24"><path d="M12 2c5.52 0 10 2 10 4v2c0 2-4.48 4-10 4S2 10 2 8V6c0-2 4.48-4 10-4zm0 2c-4.42 0-8 1.12-8 2.5S7.58 8 12 8s8-1.12 8-2.5S16.42 4 12 4z" /><path d="M4 8v8c0 2 4.48 4 10 4s10-2 10-4V8" fill="none" stroke="currentColor" strokeWidth="2" /></svg>,
+            capsule: <svg viewBox="0 0 24 24"><path d="M12 2C7.58 2 4 5.58 4 10v4h16v-4c0-4.42-3.58-8-8-8z" /></svg>,
+            grip: <svg viewBox="0 0 24 24" width="12" height="12"><path d="M9 3H7v2h2V3zm0 4H7v2h2V7zm0 4H7v2h2v-2zm0 4H7v2h2v-2zm0 4H7v2h2v-2zm4-16h-2v2h2V3zm0 4h-2v2h2V7zm0 4h-2v2h2v-2zm0 4h-2v2h2v-2zm0 4h-2v2h2v-2z" fill="currentColor" /></svg>
+        };
+        const PartIcon = ({ type }) => <div className="part-icon text-sky-400">{Icons[type] || Icons.box}</div>;
+
+        const INITIAL_PARTS = [
+            { id: 'p1', name: 'Nose Cone', type: 'cone', position: [0, 62.5, 0], rotation: [0, 0, 0], scale: [1, 1, 1], props: { radius: 10, height: 25, segments: 64 } },
+            { id: 'p2', name: 'Fuel Tank (Main)', type: 'cylinder', position: [0, 20, 0], rotation: [0, 0, 0], scale: [1, 1, 1], props: { radiusTop: 10, radiusBottom: 10, height: 60, segments: 64 } },
+            { id: 'p3', name: 'Engine (Merlin)', type: 'engine', position: [0, -15, 0], rotation: [0, 0, 0], scale: [1, 1, 1], props: { radiusTop: 6, radiusBottom: 8, height: 12 } }
+        ];
+
+        // --- 3D Parts ---
+        const CurvedImagePart = ({ data }) => {
+            const { url, height, radiusTop, radiusBottom, arc, texRotation } = data.props;
+            const originalTexture = useLoader(THREE.TextureLoader, url);
+            const texture = useMemo(() => originalTexture.clone(), [originalTexture]);
+            const rTop = radiusTop ?? 10;
+            const rBottom = radiusBottom ?? 10;
+            const arcAngle = arc ?? 1.5;
+            const imgHeight = height ?? 10;
+            const rotation = texRotation ?? 0;
+            useEffect(() => { if (texture) { texture.center.set(0.5, 0.5); texture.rotation = rotation; texture.needsUpdate = true; } }, [texture, rotation]);
+            return <mesh castShadow receiveShadow><cylinderGeometry args={[rTop, rBottom, imgHeight, 64, 1, true, -arcAngle / 2, arcAngle]} /><meshBasicMaterial map={texture} transparent side={THREE.DoubleSide} toneMapped={false} alphaTest={0.1} /></mesh>;
+        };
+
+        const CurvedTextPart = ({ data }) => {
+            const { text, color, height, radiusTop, radiusBottom, arc, texRotation } = data.props;
+            const rTop = radiusTop ?? 10;
+            const rBottom = radiusBottom ?? 10;
+            const arcAngle = arc ?? Math.PI / 2;
+            const textHeight = height ?? 10;
+            const rotation = texRotation ?? 0;
+            const texture = useMemo(() => {
+                const canvas = document.createElement('canvas'); const size = 1024; canvas.width = size; canvas.height = size;
+                const ctx = canvas.getContext('2d'); ctx.clearRect(0, 0, size, size);
+                ctx.translate(size / 2, size / 2); ctx.rotate(rotation); ctx.translate(-size / 2, -size / 2);
+                ctx.fillStyle = color || '#ffffff'; const fontSize = size * 0.15; ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text || 'TEXT', size / 2, size / 2);
+                const tex = new THREE.CanvasTexture(canvas); tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter; tex.needsUpdate = true; return tex;
+            }, [text, color, rotation]);
+            return <mesh castShadow receiveShadow><cylinderGeometry args={[rTop, rBottom, textHeight, 64, 1, true, -arcAngle / 2, arcAngle]} /><meshStandardMaterial map={texture} transparent side={THREE.DoubleSide} alphaTest={0.05} color="white" emissive={color} emissiveIntensity={0.3} toneMapped={false} /></mesh>;
+        };
+
+        const EnginePart = ({ data, isFiring, matProps }) => (
+            <group>
+                <mesh castShadow receiveShadow position={[0, data.props.height / 3, 0]}><cylinderGeometry args={[data.props.radiusTop, data.props.radiusTop * 0.9, data.props.height / 3, 32]} /><meshStandardMaterial {...matProps} color="#475569" roughness={0.7} /></mesh>
+                <mesh castShadow receiveShadow position={[0, data.props.height / 6, 0]}><cylinderGeometry args={[data.props.radiusTop * 0.9, data.props.radiusTop * 0.4, data.props.height / 6, 32]} /><meshStandardMaterial {...matProps} color="#334155" metalness={0.8} /></mesh>
+                <mesh castShadow receiveShadow position={[0, -data.props.height / 4, 0]}><cylinderGeometry args={[data.props.radiusTop * 0.4, data.props.radiusBottom, data.props.height / 1.5, 32, 1, true]} /><meshStandardMaterial {...matProps} color="#1e293b" metalness={0.5} roughness={0.6} side={THREE.DoubleSide} /></mesh>
+                <mesh position={[data.props.radiusTop * 0.8, data.props.height / 3, 0]}><cylinderGeometry args={[0.5, 0.5, data.props.height / 2, 8]} /><meshStandardMaterial color="#94a3b8" metalness={0.9} /></mesh>
+                {isFiring && <RealisticPlume position={[0, -data.props.height / 1.5 - 2, 0]} scale={data.props.radiusBottom / 4.2} isFiring={true} />}
+            </group>
+        );
+
+        const PartMesh = forwardRef(({ data, isSelected, onPointerDown, transformMode, isFiring }, ref) => {
+            const isMount = data.type === 'mount';
+            const matProps = {
+                color: isMount ? "#475569" : (isSelected ? "#0ea5e9" : "#cbd5e1"),
+                emissive: isSelected ? "#0ea5e9" : "#000000",
+                emissiveIntensity: isSelected ? 0.35 : 0,
+                metalness: 0.6,
+                roughness: 0.4,
+                polygonOffset: isSelected,
+                polygonOffsetFactor: -1
+            };
+
+            if (data.type === 'cylinder' && data.name.includes('Orange')) {
+                matProps.color = "#d97706"; matProps.roughness = 0.8; matProps.metalness = 0.1;
+            }
+
+            let content = null;
+            if (data.type === 'cone') content = <mesh castShadow receiveShadow><coneGeometry args={[data.props.radius, data.props.height, 64]} /><meshStandardMaterial {...matProps} /></mesh>;
+            else if (data.type === 'cylinder') content = <mesh castShadow receiveShadow><cylinderGeometry args={[data.props.radiusTop, data.props.radiusBottom, data.props.height, 64]} /><meshStandardMaterial {...matProps} /></mesh>;
+            else if (data.type === 'box') content = <mesh castShadow receiveShadow><boxGeometry args={[data.props.width, data.props.height, data.props.depth]} /><meshStandardMaterial {...matProps} /></mesh>;
+            else if (data.type === 'engine') content = <EnginePart data={data} isFiring={isFiring} matProps={matProps} />;
+            else if (data.type === 'mount') content = <mesh castShadow receiveShadow><torusGeometry args={[data.props.radius, 1, 16, 64]} /><meshStandardMaterial {...matProps} /></mesh>;
+            else if (data.type === 'capsule') content = <mesh castShadow receiveShadow><coneGeometry args={[data.props.radiusBottom * 0.4, data.props.radiusBottom, data.props.height, 64]} /><meshStandardMaterial {...matProps} /></mesh>;
+            else if (data.type === 'solar') content = <group><mesh><boxGeometry args={[2, 4, 1]} /><meshStandardMaterial color="#333" /></mesh><mesh position={[0, 0, 0.6]}><boxGeometry args={[12, 30, 0.2]} /><meshStandardMaterial color="#1e3a8a" roughness={0.2} metalness={0.8} /></mesh></group>;
+            else if (data.type === 'image') content = <CurvedImagePart data={data} />;
+            else if (data.type === 'text') content = <CurvedTextPart data={data} />;
+            else if (data.type === 'adapter') content = <mesh castShadow receiveShadow><cylinderGeometry args={[data.props.radiusTop, data.props.radiusBottom, data.props.height, 64]} /><meshStandardMaterial {...matProps} color="#d97706" /></mesh>;
+
+            return (
+                <group ref={ref} position={data.position} rotation={data.rotation} scale={data.scale} onPointerDown={(e) => { e.stopPropagation(); onPointerDown(e, data.id); }}>
+                    {content}
+                    {isSelected && (data.type === 'image' || data.type === 'text') && <mesh visible={false}><boxGeometry args={[15, 15, 15]} /><meshBasicMaterial wireframe color="#0ea5e9" /></mesh>}
+                </group>
+            );
+        });
+        // --- 発射スモークエフェクト ---
+        const LaunchSmoke = ({ isLaunching, launchElapsed }) => {
+            const pointsRef = useRef();
+            const PARTICLE_COUNT = 200;
+
+            // パーティクル位置を毎フレーム更新
+            const positions = useMemo(() => {
+                const arr = new Float32Array(PARTICLE_COUNT * 3);
+                for (let i = 0; i < PARTICLE_COUNT; i++) {
+                    arr[i * 3] = (Math.random() - 0.5) * 8;
+                    arr[i * 3 + 1] = Math.random() * 20;
+                    arr[i * 3 + 2] = (Math.random() - 0.5) * 8;
+                }
+                return arr;
+            }, []);
+
+            useFrame((state) => {
+                if (!pointsRef.current || !isLaunching) return;
+                const pos = pointsRef.current.geometry.attributes.position.array;
+                const t = state.clock.elapsedTime * 2;
+                for (let i = 0; i < PARTICLE_COUNT; i++) {
+                    pos[i * 3 + 1] += 0.15;
+                    if (pos[i * 3 + 1] > 25) pos[i * 3 + 1] = 0;
+                    pos[i * 3] += Math.sin(t + i) * 0.03;
+                }
+                pointsRef.current.geometry.attributes.position.needsUpdate = true;
+            });
+
+            if (!isLaunching) return null;
+            return (
+                <points ref={pointsRef}>
+                    <bufferGeometry>
+                        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+                    </bufferGeometry>
+                    <pointsMaterial size={1.5} color="#aaaaaa" transparent opacity={0.5} depthWrite={false} />
+                </points>
+            );
+        };
+
+        const Scene = ({ parts, setParts, selectedId, setSelectedId, transformMode, modelGroupRef, snapEnabled, orbitControlsRef, globalScale, isFiring, isLaunched, launchStartRef }) => {
+            const selectedPart = parts.find(p => p.id === selectedId);
+            const transformControlsRef = useRef();
+            const { camera, raycaster, gl } = useThree();
+            const [isDragging, setIsDragging] = useState(false);
+            const dragOffset = useRef(new THREE.Vector3());
+            const dragPlane = useRef(new THREE.Plane());
+            const partsRef = useRef(parts);
+            const meshRefs = useRef({});
+            const launchVel = useRef(0);
+            useEffect(() => { partsRef.current = parts; }, [parts]);
+            useEffect(() => { if (transformControlsRef.current) { const controls = transformControlsRef.current; const target = selectedId ? meshRefs.current[selectedId] : null; if (target && transformMode !== 'translate') { controls.attach(target); controls.setMode(transformMode); } else { controls.detach(); } } }, [selectedId, transformMode]);
+            useEffect(() => { if (!isLaunched || !modelGroupRef.current) return; launchVel.current = 0; }, [isLaunched]);
+            useFrame((state, delta) => {
+                const launchStart = launchStartRef.current;
+                const launchElapsed = launchStart ? (state.clock.getElapsedTime() - launchStart) : 0;
+                if (isLaunched && modelGroupRef.current) {
+                    const a = 6.0; const drag = 0.15;
+                    launchVel.current += a * delta; launchVel.current *= (1 - drag * delta);
+                    const dy = launchVel.current * delta;
+                    modelGroupRef.current.position.y += dy;
+                    if (orbitControlsRef.current) { orbitControlsRef.current.target.y += dy; camera.position.y += dy * 0.85; }
+                }
+                if (modelGroupRef.current) modelGroupRef.current.userData.launchElapsed = Math.max(0, launchElapsed);
+            });
+            const handlePartPointerDown = (e, id) => {
+                setSelectedId(id); if (transformMode !== 'translate') return;
+                const part = parts.find(p => p.id === id); if (!part) return;
+                setIsDragging(true); if (orbitControlsRef.current) orbitControlsRef.current.enabled = false;
+                document.body.style.cursor = 'grabbing';
+                const normal = new THREE.Vector3(); camera.getWorldDirection(normal); normal.negate();
+                dragPlane.current.setFromNormalAndCoplanarPoint(normal, new THREE.Vector3(...part.position));
+                const intersect = new THREE.Vector3(); raycaster.setFromCamera({ x: (e.clientX / window.innerWidth) * 2 - 1, y: -(e.clientY / window.innerHeight) * 2 + 1 }, camera);
+                if (raycaster.ray.intersectPlane(dragPlane.current, intersect)) { dragOffset.current.subVectors(new THREE.Vector3(...part.position), intersect); }
+            };
+            useEffect(() => {
+                const handlePointerMove = (e) => {
+                    if (!isDragging || !selectedPart || transformMode !== 'translate') return;
+                    raycaster.setFromCamera({ x: (e.clientX / window.innerWidth) * 2 - 1, y: -(e.clientY / window.innerHeight) * 2 + 1 }, camera);
+                    const intersect = new THREE.Vector3();
+                    if (raycaster.ray.intersectPlane(dragPlane.current, intersect)) {
+                        const newPos = new THREE.Vector3().addVectors(intersect, dragOffset.current);
+                        if (snapEnabled) {
+                            const res = calculateSnap(newPos, partsRef.current, selectedPart);
+                            setParts(prev => prev.map(p => p.id === selectedId ? { ...p, position: [res.pos.x, res.pos.y, res.pos.z], rotation: res.rot, props: res.props } : p));
+                        } else { setParts(prev => prev.map(p => p.id === selectedId ? { ...p, position: [newPos.x, newPos.y, newPos.z] } : p)); }
+                    }
+                };
+                const handlePointerUp = () => { if (!isDragging) return; setIsDragging(false); if (orbitControlsRef.current) orbitControlsRef.current.enabled = true; document.body.style.cursor = 'auto'; };
+                window.addEventListener('pointermove', handlePointerMove); window.addEventListener('pointerup', handlePointerUp);
+                return () => { window.removeEventListener('pointermove', handlePointerMove); window.removeEventListener('pointerup', handlePointerUp); };
+            }, [isDragging, selectedPart, selectedId, transformMode, snapEnabled, camera, raycaster, orbitControlsRef]);
+            const handleTransformChange = (e) => { const obj = e?.target?.object; if (!obj || !selectedId || transformMode === 'translate') return; setParts(prev => prev.map(p => p.id === selectedId ? { ...p, rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z], scale: [obj.scale.x, obj.scale.y, obj.scale.z] } : p)); };
+
+            return (
+                <>
+                    <ambientLight intensity={0.6} /><spotLight position={[50, 100, 50]} angle={0.25} penumbra={1} intensity={2} castShadow />
+                    <Environment preset="city" /><Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+                    <group ref={modelGroupRef} scale={[globalScale, globalScale, globalScale]}>
+                        <Suspense fallback={null}> {parts.map(part => (<PartMesh ref={el => (meshRefs.current[part.id] = el)} key={part.id} data={part} isSelected={selectedId === part.id} onPointerDown={handlePartPointerDown} transformMode={transformMode} isFiring={isFiring} />))} </Suspense>
+                    </group>
+                    <TransformControls ref={transformControlsRef} onObjectChange={handleTransformChange} size={0.8} />
+                    <Grid infiniteGrid sectionSize={10} sectionColor="#334155" cellColor="#1e293b" fadeDistance={250} position={[0, -0.1, 0]} />
+                    <ContactShadows resolution={1024} scale={200} blur={2.5} opacity={0.4} far={20} color="#000000" />
+                    <GizmoHelper alignment="bottom-right" margin={[80, 80]}> <GizmoViewport axisColors={['#ef4444', '#22c55e', '#3b82f6']} labelColor="white" /> </GizmoHelper>
+                    <LaunchSmoke isLaunching={isLaunched} launchElapsed={modelGroupRef.current?.userData?.launchElapsed ?? 0} />
+                </>
+            );
+        };
+
+        const App = () => {
+            const [parts, setParts] = useState(INITIAL_PARTS);
+            const [selectedId, setSelectedId] = useState(parts[0].id);
+            const [transformMode, setTransformMode] = useState('translate');
+            const [snapEnabled, setSnapEnabled] = useState(true);
+            const [globalScale, setGlobalScale] = useState(1.0);
+            const [showPartsPanel, setShowPartsPanel] = useState(false);
+            const [isFiring, setIsFiring] = useState(false);
+            const [isLaunched, setIsLaunched] = useState(false);
+            const [tab, setTab] = useState('Shapes');
+            const [showAutoModal, setShowAutoModal] = useState(false);
+            const modelGroupRef = useRef(); const orbitControlsRef = useRef(); const fileInputRef = useRef();
+            const launchStartRef = useRef(null); const firingStopTimer = useRef(null);
+            useEngineSound(isFiring);
+            const selectedPart = useMemo(() => parts.find(p => p.id === selectedId), [parts, selectedId]);
+            const updatePartProp = (key, value) => { setParts(prev => prev.map(p => (p.id === selectedId) ? { ...p, props: { ...p.props, [key]: value } } : p)); };
+            const changePlacementAngle = (newAngle) => { if (!selectedPart) return; const currentR = Math.sqrt(selectedPart.position[0] ** 2 + selectedPart.position[2] ** 2) || selectedPart.props.radius || 10; const newX = currentR * Math.sin(newAngle); const newZ = currentR * Math.cos(newAngle); const newRotY = newAngle; setParts(prev => prev.map(p => p.id === selectedId ? { ...p, position: [newX, p.position[1], newZ], rotation: [p.rotation[0], newRotY, p.rotation[2]] } : p)); };
+            const currentPlacementAngle = useMemo(() => { if (!selectedPart) return 0; let angle = Math.atan2(selectedPart.position[0], selectedPart.position[2]); if (angle < 0) angle += Math.PI * 2; return angle; }, [selectedPart]);
+            const addPart = (type, variant = 'default') => {
+                const newId = generateUUID(); let baseProps = { width: 10, height: 10, depth: 10 }; let name = type;
+
+                let rLower = 10;
+                const activePart = selectedPart || (parts.length > 0 ? parts[parts.length - 1] : null);
+                if (activePart) {
+                    if (activePart.type === 'cylinder') rLower = activePart.props.radiusTop;
+                    else if (activePart.type === 'cone') rLower = 0;
+                    else if (activePart.type === 'engine') rLower = activePart.props.radiusTop;
+                    else if (activePart.type === 'mount') rLower = activePart.props.radius;
+                    else if (activePart.type === 'adapter') rLower = activePart.props.radiusTop;
+                }
+
+                if (type === 'cone') { baseProps = { radius: rLower, height: Math.max(18, rLower * 2.2), segments: 64 }; name = 'Nose Cone'; }
+                else if (type === 'cylinder') {
+                    if (variant === 'orange') { name = 'Orange Tank'; } else { name = 'Tube'; }
+                    baseProps = { radiusTop: rLower, radiusBottom: rLower, height: 20, segments: 64 };
+                }
+                else if (type === 'box') { name = 'Box'; }
+                else if (type === 'engine') {
+                    if (variant === 'f1') { baseProps = { radiusTop: 8, radiusBottom: 12, height: 18 }; name = 'Engine F-1'; }
+                    else if (variant === 'le') { baseProps = { radiusTop: 5, radiusBottom: 7, height: 10 }; name = 'Engine LE'; }
+                    else { baseProps = { radiusTop: 6, radiusBottom: 8, height: 12 }; name = 'Engine'; }
+                }
+                else if (type === 'mount') { baseProps = { radius: rLower, height: 2 }; name = 'Mount'; }
+                else if (type === 'adapter') { baseProps = { radiusTop: rLower * 0.6, radiusBottom: rLower, height: 5 }; name = 'Adapter'; }
+                else if (type === 'solar') { baseProps = { width: 12, height: 30 }; name = 'Solar Panel'; }
+                else if (type === 'capsule') {
+                    if (variant === 'apollo') { baseProps = { radiusBottom: 10, height: 12 }; name = 'Capsule (USA)'; }
+                    else { baseProps = { radiusBottom: 9, height: 14 }; name = 'Capsule (Soyuz)'; }
+                }
+
+                let maxY = 0, targetX = 0, targetZ = 0;
+                if (activePart) { const h = activePart.props.height || 10; maxY = activePart.position[1] + h / 2; targetX = activePart.position[0]; targetZ = activePart.position[2]; }
+                const newH = baseProps.height || 10; const newY = maxY + newH / 2;
+                const newPart = { id: newId, name: `${name} ${newId.slice(0, 2)}`, type, position: [targetX, newY, targetZ], rotation: [0, 0, 0], scale: [1, 1, 1], props: baseProps };
+                setParts([...parts, newPart]); setSelectedId(newId); setShowPartsPanel(false);
+            };
+            const addText = () => { const newId = generateUUID(); const newPart = { id: newId, name: `Text`, type: 'text', position: [30, 10, 0], rotation: [0, 0, 0], scale: [1, 1, 1], props: { text: 'ROCKET', color: '#ffffff', height: 10, radius: 10, arc: 1.5, texRotation: 0, radiusTop: 10, radiusBottom: 10 } }; setParts([...parts, newPart]); setSelectedId(newId); setShowPartsPanel(false); };
+            const handleAddImageClick = () => fileInputRef.current?.click();
+            const handleImageUpload = (e) => { const file = e.target.files[0]; if (file) { const reader = new FileReader(); reader.onload = (loadEvent) => { const newId = generateUUID(); const newPart = { id: newId, name: `Image`, type: 'image', position: [30, 10, 0], rotation: [0, 0, 0], scale: [1, 1, 1], props: { url: loadEvent.target.result, height: 20, radius: 10, arc: 1.5, texRotation: 0, radiusTop: 10, radiusBottom: 10 } }; setParts(prev => [...prev, newPart]); setSelectedId(newId); setShowPartsPanel(false); }; reader.readAsDataURL(file); } e.target.value = null; };
+            const deleteSelected = () => { if (!selectedId) return; setParts(prev => prev.filter(p => p.id !== selectedId)); setSelectedId(null); };
+            const handleExport = () => { if(!window.requireExportLicense||!window.requireExportLicense())return; if (!modelGroupRef.current) return; const exporter = new STLExporter(); const result = exporter.parse(modelGroupRef.current, { binary: true }); const blob = new Blob([result], { type: 'application/octet-stream' }); const link = document.createElement('a'); link.style.display = 'none'; link.href = URL.createObjectURL(blob); link.download = 'rocket_model.stl'; document.body.appendChild(link); link.click(); };
+            const handleLaunchToggle = () => { if (isLaunched || isFiring) { setIsLaunched(false); setIsFiring(false); launchStartRef.current = null; if (firingStopTimer.current) clearTimeout(firingStopTimer.current); return; } setIsFiring(true); launchStartRef.current = null; setTimeout(() => { setIsLaunched(true); requestAnimationFrame(() => { }); }, 900); firingStopTimer.current = setTimeout(() => { setIsFiring(false); }, 6000); };
+            const handleBackgroundClick = (e) => { if (e.target.id === 'ui-layer' || (typeof e.target.className === 'string' && e.target.className.includes('canvas-wrapper'))) { setSelectedId(null); } };
+
+            const handleAutoBuild = ({ payload, dest, booster }) => {
+                const newParts = []; let currentY = 0; const mainEngineH = 18; const tankRadius = 10;
+                newParts.push({ id: generateUUID(), name: 'Main Engine', type: 'engine', position: [0, currentY, 0], rotation: [0, 0, 0], scale: [1, 1, 1], props: { radiusTop: tankRadius * 0.8, radiusBottom: tankRadius * 1.2, height: mainEngineH } }); currentY += mainEngineH / 2;
+                const tankHeight = dest === 'mars' ? 80 : dest === 'moon' ? 60 : 40; currentY += tankHeight / 2;
+                newParts.push({ id: generateUUID(), name: 'Stage 1 Tank', type: 'cylinder', position: [0, currentY, 0], rotation: [0, 0, 0], scale: [1, 1, 1], props: { radiusTop: tankRadius, radiusBottom: tankRadius, height: tankHeight } }); currentY += tankHeight / 2;
+                if (booster !== 'none') {
+                    const boosterH = tankHeight * 0.8; const boosterR = booster === 'solid' ? 4 : 5; const offset = tankRadius + boosterR + 1; const bEngH = Math.max(10, boosterR * 2.4); const bNoseH = Math.max(10, boosterR * 2.6); const boosterCenterY = (currentY - tankHeight / 2) - 5;
+                    [-1, 1].forEach((side) => {
+                        const decouplerPos = [side * (tankRadius + 0.5), currentY - tankHeight / 2, 0]; newParts.push({ id: generateUUID(), name: `Strut ${side}`, type: 'box', position: decouplerPos, rotation: [0, 0, 0], scale: [1, 1, 1], props: { width: 1.5, height: 4, depth: 1.5 } });
+                        const bPos = [side * offset, boosterCenterY, 0]; newParts.push({ id: generateUUID(), name: `Booster Tank ${side}`, type: 'cylinder', position: bPos, rotation: [0, 0, 0], scale: [1, 1, 1], props: { radiusTop: boosterR, radiusBottom: boosterR, height: boosterH } });
+                        const bEngY = bPos[1] - boosterH / 2 - bEngH / 2; newParts.push({ id: generateUUID(), name: `Booster Engine ${side}`, type: 'engine', position: [bPos[0], bEngY, bPos[2]], rotation: [0, 0, 0], scale: [1, 1, 1], props: { radiusTop: boosterR * 0.75, radiusBottom: boosterR * 1.15, height: bEngH } });
+                        const bNoseY = bPos[1] + boosterH / 2 + bNoseH / 2; newParts.push({ id: generateUUID(), name: `Booster Nose ${side}`, type: 'cone', position: [bPos[0], bNoseY, bPos[2]], rotation: [0, 0, 0], scale: [1, 1, 1], props: { radius: boosterR, height: bNoseH, segments: 64 } });
+                    });
+                }
+                if (dest !== 'orbit') {
+                    const interH = 6; currentY += interH / 2; newParts.push({ id: generateUUID(), name: 'Interstage', type: 'cylinder', position: [0, currentY, 0], rotation: [0, 0, 0], scale: [1, 1, 1], props: { radiusTop: tankRadius, radiusBottom: tankRadius, height: interH } }); currentY += interH / 2;
+                    const s2H = 25; currentY += s2H / 2; newParts.push({ id: generateUUID(), name: 'Stage 2', type: 'cylinder', position: [0, currentY, 0], rotation: [0, 0, 0], scale: [1, 1, 1], props: { radiusTop: tankRadius, radiusBottom: tankRadius, height: s2H } }); currentY += s2H / 2;
+                }
+                if (payload === 'crew') {
+                    const adapterH = 3; currentY += adapterH / 2; newParts.push({ id: generateUUID(), name: 'Adapter', type: 'adapter', position: [0, currentY, 0], rotation: [0, 0, 0], scale: [1, 1, 1], props: { radiusTop: tankRadius * 1.05, radiusBottom: tankRadius, height: adapterH } }); currentY += adapterH / 2;
+                    const capsuleH = 10; currentY += capsuleH / 2; newParts.push({ id: generateUUID(), name: 'Crew Capsule', type: 'capsule', position: [0, currentY, 0], rotation: [0, 0, 0], scale: [1, 1, 1], props: { radiusBottom: tankRadius * 1.05, height: capsuleH } });
+                    const towerBaseH = 2; currentY += capsuleH / 2 + towerBaseH / 2; newParts.push({ id: generateUUID(), name: 'Tower Base', type: 'cone', position: [0, currentY, 0], rotation: [0, 0, 0], scale: [1, 1, 1], props: { radius: 1.5, height: towerBaseH } });
+                    const towerH = 12; currentY += towerBaseH / 2 + towerH / 2; newParts.push({ id: generateUUID(), name: 'Escape Tower', type: 'cylinder', position: [0, currentY, 0], rotation: [0, 0, 0], scale: [1, 1, 1], props: { radiusTop: 0.2, radiusBottom: 0.5, height: towerH } });
+                } else {
+                    const fairingH = Math.max(22, tankRadius * 2.6); currentY += fairingH / 2; newParts.push({ id: generateUUID(), name: 'Fairing', type: 'cone', position: [0, currentY, 0], rotation: [0, 0, 0], scale: [1, 1, 1], props: { radius: tankRadius, height: fairingH, segments: 64 } });
+                }
+                setParts(newParts); setSelectedId(null); setShowAutoModal(false);
+            };
+
+            return (
+                <div className={`app-container ${selectedId ? 'panel-open' : ''}`} onClick={handleBackgroundClick}>
+                    <div className="canvas-wrapper">
+                        <Canvas shadows dpr={[1, 2]} gl={{ antialias: true, powerPreference: "high-performance", alpha: false }} camera={{ position: [120, 80, 120], fov: 30 }} onPointerMissed={() => setSelectedId(null)}>
+                            <LaunchStartSync isLaunched={isLaunched} launchStartRef={launchStartRef} />
+                            <Scene parts={parts} setParts={setParts} selectedId={selectedId} setSelectedId={setSelectedId} transformMode={transformMode} modelGroupRef={modelGroupRef} snapEnabled={snapEnabled} orbitControlsRef={orbitControlsRef} globalScale={globalScale} isFiring={isFiring} isLaunched={isLaunched} launchStartRef={launchStartRef} />
+                            <OrbitControls ref={orbitControlsRef} makeDefault minDistance={20} maxDistance={500} target={[0, 35, 0]} />
+                        </Canvas>
+                    </div>
+                    <div id="ui-layer">
+                        <header className="app-header glass-panel pointer-events-auto">
+                            <div className="flex items-center"><div className="brand text-sky-400">Grace of Touch</div><div className="global-scale-ctrl hidden sm:flex"><label>SCALE</label><input type="range" min="0.1" max="3" step="0.1" value={globalScale} onChange={(e) => setGlobalScale(parseFloat(e.target.value))} /></div></div>
+                            <div className="flex gap-2 items-center"><button className="header-btn magic" onClick={() => setShowAutoModal(true)}>🪄 AUTO</button><button className={`header-btn ${isLaunched || isFiring ? 'abort' : 'launch'} ${(isFiring && !isLaunched) ? 'animate-pulse' : ''}`} onClick={handleLaunchToggle} title={isLaunched || isFiring ? 'Abort' : 'Launch'}>{isLaunched || isFiring ? '🛑 ABORT' : '🚀 LAUNCH'}</button><button className="header-btn primary" onClick={() => setShowPartsPanel(!showPartsPanel)}>📦 Parts</button><button className="header-btn" onClick={handleExport}><span>⇩</span></button></div>
+                        </header>
+                        <AutoBuildModal isOpen={showAutoModal} onClose={() => setShowAutoModal(false)} onBuild={handleAutoBuild} />
+                        <div className={`drawer-backdrop ${showPartsPanel ? 'visible' : ''}`} onClick={() => setShowPartsPanel(false)}></div>
+                        <div className={`parts-panel glass-panel pointer-events-auto ${showPartsPanel ? 'open' : ''}`}>
+                            <div className="panel-header"><span>COMPONENTS</span><button onClick={() => setShowPartsPanel(false)} className="text-white">✕</button></div>
+                            <div className="parts-list">{parts.map((part) => (<div key={part.id} className={`part-item ${selectedId === part.id ? 'selected' : ''}`} onClick={(e) => { e.stopPropagation(); setSelectedId(part.id); setShowPartsPanel(false); }}><PartIcon type={part.type} /><div className="part-info"><span className="part-name">{part.name}</span></div></div>))}</div>
+                            <div className="p-3 border-t border-slate-700/50 bg-slate-900/30 flex flex-col gap-2">
+                                <div className="category-tabs">{['Shapes', 'Engines', 'Struct', 'Payload'].map(t => (<div key={t} className={`cat-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{t}</div>))}</div>
+                                <div className="add-btn-group">
+                                    {tab === 'Shapes' && <><button className="add-btn" onClick={() => addPart('cylinder')}>{Icons.cylinder}<span>Tube</span></button><button className="add-btn" onClick={() => addPart('cylinder', 'orange')}>{Icons.cylinder}<span className="text-orange-400">Tank</span></button><button className="add-btn" onClick={() => addPart('cone')}>{Icons.cone}<span>Cone</span></button><button className="add-btn" onClick={() => addPart('box')}>{Icons.box}<span>Box</span></button><button className="add-btn" onClick={handleAddImageClick}>{Icons.image}<span>Img</span></button><button className="add-btn" onClick={addText}>{Icons.text}<span>Txt</span></button></>}
+                                    {tab === 'Engines' && <><button className="add-btn" onClick={() => addPart('engine', 'f1')}>{Icons.engine}<span>USA F1</span></button><button className="add-btn" onClick={() => addPart('engine', 'default')}>{Icons.engine}<span>Generic</span></button><button className="add-btn" onClick={() => addPart('engine', 'le')}>{Icons.engine}<span>Jpn LE</span></button></>}
+                                    {tab === 'Struct' && <><button className="add-btn" onClick={() => addPart('mount')}>{Icons.mount}<span>Mount</span></button><button className="add-btn" onClick={() => addPart('adapter')}>{Icons.cylinder}<span>Adapter</span></button><button className="add-btn" onClick={() => addPart('cylinder')}>{Icons.cylinder}<span>Tank</span></button></>}
+                                    {tab === 'Payload' && <><button className="add-btn" onClick={() => addPart('capsule', 'apollo')}>{Icons.capsule}<span>Apollo</span></button><button className="add-btn" onClick={() => addPart('capsule', 'soyuz')}>{Icons.capsule}<span>Soyuz</span></button><button className="add-btn" onClick={() => addPart('solar')}>{Icons.solar}<span>Solar</span></button></>}
+                                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+                                </div>
+                            </div>
+                        </div>
+                        <div className={`prop-panel glass-panel pointer-events-auto ${selectedPart ? 'visible' : ''}`}>
+                            {selectedPart && (
+                                <>
+                                    <div className="flex justify-between items-center border-b border-slate-700/50 pb-2 mb-2"><h3 className="text-sm font-bold text-sky-400 truncate">{selectedPart.name}</h3><button className="text-xs text-red-400" onClick={deleteSelected}>DELETE</button></div>
+                                    <div className="control-group"><div className="toolbar"><div className={`tool-btn ${transformMode === 'translate' ? 'active' : ''}`} onClick={() => setTransformMode('translate')}>✛</div><div className={`tool-btn ${transformMode === 'rotate' ? 'active' : ''}`} onClick={() => setTransformMode('rotate')}>↻</div><div className={`tool-btn ${transformMode === 'scale' ? 'active' : ''}`} onClick={() => setTransformMode('scale')}>⤡</div><div className={`tool-btn ${snapEnabled ? 'snap-active' : ''}`} onClick={() => setSnapEnabled(!snapEnabled)}>🧲</div></div></div>
+                                    <div className="space-y-4">
+                                        {(selectedPart.type === 'cone' || selectedPart.type === 'cylinder' || selectedPart.type === 'engine' || selectedPart.type === 'capsule' || selectedPart.type === 'adapter') && (<> {selectedPart.type === 'cone' ? <div className="control-group"><div className="control-label">Radius</div><input type="range" min="1" max="50" step="0.5" value={selectedPart.props.radius} onChange={(e) => updatePartProp('radius', parseFloat(e.target.value))} /></div> : <> <div className="control-group"><div className="control-label">Top Radius</div><input type="range" min="0" max="50" step="0.5" value={selectedPart.props.radiusTop} onChange={(e) => updatePartProp('radiusTop', parseFloat(e.target.value))} /></div> <div className="control-group"><div className="control-label">Btm Radius</div><input type="range" min="0" max="50" step="0.5" value={selectedPart.props.radiusBottom} onChange={(e) => updatePartProp('radiusBottom', parseFloat(e.target.value))} /></div> </>} <div className="control-group"><div className="control-label">Height</div><input type="range" min="1" max="100" value={selectedPart.props.height} onChange={(e) => updatePartProp('height', parseFloat(e.target.value))} /></div> </>)}
+                                        {selectedPart.type === 'mount' && <div className="control-group"><div className="control-label">Radius</div><input type="range" min="1" max="50" step="0.5" value={selectedPart.props.radius} onChange={(e) => updatePartProp('radius', parseFloat(e.target.value))} /></div>}
+                                        {selectedPart.type === 'box' && <div className="control-group"><div className="control-label">Width</div><input type="range" min="1" max="50" value={selectedPart.props.width} onChange={(e) => updatePartProp('width', parseFloat(e.target.value))} /></div>}
+                                        {(selectedPart.type === 'image' || selectedPart.type === 'text') && (<> {selectedPart.type === 'text' && <div className="control-group"><input type="text" value={selectedPart.props.text} onChange={(e) => updatePartProp('text', e.target.value)} /></div>} <div className="control-group"><div className="control-label">Height</div><input type="range" min="1" max="50" value={selectedPart.props.height} onChange={(e) => updatePartProp('height', parseFloat(e.target.value))} /></div> <div className="control-group"><div className="control-label">Placement</div><input type="range" min="0" max="6.28" step="0.05" value={currentPlacementAngle} onChange={(e) => changePlacementAngle(parseFloat(e.target.value))} /></div> <div className="control-group"><div className="control-label">Rotation</div><input type="range" min="0" max="6.28" step="0.1" value={selectedPart.props.texRotation || 0} onChange={(e) => updatePartProp('texRotation', parseFloat(e.target.value))} /></div> </>)}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+
+<div id="export-paywall" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;flex-direction:column;">
+<div style="background:rgba(16,16,18,0.96);border:1px solid #00ffff;border-radius:16px;padding:32px;max-width:420px;width:90%;text-align:center;">
+<div style="font-size:32px;margin-bottom:12px;">🔒</div>
+<h2 style="color:#00ffff;font-family:monospace;font-size:16px;">Export License Required</h2>
+<p style="color:#aaa;font-size:12px;line-height:1.6;margin:12px 0 20px;">ファイルの出力にはライセンスが必要です。<br>プレビュー・操作は引き続き無料です。</p>
+<p style="color:#666;font-size:10px;">Stripe による安全な決済処理</p>
+<button onclick="document.getElementById('export-paywall').style.display='none'" style="background:none;border:none;color:#666;font-size:12px;cursor:pointer;text-decoration:underline;margin-top:12px;">閉じる</button>
+</div>
+</div>
+<script>
+window._exportLicensed = false;
+window.requireExportLicense = function() {
+  if (window._exportLicensed) return true;
+  var overlay = document.getElementById('export-paywall');
+  if (overlay) overlay.style.display = 'flex';
+  return false;
+};
+</script></body>
+
+</html>
+
+
+
+</html>

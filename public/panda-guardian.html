@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI-ZOO Panda Guardian</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+
+// Firebase stubs (offline mode)
+const getApps = () => []; const getApp = () => null; const initializeApp = () => null;
+const getAuth = () => null; const signInAnonymously = async () => null;
+const onAuthStateChanged = (a, cb) => { cb(null); return () => {}; };
+const signInWithCustomToken = async () => null;
+const getFirestore = () => null;
+const collection = () => null; const doc = () => null;
+const setDoc = async () => {}; const updateDoc = async () => {};
+const increment = () => 0; const onSnapshot = (r, cb) => { return () => {}; };
+const query = () => null; const orderBy = () => null; const limit = () => null;
+
+// Simple icon components
+const Icon = ({children, size=24, className='', ...p}) => <span style={{display:'inline-flex',width:size,height:size,alignItems:'center',justifyContent:'center'}} className={className}>{children}</span>;
+const Heart = (p) => <Icon {...p}>&#9829;</Icon>;
+const Leaf = (p) => <Icon {...p}>&#127811;</Icon>;
+const Download = (p) => <Icon {...p}>&#8595;</Icon>;
+const Utensils = (p) => <Icon {...p}>&#127860;</Icon>;
+const Volume2 = (p) => <Icon {...p}>&#128266;</Icon>;
+const VolumeX = (p) => <Icon {...p}>&#128263;</Icon>;
+const Navigation = (p) => <Icon {...p}>&#128269;</Icon>;
+const Target = (p) => <Icon {...p}>&#127919;</Icon>;
+const Activity = (p) => <Icon {...p}>&#128200;</Icon>;
+const Fingerprint = (p) => <Icon {...p}>&#128477;</Icon>;
+const ShieldAlert = (p) => <Icon {...p}>&#128737;</Icon>;
+
+const { useState, useEffect, useCallback, useRef } = React;
+
+
+
+
+
+// --- Configuration & Constants ---
+const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'ai-zoo-guardian-full-v3';
+const THRESHOLD_3D_PRINT = 1000;
+const SPOTS = {
+  ground: { x: 150, y: 240 },
+  climbing: { x: 260, y: 150 }, 
+  sleeping_rock: { x: 50, y: 260 },
+  playing_tire: { x: 180, y: 220 }, // タイヤの中心座標
+  fishing: { x: 280, y: 280 }
+};
+
+// --- Firebase Initialization ---
+let app, auth, db;
+try {
+    const firebaseConfig = {};
+    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+    auth = getAuth(app);
+    db = getFirestore(app);
+} catch (e) {
+    console.warn("Firebase Config Error:", e);
+}
+
+// --- Animation Styles ---
+const AnimationStyles = () => (
+  <style>{`
+    .fur-texture { filter: url(#fur-filter); }
+    @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+    .animate-breathe { animation: breathe 4s ease-in-out infinite; }
+    @keyframes blink { 0%, 45%, 50%, 100% { transform: scaleY(1); } 46%, 49% { transform: scaleY(0.1); } }
+    .animate-blink { animation: blink 4.2s infinite; }
+    @keyframes tire-swing { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+    /* 修正: 支点(transform-origin)をロープの上端(結び目)に合わせる Y=-50px */
+    .animate-tire-swing { animation: tire-swing 3s infinite ease-in-out; transform-origin: 0px -50px; }
+    @keyframes float-zzz { 0% { opacity: 0; transform: translateY(0); } 50% { opacity: 1; } 100% { opacity: 0; transform: translateY(-20px); } }
+    .animate-float-zzz { animation: float-zzz 3s infinite; }
+    @keyframes walk-body-bob { 0% { transform: translateY(0); } 25% { transform: translateY(-3px) rotate(1deg); } 50% { transform: translateY(0); } 75% { transform: translateY(-3px) rotate(-1deg); } 100% { transform: translateY(0); } }
+    .animate-walk-body { animation: walk-body-bob 1.0s infinite linear; }
+    @keyframes leg-swing-1 { 0% { transform: rotate(20deg); } 50% { transform: rotate(-20deg); } 100% { transform: rotate(20deg); } }
+    @keyframes leg-swing-2 { 0% { transform: rotate(-20deg); } 50% { transform: rotate(20deg); } 100% { transform: rotate(-20deg); } }
+    .animate-leg-1 { animation: leg-swing-1 1.0s infinite ease-in-out; }
+    .animate-leg-2 { animation: leg-swing-2 1.0s infinite ease-in-out; }
+    @keyframes rotor { from { transform: scaleX(1); } to { transform: scaleX(0.1); } }
+    .rotor { animation: rotor 0.05s infinite alternate; transform-origin: center; }
+  `}</style>
+);
+
+// --- Custom Hooks ---
+
+const useSoundSystem = () => {
+  const [isMuted, setIsMuted] = useState(true);
+  const audioCtxRef = useRef(null);
+  const masterGainRef = useRef(null);
+  const isStarted = useRef(false);
+
+  const initAudio = useCallback(() => {
+    if (isStarted.current || typeof window === 'undefined') return;
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtxRef.current = new AudioContext();
+      masterGainRef.current = audioCtxRef.current.createGain();
+      masterGainRef.current.gain.value = isMuted ? 0 : 0.2;
+      masterGainRef.current.connect(audioCtxRef.current.destination);
+      isStarted.current = true;
+      if(audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+    } catch (e) { console.error("Audio init failed", e); }
+  }, [isMuted]);
+
+  const playSE = useCallback((type) => {
+    if (isMuted || !audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(masterGainRef.current);
+    const now = ctx.currentTime;
+
+    switch (type) {
+      case 'drone':
+        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(80, now); osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+        gain.gain.setValueAtTime(0.03, now); gain.gain.linearRampToValueAtTime(0, now + 0.1);
+        osc.start(now); osc.stop(now + 0.1); break;
+      case 'ping':
+        osc.type = 'sine'; osc.frequency.setValueAtTime(880, now);
+        gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc.start(now); osc.stop(now + 0.2); break;
+      case 'walk':
+        osc.type = 'triangle'; osc.frequency.setValueAtTime(60, now); osc.frequency.exponentialRampToValueAtTime(30, now + 0.1);
+        gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        osc.start(now); osc.stop(now + 0.1); break;
+      case 'happy':
+        osc.type = 'sine'; osc.frequency.setValueAtTime(400, now); osc.frequency.linearRampToValueAtTime(600, now + 0.2);
+        gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        osc.start(now); osc.stop(now + 0.3); break;
+      case 'eat': 
+        osc.type = 'triangle'; osc.frequency.setValueAtTime(100, now); osc.frequency.linearRampToValueAtTime(50, now + 0.2);
+        gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        osc.start(now); osc.stop(now + 0.2); break;
+      default: break;
+    }
+  }, [isMuted]);
+
+  useEffect(() => {
+    if (masterGainRef.current) {
+      masterGainRef.current.gain.setTargetAtTime(isMuted ? 0 : 0.2, audioCtxRef.current?.currentTime || 0, 0.1);
+    }
+  }, [isMuted]);
+
+  return { isMuted, setIsMuted, initAudio, playSE };
+};
+
+const useGyroControl = (active) => {
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [permission, setPermission] = useState('unknown');
+  const [debugData, setDebugData] = useState({ beta: 0, gamma: 0 });
+
+  const requestPermission = async () => {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        const res = await DeviceOrientationEvent.requestPermission();
+        setPermission(res);
+        return res === 'granted';
+      } catch (e) { setPermission('denied'); return false; }
+    } else { setPermission('granted'); return true; }
+  };
+
+  useEffect(() => {
+    if (!active) return;
+    const handleOrientation = (e) => {
+      const beta = e.beta || 0; const gamma = e.gamma || 0;
+      setDebugData({ beta: beta.toFixed(1), gamma: gamma.toFixed(1) });
+      if (e.beta === null || e.gamma === null) return;
+      const xInput = Math.max(-1, Math.min(1, gamma / 30));
+      const yInput = Math.max(-1, Math.min(1, (beta - 45) / 30)); 
+      setTilt({ x: xInput, y: yInput });
+    };
+    window.addEventListener('deviceorientation', handleOrientation);
+    return () => window.removeEventListener('deviceorientation', handleOrientation);
+  }, [active, permission]);
+
+  return { tilt, requestPermission, permission, debugData };
+};
+
+// --- Helper Functions ---
+
+const downloadSTL = () => {
+  const stlContent = `solid panda_medal
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 0
+      vertex 10 0 0
+      vertex 0 10 0
+    endloop
+  endfacet
+endsolid panda_medal`;
+  
+  const blob = new Blob([stlContent], { type: 'model/stl' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = "panda_guardian_medal_v1.stl";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+// --- Panda Components ---
+
+const PandaHead = ({ x, y, scale = 1, rotation = 0, isSleeping = false, lookDirection = 'front' }) => {
+  const sX = Number(x)||0; const sY = Number(y)||0;
+  
+  if (lookDirection === 'back') {
+    return (
+      <g transform={`translate(${sX}, ${sY}) scale(${scale}) rotate(${rotation})`}>
+         <circle cx="50" cy="50" r="30" fill="white" filter="url(#fur-filter)" />
+         <circle cx="22" cy="25" r="9" fill="#111" filter="url(#fur-filter)" />
+         <circle cx="78" cy="25" r="9" fill="#111" filter="url(#fur-filter)" />
+      </g>
+    );
+  }
+  
+  if (lookDirection === 'side') {
+    return (
+      <g transform={`translate(${sX}, ${sY}) scale(${scale}) rotate(${rotation})`}>
+          <path d="M25,50 C25,25 40,20 60,25 C75,30 80,50 75,70 C70,85 40,85 25,50" fill="white" filter="url(#fur-filter)" />
+          <circle cx="45" cy="20" r="8" fill="#111" filter="url(#fur-filter)" />
+          <g transform="translate(5,0)">
+             <ellipse cx="60" cy="45" rx="7" ry="10" fill="#111" transform="rotate(10 60 45)" filter="url(#fur-filter)" />
+             <circle cx="62" cy="45" r="2" fill="black" />
+          </g>
+          <ellipse cx="78" cy="55" rx="3" ry="2" fill="#111" />
+       </g>
+    );
+  }
+
+  return (
+    <g transform={`translate(${sX}, ${sY}) scale(${scale}) rotate(${rotation})`}>
+      <circle cx="22" cy="25" r="9" fill="#111" filter="url(#fur-filter)" />
+      <circle cx="78" cy="25" r="9" fill="#111" filter="url(#fur-filter)" />
+      <path d="M20,50 C20,25 35,15 50,15 C65,15 80,25 80,50 C80,75 65,82 50,82 C35,82 20,75 20,50 Z" fill="white" filter="url(#fur-filter)" />
+      <g transform="rotate(-15 38 45)"><ellipse cx="38" cy="45" rx="8" ry="11" fill="#1a1a1a" /><ellipse cx="38" cy="45" rx="6" ry="8" fill="#111" opacity="0.8" /></g>
+      <g transform="rotate(15 62 45)"><ellipse cx="62" cy="45" rx="8" ry="11" fill="#1a1a1a" /><ellipse cx="62" cy="45" rx="6" ry="8" fill="#111" opacity="0.8" /></g>
+      {!isSleeping ? (
+        <g className="animate-blink origin-center">
+          <circle cx="40" cy="45" r="3.5" fill="black" />
+          <circle cx="60" cy="45" r="3.5" fill="black" />
+          <circle cx="41.5" cy="43.5" r="1.5" fill="white" opacity="0.8" />
+          <circle cx="61.5" cy="43.5" r="1.5" fill="white" opacity="0.8" />
+        </g>
+      ) : (
+        <g><path d="M33,46 Q40,50 47,46" stroke="#333" strokeWidth="2" fill="none" /><path d="M53,46 Q60,50 67,46" stroke="#333" strokeWidth="2" fill="none" /></g>
+      )}
+      <ellipse cx="50" cy="55" rx="4.5" ry="3.5" fill="#111" />
+    </g>
+  );
+};
+
+const WalkingPanda = ({ x, y, direction = 'left' }) => {
+  const scaleX = direction === 'left' ? -1 : 1; 
+  const legStyle = { transformBox: 'fill-box', transformOrigin: '50% 10%' };
+  return (
+    <g transform={`translate(${x}, ${y}) scale(${0.7})`}>
+      <g className="animate-walk-body">
+        <g transform={`scale(${scaleX}, 1)`}>
+           <g transform="translate(-20, 10)"><g className="animate-leg-2" style={legStyle}><path d="M0,0 L-5,25 L5,25 Z" stroke="#333" strokeWidth="18" strokeLinecap="round" fill="none" /></g></g>
+           <g transform="translate(25, 10)"><g className="animate-leg-1" style={legStyle}><path d="M0,0 L5,25 L-5,25 Z" stroke="#333" strokeWidth="18" strokeLinecap="round" fill="none" /></g></g>
+           <ellipse cx="5" cy="0" rx="60" ry="38" fill="white" filter="url(#fur-filter)" />
+           <path d="M25,-35 Q40,-10 25,30 L55,25 Q45,-10 55,-35" stroke="#111" strokeWidth="26" fill="none" strokeLinecap="round" filter="url(#fur-filter)" opacity="0.95" />
+           <g transform="translate(50, -15) scale(0.85) rotate(5)"><PandaHead x={0} y={0} lookDirection="side" /></g>
+           <g transform="translate(-25, 15)"><g className="animate-leg-1" style={legStyle}><path d="M0,0 L2,25 L-6,25" stroke="#111" strokeWidth="20" strokeLinecap="round" fill="none" /></g></g>
+           <g transform="translate(45, 15)"><g className="animate-leg-2" style={legStyle}><path d="M0,0 L-5,25 L5,25" stroke="#111" strokeWidth="20" strokeLinecap="round" fill="none" /></g></g>
+           <circle cx="-55" cy="-5" r="10" fill="white" filter="url(#fur-filter)" />
+        </g>
+      </g>
+    </g>
+  );
+};
+
+// --- TireSwing (Fixed: 座標調整と結び目の追加) ---
+const TireSwing = ({ isOccupied }) => (
+  <g transform={`translate(180, 220)`}> 
+    <g className={isOccupied ? "animate-tire-swing" : ""}>
+      {/* Rope: 背景の枝(Y=170)に合わせて長さを50pxにする (220 - 50 = 170) */}
+      <line x1="0" y1="0" x2="0" y2="-50" stroke="#5d4037" strokeWidth="4" />
+      {/* 結び目 (枝との接続点) */}
+      <circle cx="0" cy="-50" r="4" fill="#5d4037" />
+      
+      <g transform="translate(0, 0)"> 
+         <circle cx="0" cy="0" r="40" stroke="#1a1a1a" strokeWidth="26" fill="none" />
+         {isOccupied && (
+           <g>
+              <circle cx="0" cy="0" r="38" fill="white" filter="url(#fur-filter)" />
+              <ellipse cx="-25" cy="-20" rx="12" ry="16" fill="#111" filter="url(#fur-filter)" />
+              <ellipse cx="25" cy="-20" rx="12" ry="16" fill="#111" filter="url(#fur-filter)" />
+              <path d="M-40,-10 Q0,20 40,-10" stroke="#111" strokeWidth="16" fill="none" strokeLinecap="round" filter="url(#fur-filter)" />
+              <g transform="translate(-50, -55)"><PandaHead x={50} y={50} expression="happy" scale={0.95} lookDirection="side" /></g>
+           </g>
+         )}
+         <circle cx="0" cy="0" r="40" stroke="#2a2a2a" strokeWidth="18" fill="none" />
+         {isOccupied && (
+            <>
+              <path d="M-28,15 Q-40,40 -12,35" stroke="#111" strokeWidth="14" fill="none" strokeLinecap="round" filter="url(#fur-filter)" />
+              <path d="M28,15 Q40,40 12,35" stroke="#111" strokeWidth="14" fill="none" strokeLinecap="round" filter="url(#fur-filter)" />
+            </>
+         )}
+      </g>
+    </g>
+  </g>
+);
+
+const PandaScene = ({ activity, isWalking, pandaPos, walkDirection, mood, action }) => {
+  if (isWalking) return <WalkingPanda x={pandaPos.x} y={pandaPos.y} direction={walkDirection} />;
+  if (activity === 'playing_tire') return null; 
+
+  if (activity === 'climbing') {
+    return (
+        <g transform={`translate(${SPOTS.climbing.x}, ${SPOTS.climbing.y}) scale(0.9)`}>
+          <g className="animate-breathe">
+            <path d="M-30,90 Q-20,110 0,110" stroke="#111" strokeWidth="18" fill="none" strokeLinecap="round" />
+            <path d="M30,90 Q20,110 0,110" stroke="#111" strokeWidth="18" fill="none" strokeLinecap="round" />
+            <ellipse cx="0" cy="70" rx="40" ry="45" fill="white" filter="url(#fur-filter)" />
+            <path d="M-35,50 Q0,30 35,50 L35,65 Q0,45 -35,65 Z" fill="#111" filter="url(#fur-filter)" />
+            <g transform="translate(-50, -60)"><PandaHead x={50} y={50} scale={0.9} lookDirection="back" /></g>
+          </g>
+        </g>
+    );
+  }
+
+  if (activity === 'sleeping_rock') {
+      return (
+        <g transform={`translate(${SPOTS.sleeping_rock.x}, ${SPOTS.sleeping_rock.y})`}>
+          <g className="animate-breathe origin-center">
+            <ellipse cx="60" cy="25" rx="55" ry="35" fill="white" transform="rotate(-10)" filter="url(#fur-filter)" />
+            <path d="M25,5 Q50,-15 80,5" stroke="#111" strokeWidth="20" strokeLinecap="round" fill="none" transform="rotate(-15 60 25)" filter="url(#fur-filter)" />
+            <g transform="translate(-40, -10) rotate(-30)">
+               <PandaHead x={50} y={50} scale={0.92} expression="sleeping" isSleeping={true} />
+               <g className="animate-float-zzz"><text x="70" y="0" className="text-xl fill-blue-400 font-bold opacity-80" style={{ filter: 'drop-shadow(1px 1px 0px white)' }}>Zzz</text></g>
+            </g>
+          </g>
+        </g>
+      );
+  }
+
+  // Ground (Default)
+  return (
+    <g transform={`translate(${SPOTS.ground.x}, ${SPOTS.ground.y})`}>
+      <g className={action === 'pet' ? "animate-breathe origin-bottom-center" : "animate-breathe origin-bottom-center"}>
+          <g transform="translate(10, 95) rotate(-30)"><ellipse cx="0" cy="0" rx="15" ry="20" fill="#111" /></g>
+          <g transform="translate(90, 95) rotate(30)"><ellipse cx="0" cy="0" rx="15" ry="20" fill="#111" /></g>
+          <path d="M10,100 C0,60 20,30 50,30 C80,30 100,60 90,100 C80,125 20,125 10,100 Z" fill="white" filter="url(#fur-filter)" />
+          <path d="M20,45 Q50,65 80,45 Q95,30 85,20 Q50,25 15,20 Q5,30 20,45 Z" fill="#111" filter="url(#fur-filter)" />
+          <g transform="translate(-50, -55)"><PandaHead x={50} y={50} scale={1.1} /></g>
+          {action === 'eat' ? (
+             <g transform="translate(40, 50)"><path d="M0,0 L10,-40" stroke="#4ade80" strokeWidth="6" strokeLinecap="round" /><ellipse cx="5" cy="-10" rx="8" ry="14" fill="#86efac" transform="rotate(10)" /></g>
+          ) : (
+            <>
+              <path d="M25,45 Q10,70 30,85" stroke="#111" strokeWidth="20" strokeLinecap="round" filter="url(#fur-filter)" />
+              <path d="M75,45 Q90,70 70,85" stroke="#111" strokeWidth="20" strokeLinecap="round" filter="url(#fur-filter)" />
+            </>
+          )}
+      </g>
+    </g>
+  );
+};
+
+const DroneActor = ({ x, y, tiltX = 0, tiltY = 0 }) => (
+  <g transform={`translate(${x}, ${y}) rotate(${tiltX * 10})`}>
+    <line x1="-20" y1="-20" x2="20" y2="20" stroke="#444" strokeWidth="4" />
+    <line x1="20" y1="-20" x2="-20" y2="20" stroke="#444" strokeWidth="4" />
+    <ellipse cx="-20" cy="-20" rx="12" ry="3" fill="#222" className="rotor" />
+    <ellipse cx="20" cy="-20" rx="12" ry="3" fill="#222" className="rotor" />
+    <ellipse cx="-20" cy="20" rx="12" ry="3" fill="#222" className="rotor" />
+    <ellipse cx="20" cy="20" rx="12" ry="3" fill="#222" className="rotor" />
+    <rect x="-10" y="-10" width="20" height="20" rx="4" fill="#333" />
+    <circle cx="0" cy="0" r="4" fill="#00ff00" className="animate-pulse" />
+  </g>
+);
+
+// --- Main App ---
+
+function App() {
+  const [user, setUser] = useState(null);
+  const [globalStats, setGlobalStats] = useState({ visitors: 0, lovePoints: 0 });
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [activity, setActivity] = useState('ground');
+  const [pandaPos, setPandaPos] = useState(SPOTS.ground);
+  const [mood, setMood] = useState('idle');
+  const [action, setAction] = useState(null);
+  const [hunger, setHunger] = useState(30);
+  const [sleepiness, setSleepiness] = useState(0);
+  const [isWalking, setIsWalking] = useState(false);
+  const [walkDirection, setWalkDirection] = useState('left');
+  const [speech, setSpeech] = useState("こんにちはパン！🐼");
+
+  const [isDroneMode, setIsDroneMode] = useState(false);
+  const [dronePos, setDronePos] = useState({ x: 200, y: 100 });
+  const [pois, setPois] = useState([
+    { id: 1, x: 80, y: 150, checked: false },
+    { id: 2, x: 320, y: 120, checked: false },
+    { id: 3, x: 200, y: 300, checked: false }
+  ]);
+  const [isDebugOpen, setIsDebugOpen] = useState(false);
+  const [isHttps, setIsHttps] = useState(true);
+
+  const { isMuted, setIsMuted, initAudio, playSE } = useSoundSystem();
+  const { tilt, requestPermission, permission, debugData } = useGyroControl(isDroneMode);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') setIsHttps(false);
+    if (!auth) { setLoading(false); return; }
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
+        else await signInAnonymously(auth);
+      } catch (err) {}
+    };
+    initAuth();
+    return onAuthStateChanged(auth, (u) => { setUser(u); setLoading(false); });
+  }, []);
+
+  useEffect(() => {
+    if (!user || !db) return;
+    const statsRef = doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats', 'general');
+    const unsubStats = onSnapshot(statsRef, (s) => {
+      if (s.exists()) setGlobalStats(s.data());
+      else setDoc(statsRef, { visitors: 1, lovePoints: 0 });
+    });
+    const msgsRef = collection(db, 'artifacts', APP_ID, 'public', 'data', 'messages');
+    const unsubMsgs = onSnapshot(query(msgsRef, orderBy('createdAt', 'desc'), limit(5)), (s) => {
+      setMessages(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => { unsubStats(); unsubMsgs(); };
+  }, [user]);
+
+  const transitionToActivity = useCallback((nextActivity) => {
+    if (nextActivity === activity || isWalking) return;
+    const startPos = SPOTS[activity] || SPOTS.ground;
+    const targetPos = SPOTS[nextActivity] || SPOTS.ground;
+    
+    const direction = targetPos.x < startPos.x ? 'left' : 'right';
+    setWalkDirection(direction);
+    setIsWalking(true);
+    playSE('walk');
+
+    const duration = 3000;
+    const startTime = Date.now();
+    
+    const animateMove = () => {
+      const now = Date.now();
+      const p = Math.min((now - startTime) / duration, 1);
+      const newX = startPos.x + (targetPos.x - startPos.x) * p;
+      const newY = startPos.y + (targetPos.y - startPos.y) * p;
+      
+      setPandaPos({ x: newX, y: newY });
+
+      if (p < 1) {
+        requestAnimationFrame(animateMove);
+      } else {
+        setIsWalking(false);
+        setActivity(nextActivity);
+        setPandaPos(targetPos);
+        if (nextActivity === 'sleeping_rock') { 
+            setMood('sleeping'); 
+            setSpeech("ふわぁ...おやすみ...💤"); 
+        } else {
+            setMood('idle');
+            setSpeech("");
+        }
+      }
+    };
+    requestAnimationFrame(animateMove);
+  }, [activity, isWalking, playSE]);
+
+  useEffect(() => {
+    const tick = setInterval(() => {
+      if (action || isWalking || isDroneMode) return;
+      setHunger(h => Math.max(0, h - 1));
+      setSleepiness(s => Math.min(100, s + 2));
+      
+      let nextActivity = activity;
+      if (hunger < 20 && activity !== 'ground') nextActivity = 'ground';
+      else if (sleepiness > 80 && activity !== 'sleeping_rock') nextActivity = 'sleeping_rock';
+      else if (activity === 'sleeping_rock' && sleepiness < 30) nextActivity = 'ground';
+      else if (Math.random() < 0.3) {
+        const acts = ['ground', 'climbing', 'playing_tire', 'fishing'];
+        nextActivity = acts[Math.floor(Math.random() * acts.length)];
+      }
+      if (nextActivity !== activity) transitionToActivity(nextActivity);
+    }, 5000);
+    return () => clearInterval(tick);
+  }, [action, activity, hunger, sleepiness, isWalking, transitionToActivity, isDroneMode]);
+
+  const handleTouchMove = (e) => {
+    if (!isDroneMode) return;
+    const svgRect = e.currentTarget.getBoundingClientRect();
+    let clientX, clientY;
+    if (e.touches) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; } 
+    else { if (e.buttons !== 1) return; clientX = e.clientX; clientY = e.clientY; }
+    const x = (clientX - svgRect.left) * (400 / svgRect.width);
+    const y = (clientY - svgRect.top) * (400 / svgRect.height);
+    setDronePos({ x: Math.max(20, Math.min(380, x)), y: Math.max(20, Math.min(380, y)) });
+  };
+
+  useEffect(() => {
+    if (!isDroneMode) return;
+    const interval = setInterval(() => {
+      setDronePos(prev => {
+        const nextX = Math.max(20, Math.min(380, prev.x + tilt.x * 5.0));
+        const nextY = Math.max(20, Math.min(380, prev.y + tilt.y * 5.0));
+        setPois(currentPois => currentPois.map(p => {
+          const dist = Math.sqrt(Math.pow(nextX - p.x, 2) + Math.pow(nextY - p.y, 2));
+          if (dist < 25 && !p.checked) { playSE('ping'); return { ...p, checked: true }; }
+          return p;
+        }));
+        return { x: nextX, y: nextY };
+      });
+      if (Math.random() < 0.2) playSE('drone');
+    }, 50);
+    return () => clearInterval(interval);
+  }, [isDroneMode, tilt, playSE]);
+
+  useEffect(() => {
+    if (isDroneMode && pois.every(p => p.checked)) {
+      setTimeout(() => {
+        setIsDroneMode(false);
+        setSpeech("点検完了！安全だパン！🚁");
+        playSE('happy');
+        if (user && db) updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats', 'general'), { lovePoints: increment(50) });
+        setPois(pois.map(p => ({ ...p, checked: false })));
+      }, 500);
+    }
+  }, [pois, isDroneMode]);
+
+  const handleAction = async (type) => {
+    initAudio();
+    if (isWalking) return;
+    if (type === 'pet') {
+      setMood('happy'); setAction('pet'); setSleepiness(s => Math.max(0, s - 10));
+      setSpeech("えへへ〜💖"); playSE('happy');
+    } else if (type === 'feed') {
+      if(activity !== 'ground') { transitionToActivity('ground'); return; }
+      setMood('happy'); setAction('eat'); setHunger(100);
+      setSpeech("うまうま🌿"); playSE('eat');
+    }
+    if (user && db) updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'stats', 'general'), { lovePoints: increment(5) });
+    setTimeout(() => { setAction(null); setMood('idle'); }, 2000);
+  };
+
+  const startDroneMode = async () => {
+    initAudio();
+    await requestPermission();
+    setIsDroneMode(true);
+    setSpeech("上空からドローン点検中...");
+  };
+
+  if (loading) return <div className="h-screen flex items-center justify-center bg-stone-100">AI-ZOO Loading...</div>;
+
+  return (
+    <div className="min-h-screen bg-stone-50 text-stone-800 font-sans pb-10 select-none">
+      <AnimationStyles />
+      <div className="bg-emerald-600 p-4 sticky top-0 z-50 flex justify-between items-center text-white shadow-lg">
+        <h1 className="font-bold flex items-center gap-2"><Navigation size={20}/> AI-ZOO: Full</h1>
+        <div className="flex gap-4 items-center">
+           <button onClick={() => setIsDebugOpen(!isDebugOpen)} className={`p-1 rounded-full ${isDebugOpen ? 'bg-red-500' : 'hover:bg-white/20'}`}><Activity size={18} /></button>
+           <button onClick={() => setIsMuted(!isMuted)} className="hover:bg-white/20 p-1 rounded-full">{isMuted ? <VolumeX /> : <Volume2 />}</button>
+           <div className="bg-emerald-700 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1"><Heart size={14} className="fill-white"/> {globalStats.lovePoints}</div>
+        </div>
+      </div>
+
+      {!isHttps && <div className="bg-red-500 text-white text-xs p-2 text-center font-bold">⚠️ ジャイロセンサーはHTTPS環境でのみ動作します。</div>}
+      {isDebugOpen && (
+        <div className="fixed top-16 left-2 z-[60] bg-black/80 text-green-400 p-2 rounded text-[10px] font-mono pointer-events-none">
+          <p>Debug: {isDroneMode ? 'DRONE ON' : 'AI ON'}</p>
+          <p>Gyro: {permission} / X:{tilt.x.toFixed(2)} Y:{tilt.y.toFixed(2)}</p>
+          <p>Panda: {activity} / Hunger:{hunger}</p>
+        </div>
+      )}
+
+      <main className="max-w-md mx-auto p-4 space-y-4">
+        <div 
+          className="relative aspect-square bg-sky-200 rounded-[2rem] overflow-hidden shadow-inner border-4 border-white touch-none"
+          onTouchMove={handleTouchMove}
+          onMouseMove={handleTouchMove}
+        >
+          <svg viewBox="0 0 400 400" className="w-full h-full pointer-events-none">
+             <defs>
+               <filter id="fur-filter"><feTurbulence type="fractalNoise" baseFrequency="0.6" numOctaves="2" result="noise" /><feDisplacementMap in="SourceGraphic" in2="noise" scale="2" /></filter>
+             </defs>
+             <rect width="400" height="400" fill="#bae6fd" />
+             <path d="M-50,400 Q200,300 450,400" fill="#4ade80" />
+             
+             {/* Background Tree: 枝を伸ばしてタイヤを吊るす */}
+             <g transform="translate(280, 50)">
+                <path d="M20,350 L25,100" stroke="#78350f" strokeWidth="28" strokeLinecap="round" />
+                <path d="M20,120 Q-50,140 -100,120" stroke="#78350f" strokeWidth="12" strokeLinecap="round" /> {/* タイヤ吊り用枝 (絶対Y=170) */}
+                <circle cx="20" cy="80" r="55" fill="#16a34a" />
+                <circle cx="-15" cy="110" r="45" fill="#15803d" />
+                <circle cx="55" cy="110" r="45" fill="#15803d" />
+             </g>
+
+             <TireSwing isOccupied={activity === 'playing_tire' && !isWalking} />
+             <PandaScene activity={activity} isWalking={isWalking} pandaPos={pandaPos} walkDirection={walkDirection} mood={mood} action={action} />
+
+             {isDroneMode && (
+              <g>
+                {pois.map(p => (
+                  <g key={p.id}>
+                    <circle cx={p.x} cy={p.y} r={20} fill={p.checked ? "#22c55e" : "#ef4444"} opacity="0.3" className={!p.checked ? "animate-pulse" : ""} />
+                    {!p.checked && <Target cx={p.x} cy={p.y} size={20} className="text-white opacity-50" />}
+                  </g>
+                ))}
+                <DroneActor x={dronePos.x} y={dronePos.y} tiltX={tilt.x} tiltY={tilt.y} />
+              </g>
+             )}
+          </svg>
+
+          {speech && <div className="absolute top-10 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-2xl text-xs font-bold shadow-md border border-white animate-bounce pointer-events-none">{speech}</div>}
+          {isDroneMode && <div className="absolute bottom-2 right-2 text-[10px] text-white/50 pointer-events-none flex items-center gap-1"><Fingerprint size={12}/> Touch Enabled</div>}
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <button onClick={() => handleAction('feed')} disabled={isDroneMode} className="flex flex-col items-center bg-white p-3 rounded-2xl shadow-sm hover:scale-105 transition-all disabled:opacity-50">
+             <Utensils className="text-emerald-500 mb-1"/> <span className="text-[10px] font-bold">おやつ</span>
+          </button>
+          <button onClick={() => handleAction('pet')} disabled={isDroneMode} className="flex flex-col items-center bg-white p-3 rounded-2xl shadow-sm hover:scale-105 transition-all disabled:opacity-50">
+             <Heart className="text-pink-500 mb-1"/> <span className="text-[10px] font-bold">なでる</span>
+          </button>
+          <button onClick={startDroneMode} disabled={isDroneMode} className="flex flex-col items-center bg-indigo-600 text-white p-3 rounded-2xl shadow-sm hover:bg-indigo-700 transition-all disabled:bg-stone-400">
+             <Navigation className="mb-1"/> <span className="text-[10px] font-bold">点検</span>
+          </button>
+        </div>
+
+        <div className={`p-4 rounded-2xl border-2 transition-all ${globalStats.lovePoints >= THRESHOLD_3D_PRINT ? 'border-yellow-400 bg-yellow-50 shadow-lg' : 'border-dashed border-stone-200 bg-stone-100 opacity-60'}`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${globalStats.lovePoints >= THRESHOLD_3D_PRINT ? 'bg-yellow-400 text-white' : 'bg-stone-300 text-stone-500'}`}><Download size={20} /></div>
+            <div className="flex-1">
+              <h4 className="text-sm font-bold">Guardian Medal (A1 mini)</h4>
+              <p className="text-[10px] text-stone-500">サポート不要STLデータ</p>
+            </div>
+            {globalStats.lovePoints >= THRESHOLD_3D_PRINT ? 
+              <button onClick={downloadSTL} className="bg-stone-800 text-white px-3 py-1 rounded-full text-[10px] font-bold">DL</button> 
+              : 
+              <div className="text-[10px] font-bold text-stone-400">あと {THRESHOLD_3D_PRINT - globalStats.lovePoints} LP</div>
+            }
+          </div>
+        </div>
+
+        {isDroneMode && permission !== 'granted' && (
+          <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-6 text-center text-white">
+            <div className="max-w-xs space-y-4">
+              <ShieldAlert size={48} className="mx-auto text-yellow-400" />
+              <h2 className="text-xl font-bold">センサー許可</h2>
+              <p className="text-sm opacity-80">ジャイロ操作のために許可が必要です。(タッチ操作も可能です)</p>
+              <button onClick={async () => { const g = await requestPermission(); if(!g) alert("タッチ操作モード"); }} className="w-full bg-white text-black py-3 rounded-xl font-bold">許可して開始</button>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+  </script>
+</body>
+</html>

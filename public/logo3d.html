@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>画像からSTL浮き彫りデータ生成</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ⭐️ 修正: Three.jsのCDNを再導入し、ReferenceErrorを解消 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <style>
+        /* カスタムスタイル */
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f7f9fb; 
+        }
+        /* 3Dコンテナのサイズと配置を調整 */
+        #container {
+            position: relative; /* マスクCanvasを重ねるための基準 */
+            width: 100%;
+            height: 50vh; 
+            min-height: 350px;
+            background-color: #333; 
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            margin-top: 20px; 
+        }
+        canvas {
+            display: block;
+            touch-action: none; 
+        }
+        /* マスクCanvasのスタイル */
+        #maskCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10; /* 3Dの上に表示 */
+            cursor: default;
+        }
+
+        /* 以下、UIコントロール関連のスタイルは変更なし */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #10b981; 
+            cursor: pointer;
+            margin-top: -8px; 
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.3); /* box-shadow の typo を修正 */
+        }
+        #loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            color: #10b981;
+            z-index: 100;
+            border-radius: 12px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8"><a href="/" id="gt-back" style="position:fixed;top:12px;left:12px;z-index:99999;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);border:1px solid rgba(0,255,255,0.2);border-radius:8px;padding:6px 14px;text-decoration:none;color:rgba(0,255,255,0.8);font-family:Orbitron,monospace;font-size:10px;letter-spacing:0.1em;transition:all 0.3s;" onmouseover="this.style.background='rgba(0,255,255,0.12)';this.style.borderColor='rgba(0,255,255,0.5)'" onmouseout="this.style.background='rgba(0,0,0,0.6)';this.style.borderColor='rgba(0,255,255,0.2)'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>PORTAL</a>
+
+    <script>
+        // グローバル変数（Firebase関連）
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+
+        // 必須のThree.jsコンポーネントをグローバルスコープで参照できるように再設定
+        let THREE = window.THREE; // Three.jsがグローバルで利用可能になったため再設定
+        
+        let scene, camera, renderer, controls; // controlsを追加
+        let keyChainMesh, logoMesh;
+        
+        // ⭐️ 固定されたキーホルダーサイズ (内部でMM単位の計算に使用)
+        const KEYCHAIN_RADIUS_MM = 30; // 直径 60mm
+        const KEYCHAIN_THICKNESS_MM = 5; // 厚み 5mm
+
+        let embossImage = null; 
+        const TEXTURE_SIZE = 512; 
+
+        // ⭐️ マスクキャンバス変数
+        let maskCanvas, maskCtx;
+        let isErasing = false;
+        let isDrawing = false;
+        
+        // --- STLExporter (Binary STL) ---
+        const STLExporter = (function () {
+            // ⭐️ THREEが未定義の場合のエラーハンドリング
+            if (typeof THREE === 'undefined') {
+                console.error("STLExporter: THREE is not defined.");
+                // ダミー関数を返すか、エラーを投げる
+                return { parse: () => new Blob([]) };
+            }
+            const tempVector = new THREE.Vector3();
+            const cb = new ArrayBuffer(80);
+            const dv = new DataView(cb);
+            let offset = 0;
+
+            const writeString = (view, offset, string) => {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            };
+
+            const writeBinary = (geometry) => {
+                if (!geometry || !geometry.index || !geometry.attributes.position || !geometry.attributes.normal) {
+                    console.error("Invalid geometry provided to STLExporter.");
+                    return new Blob([]);
+                }
+                const totalFaces = geometry.index.count / 3;
+                if (isNaN(totalFaces) || totalFaces < 0) { // totalFacesが負の場合もチェック
+                     console.error("Calculated invalid number of faces in STLExporter:", totalFaces);
+                     return new Blob([]);
+                }
+                const bufferSize = 80 + 4 + totalFaces * 50;
+                 if (isNaN(bufferSize) || bufferSize < 84) {
+                     console.error("Invalid buffer size calculated in STLExporter.");
+                     return new Blob([]);
+                 }
+
+                let buffer, dv;
+                 try {
+                     buffer = new ArrayBuffer(bufferSize);
+                     dv = new DataView(buffer);
+                 } catch (e) {
+                     console.error("Error creating ArrayBuffer for STL:", e, "Size:", bufferSize);
+                     return new Blob([]);
+                 }
+
+                let offset = 0;
+
+                writeString(dv, offset, 'Generated by Three.js STLExporter');
+                offset += 80;
+
+                dv.setUint32(offset, totalFaces, true);
+                offset += 4;
+
+                const position = geometry.getAttribute('position');
+                const normal = geometry.getAttribute('normal');
+                const index = geometry.getIndex();
+
+                 // ⭐️ 属性カウントの存在チェック
+                if (!position || !normal || !index || typeof position.count === 'undefined' || typeof normal.count === 'undefined' || typeof index.count === 'undefined') {
+                    console.error("Geometry attributes or counts are missing in STLExporter.");
+                    return new Blob([]);
+                }
+
+
+                for (let i = 0; i < totalFaces; i++) {
+                    const i3 = i * 3;
+                    if (i3 + 2 >= index.count) {
+                        console.warn("Index out of bounds in STLExporter loop.");
+                        continue; 
+                    }
+                    const vA = index.getX(i3 + 0);
+                    const vB = index.getX(i3 + 1);
+                    const vC = index.getX(i3 + 2);
+                    if (vA >= position.count || vB >= position.count || vC >= position.count) {
+                        console.warn("Vertex index out of bounds for position attribute.");
+                        continue; 
+                    }
+                     if (vA >= normal.count || vB >= normal.count || vC >= normal.count) {
+                         console.warn("Vertex index out of bounds for normal attribute.");
+                         continue; 
+                     }
+
+                    try {
+                        tempVector.fromBufferAttribute(normal, vA).add(tempVector.fromBufferAttribute(normal, vB)).add(tempVector.fromBufferAttribute(normal, vC)).divideScalar(3).normalize();
+                        if (isNaN(tempVector.x) || isNaN(tempVector.y) || isNaN(tempVector.z)) {
+                             console.warn("NaN normal vector calculated, using default normal.");
+                             tempVector.set(0, 0, 1); 
+                        }
+
+                        dv.setFloat32(offset + 0, tempVector.x, true);
+                        dv.setFloat32(offset + 4, tempVector.y, true);
+                        dv.setFloat32(offset + 8, tempVector.z, true);
+
+                        tempVector.fromBufferAttribute(position, vA);
+                         if (isNaN(tempVector.x) || isNaN(tempVector.y) || isNaN(tempVector.z)) throw new Error("NaN vertex A");
+                        dv.setFloat32(offset + 12, tempVector.x, true);
+                        dv.setFloat32(offset + 16, tempVector.y, true);
+                        dv.setFloat32(offset + 20, tempVector.z, true);
+
+                        tempVector.fromBufferAttribute(position, vB);
+                         if (isNaN(tempVector.x) || isNaN(tempVector.y) || isNaN(tempVector.z)) throw new Error("NaN vertex B");
+                        dv.setFloat32(offset + 24, tempVector.x, true);
+                        dv.setFloat32(offset + 28, tempVector.y, true);
+                        dv.setFloat32(offset + 32, tempVector.z, true);
+
+                        tempVector.fromBufferAttribute(position, vC);
+                         if (isNaN(tempVector.x) || isNaN(tempVector.y) || isNaN(tempVector.z)) throw new Error("NaN vertex C");
+                        dv.setFloat32(offset + 36, tempVector.x, true);
+                        dv.setFloat32(offset + 40, tempVector.y, true);
+                        dv.setFloat32(offset + 44, tempVector.z, true);
+
+                        dv.setUint16(offset + 48, 0, true);
+                        offset += 50;
+                    } catch (e) {
+                        console.error("Error accessing buffer attributes in STLExporter:", e);
+                        continue; 
+                    }
+                }
+
+                return new Blob([buffer], { type: 'application/vnd.ms-pki.stl' });
+            };
+
+            return {
+                parse: function (geometry) {
+                    if (!geometry || !geometry.attributes || !geometry.attributes.position) {
+                         console.error("Attempted to compute normals on invalid geometry.");
+                         return new Blob([]);
+                    }
+                    try {
+                      geometry.computeVertexNormals();
+                    } catch (e) {
+                      console.error("Error computing vertex normals:", e);
+                      return new Blob([]);
+                    }
+                    return writeBinary(geometry);
+                }
+            };
+        })();
+        // ==== STLExporter 終了 ====
+
+        // --- BufferGeometry統合関数 (STL出力用) ---
+        function mergeBufferGeometries(geometries) {
+            const validGeometries = geometries.filter(g => g && g.attributes && g.attributes.position && g.index);
+            if (validGeometries.length === 0) return null;
+            if (validGeometries.length === 1) return validGeometries[0];
+
+            let offset = 0;
+            const mergedPosition = [];
+            const mergedNormal = [];
+            const mergedIndex = [];
+
+            validGeometries.forEach(geometry => { 
+                try {
+                   geometry.computeVertexNormals(); 
+                } catch (e) {
+                   console.error("Error computing normals during merge:", e);
+                   return; 
+                }
+                if (!geometry.attributes.position || !geometry.attributes.normal || !geometry.index) {
+                     console.warn("Skipping geometry with missing attributes during merge.");
+                     return;
+                }
+
+                const positions = geometry.attributes.position.array;
+                const normals = geometry.attributes.normal.array;
+                const indices = geometry.index.array;
+                const numVertices = positions.length / 3;
+
+                if (positions.length === 0 || normals.length === 0 || indices.length === 0) {
+                     console.warn("Skipping geometry with empty arrays during merge.");
+                     return;
+                }
+
+                for (let i = 0; i < positions.length; i++) {
+                    mergedPosition.push(positions[i]);
+                }
+                for (let i = 0; i < normals.length; i++) {
+                    mergedNormal.push(normals[i]);
+                }
+
+                for (let i = 0; i < indices.length; i++) {
+                     // ⭐️ indices[i]のNaNチェック
+                     if (isNaN(indices[i])) {
+                          console.warn("NaN index found during merge, skipping index.");
+                          continue;
+                     }
+                    mergedIndex.push(indices[i] + offset);
+                }
+                
+                 // ⭐️ offsetのNaNチェック
+                if (isNaN(numVertices)) {
+                     console.error("Calculated NaN numVertices during merge.");
+                     // ここで処理を中断するか、エラー状態にするべきかもしれない
+                     return;
+                }
+                offset += numVertices;
+            });
+            
+             if (mergedPosition.length === 0 || mergedIndex.length === 0) {
+                 console.error("Merge resulted in empty geometry arrays.");
+                 return null;
+             }
+
+            const finalGeometry = new THREE.BufferGeometry();
+            try {
+              finalGeometry.setAttribute('position', new THREE.Float32BufferAttribute(mergedPosition, 3));
+              finalGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(mergedNormal, 3));
+              finalGeometry.setIndex(new THREE.Uint32BufferAttribute(mergedIndex, 1));
+            
+              finalGeometry.computeBoundingBox();
+              finalGeometry.computeBoundingSphere();
+            } catch (e) {
+              console.error("Error creating final merged geometry:", e);
+              return null;
+            }
+
+            return finalGeometry;
+        }
+        
+        // --- Initialization and Core Functions ---
+
+        function init() {
+            if (typeof THREE === 'undefined') {
+                 try { document.getElementById('loading-overlay').textContent = 'エラー: Three.jsライブラリの読み込みに失敗しました。'; } catch(e){}
+                return;
+            }
+            
+            const container = document.getElementById('container');
+            if (!container) {
+                console.error("Error: Could not find container element (#container). Initialization aborted.");
+                 try { document.getElementById('loading-overlay').textContent = 'エラー: 表示コンテナが見つかりません。'; } catch(e){}
+                return;
+            }
+            
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+             // ⭐️ width, heightのNaNチェック
+            if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
+                 console.error("Invalid container dimensions:", width, height);
+                 try { document.getElementById('loading-overlay').textContent = 'エラー: コンテナサイズが無効です。'; } catch(e){}
+                 return;
+            }
+
+
+            // シーン
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f0f0); 
+
+            // カメラ
+            camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+            camera.position.set(0, 50, 80);
+
+            // レンダラー
+             try {
+                 renderer = new THREE.WebGLRenderer({ antialias: true });
+                 renderer.setSize(width, height);
+                 renderer.setPixelRatio(window.devicePixelRatio);
+                 container.appendChild(renderer.domElement);
+                 renderer.localClippingEnabled = true; 
+             } catch (e) {
+                 console.error("Error initializing WebGLRenderer:", e);
+                  try { document.getElementById('loading-overlay').textContent = 'エラー: 3Dレンダラーの初期化に失敗しました。'; } catch(err){}
+                 return;
+             }
+
+
+            // OrbitControls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.25;
+            controls.screenSpacePanning = false;
+            controls.maxDistance = 300;
+            controls.target.set(0, 0, 0);
+
+            // ライト
+            const ambientLight = new THREE.AmbientLight(0x404040, 3);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
+            directionalLight.position.set(25, 50, 50);
+            scene.add(directionalLight);
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 1.5);
+            directionalLight2.position.set(-25, -50, -50);
+            scene.add(directionalLight2);
+
+            // マスクCanvasの初期化と設定
+            maskCanvas = document.getElementById('maskCanvas');
+             if (!maskCanvas) {
+                console.error("Error: Could not find mask canvas element (#maskCanvas).");
+                 try { document.getElementById('loading-overlay').textContent = 'エラー: マスクCanvasが見つかりません。'; } catch(e){}
+                return; 
+            }
+            maskCtx = maskCanvas.getContext('2d');
+            if (!maskCtx) { // getContextがnullを返す場合
+                 console.error("Error: Could not get 2D context for mask canvas.");
+                 try { document.getElementById('loading-overlay').textContent = 'エラー: マスクCanvasのコンテキスト取得に失敗。'; } catch(e){}
+                 return;
+            }
+
+            
+            const maskCanvasSize = Math.min(width, height);
+            maskCanvas.width = maskCanvasSize;
+            maskCanvas.height = maskCanvasSize;
+            maskCanvas.style.left = `${(width - maskCanvasSize) / 2}px`;
+            maskCanvas.style.top = `${(height - maskCanvasSize) / 2}px`;
+            maskCtx.fillStyle = 'transparent'; 
+            maskCtx.fillRect(0, 0, width, height);
+            maskCtx.globalCompositeOperation = 'source-over'; 
+            
+            // ローディングオーバーレイを非表示にする前に要素の存在を確認
+             const loadingOverlay = document.getElementById('loading-overlay');
+             if (loadingOverlay) loadingOverlay.style.display = 'none';
+             
+            createKeyChain();
+            animate();
+            
+            // イベントリスナー設定
+            setupEventListeners();
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('container');
+            // ⭐️ renderer, camera, maskCanvasの存在チェックを追加
+            if (!container || !maskCanvas || !renderer || !camera) return; 
+            
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+             // ⭐️ width, heightのNaN/ゼロチェック
+            if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
+                 console.warn("Invalid dimensions on resize.");
+                 return;
+            }
+
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            
+            const maskCanvasSize = Math.min(width, height);
+            maskCanvas.width = maskCanvasSize;
+            maskCanvas.height = maskCanvasSize;
+            maskCanvas.style.left = `${(width - maskCanvasSize) / 2}px`;
+            maskCanvas.style.top = `${(height - maskCanvasSize) / 2}px`;
+             // ⭐️ maskCtxの存在チェック
+             if (maskCtx) {
+                 maskCtx.fillStyle = 'transparent'; 
+                 maskCtx.fillRect(0, 0, width, height); 
+                 maskCtx.globalCompositeOperation = 'source-over';
+             }
+        }
+
+        function createKeyChain() {
+             // ⭐️ sceneの存在チェック
+            if (!scene) return; 
+            if (keyChainMesh) {
+                scene.remove(keyChainMesh);
+                keyChainMesh.traverse(child => {
+                    if (child.isMesh) {
+                        try {
+                           if (child.geometry) child.geometry.dispose();
+                           if (Array.isArray(child.material)) {
+                               child.material.forEach(m => { if(m && m.dispose) m.dispose(); });
+                           } else {
+                                if(child.material && child.material.dispose) child.material.dispose(); 
+                           }
+                        } catch (e) {
+                           console.error("Error disposing mesh resources:", e);
+                        }
+                    }
+                });
+            }
+            keyChainMesh = new THREE.Group();
+            scene.add(keyChainMesh);
+            updateLogo(); 
+        }
+        
+        function handleEmbossImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    embossImage = img;
+                    // ⭐️ 要素の存在チェック
+                    const currentEmbossImageEl = document.getElementById('currentEmbossImage');
+                    if (currentEmbossImageEl) currentEmbossImageEl.textContent = `現在: ${file.name} (${img.width}x${img.height})`;
+
+                    maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+                    updateLogo(); 
+                };
+                 img.onerror = () => { 
+                    const msgBox = document.getElementById('messageBox');
+                    if(msgBox) msgBox.textContent = '画像の読み込みに失敗しました。ファイル形式を確認してください。';
+                 };
+                 // ⭐️ e.target.result の存在と型をチェック
+                 if (e.target && typeof e.target.result === 'string') {
+                    img.src = e.target.result;
+                 } else {
+                     const msgBox = document.getElementById('messageBox');
+                    if(msgBox) msgBox.textContent = '画像データの読み込みに失敗しました。';
+                 }
+            };
+             reader.onerror = () => { 
+                 const msgBox = document.getElementById('messageBox');
+                 if(msgBox) msgBox.textContent = 'ファイルリーダーでエラーが発生しました。';
+             };
+             // ⭐️ readAsDataURLの前にファイルタイプをチェック（オプション）
+             if (file.type.startsWith('image/')) {
+                reader.readAsDataURL(file);
+             } else {
+                 const msgBox = document.getElementById('messageBox');
+                 if(msgBox) msgBox.textContent = '画像ファイルを選択してください (PNG or JPEG)。';
+             }
+        }
+
+        // ⭐️ マスクCanvasからデータを取得するヘルパー関数
+        function getMaskCanvasData(size) {
+             if (!maskCanvas) {
+                 console.warn("Mask canvas not found, returning empty mask data.");
+                 const emptyData = new Uint8ClampedArray(size * size * 4);
+                 return emptyData;
+             }
+             // ⭐️ sizeのNaNチェック
+             if (isNaN(size) || size <= 0) {
+                 console.error("Invalid size provided for getMaskCanvasData:", size);
+                  const emptyData = new Uint8ClampedArray(1 * 1 * 4); // 最小サイズで返す
+                 return emptyData;
+             }
+
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = size;
+            tempCanvas.height = size;
+            
+            tempCtx.drawImage(maskCanvas, 0, 0, size, size); 
+            
+            try {
+              const imageData = tempCtx.getImageData(0, 0, size, size);
+               // ⭐️ imageDataとdataの存在チェック
+               if (!imageData || !imageData.data) {
+                   throw new Error("getImageData returned null or invalid data.");
+               }
+              return imageData.data;
+            } catch (e) {
+              console.error("Error getting mask canvas data:", e);
+              const emptyData = new Uint8ClampedArray(size * size * 4); 
+              return emptyData;
+            }
+        }
+
+
+        // --- Logo Geometry (Embossing) ---
+        function createImageGeometry(img, extrudeHeight) {
+            // ⭐️ img, extrudeHeight の有効性チェック
+             if (!img || typeof img.width === 'undefined' || typeof img.height === 'undefined' || isNaN(extrudeHeight)) {
+                 console.error("Invalid arguments for createImageGeometry.");
+                 return new THREE.BufferGeometry();
+             }
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const size = TEXTURE_SIZE;
+            canvas.width = size;
+            canvas.height = size;
+            
+            try {
+              const imgAspectRatio = img.width / img.height;
+              const canvasAspectRatio = size / size; // Always 1 for TEXTURE_SIZE x TEXTURE_SIZE
+
+              let drawWidth, drawHeight, offsetX, offsetY;
+
+              if (imgAspectRatio > canvasAspectRatio) {
+                  // Image is wider than canvas, fit width
+                  drawWidth = size;
+                  drawHeight = size / imgAspectRatio;
+                  offsetX = 0;
+                  offsetY = (size - drawHeight) / 2;
+              } else {
+                  // Image is taller than or equal to canvas, fit height
+                  drawHeight = size;
+                  drawWidth = size * imgAspectRatio;
+                  offsetX = (size - drawWidth) / 2;
+                  offsetY = 0;
+              }
+              ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+            } catch (e) {
+              console.error("Error drawing image to canvas:", e);
+               const msgBox = document.getElementById('messageBox');
+               if(msgBox) msgBox.textContent = '画像の描画中にエラーが発生しました。';
+              return new THREE.BufferGeometry(); 
+            }
+
+             let imageData;
+             try {
+                imageData = ctx.getImageData(0, 0, size, size);
+             } catch (e) {
+                 console.error("Error getting image data from canvas:", e);
+                 const msgBox = document.getElementById('messageBox');
+                 if(msgBox) msgBox.textContent = '画像データの取得中にエラーが発生しました。';
+                 return new THREE.BufferGeometry();
+             }
+
+            const data = imageData.data;
+             // ⭐️ dataの有効性チェック
+            if (!data || data.length !== size * size * 4) {
+                 console.error("Invalid image data retrieved from canvas.");
+                 return new THREE.BufferGeometry();
+            }
+
+            
+            const boxSize = KEYCHAIN_RADIUS_MM * 2 / size; 
+             // ⭐️ boxSizeのNaNチェック
+             if (isNaN(boxSize) || boxSize <= 0) {
+                 console.error("Invalid boxSize calculated:", boxSize);
+                 return new THREE.BufferGeometry();
+             }
+
+            const geometries = [];
+            
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            
+            // マスクのパラメータを取得
+            // ⭐️ 修正: 要素が存在するか確認してから値を取得
+            const maskRadiusElement = document.getElementById('maskRadius');
+            const maskRadius = maskRadiusElement ? parseFloat(maskRadiusElement.value) : 25;
+            
+            const maskOffsetXElement = document.getElementById('maskOffsetX');
+            const maskOffsetX = maskOffsetXElement ? parseFloat(maskOffsetXElement.value) : 0;
+            
+            const maskOffsetYElement = document.getElementById('maskOffsetY');
+            const maskOffsetY = maskOffsetYElement ? parseFloat(maskOffsetYElement.value) : 0;
+            
+             // ⭐️ マスクパラメータのNaNチェック
+             if (isNaN(maskRadius) || isNaN(maskOffsetX) || isNaN(maskOffsetY)) {
+                  console.error("Invalid mask parameters:", maskRadius, maskOffsetX, maskOffsetY);
+                  return new THREE.BufferGeometry(); // 無効なパラメータの場合は中断
+             }
+            
+            
+            const maskData = getMaskCanvasData(size); 
+             // ⭐️ maskDataの有効性チェック
+             if (maskData.length !== size * size * 4) {
+                  console.error("Invalid mask data retrieved.");
+                  return new THREE.BufferGeometry();
+             }
+            
+            
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    const i = (y * size + x) * 4;
+                    if (i + 3 >= data.length) continue; 
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    const alpha = data[i + 3];
+
+                    const maskIndex = (y * size + x) * 4;
+                    if (maskIndex + 3 >= maskData.length) continue; 
+                    if (maskData[maskIndex + 3] > 128) { 
+                        continue; 
+                    }
+                    
+                    const pixelX_mm = (x - size / 2) * boxSize;
+                    const pixelY_mm = -(y - size / 2) * boxSize;
+
+                    const distFromMaskCenter_mm = Math.sqrt(
+                        Math.pow(pixelX_mm - maskOffsetX, 2) + 
+                        Math.pow(pixelY_mm - maskOffsetY, 2)
+                    );
+                    if (isNaN(distFromMaskCenter_mm)) continue; 
+
+                    if (distFromMaskCenter_mm > maskRadius || alpha < 50) continue; 
+                    
+                    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+                    if (isNaN(luminance)) continue; 
+                    
+                    const heightFactor = Math.pow(1.0 - luminance, 1.5); 
+                    if (isNaN(heightFactor)) continue; 
+                    
+                    const blockHeight = extrudeHeight * heightFactor;
+                     if (isNaN(blockHeight)) continue; 
+
+                    if (blockHeight > 0.05) { 
+                        try {
+                          const boxClone = new THREE.BoxGeometry(boxSize, boxSize, 1);
+                          if (isNaN(blockHeight)) throw new Error("NaN blockHeight for scale"); 
+                          boxClone.scale(1, 1, blockHeight);
+                          
+                          const x_pos = pixelX_mm; 
+                          const y_pos = pixelY_mm; 
+                          if (isNaN(x_pos) || isNaN(y_pos) || isNaN(blockHeight)) throw new Error("NaN values for translate"); 
+                          boxClone.translate(x_pos, blockHeight / 2, y_pos); 
+
+                          geometries.push(boxClone);
+                          
+                          minX = Math.min(minX, x_pos);
+                          maxX = Math.max(maxX, x_pos);
+                          minY = Math.min(minY, y_pos);
+                          maxY = Math.max(maxY, y_pos);
+                        } catch (e) {
+                          console.error("Error creating or transforming box geometry:", e);
+                          continue; 
+                        }
+                    }
+                }
+            } // End of outer for loop
+
+            if (geometries.length === 0) {
+                 const msgBox = document.getElementById('messageBox');
+                 if(msgBox) msgBox.textContent = 'ロゴ画像から有効な浮き彫り形状を検出できませんでした。コントラストの高い画像を使用するか、マスク設定を調整してください。';
+                 return new THREE.BufferGeometry();
+            }
+            
+            const mergedGeometry = mergeBufferGeometries(geometries);
+             if (!mergedGeometry) {
+                 const msgBox = document.getElementById('messageBox');
+                 if(msgBox) msgBox.textContent = 'ジオメトリのマージに失敗しました。';
+                 return new THREE.BufferGeometry();
+             }
+
+             const centerX = (minX + maxX) / 2;
+             const centerY = (minY + maxY) / 2;
+             if (isNaN(centerX) || isNaN(centerY) || !isFinite(minX) || !isFinite(maxX) || !isFinite(minY) || !isFinite(maxY)) { // Infinityチェックも追加
+                  console.error("NaN or Infinite calculated for center offset.", {minX, maxX, minY, maxY});
+                  return mergedGeometry; // オフセットなしで返す
+             }
+
+            if (mergedGeometry.attributes && mergedGeometry.attributes.position) {
+              mergedGeometry.translate(-centerX, -centerY, 0);
+            } else {
+              console.error("Merged geometry is invalid before translation.");
+              return new THREE.BufferGeometry();
+            }
+
+            return mergedGeometry;
+        }
+            
+                    function updateLogo() {
+                         if (!scene || !keyChainMesh || !renderer) return;
+            
+                        if (logoMesh) {
+                            scene.remove(logoMesh);
+                            if (logoMesh.geometry) logoMesh.geometry.dispose(); 
+                             if (logoMesh.material) logoMesh.material.dispose(); 
+                             logoMesh = null; 
+                        }
+            
+                        // ⭐️ 修正: 要素が存在するか確認してから値を取得
+                        const extrudeHeightElement = document.getElementById('extrudeHeight');
+                        const extrudeHeight = extrudeHeightElement ? parseFloat(extrudeHeightElement.value) : 3.0; // デフォルト値 3.0
+                         if (isNaN(extrudeHeight)) return;
+                        
+                        const posX = 0; 
+                        const posY = 0; 
+                        const posZUserOffset = 0; 
+            
+                        const keychainSurfaceZ = KEYCHAIN_THICKNESS_MM / 2; 
+                        
+                        let geometry;
+            
+                        if (!embossImage) return; 
+            
+                        geometry = createImageGeometry(embossImage, extrudeHeight);
+                        
+                         if (!geometry || !geometry.attributes || !geometry.attributes.position || geometry.attributes.position.array.length === 0) {
+                             console.warn("Invalid geometry returned from createImageGeometry, skipping logo update.");
+                             if (logoMesh) { 
+                                 keyChainMesh.remove(logoMesh);
+                                 if (logoMesh.geometry) logoMesh.geometry.dispose();
+                                 if (logoMesh.material) logoMesh.material.dispose();
+                                 logoMesh = null;
+                             }
+                             renderer.render(scene, camera); 
+                             return;
+                         }
+                         
+                        // Z位置: ロゴの最下部がZ=0になるように調整
+                        try {
+                          geometry.computeBoundingBox(); 
+                          if (geometry.boundingBox && !isNaN(geometry.boundingBox.min.z) && isFinite(geometry.boundingBox.min.z)) { // NaNとInfinityチェック
+                              const zOffset = -geometry.boundingBox.min.z;
+                               if (!isNaN(zOffset) && isFinite(zOffset) && geometry.attributes && geometry.attributes.position) {
+                                 geometry.translate(0, 0, zOffset);
+                               }
+                          }
+                        } catch (e) {
+                           console.error("Error computing bounding box or translating geometry:", e);
+                           renderer.render(scene, camera); 
+                           return;
+                        }
+                        
+                        if (!geometry.attributes.position || geometry.attributes.position.array.length === 0) {
+                            console.warn("Geometry became invalid after Z offset, skipping logo update.");
+                            renderer.render(scene, camera);
+                            return;
+                        }
+            
+            
+                        const logoMaterial = new THREE.MeshPhongMaterial({ color: 0xff4500, shininess: 80 }); 
+                        logoMesh = new THREE.Mesh(geometry, logoMaterial);
+                        
+                        logoMesh.rotation.x = Math.PI / 2; 
+            
+                        keyChainMesh.add(logoMesh);
+                        
+                        if (controls) controls.update(); 
+                        if (renderer) renderer.render(scene, camera);
+                    }
+            
+                    // ⭐️ 消しゴム機能ロジック
+                    function drawOnMaskCanvas(event) {
+                         // ⭐️ 修正: eraserSize要素の存在を確認
+                         const eraserSizeElement = document.getElementById('eraserSize');
+                         if (!isDrawing || !maskCtx || !maskCanvas || !eraserSizeElement) return;
+            
+                        const rect = maskCanvas.getBoundingClientRect();
+                        let clientX, clientY;
+                        if (event.touches && event.touches.length > 0) {
+                            clientX = event.touches[0].clientX;
+                            clientY = event.touches[0].clientY;
+                        } else if (event.clientX && event.clientY) {
+                            clientX = event.clientX;
+                            clientY = event.clientY;
+                        } else {
+                            return; 
+                        }
+            
+                         const x = clientX - rect.left;
+                         const y = clientY - rect.top;
+                         const size = parseFloat(eraserSizeElement.value); // 要素が存在するので安全にアクセス
+                         if (isNaN(x) || isNaN(y) || isNaN(size)) return;
+            
+            
+                        maskCtx.beginPath();
+                        maskCtx.fillStyle = 'rgba(0,0,0,255)'; 
+                        maskCtx.arc(x, y, size / 2, 0, Math.PI * 2);
+                        maskCtx.fill();
+                        
+                        // updateLogo(); // Removed direct call
+                    }
+            
+            
+                    // --- Event Listeners and UI Logic ---        function setupEventListeners() {
+            if (!extrudeHeight || !embossFileInput || !maskRadius || !maskOffsetX || !maskOffsetY || !downloadBtn || !eraserSize || !toggleEraserBtn) {
+                console.error("One or more UI control elements could not be found. Event listeners not set up.");
+                 const msgBox = document.getElementById('messageBox');
+                 if(msgBox) msgBox.textContent = 'UI要素の読み込みに失敗しました。ページを再読み込みしてください。';
+                return;
+            }
+            
+            const updateValues = () => {
+                 const extrudeHeightValueEl = document.getElementById('extrudeHeightValue');
+                 const maskRadiusValueEl = document.getElementById('maskRadiusValue');
+                 const maskOffsetXValueEl = document.getElementById('maskOffsetXValue');
+                 const maskOffsetYValueEl = document.getElementById('maskOffsetYValue');
+                 const eraserSizeValueEl = document.getElementById('eraserSizeValue');
+
+                 // ⭐️ 修正: 各要素が存在するかチェックしてからtextContentを設定
+                 if (extrudeHeightValueEl && extrudeHeight) extrudeHeightValueEl.textContent = extrudeHeight.value;
+                 if (maskRadiusValueEl && maskRadius) maskRadiusValueEl.textContent = maskRadius.value;
+                 if (maskOffsetXValueEl && maskOffsetX) maskOffsetXValueEl.textContent = maskOffsetX.value;
+                 if (maskOffsetYValueEl && maskOffsetY) maskOffsetYValueEl.textContent = maskOffsetY.value;
+                 if (eraserSizeValueEl && eraserSize) eraserSizeValueEl.textContent = eraserSize.value;
+                 
+                updateLogo();
+            };
+            
+            [extrudeHeight, maskRadius, maskOffsetX, maskOffsetY, eraserSize].forEach(el => {
+                if (el) el.addEventListener('input', updateValues); 
+            });
+            
+            if (embossFileInput) embossFileInput.addEventListener('change', handleEmbossImageUpload);
+            
+            updateValues();
+
+            if (downloadBtn) downloadBtn.addEventListener('click', downloadSTL);
+            
+            if (toggleEraserBtn) {
+              toggleEraserBtn.addEventListener('click', () => {
+                  isErasing = !isErasing;
+                  if (!controls || !maskCanvas) return;
+
+                  if (isErasing) {
+                      toggleEraserBtn.textContent = '消しゴムモード ON (クリックでOFF)';
+                      toggleEraserBtn.classList.remove('bg-gray-500', 'hover:bg-gray-600');
+                      toggleEraserBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+                      maskCanvas.style.cursor = 'crosshair';
+                      maskCanvas.style.pointerEvents = 'auto';
+                      
+                      controls.enabled = false; 
+                      
+                      // 消しゴム描画イベント
+                      maskCanvas.onmousedown = (e) => { isDrawing = true; drawOnMaskCanvas(e); };
+                      maskCanvas.onmousemove = drawOnMaskCanvas;
+                      maskCanvas.onmouseup = () => { isDrawing = false; updateLogo(); };
+                      maskCanvas.ontouchstart = (e) => { e.preventDefault(); isDrawing = true; drawOnMaskCanvas(e); };
+                      maskCanvas.ontouchmove = (e) => { e.preventDefault(); drawOnMaskCanvas(e); };
+                      maskCanvas.ontouchend = () => { isDrawing = false; updateLogo(); };
+                      
+                  } else {
+                      toggleEraserBtn.textContent = '消しゴムモード OFF';
+                      toggleEraserBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
+                      toggleEraserBtn.classList.add('bg-gray-500', 'hover:bg-gray-600');
+                      maskCanvas.style.cursor = 'default';
+                      maskCanvas.style.pointerEvents = 'none';
+
+                      // イベント削除
+                      maskCanvas.onmousedown = null;
+                      maskCanvas.onmousemove = null;
+                      maskCanvas.onmouseup = null;
+                      maskCanvas.ontouchstart = null;
+                      maskCanvas.ontouchmove = null;
+                      maskCanvas.ontouchend = null;
+
+                      controls.enabled = true; 
+                  }
+              });
+            }
+
+        // --- STL Download Logic ---
+
+        function createFinalBaseGeometry() {
+             return null;
+        }
+
+        function downloadSTL() { if(!window.requireExportLicense())return;
+             const msgBox = document.getElementById('messageBox');
+             if(msgBox) msgBox.textContent = 'STLファイルを生成中...';
+            
+            if (!embossImage) {
+                 if(msgBox) msgBox.textContent = 'ロゴ画像が選択されていません。画像をアップロードしてください。';
+                 return;
+            }
+             if (!keyChainMesh || !logoMesh || !logoMesh.geometry || !logoMesh.geometry.attributes || !logoMesh.geometry.attributes.position) {
+                 if(msgBox) msgBox.textContent = '有効な浮き彫りモデルがありません。画像をアップロードして調整してください。';
+                 return;
+            }
+
+            const allGeometries = [];
+            
+             if (logoMesh && logoMesh.geometry && logoMesh.geometry.attributes && logoMesh.geometry.attributes.position && logoMesh.geometry.index) {
+                try {
+                    const logoGeometry = logoMesh.geometry.clone();
+                    const logoWorldMatrix = new THREE.Matrix4().multiplyMatrices(keyChainMesh.matrixWorld, logoMesh.matrix);
+                    logoGeometry.applyMatrix4(logoWorldMatrix);
+                    allGeometries.push(logoGeometry);
+                } catch (e) {
+                    console.error("Error cloning or transforming logo geometry for STL:", e);
+                    if(msgBox) msgBox.textContent = 'ロゴジオメトリの処理中にエラーが発生しました。';
+                    return;
+                }
+            } else {
+                if(msgBox) msgBox.textContent = 'STL生成のためのロゴジオメリが無効です。';
+                return;
+            }
+            
+            const finalGeometry = mergeBufferGeometries(allGeometries);
+
+            if (!finalGeometry) {
+                if(msgBox) msgBox.textContent = 'ジオメトリの統合に失敗しました。';
+                return;
+            }
+
+            const blob = STLExporter.parse(finalGeometry);
+             if (!blob || blob.size === 0) {
+                 if(msgBox) msgBox.textContent = 'STLエクスポート中にエラーが発生しました。生成されたデータが空です。';
+                 return;
+             }
+
+
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `Embossed_Logo.stl`;
+            link.click();
+
+            URL.revokeObjectURL(url);
+            if(msgBox) msgBox.textContent = 'STLファイルのダウンロードが完了しました。';
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls) controls.update(); 
+            if (renderer && scene && camera) {
+                 try {
+                    renderer.render(scene, camera);
+                 } catch (e) {
+                     console.error("Error during rendering:", e);
+                     // エラーが発生した場合、アニメーションループを停止するなどの処理が必要な場合がある
+                 }
+            }
+        }
+
+        // ⭐️ 修正: 初期化を DOMContentLoaded イベントリスナーに変更
+        document.addEventListener('DOMContentLoaded', init);
+
+    </script>
+
+    
+
+<div class="max-w-xl mx-auto">
+        
+
+<div class="bg-white p-6 rounded-xl shadow-lg border border-gray-100">
+            <div class="space-y-6">
+
+                
+
+<div class="space-y-4">
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">ロゴ画像アップロード</h3>
+                    
+                    <input type="file" id="embossFileInput" accept="image/png, image/jpeg" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-emerald-500 focus:border-emerald-500 transition duration-150">
+                    <p class="text-sm text-red-500 font-semibold">※画像の濃淡（黒い部分）に応じて浮き彫りの高さが変わります。</p>
+                    <div id="currentEmbossImage" class="text-xs text-gray-500">現在: 未設定</div>
+                </div>
+
+                
+
+<div class="space-y-4">
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">浮き彫りの高さ設定</h3>
+                    
+                    <label for="extrudeHeight" class="block text-sm font-medium text-gray-700 mt-4">浮き彫りの最大高さ (mm): <span id="extrudeHeightValue" class="font-semibold text-emerald-600">3.0</span></label>
+                    <input type="range" id="extrudeHeight" min="1" max="5" step="0.5" value="3.0"
+                           class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer range-lg">
+                </div>                
+
+                
+
+
+
+<div class="space-y-4">
+
+                    <h3 class="text-xl font-bold text-gray-700 mb-2">画像の円形マスク</h3>
+
+                    
+
+                    <label for="maskRadius" class="block text-sm font-medium text-gray-700">マスクの半径 (mm): <span id="maskRadiusValue" class="font-semibold text-emerald-600">25</span></label>
+
+                    <input type="range" id="maskRadius" min="10" max="40" step="1" value="25"
+
+                           class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer range-lg">
+
+
+
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+
+                        <div class="flex items-center space-x-2">
+
+                            <label class="text-sm font-medium text-gray-700 w-12">Xオフセット:</label>
+
+                            <input type="range" id="maskOffsetX" min="-20" max="20" step="0.5" value="0"
+
+                                   class="flex-grow h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+
+                            <span id="maskOffsetXValue" class="font-semibold text-emerald-600 w-8 text-right">0</span>
+
+                        </div>
+
+                        <div class="flex items-center space-x-2">
+
+                            <label class="text-sm font-medium text-gray-700 w-12">Yオフセット:</label>
+
+                            <input type="range" id="maskOffsetY" min="-20" max="20" step="0.5" value="0"
+
+                                   class="flex-grow h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+
+                            <span id="maskOffsetYValue" class="font-semibold text-emerald-600 w-8 text-right">0</span>
+
+                        </div>
+
+                    </div>
+
+                </div>                
+
+
+
+<div class="space-y-4">
+
+                     <h3 class="text-xl font-bold text-gray-700 mb-2">消しゴム機能</h3>
+
+                     <button id="toggleEraserBtn"
+
+                             class="w-full py-2 px-4 bg-gray-500 text-white font-semibold rounded-lg hover:bg-gray-600 transition duration-150">
+
+                         消しゴムモード OFF
+
+                     </button>
+
+                     <label for="eraserSize" class="block text-sm font-medium text-gray-700 mt-2">消しゴムサイズ: <span id="eraserSizeValue" class="font-semibold text-emerald-600">10</span></label>
+
+                     <input type="range" id="eraserSize" min="2" max="50" step="1" value="10"
+
+                            class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer range-lg">
+
+                 </div>
+
+
+
+
+
+
+
+            </div>
+
+            
+
+<button id="downloadBtn"
+                    class="w-full mt-8 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition duration-300 shadow-md shadow-emerald-200/50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 inline-block mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                STLをダウンロード
+            </button>
+            <p id="messageBox" class="text-center text-sm mt-3 text-red-500"></p>
+        </div>
+
+        
+
+<div id="container" class="relative">
+            <canvas id="maskCanvas"></canvas> 
+            <div id="loading-overlay" style="display: none;">3Dモデルを読み込み中...</div>
+        </div>
+    </div>
+
+<div id="export-paywall" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;flex-direction:column;">
+<div style="background:rgba(16,16,18,0.96);border:1px solid #00ffff;border-radius:16px;padding:32px;max-width:420px;width:90%;text-align:center;">
+<div style="font-size:32px;margin-bottom:12px;">🔒</div>
+<h2 style="color:#00ffff;font-family:monospace;font-size:16px;">Export License Required</h2>
+<p style="color:#aaa;font-size:12px;line-height:1.6;margin:12px 0 20px;">ファイルの出力にはライセンスが必要です。<br>プレビュー・操作は引き続き無料です。</p>
+<p style="color:#666;font-size:10px;">Stripe による安全な決済処理</p>
+<button onclick="document.getElementById('export-paywall').style.display='none'" style="background:none;border:none;color:#666;font-size:12px;cursor:pointer;text-decoration:underline;margin-top:12px;">閉じる</button>
+</div>
+</div>
+<script>
+window._exportLicensed = false;
+window.requireExportLicense = function() {
+  if (window._exportLicensed) return true;
+  var overlay = document.getElementById('export-paywall');
+  if (overlay) overlay.style.display = 'flex';
+  return false;
+};
+</script></body>
+</html>

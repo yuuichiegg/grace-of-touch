@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DroneGuard</title>
+<!-- Firebase SDK (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --surface: #141926;
+    --surface2: #1c2236;
+    --border: #262e45;
+    --text: #e2e6f0;
+    --text2: #7a839e;
+    --accent: #4a8aff;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app { max-width: 480px; margin: 0 auto; min-height: 100vh; }
+
+  /* === Setup screen === */
+  .setup-screen {
+    min-height: 100vh;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .setup-screen.hidden { display: none; }
+
+  /* Auth screen */
+  .auth-screen {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    text-align: center;
+  }
+  .auth-screen.hidden { display: none; }
+  .auth-logo { font-size: 48px; margin-bottom: 16px; }
+  .auth-title {
+    font-size: 28px; font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--green));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .auth-sub { color: var(--text2); font-size: 14px; margin-bottom: 32px; }
+  .auth-btn {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 28px;
+    color: var(--text); font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .auth-btn:hover { border-color: var(--accent); background: var(--surface2); }
+  .auth-btn svg { width: 20px; height: 20px; }
+  .auth-guest {
+    margin-top: 16px; background: none; border: none;
+    color: var(--text2); font-size: 13px; cursor: pointer;
+    text-decoration: underline; padding: 8px;
+  }
+  .auth-guest:hover { color: var(--text); }
+
+  /* User bar (top of main screen) */
+  .user-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 16px; background: var(--surface);
+    border-bottom: 1px solid var(--border); font-size: 12px;
+  }
+  .user-bar .user-info { color: var(--text2); display: flex; align-items: center; gap: 6px; }
+  .user-bar .user-name { color: var(--accent); font-weight: 600; }
+  .user-bar .logout-btn {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text2); font-size: 11px; padding: 4px 10px; cursor: pointer;
+  }
+  .user-bar .logout-btn:hover { border-color: var(--red); color: var(--red); }
+  .setup-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+  .setup-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--green));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .setup-header p {
+    color: var(--text2);
+    font-size: 14px;
+    margin-top: 8px;
+  }
+  .setup-step { display: none; }
+  .setup-step.active { display: block; }
+  .step-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .step-sub {
+    font-size: 13px;
+    color: var(--text2);
+    margin-bottom: 16px;
+  }
+  .choice-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .choice {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .choice:active { transform: scale(0.96); }
+  .choice.selected { border-color: var(--accent); background: rgba(74,138,255,0.08); }
+  .choice .c-icon { font-size: 24px; margin-bottom: 6px; }
+  .choice .c-label { font-size: 13px; font-weight: 600; }
+  .choice .c-hint { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+  .setup-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 24px;
+  }
+  .setup-dots {
+    display: flex;
+    gap: 6px;
+  }
+  .setup-dots span {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+  }
+  .setup-dots span.active { background: var(--accent); }
+  .btn-next {
+    padding: 10px 24px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-next:active { transform: scale(0.96); }
+  .btn-next:disabled { opacity: 0.3; cursor: default; }
+  .btn-back {
+    padding: 10px 16px;
+    background: transparent;
+    color: var(--text2);
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  /* === Profile badge (main screen) === */
+  .profile-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 11px;
+    color: var(--text2);
+    cursor: pointer;
+  }
+  .profile-badge:hover { border-color: var(--accent); }
+
+  /* === Main screen === */
+  .main-screen { display: none; }
+  .main-screen.visible { display: block; }
+  .top {
+    padding: 16px 20px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .top h1 { font-size: 17px; font-weight: 700; color: var(--accent); }
+
+  /* === Your info banner === */
+  .my-banner {
+    margin: 0 20px 12px;
+    background: linear-gradient(135deg, rgba(74,138,255,0.1), rgba(52,211,153,0.08));
+    border: 1px solid rgba(74,138,255,0.2);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .my-banner .my-label {
+    font-size: 11px;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .my-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .my-tag {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    background: rgba(74,138,255,0.15);
+    color: var(--accent);
+  }
+
+  /* === Search === */
+  .search-wrap {
+    padding: 8px 20px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--bg);
+  }
+  .search {
+    width: 100%;
+    padding: 14px 18px 14px 44px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    color: var(--text);
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search:focus { border-color: var(--accent); }
+  .search::placeholder { color: var(--text2); }
+  .search-icon {
+    position: absolute;
+    left: 34px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text2);
+    font-size: 16px;
+    pointer-events: none;
+  }
+
+  .content { padding: 0 20px 100px; }
+  .quick-section { margin-bottom: 24px; }
+  .section-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+
+  /* Info cards */
+  .info-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .info-card:active { transform: scale(0.98); }
+  .info-card .title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .info-card .title { font-size: 15px; font-weight: 600; }
+  .info-card .hint { font-size: 13px; color: var(--text2); margin-top: 4px; }
+  .info-card .chevron { color: var(--text2); font-size: 18px; transition: transform 0.2s; }
+  .info-card.open .chevron { transform: rotate(90deg); }
+  .info-card .body {
+    display: none;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    font-size: 14px;
+    line-height: 1.8;
+  }
+  .info-card.open .body { display: block; }
+
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .dot-g { background: var(--green); }
+  .dot-y { background: var(--yellow); }
+  .dot-r { background: var(--red); }
+
+  .compare-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; font-size: 13px; }
+  .compare-cell { padding: 8px 10px; background: var(--surface2); border-radius: 8px; }
+  .compare-cell .label { color: var(--text2); font-size: 11px; }
+
+  .tag { display: inline-block; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+  .tag-g { background: rgba(52,211,153,0.15); color: var(--green); }
+  .tag-y { background: rgba(251,191,36,0.15); color: var(--yellow); }
+  .tag-r { background: rgba(248,113,113,0.15); color: var(--red); }
+  .tag-b { background: rgba(74,138,255,0.15); color: var(--accent); }
+
+  .results-wrap { display: none; }
+  .results-wrap.active { display: block; }
+  .no-result { text-align: center; padding: 40px 0; color: var(--text2); font-size: 14px; }
+
+  .layer { padding: 10px 12px; border-radius: 8px; margin-top: 8px; font-size: 13px; line-height: 1.8; }
+  .layer-why { background: rgba(251,191,36,0.06); border-left: 3px solid var(--yellow); }
+  .layer-how { background: rgba(52,211,153,0.06); border-left: 3px solid var(--green); }
+  .layer b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .layer-why b { color: var(--yellow); }
+  .layer-how b { color: var(--green); }
+
+  .analogy { background: var(--surface2); border-radius: 8px; padding: 10px 14px; margin: 8px 0; font-size: 13px; border-left: 3px solid var(--accent); color: var(--text2); }
+  .analogy strong { color: var(--text); }
+
+  .slist { list-style: none; }
+  .slist li { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .slist li:last-child { border-bottom: none; }
+  .ok { color: var(--green); }
+  .ng { color: var(--red); }
+  .cond { color: var(--yellow); }
+
+  /* Relevance indicator */
+  .relevance-high { border-left: 3px solid var(--accent); }
+  .relevance-tag {
+    font-size: 10px;
+    color: var(--accent);
+    background: rgba(74,138,255,0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ==================== AUTH SCREEN ==================== -->
+  <div class="auth-screen" id="authScreen">
+    <div class="auth-logo">🛡️</div>
+    <div class="auth-title">DroneGuard</div>
+    <div class="auth-sub">ドローン運航総合支援アプリ<br>ログインしてデータをクラウド保存</div>
+    <button class="auth-btn" id="googleLoginBtn">
+      <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Googleでログイン
+    </button>
+    <button class="auth-guest" id="guestBtn">ゲストとして使う（データはこの端末のみ）</button>
+  </div>
+
+  <!-- ==================== USER BAR (shown when logged in) ==================== -->
+  <div class="user-bar hidden" id="userBar">
+    <div class="user-info">
+      <span>👤</span>
+      <span class="user-name" id="userName"></span>
+      <span id="syncStatus" style="color:var(--green);font-size:10px;">● 同期済み</span>
+    </div>
+    <button class="logout-btn" id="logoutBtn">ログアウト</button>
+  </div>
+
+  <!-- ==================== SETUP SCREEN ==================== -->
+  <div class="setup-screen hidden" id="setupScreen">
+    <div class="setup-header">
+      <h1>DroneGuard</h1>
+      <p>あなたに合った情報を表示するために<br>利用シーンを教えてください</p>
+    </div>
+
+    <!-- Step 1: 用途 -->
+    <div class="setup-step active" id="step1">
+      <div class="step-title">主な用途は？</div>
+      <div class="step-sub">複数選択できます</div>
+      <div class="choice-grid">
+        <div class="choice" data-val="aerial" onclick="toggleChoice(this)">
+          <div class="c-icon">&#127909;</div>
+          <div class="c-label">空撮</div>
+        </div>
+        <div class="choice" data-val="inspection" onclick="toggleChoice(this)">
+          <div class="c-icon">&#128270;</div>
+          <div class="c-label">インフラ点検</div>
+        </div>
+        <div class="choice" data-val="agriculture" onclick="toggleChoice(this)">
+          <div class="c-icon">&#127807;</div>
+          <div class="c-label">農薬散布</div>
+        </div>
+        <div class="choice" data-val="logistics" onclick="toggleChoice(this)">
+          <div class="c-icon">&#128230;</div>
+          <div class="c-label">物流・配送</div>
+        </div>
+        <div class="choice" data-val="survey" onclick="toggleChoice(this)">
+          <div class="c-icon">&#128208;</div>
+          <div class="c-label">測量</div>
+        </div>
+        <div class="choice" data-val="other" onclick="toggleChoice(this)">
+          <div class="c-icon">&#9881;</div>
+          <div class="c-label">その他</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: 飛行環境 -->
+    <div class="setup-step" id="step2">
+      <div class="step-title">飛行環境は？</div>
+      <div class="step-sub">普段の飛行に当てはまるものを選んでください</div>
+      <div class="choice-grid">
+        <div class="choice" data-val="bvlos" onclick="toggleChoice(this)">
+          <div class="c-icon">&#128065;</div>
+          <div class="c-label">目視外飛行あり</div>
+        </div>
+        <div class="choice" data-val="night" onclick="toggleChoice(this)">
+          <div class="c-icon">&#127769;</div>
+          <div class="c-label">夜間飛行あり</div>
+        </div>
+        <div class="choice" data-val="did" onclick="toggleChoice(this)">
+          <div class="c-icon">&#127959;</div>
+          <div class="c-label">DID地区あり</div>
+        </div>
+        <div class="choice" data-val="outdoor" onclick="toggleChoice(this)">
+          <div class="c-icon">&#9968;</div>
+          <div class="c-label">屋外</div>
+        </div>
+        <div class="choice" data-val="indoor" onclick="toggleChoice(this)">
+          <div class="c-icon">&#127970;</div>
+          <div class="c-label">屋内</div>
+        </div>
+        <div class="choice" data-val="over30m" onclick="toggleChoice(this)">
+          <div class="c-icon">&#9650;</div>
+          <div class="c-label">高度30m以上</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: 資格 -->
+    <div class="setup-step" id="step3">
+      <div class="step-title">保有している資格は？</div>
+      <div class="step-sub">現在の状況を教えてください</div>
+      <div class="choice-grid" style="grid-template-columns:1fr;">
+        <div class="choice" data-val="class1" onclick="selectOne(this, 'step3')">
+          <div class="c-label">一等無人航空機操縦士</div>
+          <div class="c-hint">カテゴリーIII対応</div>
+        </div>
+        <div class="choice" data-val="class2" onclick="selectOne(this, 'step3')">
+          <div class="c-label">二等無人航空機操縦士</div>
+          <div class="c-hint">カテゴリーIIB対応</div>
+        </div>
+        <div class="choice" data-val="none" onclick="selectOne(this, 'step3')">
+          <div class="c-label">資格なし / 取得予定</div>
+          <div class="c-hint">カテゴリーI + 許可申請</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-nav">
+      <button class="btn-back" id="btnBack" onclick="prevStep()" style="visibility:hidden;">戻る</button>
+      <div class="setup-dots" id="dots">
+        <span class="active"></span><span></span><span></span>
+      </div>
+      <button class="btn-next" id="btnNext" onclick="nextStep()">次へ</button>
+    </div>
+  </div>
+
+  <!-- ==================== MAIN SCREEN ==================== -->
+  <div class="main-screen" id="mainScreen">
+    <div class="top">
+      <h1>DroneGuard</h1>
+      <div class="profile-badge" onclick="resetProfile()">
+        <span id="profileIcon">&#9881;</span>
+        <span id="profileLabel">設定変更</span>
+      </div>
+    </div>
+
+    <!-- Your profile banner -->
+    <div class="my-banner" id="myBanner">
+      <div class="my-label">あなたのプロファイル</div>
+      <div class="my-tags" id="myTags"></div>
+    </div>
+
+    <div class="search-wrap" style="position:relative;">
+      <span class="search-icon">&#128269;</span>
+      <input class="search" id="searchInput" type="text"
+        placeholder="知りたいことを入力..."
+        oninput="onSearch(this.value)">
+    </div>
+
+    <div class="content">
+      <div id="defaultView">
+        <!-- Quick actions -->
+        <div class="quick-section">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px;">
+            <a href="preflight.html" style="text-decoration:none;">
+              <div class="info-card" style="text-align:center; padding:18px 12px; border-color:var(--green);">
+                <div style="font-size:24px;">&#9989;</div>
+                <div class="title" style="font-size:14px; margin-top:6px;">飛行前チェック</div>
+                <div class="hint">35項目の安全確認</div>
+              </div>
+            </a>
+            <a href="qrh.html" style="text-decoration:none;">
+              <div class="info-card" style="text-align:center; padding:18px 12px; border-color:var(--red);">
+                <div style="font-size:24px;">&#9888;</div>
+                <div class="title" style="font-size:14px; margin-top:6px; color:var(--red);">緊急時QRH</div>
+                <div class="hint">トラブル対応手順</div>
+              </div>
+            </a>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px;">
+            <a href="flightlog.html" style="text-decoration:none;">
+              <div class="info-card" style="text-align:center; padding:18px 12px; border-color:var(--accent);">
+                <div style="font-size:24px;">&#128214;</div>
+                <div class="title" style="font-size:14px; margin-top:6px;">飛行日誌</div>
+                <div class="hint">飛行記録・履歴・統計</div>
+              </div>
+            </a>
+            <a href="https://drone-flight-helper.web.app/" target="_blank" style="text-decoration:none;">
+              <div class="info-card" style="text-align:center; padding:18px 12px; border-color:var(--yellow); background:rgba(251,191,36,0.04);">
+                <div style="font-size:24px;">&#128196;</div>
+                <div class="title" style="font-size:14px; margin-top:6px; color:var(--yellow);">飛行許可ヘルパー</div>
+                <div class="hint">土地管理者への許可申請</div>
+              </div>
+            </a>
+          </div>
+
+          <!-- WallGuard integration -->
+          <div style="margin-bottom:16px;">
+            <a href="/wallguard.html" style="text-decoration:none; display:block;">
+              <div class="info-card" style="padding:16px; border-color:rgba(139,92,246,0.3); background:rgba(139,92,246,0.04);">
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <div style="font-size:28px;">🛡️</div>
+                  <div style="flex:1;">
+                    <div class="title" style="font-size:14px; color:#a78bfa;">WallGuard FlickCheck</div>
+                    <div class="hint">外壁点検AIツール — ドローン空撮データと連携</div>
+                  </div>
+                  <span style="color:rgba(139,92,246,0.5); font-size:18px;">&#8250;</span>
+                </div>
+                <div style="display:flex; gap:6px; margin-top:10px; flex-wrap:wrap;">
+                  <span class="tag tag-b" style="background:rgba(139,92,246,0.12); color:#a78bfa;">外壁点検</span>
+                  <span class="tag tag-b" style="background:rgba(139,92,246,0.12); color:#a78bfa;">AIマーカー</span>
+                  <span class="tag tag-b" style="background:rgba(139,92,246,0.12); color:#a78bfa;">チーム連携</span>
+                </div>
+              </div>
+            </a>
+          </div>
+        </div>
+
+        <!-- Recommended for you -->
+        <div class="quick-section" id="recommendedSection">
+          <div class="section-label">あなたに関連する情報</div>
+          <div id="recommendedList"></div>
+        </div>
+
+        <div class="quick-section">
+          <div class="section-label">制度の全体像</div>
+
+          <div class="info-card" onclick="toggle(this)">
+            <div class="title-row">
+              <div>
+                <div class="title">自動車に例えると</div>
+                <div class="hint">免許・車検・公道の関係</div>
+              </div>
+              <span class="chevron">&#8250;</span>
+            </div>
+            <div class="body">
+              <div class="compare-row">
+                <div class="compare-cell"><div class="label">普通免許</div>技能証明</div>
+                <div class="compare-cell"><div class="label">車検証</div>機体認証</div>
+              </div>
+              <div class="compare-row">
+                <div class="compare-cell"><div class="label">公道を走る</div>特定飛行</div>
+                <div class="compare-cell"><div class="label">サーキット</div>カテゴリーI</div>
+              </div>
+              <div class="compare-row">
+                <div class="compare-cell"><div class="label">一般道</div>カテゴリーII</div>
+                <div class="compare-cell"><div class="label">高速道路</div>カテゴリーIII</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="info-card" onclick="toggle(this)">
+            <div class="title-row">
+              <div>
+                <div class="title">カテゴリーI / II / III</div>
+                <div class="hint">飛行リスクの3区分</div>
+              </div>
+              <span class="chevron">&#8250;</span>
+            </div>
+            <div class="body">
+              <div style="margin-bottom:12px;">
+                <div><span class="dot dot-g"></span><strong>カテゴリーI</strong> <span class="tag tag-g">資格不要</span></div>
+                <div style="font-size:13px; color:var(--text2); margin:4px 0 4px 14px;">特定飛行に該当しない。手続不要。</div>
+                <div class="analogy"><strong>サーキット・私有地</strong>を走るのと同じ</div>
+              </div>
+              <div style="margin-bottom:12px;">
+                <div><span class="dot dot-y"></span><strong>カテゴリーII</strong> <span class="tag tag-y">免許+車検</span></div>
+                <div style="font-size:13px; color:var(--text2); margin:4px 0 4px 14px;">特定飛行 + 立入管理措置あり</div>
+                <div class="analogy"><strong>一般道路</strong>。IIBは免許+車検で手続不要、IIAは追加で許可が要る</div>
+              </div>
+              <div>
+                <div><span class="dot dot-r"></span><strong>カテゴリーIII</strong> <span class="tag tag-r">一等+第一種+許可</span></div>
+                <div style="font-size:13px; color:var(--text2); margin:4px 0 4px 14px;">特定飛行 + 立入管理措置なし</div>
+                <div class="analogy"><strong>高速道路</strong>。一等+第一種+国の許可、すべて必須</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="info-card" onclick="toggle(this)">
+            <div class="title-row">
+              <div>
+                <div class="title">特定飛行とは</div>
+                <div class="hint">空域4つ + 方法6つ = 公道に出ること</div>
+              </div>
+              <span class="chevron">&#8250;</span>
+            </div>
+            <div class="body">
+              <div style="font-size:13px; color:var(--text2); margin-bottom:8px;">いずれか1つでも該当すれば「特定飛行」</div>
+              <div style="font-size:12px; color:var(--accent); font-weight:600; margin-bottom:4px;">空域</div>
+              <ul class="slist">
+                <li>A. 空港等の周辺の上空</li>
+                <li>B. 緊急用務空域</li>
+                <li>C. 地表から150m以上</li>
+                <li>D. DID地区上空</li>
+              </ul>
+              <div style="font-size:12px; color:var(--accent); font-weight:600; margin:8px 0 4px;">方法</div>
+              <ul class="slist">
+                <li>1. 夜間飛行</li>
+                <li>2. 目視外飛行</li>
+                <li>3. 人・物件から30m未満</li>
+                <li>4. 催し場所上空</li>
+                <li>5. 危険物の輸送</li>
+                <li>6. 物件の投下</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="info-card" onclick="toggle(this)">
+            <div class="title-row">
+              <div>
+                <div class="title">飛行レベル 1〜4</div>
+                <div class="hint">レベル3と4の違いは「人がいるか」</div>
+              </div>
+              <span class="chevron">&#8250;</span>
+            </div>
+            <div class="body">
+              <ul class="slist">
+                <li><span class="tag tag-g">Lv.1</span> 目視内・手動 <span style="color:var(--text2);font-size:12px;">— 教習所内</span></li>
+                <li><span class="tag tag-b">Lv.2</span> 目視内・自動 <span style="color:var(--text2);font-size:12px;">— 路上教習</span></li>
+                <li><span class="tag tag-y">Lv.3</span> <strong>無人地帯</strong>で目視外 <span style="color:var(--text2);font-size:12px;">— 田舎道</span></li>
+                <li><span class="tag tag-r">Lv.4</span> <strong>有人地帯</strong>で目視外 <span style="color:var(--text2);font-size:12px;">— 市街地</span></li>
+              </ul>
+              <div class="analogy">レベル3→4の壁 = <strong>「人の上を飛べるか」</strong></div>
+            </div>
+          </div>
+
+          <div class="info-card" onclick="toggle(this)">
+            <div class="title-row">
+              <div>
+                <div class="title">資格で何ができるか</div>
+                <div class="hint">なし / 二等 / 一等の比較</div>
+              </div>
+              <span class="chevron">&#8250;</span>
+            </div>
+            <div class="body">
+              <div style="font-size:12px; font-weight:600; color:var(--text2); margin-bottom:6px;">資格なし</div>
+              <ul class="slist">
+                <li><span class="ok">&#10003;</span> カテゴリーI</li>
+                <li><span class="cond">&#9888;</span> カテゴリーII — 許可・承認が必要</li>
+                <li><span class="ng">&#10007;</span> カテゴリーIII</li>
+              </ul>
+              <div style="font-size:12px; font-weight:600; color:var(--yellow); margin:10px 0 6px;">二等 + 第二種</div>
+              <ul class="slist">
+                <li><span class="ok">&#10003;</span> カテゴリーI / IIB <strong>手続不要</strong></li>
+                <li><span class="cond">&#9888;</span> カテゴリーIIA — 許可要</li>
+                <li><span class="ng">&#10007;</span> カテゴリーIII</li>
+              </ul>
+              <div style="font-size:12px; font-weight:600; color:var(--accent); margin:10px 0 6px;">一等 + 第一種</div>
+              <ul class="slist">
+                <li><span class="ok">&#10003;</span> カテゴリーI / IIB</li>
+                <li><span class="cond">&#9888;</span> カテゴリーIIA — 許可要</li>
+                <li><span class="ok">&#10003;</span> カテゴリーIII — <strong>許可を受けて飛行可</strong></li>
+              </ul>
+              <div style="margin-top:10px; font-size:12px; color:var(--text2);">
+                技能証明3年 / 第一種<strong style="color:var(--red)">1年</strong> / 第二種3年
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="quick-section" id="glossarySection">
+          <div class="section-label">用語解説</div>
+          <div id="glossaryList"></div>
+        </div>
+      </div>
+
+      <div id="searchResults" class="results-wrap"></div>
+
+      <!-- ==================== FEEDBACK FORM ==================== -->
+      <div id="feedbackSection" style="margin-top:32px; padding-top:24px; border-top:1px solid var(--border);">
+        <div class="section-label">ご要望・フィードバック</div>
+        <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px;">
+          <select id="feedbackType" style="width:100%; padding:10px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; margin-bottom:10px;">
+            <option value="feature">機能追加リクエスト</option>
+            <option value="bug">不具合報告</option>
+            <option value="content">コンテンツ追加要望</option>
+            <option value="improve">改善提案</option>
+            <option value="other">その他</option>
+          </select>
+          <textarea id="feedbackMsg" placeholder="ご意見・ご要望をお聞かせください..." style="width:100%; min-height:80px; padding:10px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; font-family:inherit; resize:vertical; outline:none;"></textarea>
+          <div style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+            <button id="feedbackSend" onclick="sendFeedback()" style="padding:10px 20px; background:var(--accent); border:none; border-radius:8px; color:#fff; font-size:13px; font-weight:600; cursor:pointer;">送信</button>
+            <span id="feedbackStatus" style="font-size:12px; color:var(--text2);"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ==================== PROFILE & SETUP ====================
+let profile = { uses: [], env: [], cert: '' };
+let currentStep = 1;
+
+function toggleChoice(el) {
+  el.classList.toggle('selected');
+}
+function selectOne(el, stepId) {
+  document.querySelectorAll(`#${stepId} .choice`).forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function getSelected(stepId) {
+  return [...document.querySelectorAll(`#${stepId} .choice.selected`)].map(c => c.dataset.val);
+}
+
+function nextStep() {
+  if (currentStep === 1) {
+    profile.uses = getSelected('step1');
+  } else if (currentStep === 2) {
+    profile.env = getSelected('step2');
+  } else if (currentStep === 3) {
+    profile.cert = getSelected('step3')[0] || 'none';
+    saveProfile();
+    showMain();
+    return;
+  }
+  currentStep++;
+  showStep();
+}
+
+function prevStep() {
+  if (currentStep > 1) { currentStep--; showStep(); }
+}
+
+function showStep() {
+  document.getElementById('setupScreen').classList.remove('hidden');
+  document.querySelectorAll('.setup-step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + currentStep).classList.add('active');
+  document.querySelectorAll('.setup-dots span').forEach((d, i) => {
+    d.classList.toggle('active', i < currentStep);
+  });
+  document.getElementById('btnBack').style.visibility = currentStep === 1 ? 'hidden' : 'visible';
+  document.getElementById('btnNext').textContent = currentStep === 3 ? '始める' : '次へ';
+}
+
+function saveProfile() {
+  localStorage.setItem('dg_profile', JSON.stringify(profile));
+}
+function loadProfile() {
+  const p = localStorage.getItem('dg_profile');
+  if (p) { profile = JSON.parse(p); return true; }
+  return false;
+}
+function resetProfile() {
+  localStorage.removeItem('dg_profile');
+  document.getElementById('mainScreen').classList.remove('visible');
+  document.getElementById('setupScreen').classList.remove('hidden');
+  currentStep = 1;
+  showStep();
+  // Reset selections
+  document.querySelectorAll('.choice').forEach(c => c.classList.remove('selected'));
+}
+
+// ==================== MAIN SCREEN ====================
+const useLabels = { aerial:'空撮', inspection:'インフラ点検', agriculture:'農薬散布', logistics:'物流', survey:'測量', other:'その他' };
+const envLabels = { bvlos:'目視外', night:'夜間', did:'DID地区', outdoor:'屋外', indoor:'屋内', over30m:'高度30m+' };
+const certLabels = { class1:'一等操縦士', class2:'二等操縦士', none:'資格なし' };
+
+function showMain() {
+  document.getElementById('setupScreen').classList.add('hidden');
+  document.getElementById('mainScreen').classList.add('visible');
+
+  // Render profile tags
+  const tags = document.getElementById('myTags');
+  let html = '';
+  profile.uses.forEach(u => { html += `<span class="my-tag">${useLabels[u]||u}</span>`; });
+  profile.env.forEach(e => { html += `<span class="my-tag">${envLabels[e]||e}</span>`; });
+  html += `<span class="my-tag" style="background:rgba(52,211,153,0.15);color:var(--green);">${certLabels[profile.cert]||'未設定'}</span>`;
+  tags.innerHTML = html;
+
+  renderRecommended();
+  renderGlossary(getFilteredTerms(), document.getElementById('glossaryList'));
+}
+
+// ==================== CONTENT RELEVANCE ====================
+const terms = [
+  { name:"ボルテックス・リング・ステート", cat:"飛行原理", one:"垂直降下で揚力を失う現象",
+    why:"プロペラの風が再循環し、揚力がほぼゼロに。スロットルを上げても回復不能。",
+    how:"前兆: 小刻みな揺れ → 対処: 前後左右に移動して抜ける → 予防: 垂直降下を避ける",
+    tags:["aerial","inspection","agriculture","survey","outdoor"] },
+  { name:"ダウンウォッシュ", cat:"飛行原理", one:"プロペラが生む下向きの風",
+    why:"揚力の源。砂石を巻き上げて危険。大型機ほど強い。",
+    how:"離着陸場所の飛散物を確認。大型機は広いスペース確保",
+    tags:["agriculture","logistics","outdoor"] },
+  { name:"グランドエフェクト", cat:"飛行原理", one:"地面近くで揚力が増す現象",
+    why:"ローター高度が直径以下で発生。離着陸時の不安定の原因。",
+    how:"離陸後は速やかに上昇。着陸時はホバリングせず速やかに降ろす",
+    tags:["aerial","inspection","agriculture","logistics","survey","outdoor"] },
+  { name:"フェールセーフ", cat:"安全管理", one:"異常時に自動で安全側に移行する機能",
+    why:"電波断絶・バッテリー低下時に自動ホバリング・帰還・着陸する最後の砦。",
+    how:"飛行前にRTH高度・バッテリー低下時の動作を必ず設定",
+    tags:["aerial","inspection","agriculture","logistics","survey","bvlos","outdoor"] },
+  { name:"CRM", cat:"安全管理", one:"全リソースを活用した安全管理手法",
+    why:"操縦技量だけではヒューマンエラーをゼロにできない。",
+    how:"5つのスキル: 状況認識、意思決定、ワークロード管理、チーム体制、コミュニケーション",
+    tags:["inspection","agriculture","logistics","bvlos","did"] },
+  { name:"TEM", cat:"安全管理", one:"エラーの原因（スレット）を早期把握する手法",
+    why:"エラーはスレット（気象変化・疲労・機材不具合）が引き金。",
+    how:"飛行前に『今日のスレットは何か』を全員で共有する",
+    tags:["inspection","agriculture","logistics","bvlos"] },
+  { name:"SORA", cat:"安全管理", one:"リスク評価の国際標準（6ステップ）",
+    why:"カテゴリーIII飛行のリスク評価に推奨。",
+    how:"6段階: 運航計画→地上リスク→空中リスク→安全目標→隣接エリア→対応策",
+    tags:["logistics","bvlos","did","class1"] },
+  { name:"ハザード", cat:"安全管理", one:"事故につながりかねない危険要素",
+    why:"強風・電波塔・バッテリー劣化・操縦者の疲労など。",
+    how:"ハザードごとに低減策を飛行マニュアルに記載",
+    tags:["aerial","inspection","agriculture","logistics","survey","outdoor"] },
+  { name:"特定飛行", cat:"法規制", one:"航空法で規制される飛行 = 公道に出ること",
+    why:"空域4つ+方法6つのいずれか1つでも該当。",
+    how:"DIPSで飛行予定地を確認し判定",
+    tags:["aerial","inspection","agriculture","logistics","survey","bvlos","night","did","outdoor"] },
+  { name:"立入管理措置", cat:"法規制", one:"飛行範囲+落下距離内を無人地帯にする措置",
+    why:"これを講じるか否かでカテゴリーIIとIIIが分かれる。",
+    how:"危険半径 = 飛行高度 or 30m の長い方",
+    tags:["inspection","agriculture","logistics","bvlos","did","outdoor"] },
+  { name:"ジオフェンス", cat:"法規制", one:"飛行禁止エリアの電子的な見えない壁",
+    why:"設定エリア外への逸脱を防止。",
+    how:"飛行前に設定確認。到達時の動作も要確認",
+    tags:["aerial","inspection","logistics","survey","bvlos","outdoor"] },
+  { name:"技能証明", cat:"法規制", one:"国が操縦士の技能を証明 = 免許",
+    why:"一等は全カテゴリー対応。二等はIIBまで。",
+    how:"取得: 登録講習機関→修了審査→学科試験(CBT)。有効3年",
+    tags:["aerial","inspection","agriculture","logistics","survey"] },
+  { name:"機体認証", cat:"法規制", one:"機体の安全性を国が認証 = 車検",
+    why:"第一種: カテゴリーIII(1年)。第二種: II(3年)。",
+    how:"技能証明+機体認証でカテゴリーIIBの手続省略が可能",
+    tags:["inspection","logistics","bvlos","did"] },
+  { name:"DIPS", cat:"法規制", one:"飛行計画通報・許可申請システム",
+    why:"飛行計画を事前通報し安全を確保。",
+    how:"出発地・経路・日時を入力して通報",
+    tags:["aerial","inspection","agriculture","logistics","survey","bvlos","night","did","outdoor"] },
+  { name:"リモートID", cat:"法規制", one:"飛行中の機体識別信号 = ナンバープレート",
+    why:"100g以上の機体に登録義務。",
+    how:"飛行前にランプ点灯を確認",
+    tags:["aerial","inspection","agriculture","logistics","survey","outdoor"] },
+  { name:"GNSS / GPS / RTK", cat:"機体", one:"衛星測位 — 単独(数十m) vs RTK(数cm)",
+    why:"機体位置の基幹技術。自動操縦の精度に直結。",
+    how:"GNSS異常→手動切替→ホバリング→安全着陸",
+    tags:["aerial","inspection","survey","logistics","bvlos","outdoor"] },
+  { name:"IMU", cat:"機体", one:"慣性計測装置 — 姿勢制御の基盤",
+    why:"機体の傾き・回転を常時計測。",
+    how:"IMU異常→速やかに手動着陸。飛行前キャリブレーション",
+    tags:["aerial","inspection","agriculture","logistics","survey","outdoor"] },
+  { name:"LiPoバッテリー", cat:"機体", one:"高エネルギー密度だが発火リスクあり",
+    why:"過充電・過放電・衝撃で発火。冬季は飛行時間半減。",
+    how:"保管: 充電60%、35℃以下。膨らんだら即交換",
+    tags:["aerial","inspection","agriculture","logistics","survey","outdoor","night"] },
+  { name:"フレネルゾーン", cat:"機体", one:"電波伝搬に必要な楕円体空間",
+    why:"障害物があると電波減衰。",
+    how:"送信機と機体の間に建物が入らない経路を設定",
+    tags:["inspection","logistics","bvlos","outdoor"] },
+];
+
+// Recommendations based on profile
+const recommendations = [
+  { title:"目視外飛行の追加装備", hint:"補助者なしの場合に必要なもの",
+    content:"補助者なし目視外: 灯火・塗色、経路全体の航空機監視カメラ、針路・姿勢・高度・速度の把握装置、飛行経路と実位置の差を表示できる装置が追加で必要。",
+    cond: p => p.env.includes('bvlos') },
+  { title:"DID地区での飛行", hint:"カテゴリーIIの手続きが必要",
+    content:"DID地区上空は「特定飛行」に該当。技能証明+機体認証があればカテゴリーIIBとして手続不要で飛行可。なければ国の許可・承認を事前に取得。",
+    cond: p => p.env.includes('did') },
+  { title:"夜間飛行の注意点", hint:"特定飛行に該当・灯火が必要",
+    content:"夜間飛行（日没後〜日出前）は特定飛行。機体の灯火が必須。視界が制限されるため、目視外飛行との組み合わせは高リスク。飛行マニュアルに夜間特有のリスク対策を記載。",
+    cond: p => p.env.includes('night') },
+  { title:"農薬散布の特有リスク", hint:"物件投下に該当・ドリフト対策",
+    content:"農薬散布は「物件投下」に該当し特定飛行。周辺への農薬飛散（ドリフト）防止が重要。風速・風向を飛行前・飛行中に常時確認。補助者との連携不足が事故原因の上位。",
+    cond: p => p.uses.includes('agriculture') },
+  { title:"インフラ点検のポイント", hint:"構造物近接飛行・電波環境",
+    content:"構造物に近接して飛行するため、GNSS電波の遮蔽・マルチパス、金属構造物による磁気センサ異常に注意。手動操縦スキルが特に重要。",
+    cond: p => p.uses.includes('inspection') },
+  { title:"物流ドローンの要件", hint:"レベル3〜4・長距離運航",
+    content:"無人地帯の目視外（レベル3）から有人地帯（レベル4）まで。長距離運航ではバッテリー管理・緊急着陸地点の複数設定・通信途絶対策が必須。カテゴリーIII飛行にはSORAリスク評価が推奨。",
+    cond: p => p.uses.includes('logistics') },
+  { title:"一等操縦士の活用", hint:"カテゴリーIII飛行が可能に",
+    content:"一等技能証明＋第一種機体認証で、立入管理措置なしの第三者上空飛行（カテゴリーIII）が可能。ただし国の許可・承認とSORAリスク評価が必要。第一種機体認証は有効期間1年（毎年検査）。",
+    cond: p => p.cert === 'class1' },
+  { title:"屋内飛行について", hint:"航空法の適用範囲外",
+    content:"屋内は航空法上の「飛行」に該当しないため、特定飛行の規制対象外。ただし施設管理者の許可は必要。また、GNSSが受信できないため手動操縦スキルが必須。",
+    cond: p => p.env.includes('indoor') },
+];
+
+function renderRecommended() {
+  const container = document.getElementById('recommendedList');
+  const section = document.getElementById('recommendedSection');
+  const matched = recommendations.filter(r => r.cond(profile));
+
+  if (matched.length === 0) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+  container.innerHTML = '';
+  matched.forEach(r => {
+    container.innerHTML += `
+      <div class="info-card relevance-high" onclick="toggle(this)">
+        <div class="title-row">
+          <div>
+            <div class="title">${r.title} <span class="relevance-tag">あなた向け</span></div>
+            <div class="hint">${r.hint}</div>
+          </div>
+          <span class="chevron">&#8250;</span>
+        </div>
+        <div class="body">${r.content}</div>
+      </div>`;
+  });
+}
+
+function getFilteredTerms() {
+  const profileTags = [...profile.uses, ...profile.env, profile.cert].filter(Boolean);
+  if (profileTags.length === 0) return terms;
+
+  // Sort: matching terms first, then others
+  return [...terms].sort((a, b) => {
+    const aMatch = a.tags.filter(t => profileTags.includes(t)).length;
+    const bMatch = b.tags.filter(t => profileTags.includes(t)).length;
+    return bMatch - aMatch;
+  });
+}
+
+// Toggle card
+function toggle(el) { el.classList.toggle('open'); }
+
+// Render glossary
+function renderGlossary(list, container) {
+  const profileTags = [...profile.uses, ...profile.env, profile.cert].filter(Boolean);
+  container.innerHTML = '';
+  list.forEach(t => {
+    const isRelevant = profileTags.length > 0 && t.tags.some(tag => profileTags.includes(tag));
+    const card = document.createElement('div');
+    card.className = 'info-card' + (isRelevant ? ' relevance-high' : '');
+    card.onclick = function(){ toggle(this); };
+    card.innerHTML = `
+      <div class="title-row">
+        <div>
+          <div class="title">${t.name}${isRelevant ? ' <span class="relevance-tag">関連</span>' : ''}</div>
+          <div class="hint">${t.one}</div>
+        </div>
+        <span class="chevron">&#8250;</span>
+      </div>
+      <div class="body">
+        <div class="layer layer-why"><b>なぜ重要か</b>${t.why}</div>
+        <div class="layer layer-how"><b>どう対処するか</b>${t.how}</div>
+      </div>`;
+    container.appendChild(card);
+  });
+}
+
+// Search
+function onSearch(q) {
+  const def = document.getElementById('defaultView');
+  const res = document.getElementById('searchResults');
+  if (!q.trim()) { def.style.display=''; res.classList.remove('active'); return; }
+  def.style.display = 'none';
+  res.classList.add('active');
+  const query = q.toLowerCase();
+
+  const matched = terms.filter(t =>
+    t.name.toLowerCase().includes(query) || t.one.includes(query) || t.why.includes(query) || t.how.includes(query) || t.cat.includes(query)
+  );
+
+  const systemCards = [
+    { title:"自動車に例えると", text:"免許 車検 公道 技能証明 機体認証 カテゴリー" },
+    { title:"カテゴリーI/II/III", text:"カテゴリー 立入管理措置 特定飛行 第三者 IIA IIB" },
+    { title:"特定飛行", text:"空域 夜間 目視外 30m DID 人口集中 催し 危険物 投下 150m 空港" },
+    { title:"飛行レベル", text:"レベル 目視内 目視外 無人地帯 有人地帯 市街地" },
+    { title:"資格で何ができるか", text:"一等 二等 資格なし 技能証明 機体認証 有効期間" },
+  ];
+  const matchedSys = systemCards.filter(c => c.title.includes(query) || c.text.includes(query));
+
+  let html = '';
+  if (matchedSys.length) {
+    html += '<div class="section-label" style="margin-bottom:10px;">制度</div>';
+    matchedSys.forEach(c => {
+      html += `<div class="info-card" onclick="document.getElementById('searchInput').value='';onSearch('');document.querySelectorAll('#defaultView .info-card .title').forEach(el=>{if(el.textContent==='${c.title}'){const card=el.closest('.info-card');card.classList.add('open');setTimeout(()=>card.scrollIntoView({behavior:'smooth',block:'center'}),100);}});">
+        <div class="title-row"><div class="title">${c.title}</div><span class="chevron" style="color:var(--accent);">&#8594;</span></div></div>`;
+    });
+  }
+  if (matched.length) {
+    html += '<div class="section-label" style="margin:16px 0 10px;">用語</div>';
+    const tmp = document.createElement('div');
+    renderGlossary(matched, tmp);
+    html += tmp.innerHTML;
+  }
+  if (!matchedSys.length && !matched.length) html = '<div class="no-result">該当する情報が見つかりません</div>';
+  res.innerHTML = html;
+}
+
+// ==================== FIREBASE AUTH ====================
+firebase.initializeApp({
+  apiKey: "AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",
+  authDomain: "grace-of-touch.firebaseapp.com",
+  projectId: "grace-of-touch",
+  storageBucket: "grace-of-touch.firebasestorage.app",
+  messagingSenderId: "505078300866",
+  appId: "1:505078300866:web:adad2a27b163c3b0f1bb5b"
+});
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+let currentUser = null;
+let isGuest = false;
+
+const authScreen = document.getElementById('authScreen');
+const userBar = document.getElementById('userBar');
+
+// Google login
+document.getElementById('googleLoginBtn').onclick = () => {
+  auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+};
+
+// Guest mode
+document.getElementById('guestBtn').onclick = () => {
+  isGuest = true;
+  authScreen.classList.add('hidden');
+  if (loadProfile()) { showMain(); } else { showStep(); }
+};
+
+// Logout
+document.getElementById('logoutBtn').onclick = () => {
+  auth.signOut();
+};
+
+// Auth state listener
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    currentUser = user;
+    isGuest = false;
+    authScreen.classList.add('hidden');
+    userBar.classList.remove('hidden');
+    document.getElementById('userName').textContent = user.displayName || user.email || 'User';
+
+    // Load profile from Firestore if exists
+    try {
+      const doc = await db.collection('droneguard_users').doc(user.uid).get();
+      if (doc.exists && doc.data().profile) {
+        const p = doc.data().profile;
+        localStorage.setItem('dg_profile', JSON.stringify(p));
+        document.getElementById('syncStatus').textContent = '● 同期済み';
+        document.getElementById('syncStatus').style.color = 'var(--green)';
+      }
+    } catch(e) {
+      document.getElementById('syncStatus').textContent = '● ローカル';
+      document.getElementById('syncStatus').style.color = 'var(--yellow)';
+    }
+
+    if (loadProfile()) { showMain(); } else { showStep(); }
+  } else {
+    currentUser = null;
+    userBar.classList.add('hidden');
+    if (!isGuest) {
+      authScreen.classList.remove('hidden');
+      document.getElementById('setupScreen').classList.add('hidden');
+      document.getElementById('mainScreen').classList.add('hidden');
+    }
+  }
+});
+
+// Save profile to Firestore when set
+const _origSaveProfile = saveProfile;
+saveProfile = function() {
+  _origSaveProfile();
+  syncProfileToCloud();
+};
+
+async function syncProfileToCloud() {
+  if (!currentUser) return;
+  const profile = JSON.parse(localStorage.getItem('dg_profile') || 'null');
+  if (!profile) return;
+  try {
+    await db.collection('droneguard_users').doc(currentUser.uid).set({
+      profile: profile,
+      email: currentUser.email,
+      displayName: currentUser.displayName || '',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    document.getElementById('syncStatus').textContent = '● 同期済み';
+    document.getElementById('syncStatus').style.color = 'var(--green)';
+  } catch(e) {
+    document.getElementById('syncStatus').textContent = '● 同期エラー';
+    document.getElementById('syncStatus').style.color = 'var(--red)';
+  }
+}
+
+// ==================== FEEDBACK ====================
+async function sendFeedback() {
+  const type = document.getElementById('feedbackType').value;
+  const msg = document.getElementById('feedbackMsg').value.trim();
+  const status = document.getElementById('feedbackStatus');
+
+  if (!msg) { status.textContent = 'メッセージを入力してください'; status.style.color = 'var(--yellow)'; return; }
+
+  document.getElementById('feedbackSend').disabled = true;
+  status.textContent = '送信中...';
+  status.style.color = 'var(--text2)';
+
+  const feedbackData = {
+    type: type,
+    message: msg,
+    profile: profile,
+    userAgent: navigator.userAgent,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  if (currentUser) {
+    feedbackData.uid = currentUser.uid;
+    feedbackData.email = currentUser.email;
+    feedbackData.displayName = currentUser.displayName || '';
+  } else {
+    feedbackData.uid = 'guest';
+    feedbackData.email = 'guest';
+  }
+
+  try {
+    await db.collection('droneguard_feedback').add(feedbackData);
+    document.getElementById('feedbackMsg').value = '';
+    status.textContent = '送信しました。ありがとうございます！';
+    status.style.color = 'var(--green)';
+  } catch(e) {
+    // Fallback: mailto
+    const subject = encodeURIComponent('DroneGuard フィードバック [' + type + ']');
+    const body = encodeURIComponent(msg);
+    window.open('mailto:graceoftouchco@gmail.com?subject=' + subject + '&body=' + body);
+    status.textContent = 'メールアプリを開きました';
+    status.style.color = 'var(--yellow)';
+  }
+  document.getElementById('feedbackSend').disabled = false;
+}
+
+// ==================== INIT ====================
+// Auth state will handle showing the right screen
+// For immediate local check (avoids flash)
+if (localStorage.getItem('dg_guest_mode') === 'true') {
+  // If previously used as guest, show immediately
+}
+</script>
+</body>
+</html>

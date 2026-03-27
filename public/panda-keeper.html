@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panda Keeper AI-ZOO</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+
+// Firebase stubs (offline mode)
+const getApps = () => []; const getApp = () => null; const initializeApp = () => null;
+const getAuth = () => null; const signInAnonymously = async () => null;
+const onAuthStateChanged = (a, cb) => { cb(null); return () => {}; };
+const signInWithCustomToken = async () => null;
+const getFirestore = () => null;
+const collection = () => null; const doc = () => null;
+const setDoc = async () => {}; const getDoc = async () => ({exists:()=>false});
+const getDocs = async () => ({docs:[]}); const updateDoc = async () => {};
+const increment = () => 0; const onSnapshot = (r, cb) => { return () => {}; };
+const addDoc = async () => {}; const serverTimestamp = () => new Date();
+const query = () => null; const orderBy = () => null; const limit = () => null;
+
+// Simple icon components
+const Icon = ({children, size=24, className='', ...p}) => <span style={{display:'inline-flex',width:size,height:size,alignItems:'center',justifyContent:'center'}} className={className}>{children}</span>;
+const Heart = (p) => <Icon {...p}>&#9829;</Icon>;
+const MessageCircle = (p) => <Icon {...p}>&#128172;</Icon>;
+const Send = (p) => <Icon {...p}>&#10148;</Icon>;
+const Leaf = (p) => <Icon {...p}>&#127811;</Icon>;
+const Sparkles = (p) => <Icon {...p}>&#10024;</Icon>;
+const MapPin = (p) => <Icon {...p}>&#128205;</Icon>;
+const Camera = (p) => <Icon {...p}>&#128247;</Icon>;
+const AlertCircle = (p) => <Icon {...p}>&#9888;</Icon>;
+const RefreshCw = (p) => <Icon {...p}>&#8635;</Icon>;
+const MessageSquare = (p) => <Icon {...p}>&#128172;</Icon>;
+const WifiOff = (p) => <Icon {...p}>&#128246;</Icon>;
+const ShieldAlert = (p) => <Icon {...p}>&#128737;</Icon>;
+const Info = (p) => <Icon {...p}>&#8505;</Icon>;
+const X = (p) => <Icon {...p}>&#10005;</Icon>;
+const BookOpen = (p) => <Icon {...p}>&#128214;</Icon>;
+const User = (p) => <Icon {...p}>&#128100;</Icon>;
+const FileText = (p) => <Icon {...p}>&#128196;</Icon>;
+const Lock = (p) => <Icon {...p}>&#128274;</Icon>;
+const Download = (p) => <Icon {...p}>&#8595;</Icon>;
+const Database = (p) => <Icon {...p}>&#128450;</Icon>;
+const Upload = (p) => <Icon {...p}>&#8593;</Icon>;
+const Battery = (p) => <Icon {...p}>&#128267;</Icon>;
+const Utensils = (p) => <Icon {...p}>&#127860;</Icon>;
+const Sun = (p) => <Icon {...p}>&#9728;</Icon>;
+const Moon = (p) => <Icon {...p}>&#127769;</Icon>;
+const CloudRain = (p) => <Icon {...p}>&#127783;</Icon>;
+const Cloud = (p) => <Icon {...p}>&#9729;</Icon>;
+const Volume2 = (p) => <Icon {...p}>&#128266;</Icon>;
+const VolumeX = (p) => <Icon {...p}>&#128263;</Icon>;
+
+const { useState, useEffect, useCallback, useMemo, useRef } = React;
+
+
+
+
+
+// --- Configuration ---
+const ADMIN_PASSWORD = "panda";
+
+// --- 1. Robust Firebase Initialization ---
+let app = null;
+let auth = null;
+let db = null;
+
+try {
+  if (typeof window !== 'undefined') {
+    const rawConfig = window.__firebase_config || (typeof __firebase_config !== 'undefined' ? __firebase_config : null);
+    if (rawConfig) {
+      const config = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : rawConfig;
+      if (Object.keys(config).length > 0) {
+        app = getApps().length === 0 ? initializeApp(config) : getApp();
+        auth = getAuth(app);
+        db = getFirestore(app);
+      }
+    }
+  }
+} catch (error) {
+  console.warn("Firebase Init Warning:", error);
+}
+
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'ai-zoo-panda';
+
+// --- Helper: Safety Number Converter ---
+const sN = (val) => {
+  const num = Number(val);
+  return isFinite(num) ? num : 0;
+};
+
+// --- Sound Engine (Web Audio API) ---
+const useSoundSystem = () => {
+  const [isMuted, setIsMuted] = useState(false);
+  const audioCtxRef = useRef(null);
+  const bgmGainNodeRef = useRef(null);
+  const nextNoteTimeRef = useRef(0);
+  const schedulerTimerRef = useRef(null);
+  const isAudioStartedRef = useRef(false);
+
+  const initAudio = useCallback(() => {
+    if (isAudioStartedRef.current) return;
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtxRef.current = new AudioContext();
+      const masterGain = audioCtxRef.current.createGain();
+      masterGain.gain.value = 0.15; 
+      masterGain.connect(audioCtxRef.current.destination);
+      bgmGainNodeRef.current = audioCtxRef.current.createGain();
+      bgmGainNodeRef.current.gain.value = isMuted ? 0 : 0.4;
+      bgmGainNodeRef.current.connect(masterGain);
+      playPinkNoise(audioCtxRef.current, bgmGainNodeRef.current);
+      schedulerTimerRef.current = setInterval(scheduleMusic, 1000);
+      isAudioStartedRef.current = true;
+      if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+    } catch (e) { console.error("Audio init failed", e); }
+  }, [isMuted]);
+
+  const playPinkNoise = (ctx, dest) => {
+    const bufferSize = 2 * ctx.sampleRate;
+    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const output = noiseBuffer.getChannelData(0);
+    let lastOut = 0;
+    for (let i = 0; i < bufferSize; i++) {
+      const white = Math.random() * 2 - 1;
+      output[i] = (lastOut + (0.02 * white)) / 1.02;
+      lastOut = output[i];
+      output[i] *= 3.5; 
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    noise.loop = true;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 300;
+    noise.connect(filter);
+    filter.connect(dest);
+    noise.start(0);
+  };
+
+  const playNote = (freq, duration) => {
+    if (isMuted || !audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(0.05, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(bgmGainNodeRef.current);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  };
+
+  const scheduleMusic = () => {
+    if (!audioCtxRef.current || isMuted) return;
+    const now = audioCtxRef.current.currentTime;
+    if (nextNoteTimeRef.current < now + 0.1) {
+       const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25]; 
+       if (Math.random() < 0.2) {
+          const note = notes[Math.floor(Math.random() * notes.length)];
+          playNote(note, 3.0);
+       }
+       nextNoteTimeRef.current += 2.0;
+    }
+  };
+
+  useEffect(() => {
+    if (bgmGainNodeRef.current && audioCtxRef.current) {
+      bgmGainNodeRef.current.gain.setTargetAtTime(isMuted ? 0 : 0.4, audioCtxRef.current.currentTime, 1.0);
+    }
+  }, [isMuted]);
+
+  const playSE = useCallback((type) => {
+    if (isMuted || !audioCtxRef.current) return;
+    const ctx = audioCtxRef.current;
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    const now = ctx.currentTime;
+    switch (type) {
+        case 'eat': 
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(100, now); osc.frequency.linearRampToValueAtTime(50, now + 0.2);
+            gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+            osc.start(now); osc.stop(now + 0.2); break;
+        case 'voice_happy':
+            osc.type = 'sine'; osc.frequency.setValueAtTime(400, now); osc.frequency.linearRampToValueAtTime(500, now + 0.3);
+            gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(0.1, now + 0.1); gain.gain.linearRampToValueAtTime(0, now + 0.4);
+            osc.start(now); osc.stop(now + 0.4); break;
+        case 'voice_excited':
+            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(300, now); osc.frequency.exponentialRampToValueAtTime(100, now + 0.2);
+            gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+            osc.start(now); osc.stop(now + 0.2); break;
+        case 'walk':
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(60, now); osc.frequency.exponentialRampToValueAtTime(30, now + 0.1);
+            gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+            osc.start(now); osc.stop(now + 0.1); break;
+        case 'click':
+            osc.type = 'sine'; osc.frequency.setValueAtTime(800, now); gain.gain.setValueAtTime(0.02, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+            osc.start(now); osc.stop(now + 0.05); break;
+    }
+  }, [isMuted]);
+
+  return { isMuted, setIsMuted, initAudio, playSE };
+};
+
+// --- Constants ---
+const SPOTS = {
+  ground: { x: 150, y: 240 },
+  climbing: { x: 260, y: 150 }, 
+  sleeping_rock: { x: 50, y: 260 },
+  playing_tire: { x: 180, y: 170 },
+  fishing: { x: 280, y: 280 }
+};
+
+// --- Helper: Safe Weather Hook ---
+const useEnvironment = () => {
+  const [weather, setWeather] = useState('clear');
+  const [timeOfDay, setTimeOfDay] = useState('day');
+  const [temperature, setTemperature] = useState(20);
+  useEffect(() => {
+    const updateEnv = async () => {
+      const hour = new Date().getHours();
+      if (hour >= 5 && hour < 8) setTimeOfDay('sunrise');
+      else if (hour >= 8 && hour < 16) setTimeOfDay('day');
+      else if (hour >= 16 && hour < 19) setTimeOfDay('sunset');
+      else setTimeOfDay('night');
+      try {
+        const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=35.6895&longitude=139.6917&current_weather=true');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.current_weather) {
+            const code = data.current_weather.weathercode;
+            setTemperature(data.current_weather.temperature);
+            if (code <= 3) setWeather('clear');
+            else if (code <= 60) setWeather('cloud');
+            else setWeather('rain');
+          }
+        }
+      } catch (e) {}
+    };
+    updateEnv();
+  }, []);
+  return { weather, timeOfDay, temperature };
+};
+
+// --- Animation Styles ---
+const AnimationStyles = () => (
+  <style>{`
+    .fur-texture { filter: url(#fur-filter); }
+    @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+    .animate-breathe { animation: breathe 4s ease-in-out infinite; }
+    
+    @keyframes deep-breathe { 0%, 100% { transform: scale(1) rotate(-2deg); } 50% { transform: scale(1.04) rotate(2deg); } }
+    .animate-deep-breathe { animation: deep-breathe 5s ease-in-out infinite; }
+    
+    @keyframes blink { 0%, 45%, 50%, 100% { transform: scaleY(1); } 46%, 49% { transform: scaleY(0.1); } }
+    .animate-blink { animation: blink 4.2s infinite; }
+    
+    @keyframes sniff { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1px); } }
+    .animate-sniff { animation: sniff 2s infinite; }
+    
+    @keyframes tire-swing { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+    .animate-tire-swing { animation: tire-swing 3s infinite ease-in-out; transform-origin: 0px 0px; }
+    @keyframes float-zzz { 0% { opacity: 0; transform: translateY(0); } 50% { opacity: 1; } 100% { opacity: 0; transform: translateY(-20px); } }
+    .animate-float-zzz { animation: float-zzz 3s infinite; }
+    
+    @keyframes rain-fall { 
+      0% { transform: translate(0, -20px); opacity: 0; } 
+      10% { opacity: 0.6; } 
+      90% { opacity: 0.6; }
+      100% { transform: translate(-10px, 420px); opacity: 0; } 
+    }
+    .animate-rain { animation: rain-fall 0.8s linear infinite; }
+    
+    @keyframes tree-sway { 0% { transform: rotate(0); } 50% { transform: rotate(1deg); } 100% { transform: rotate(0); } }
+    .animate-tree-sway { animation: tree-sway 5s infinite ease-in-out; transform-origin: bottom center; }
+    @keyframes chew { 0% { transform: scaleY(1); } 50% { transform: scaleY(0.8); } 100% { transform: scaleY(1); } }
+    .animate-chew { animation: chew 0.3s infinite; }
+    @keyframes happy-wiggle { 0% { transform: rotate(0); } 25% { transform: rotate(5deg); } 75% { transform: rotate(-5deg); } 100% { transform: rotate(0); } }
+    .animate-happy-wiggle { animation: happy-wiggle 1.5s ease-in-out; }
+    @keyframes ear-wiggle { 0% { transform: rotate(0); } 80% { transform: rotate(10deg); } 100% { transform: rotate(0); } }
+    .animate-ear-wiggle { animation: ear-wiggle 3s infinite; }
+    @keyframes fall-leaf { 0% { transform: translateY(-20px) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 100% { transform: translateY(300px) rotate(360deg); opacity: 0; } }
+    .animate-fall-leaf { animation: fall-leaf 2s ease-in forwards; }
+    @keyframes float-heart { 0% { transform: translateY(0) scale(0.5); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(-100px) scale(1.2); opacity: 0; } }
+    .animate-float-heart { animation: float-heart 2.5s ease-out forwards; }
+    @keyframes climb-struggle { 0% { transform: translateY(0); } 50% { transform: translateY(-2px) rotate(1deg); } 100% { transform: translateY(0); } }
+    .animate-climb-struggle { animation: climb-struggle 3s infinite ease-in-out; }
+    @keyframes fish-wait { 0% { transform: rotate(0); } 50% { transform: rotate(2deg); } 100% { transform: rotate(0); } }
+    .animate-fish-wait { animation: fish-wait 4s infinite ease-in-out; }
+    @keyframes tire-happy { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(15deg); } 75% { transform: rotate(-15deg); } }
+    .animate-tire-happy { animation: tire-happy 1s ease-in-out; transform-origin: 0px 0px; }
+    @keyframes snot-bubble { 0% { transform: scale(0.5); opacity: 0.8; } 50% { transform: scale(1.2); opacity: 0.9; } 100% { transform: scale(0.5); opacity: 0.8; } }
+    .animate-snot-bubble { animation: snot-bubble 5s infinite ease-in-out; transform-origin: top left; }
+    @keyframes arm-eat-left { 0% { transform: rotate(0); } 100% { transform: rotate(-25deg) translate(2px, -5px); } }
+    .animate-arm-eat-left { animation: arm-eat-left 0.8s forwards ease-out; }
+    @keyframes arm-eat-right { 0%, 100% { transform: rotate(0) translate(0,0); } 50% { transform: rotate(-15deg) translate(0, -8px); } }
+    .animate-arm-eat-right { animation: arm-eat-right 2s infinite alternate ease-in-out; }
+    @keyframes head-eat { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(2px) rotate(5deg); } }
+    .animate-head-eat { animation: head-eat 0.8s infinite ease-in-out; }
+
+    /* REALISTIC WADDLE WALK ANIMATION */
+    @keyframes walk-body-bob { 
+      0% { transform: translateY(0); } 
+      25% { transform: translateY(-3px) rotate(1deg); }
+      50% { transform: translateY(0); }
+      75% { transform: translateY(-3px) rotate(-1deg); }
+      100% { transform: translateY(0); } 
+    }
+    .animate-walk-body { animation: walk-body-bob 1.0s infinite linear; }
+    
+    /* Leg Movements */
+    @keyframes leg-swing-1 { 
+      0% { transform: rotate(20deg); } 
+      50% { transform: rotate(-20deg); } 
+      100% { transform: rotate(20deg); } 
+    }
+    @keyframes leg-swing-2 { 
+      0% { transform: rotate(-20deg); } 
+      50% { transform: rotate(20deg); } 
+      100% { transform: rotate(-20deg); } 
+    }
+    .animate-leg-1 { animation: leg-swing-1 1.0s infinite ease-in-out; }
+    .animate-leg-2 { animation: leg-swing-2 1.0s infinite ease-in-out; }
+    
+    @keyframes head-sway { 
+       0%, 100% { transform: translateY(0) rotate(0); } 
+       50% { transform: translateY(2px) rotate(2deg); } 
+    }
+    .animate-head-sway { animation: head-sway 1.0s infinite ease-in-out; }
+  `}</style>
+);
+
+// --- Info Modal ---
+const InfoModal = ({ isOpen, onClose }) => {
+  const [activeTab, setActiveTab] = useState('guide');
+  const [adminPass, setAdminPass] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+
+  if (!isOpen) return null;
+
+  const handleExportData = async () => {
+    if (!db) return alert("DB未接続");
+    setIsExporting(true);
+    try {
+      const statsDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'general'));
+      const msgsSnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'messages'));
+      const exportData = {
+        appName: "AI-ZOO", exportedAt: new Date().toISOString(), appId: appId,
+        data: {
+          stats: statsDoc.exists() ? statsDoc.data() : { visitors: 0, lovePoints: 0 },
+          messages: msgsSnapshot.docs.map(d => ({ ...d.data(), id: d.id, createdAt: d.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString() }))
+        }
+      };
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `ai-zoo-backup.json`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    } catch (e) { alert("Error: " + e.message); } finally { setIsExporting(false); }
+  };
+
+  const handleImportData = async () => {
+    if (!db || !importFile) return alert("ファイルを選択してください");
+    if (!window.confirm("上書きしますか？")) return;
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const json = JSON.parse(e.target.result);
+        if (!json.data) throw new Error("Invalid file");
+        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'general'), json.data.stats, { merge: true });
+        if (json.data.messages) {
+          await Promise.all(json.data.messages.map(m => {
+             if(!m.id) return;
+             return setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'messages', m.id), { ...m, createdAt: m.createdAt ? new Date(m.createdAt) : serverTimestamp() }, { merge: true });
+          }));
+        }
+        alert("完了しました。リロードしてください。");
+      } catch (err) { alert("Error: " + err.message); } finally { setIsImporting(false); }
+    };
+    reader.readAsText(importFile);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl w-full max-w-sm flex flex-col shadow-xl overflow-hidden max-h-[80vh]">
+        <div className="bg-emerald-600 p-3 text-white flex justify-between items-center">
+          <span className="font-bold flex items-center gap-2"><Info size={18}/> インフォメーション</span>
+          <button onClick={onClose}><X size={20}/></button>
+        </div>
+        <div className="flex bg-stone-50 border-b">
+          {['guide', 'terms', 'admin'].map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 p-3 text-xs font-bold ${activeTab === tab ? 'bg-white text-emerald-600 border-b-2 border-emerald-500' : 'text-stone-400'}`}>
+              {tab === 'guide' ? '遊び方' : tab === 'terms' ? '規約' : '管理者'}
+            </button>
+          ))}
+        </div>
+        <div className="p-4 overflow-y-auto flex-1 text-sm text-stone-600">
+          {activeTab === 'guide' && <p>パンダは自由に暮らしています。お腹が空いたら笹を食べ、眠くなったら寝ます。</p>}
+          {activeTab === 'terms' && <p>不適切な投稿は禁止です。</p>}
+          {activeTab === 'admin' && (
+            <div className="space-y-3">
+              {!isAdmin ? (
+                <div className="flex gap-2">
+                  <input type="password" value={adminPass} onChange={e => setAdminPass(e.target.value)} className="border p-2 rounded flex-1" placeholder="Pass" />
+                  <button onClick={() => adminPass === ADMIN_PASSWORD ? setIsAdmin(true) : alert('Wrong')} className="bg-stone-600 text-white p-2 rounded">Login</button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <button onClick={handleExportData} disabled={isExporting} className="w-full bg-blue-500 text-white p-2 rounded text-xs">{isExporting ? '...' : 'バックアップ (DL)'}</button>
+                  <div className="flex gap-1"><input type="file" accept=".json" onChange={e => setImportFile(e.target.files[0])} className="text-xs w-full" /></div>
+                  <button onClick={handleImportData} disabled={isImporting || !importFile} className="w-full bg-orange-500 text-white p-2 rounded text-xs">{isImporting ? '...' : '復元 (Upload)'}</button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Panda Parts ---
+const PandaHead = ({ x, y, scale = 1, rotation = 0, expression = 'normal', isSleeping = false, mood, action, lookDirection = 'front' }) => {
+  const safeX = sN(x);
+  const safeY = sN(y);
+
+  if (lookDirection === 'back') {
+    return (
+      <g transform={`translate(${safeX}, ${safeY}) scale(${scale}) rotate(${rotation})`}>
+         <circle cx="50" cy="50" r="30" fill="url(#furWhite)" filter="url(#fur-filter)" />
+         <circle cx="22" cy="25" r="9" fill="url(#furBlack)" filter="url(#fur-filter)" />
+         <circle cx="78" cy="25" r="9" fill="url(#furBlack)" filter="url(#fur-filter)" />
+      </g>
+    );
+  }
+  
+  if (lookDirection === 'side') {
+    return (
+      <g transform={`translate(${safeX}, ${safeY}) scale(${scale}) rotate(${rotation})`}>
+          <path d="M30,50 C30,30 40,20 60,25 C75,30 80,50 75,70 C70,85 40,85 30,50" fill="url(#furWhite)" filter="url(#fur-filter)" />
+          <circle cx="40" cy="25" r="9" fill="url(#furBlack)" filter="url(#fur-filter)" />
+          <g transform="translate(5,0)">
+             <ellipse cx="60" cy="45" rx="7" ry="10" fill="url(#furBlack)" transform="rotate(10 60 45)" filter="url(#fur-filter)" />
+             <circle cx="62" cy="45" r="2" fill="black" />
+          </g>
+          <ellipse cx="78" cy="55" rx="3" ry="2" fill="#111" />
+       </g>
+    );
+  }
+
+  // Front View
+  return (
+    <g transform={`translate(${safeX}, ${safeY}) scale(${scale}) rotate(${rotation})`}>
+      <ellipse cx="50" cy="70" rx="25" ry="12" fill="black" opacity="0.1" filter="url(#blurFilter)" />
+      <circle cx="22" cy="25" r="9" fill="url(#furBlack)" filter="url(#fur-filter)" className="animate-ear-wiggle" />
+      <circle cx="78" cy="25" r="9" fill="url(#furBlack)" filter="url(#fur-filter)" className="animate-ear-wiggle" />
+      
+      <path d="M20,50 C20,25 35,15 50,15 C65,15 80,25 80,50 C80,75 65,82 50,82 C35,82 20,75 20,50 Z" fill="url(#furWhite)" filter="url(#fur-filter)" />
+      
+      <g transform="rotate(-15 38 45)">
+         <ellipse cx="38" cy="45" rx="8" ry="11" fill="#1a1a1a" />
+         <ellipse cx="38" cy="45" rx="6" ry="8" fill="url(#furBlack)" filter="url(#fur-filter)" opacity="0.8" />
+      </g>
+      <g transform="rotate(15 62 45)">
+         <ellipse cx="62" cy="45" rx="8" ry="11" fill="#1a1a1a" />
+         <ellipse cx="62" cy="45" rx="6" ry="8" fill="url(#furBlack)" filter="url(#fur-filter)" opacity="0.8" />
+      </g>
+
+      {!isSleeping && (
+        <g className="animate-blink origin-center">
+          <circle cx="40" cy="45" r="3.5" fill="black" />
+          <circle cx="60" cy="45" r="3.5" fill="black" />
+          <circle cx="41.5" cy="43.5" r="1.5" fill="white" opacity="0.8" />
+          <circle cx="61.5" cy="43.5" r="1.5" fill="white" opacity="0.8" />
+        </g>
+      )}
+      {isSleeping && (
+        <g>
+          <path d="M33,46 Q40,50 47,46" stroke="#333" strokeWidth="2" fill="none" />
+          <path d="M53,46 Q60,50 67,46" stroke="#333" strokeWidth="2" fill="none" />
+        </g>
+      )}
+
+      <ellipse cx="50" cy="55" rx="4.5" ry="3.5" fill="#111" className={!isSleeping ? "animate-sniff" : ""} />
+      
+      {action === 'eat' && (
+        <g className="animate-chew origin-[50px_62px]">
+           <ellipse cx="50" cy="62" rx="4" ry="3" fill="pink" />
+           <path d="M46,62 Q50,66 54,62" stroke="#333" strokeWidth="1.5" fill="none" />
+        </g>
+      )}
+
+      {isSleeping && (
+        <g transform="translate(58, 52)">
+           <circle cx="0" cy="0" r="5" fill="rgba(200, 240, 255, 0.4)" stroke="rgba(255,255,255,0.8)" strokeWidth="1" className="animate-snot-bubble" />
+        </g>
+      )}
+    </g>
+  );
+};
+
+// **FIXED**: TireSwing component now accepts scrollX and prevents double render
+const TireSwing = ({ isOccupied, scrollX = 0, mood, action }) => (
+  // scrollX is used here. Defaults to 0 to prevent NaN
+  <g transform={`translate(${180 - sN(scrollX)}, 170)`}> 
+    <g className={isOccupied ? "animate-tire-swing" : ""}>
+      <line x1="0" y1="0" x2="0" y2="100" stroke="#5d4037" strokeWidth="4" />
+      <g transform="translate(0, 100)"> 
+         <circle cx="0" cy="0" r="40" stroke="#1a1a1a" strokeWidth="26" fill="none" />
+         <circle cx="0" cy="0" r="40" stroke="#000" strokeWidth="26" fill="none" opacity="0.3" />
+         {isOccupied && (
+           <g>
+              <circle cx="0" cy="0" r="38" fill="url(#furWhite)" filter="url(#fur-filter)" />
+              <ellipse cx="-25" cy="-20" rx="12" ry="16" fill="url(#furBlack)" filter="url(#fur-filter)" />
+              <ellipse cx="25" cy="-20" rx="12" ry="16" fill="url(#furBlack)" filter="url(#fur-filter)" />
+              <path d="M-40,-10 Q0,20 40,-10" stroke="url(#furBlack)" strokeWidth="16" fill="none" strokeLinecap="round" filter="url(#fur-filter)" />
+              <g transform="translate(-50, -55)"><PandaHead x={50} y={50} expression="happy" scale={0.95} lookDirection="side" mood={mood} action={action} /></g>
+           </g>
+         )}
+         <circle cx="0" cy="0" r="40" stroke="#2a2a2a" strokeWidth="18" fill="none" />
+         {isOccupied && (
+            <>
+              <path d="M-28,15 Q-40,40 -12,35" stroke="url(#furBlack)" strokeWidth="14" fill="none" strokeLinecap="round" filter="url(#fur-filter)" />
+              <path d="M28,15 Q40,40 12,35" stroke="url(#furBlack)" strokeWidth="14" fill="none" strokeLinecap="round" filter="url(#fur-filter)" />
+            </>
+         )}
+      </g>
+    </g>
+  </g>
+);
+
+// **REBUILT**: Quadruped Walking Panda Component (Corrected structure & Joints)
+// Default orientation is RIGHT (Walking Right). If left, scaleX is -1.
+const WalkingPanda = ({ x, y, direction = 'left' }) => {
+  const isLeft = direction === 'left';
+  const scaleX = isLeft ? -1 : 1; 
+  const sX = sN(x);
+  const sY = sN(y);
+
+  // Leg Style: Pivot from top center to avoid detachment
+  const legStyle = { transformBox: 'fill-box', transformOrigin: '50% 10%' };
+
+  return (
+    <g transform={`translate(${sX}, ${sY}) scale(${0.7})`}>
+      <g className="animate-walk-body">
+        {/* ScaleX handles flipping. The panda drawing is FACING RIGHT by default. */}
+        <g transform={`scale(${scaleX}, 1)`}>
+           
+           {/* 1. 奥の足 (Back Legs - Far) - 暗めに描画して奥行きを出す */}
+           {/* 右後ろ足 (Rear Right) - Left leg cycle in 2D profile */}
+           <g transform="translate(-20, 10)">
+              <g className="animate-leg-2" style={legStyle}>
+                 <path d="M0,0 L-5,25 L5,25 Z" stroke="#333" strokeWidth="18" strokeLinecap="round" fill="none" filter="url(#fur-filter)" />
+              </g>
+           </g>
+           {/* 左前足 (Front Left) */}
+           <g transform="translate(25, 10)">
+              <g className="animate-leg-1" style={legStyle}>
+                 <path d="M0,0 L5,25 L-5,25 Z" stroke="#333" strokeWidth="18" strokeLinecap="round" fill="none" filter="url(#fur-filter)" />
+              </g>
+           </g>
+
+           {/* 2. 胴体 (Body) - 横長の楕円で重量感を出す */}
+           <ellipse cx="5" cy="0" rx="60" ry="38" fill="url(#furWhite)" filter="url(#fur-filter)" />
+           
+           {/* 3. 肩バンド (Shoulder Band) - 背中から前足にかけて */}
+           <path d="M25,-35 Q40,-10 25,30 L55,25 Q45,-10 55,-35" stroke="url(#furBlack)" strokeWidth="26" fill="none" strokeLinecap="round" filter="url(#fur-filter)" opacity="0.95" />
+
+           {/* 4. 頭 (Head) - Attached to front (Right side) - Corrected coordinates & connection */}
+           <g transform="translate(60, -20)"> {/* Adjusted X, Y to sit properly on shoulder */}
+               {/* No separate animation to keep head stable */}
+              <g transform="scale(0.85) rotate(10)">
+                 <PandaHead x={0} y={0} lookDirection="side" />
+              </g>
+           </g>
+           
+           {/* 5. 手前の足 (Front Legs) */}
+           {/* Rear Left */}
+           <g transform="translate(-25, 15)">
+              <g className="animate-leg-1" style={legStyle}>
+                 <path d="M0,0 L2,25 L-6,25" stroke="url(#furBlack)" strokeWidth="20" strokeLinecap="round" fill="none" filter="url(#fur-filter)" />
+              </g>
+           </g>
+           {/* Front Right */}
+           <g transform="translate(45, 15)">
+              <g className="animate-leg-2" style={legStyle}>
+                 <path d="M0,0 L-5,25 L5,25" stroke="url(#furBlack)" strokeWidth="20" strokeLinecap="round" fill="none" filter="url(#fur-filter)" />
+              </g>
+           </g>
+           
+           {/* 6. 尻尾 (Tail) - 左端 */}
+           <circle cx="-55" cy="-5" r="10" fill="url(#furWhite)" filter="url(#fur-filter)" />
+        </g>
+      </g>
+    </g>
+  );
+};
+
+const PandaScene = ({ mood, action, activity, isWalking, pandaPos, walkDirection, scrollX = 0 }) => {
+  const safeScrollX = sN(scrollX);
+  const safePandaPos = pandaPos && !isNaN(pandaPos.x) ? pandaPos : SPOTS.ground;
+  
+  if (isWalking) {
+     return <WalkingPanda x={safePandaPos.x - safeScrollX} y={safePandaPos.y} direction={walkDirection} />;
+  }
+
+  // Prevent double rendering if panda is occupied on tire
+  if (activity === 'playing_tire') return null;
+
+  if (activity === 'climbing') {
+    return (
+        <g transform={`translate(${SPOTS.climbing.x - safeScrollX}, ${SPOTS.climbing.y}) scale(0.9)`}>
+          <g className="animate-breathe">
+            <path d="M-30,90 Q-20,110 0,110" stroke="url(#furBlack)" strokeWidth="18" fill="none" strokeLinecap="round" filter="url(#fur-filter)" />
+            <path d="M30,90 Q20,110 0,110" stroke="url(#furBlack)" strokeWidth="18" fill="none" strokeLinecap="round" filter="url(#fur-filter)" />
+            <ellipse cx="0" cy="70" rx="40" ry="45" fill="url(#furWhite)" filter="url(#fur-filter)" />
+            <path d="M-35,50 Q0,30 35,50 L35,65 Q0,45 -35,65 Z" fill="url(#furBlack)" filter="url(#fur-filter)" />
+            <path d="M-35,55 Q-45,30 -20,20" stroke="url(#furBlack)" strokeWidth="16" fill="none" strokeLinecap="round" filter="url(#fur-filter)" />
+            <path d="M35,55 Q45,30 20,20" stroke="url(#furBlack)" strokeWidth="16" fill="none" strokeLinecap="round" filter="url(#fur-filter)" />
+            <g transform="translate(-50, -60)"><PandaHead x={50} y={50} scale={0.9} lookDirection="back" /></g>
+          </g>
+        </g>
+    );
+  }
+
+  if (activity === 'fishing') {
+      return (
+        <g transform={`translate(${SPOTS.fishing.x - safeScrollX}, ${SPOTS.fishing.y})`}>
+            <g>
+                <ellipse cx="0" cy="0" rx="35" ry="30" fill="url(#furWhite)" filter="url(#fur-filter)" />
+                <ellipse cx="-20" cy="20" rx="12" ry="15" fill="url(#furBlack)" filter="url(#fur-filter)" />
+                <path d="M-10,-20 Q20,-10 30,10" stroke="url(#furBlack)" strokeWidth="16" strokeLinecap="round" filter="url(#fur-filter)" />
+                <path d="M20,0 L60,-30" stroke="#4ade80" strokeWidth="4" />
+                <line x1="60" y1="-30" x2="60" y2="20" stroke="white" strokeWidth="1" opacity="0.5" />
+                <g transform="translate(-30, -40)"><PandaHead x={0} y={0} scale={0.9} lookDirection="side" /></g>
+            </g>
+        </g>
+      );
+  }
+
+  if (activity === 'sleeping_rock') {
+      return (
+        <g transform={`translate(${SPOTS.sleeping_rock.x - safeScrollX}, ${SPOTS.sleeping_rock.y})`}>
+          <g className="animate-deep-breathe origin-center">
+            <ellipse cx="60" cy="25" rx="55" ry="35" fill="url(#furWhite)" transform="rotate(-10)" filter="url(#fur-filter)" />
+            <path d="M25,5 Q50,-15 80,5" stroke="url(#furBlack)" strokeWidth="20" strokeLinecap="round" fill="none" transform="rotate(-15 60 25)" filter="url(#fur-filter)" />
+            <ellipse cx="25" cy="45" rx="16" ry="20" fill="url(#furBlack)" transform="rotate(-40)" filter="url(#fur-filter)" />
+            <ellipse cx="95" cy="45" rx="16" ry="20" fill="url(#furBlack)" transform="rotate(30)" filter="url(#fur-filter)" />
+            <g transform="translate(-40, -10) rotate(-30)">
+               <PandaHead x={50} y={50} scale={0.92} expression="sleeping" isSleeping={true} mood={mood} action={action} />
+               <g className="animate-float-zzz"><text x="70" y="0" className="text-xl fill-blue-400 font-bold opacity-80" style={{ filter: 'drop-shadow(1px 1px 0px white)' }}>Zzz</text></g>
+            </g>
+          </g>
+        </g>
+      );
+  }
+
+  // Ground (Default)
+  return (
+    <g transform={`translate(${SPOTS.ground.x - safeScrollX}, ${SPOTS.ground.y})`}>
+      <g className={action === 'pet' ? "animate-happy-wiggle origin-bottom-center" : "animate-breathe origin-bottom-center"}>
+          
+          <g transform="translate(10, 95) rotate(-30)">
+             <ellipse cx="0" cy="0" rx="15" ry="20" fill="url(#furBlack)" filter="url(#fur-filter)" />
+             <g opacity="0.9"><ellipse cx="0" cy="4" rx="8" ry="7" fill="#ffb6c1" /><circle cx="-7" cy="-7" r="3" fill="#ffb6c1" /><circle cx="0" cy="-11" r="3" fill="#ffb6c1" /><circle cx="7" cy="-7" r="3" fill="#ffb6c1" /></g>
+          </g>
+          <g transform="translate(90, 95) rotate(30)">
+             <ellipse cx="0" cy="0" rx="15" ry="20" fill="url(#furBlack)" filter="url(#fur-filter)" />
+             <g opacity="0.9"><ellipse cx="0" cy="4" rx="8" ry="7" fill="#ffb6c1" /><circle cx="-7" cy="-7" r="3" fill="#ffb6c1" /><circle cx="0" cy="-11" r="3" fill="#ffb6c1" /><circle cx="7" cy="-7" r="3" fill="#ffb6c1" /></g>
+          </g>
+
+          <path d="M10,100 C0,60 20,30 50,30 C80,30 100,60 90,100 C80,125 20,125 10,100 Z" fill="url(#furWhite)" filter="url(#fur-filter)" />
+          <path d="M20,45 Q50,65 80,45 Q95,30 85,20 Q50,25 15,20 Q5,30 20,45 Z" fill="url(#furBlack)" filter="url(#fur-filter)" />
+          
+          <g transform="translate(-50, -55)"><PandaHead x={50} y={50} scale={1.1} mood={mood} action={action} /></g>
+
+          {action === 'eat' ? (
+            <>
+              <g className="animate-arm-eat-left origin-[25px_45px]"><path d="M25,45 Q15,30 35,30" stroke="url(#furBlack)" strokeWidth="20" strokeLinecap="round" filter="url(#fur-filter)" /><g transform="translate(35, 30) rotate(-20)"><path d="M0,0 L10,-50" stroke="#4ade80" strokeWidth="8" strokeLinecap="round" /><ellipse cx="5" cy="-10" rx="8" ry="14" fill="#86efac" transform="rotate(10)" /><ellipse cx="8" cy="-30" rx="8" ry="14" fill="#86efac" transform="rotate(20)" /></g></g>
+              <g className="animate-arm-eat-right origin-[75px_45px]"><path d="M75,45 Q65,30 55,35" stroke="url(#furBlack)" strokeWidth="20" strokeLinecap="round" filter="url(#fur-filter)" /></g>
+            </>
+          ) : (
+            <>
+              <path d="M25,45 Q10,70 30,85" stroke="url(#furBlack)" strokeWidth="20" strokeLinecap="round" filter="url(#fur-filter)" />
+              <path d="M75,45 Q90,70 70,85" stroke="url(#furBlack)" strokeWidth="20" strokeLinecap="round" filter="url(#fur-filter)" />
+            </>
+          )}
+      </g>
+    </g>
+  );
+};
+
+const ActionEffects = ({ action }) => {
+  if (!action) return null;
+  const particles = [0, 1, 2, 3, 4, 5, 6, 7].map(i => ({ id: i, left: `${20 + (i * 10)}%`, animationDelay: `${i * 0.1}s`, rotation: i * 45 }));
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden z-20">
+      {action === 'eat' && particles.map(p => <div key={p.id} className="absolute top-0 animate-fall-leaf opacity-0" style={{ left: p.left, animationDelay: p.animationDelay }}><Leaf className="text-emerald-500 fill-emerald-300" size={24} style={{ transform: `rotate(${p.rotation}deg)` }} /></div>)}
+      {action === 'pet' && particles.map(p => <div key={p.id} className="absolute bottom-20 animate-float-heart opacity-0" style={{ left: p.left, animationDelay: p.animationDelay }}><Heart className="text-pink-500 fill-pink-400" size={30} style={{ transform: `rotate(${p.rotation - 180}deg)` }} /></div>)}
+    </div>
+  );
+};
+
+// --- Main App Logic ---
+const AIZooContent = () => {
+  const [user, setUser] = useState(null);
+  const [globalStats, setGlobalStats] = useState({ visitors: 0, lovePoints: 0 });
+  const [recentMessages, setRecentMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showInfo, setShowInfo] = useState(false);
+  const [isMuted, setIsMuted] = useState(false); // Default unmuted but needs interaction
+  
+  const [mood, setMood] = useState('idle');
+  const [action, setAction] = useState(null);
+  const [activity, setActivity] = useState('ground');
+  const [pandaPos, setPandaPos] = useState(SPOTS.ground);
+  const [scrollX, setScrollX] = useState(0);
+  const [isWalking, setIsWalking] = useState(false);
+  const [walkDirection, setWalkDirection] = useState('left');
+  
+  const [hunger, setHunger] = useState(30);
+  const [sleepiness, setSleepiness] = useState(0);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pandaSpeech, setPandaSpeech] = useState("今日は何して遊ぼうかなぁ～🐼");
+  const [isOnline, setIsOnline] = useState(true);
+  
+  const { weather, timeOfDay, temperature } = useEnvironment();
+  
+  // Audio
+  const { isMuted: _isMuted, setIsMuted: _setIsMuted, playSE, initAudio } = useSoundSystem();
+  const toggleMute = () => _setIsMuted(p => !p);
+  
+  // Interaction Handler to Start Audio Context
+  const handleInteraction = () => {
+    initAudio();
+  };
+
+  const handleToggleSound = (e) => {
+    e.stopPropagation(); // Prevent triggering other click events
+    toggleMute();
+  };
+  
+  // Rain particles
+  const rainDrops = useMemo(() => {
+    return [...Array(20)].map((_, i) => ({
+      id: i,
+      x: Math.random() * 400,
+      delay: Math.random(),
+      duration: 0.8 + Math.random() * 0.5
+    }));
+  }, []);
+
+  // Camera Follow
+  useEffect(() => {
+     const pX = (pandaPos && !isNaN(pandaPos.x)) ? pandaPos.x : SPOTS.ground.x;
+     const target = Math.max(0, Math.min(400, pX - 200));
+     setScrollX(prev => {
+       const next = prev + (target - prev) * 0.1;
+       return isNaN(next) ? 0 : next;
+     });
+  }, [pandaPos]);
+
+  // Auth Init
+  useEffect(() => {
+    if (typeof navigator !== 'undefined') setIsOnline(navigator.onLine);
+    if (!auth) { setLoading(false); return; }
+    const initAuth = async () => { try { if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token); else await signInAnonymously(auth); } catch (err) {} };
+    initAuth();
+    const unsub = onAuthStateChanged(auth, (u) => { setUser(u); setLoading(false); });
+    return () => unsub();
+  }, []);
+
+  // Firestore
+  useEffect(() => {
+    if (!user || !db) return;
+    try {
+      const unsubStats = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'general'), s => { if (s.exists()) setGlobalStats(s.data()); else setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'general'), { visitors: 1, lovePoints: 0 }); });
+      const unsubMsgs = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), s => { const ms = s.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)).slice(0,5); setRecentMessages(ms); });
+      return () => { unsubStats(); unsubMsgs(); };
+    } catch (e) { console.log('Firestore sync error', e); }
+  }, [user]);
+
+  // Transition Logic
+  const transitionToActivity = useCallback((nextActivity) => {
+    if (nextActivity === activity || isWalking) return;
+    const startPos = SPOTS[activity] || SPOTS.ground;
+    const targetPos = SPOTS[nextActivity] || SPOTS.ground;
+    
+    if (!startPos || !targetPos) return;
+
+    const direction = targetPos.x < startPos.x ? 'left' : 'right';
+    setWalkDirection(direction);
+    setIsWalking(true);
+    setPandaSpeech("トコトコ...");
+    playSE('walk');
+
+    const duration = 4000;
+    const startTime = Date.now();
+    
+    const animateMove = () => {
+      const now = Date.now();
+      const p = Math.min((now - startTime) / duration, 1);
+      
+      const newX = startPos.x + (targetPos.x - startPos.x) * p;
+      const newY = startPos.y + (targetPos.y - startPos.y) * p;
+      
+      if (!isNaN(newX) && !isNaN(newY)) {
+        setPandaPos({ x: newX, y: newY });
+      }
+
+      if (p < 1) {
+        requestAnimationFrame(animateMove);
+      } else {
+        setIsWalking(false);
+        setActivity(nextActivity);
+        setPandaPos(targetPos);
+        setPandaSpeech(null);
+        if (nextActivity === 'sleeping_rock') { 
+            setMood('sleeping'); 
+            setPandaSpeech("ふわぁ...おやすみ...💤"); 
+            playSE('voice_sleepy');
+        } else {
+            setMood('idle');
+        }
+      }
+    };
+    requestAnimationFrame(animateMove);
+  }, [activity, isWalking, playSE]);
+
+  // AI Logic
+  useEffect(() => {
+    const tick = setInterval(() => {
+      if (action || isWalking) return;
+      setHunger(h => Math.max(0, h - 1));
+      setSleepiness(s => Math.min(100, s + 2));
+      
+      let nextActivity = activity;
+      if (hunger < 10 && activity !== 'ground') nextActivity = 'ground';
+      else if (sleepiness > 90 && activity !== 'sleeping_rock') nextActivity = 'sleeping_rock';
+      else if (activity === 'sleeping_rock' && sleepiness < 30) nextActivity = 'ground';
+      else if (Math.random() < 0.2) {
+        const acts = ['ground', 'climbing', 'playing_tire', 'fishing'];
+        nextActivity = acts[Math.floor(Math.random() * acts.length)];
+      }
+      
+      if (nextActivity !== activity) transitionToActivity(nextActivity);
+    }, 4000);
+    return () => clearInterval(tick);
+  }, [action, activity, hunger, sleepiness, isWalking, transitionToActivity]);
+
+  const handleAction = (type) => {
+    handleInteraction(); // Ensure audio starts
+    if (isWalking) return;
+    if (type === 'pet') { 
+        setMood('happy'); setAction('pet'); setSleepiness(s => Math.max(0, s - 10)); 
+        setPandaSpeech("えへへ💖"); 
+        playSE('voice_happy');
+        playSE('pet');
+    } 
+    else if (type === 'feed') { 
+        if(activity !== 'ground') { transitionToActivity('ground'); return; }
+        setMood('happy'); setAction('eat'); setHunger(100); 
+        setPandaSpeech("うまいっパン！🌿"); 
+        playSE('voice_excited');
+        playSE('eat');
+    }
+    setTimeout(() => { setAction(null); if (activity !== 'sleeping_rock') setMood('idle'); }, 2000);
+    if (user && db) updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'general'), { lovePoints: increment(1) });
+  };
+
+  const handleSend = (e) => {
+    e.preventDefault();
+    handleInteraction();
+    if (!inputMessage.trim()) return;
+    if (user && db) addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), { text: inputMessage, userId: user.uid.slice(0,4), createdAt: serverTimestamp() });
+    setInputMessage('');
+    setPandaSpeech("ふむふむ🐼");
+    playSE('click');
+  };
+  
+  const getBubbleStyle = () => {
+    const defaultStyle = { top: '40%', left: '50%' };
+    try {
+      if (isWalking) return { top: '50%', left: '50%' };
+      if (activity === 'climbing') return { top: '15%', left: '65%' };
+      if (activity === 'sleeping_rock') return { top: '45%', left: '30%' };
+      if (activity === 'playing_tire') return { top: '25%', left: '50%' };
+      return defaultStyle;
+    } catch {
+      return defaultStyle;
+    }
+  };
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-stone-50">Loading AI-ZOO...</div>;
+
+  return (
+    <div className="min-h-screen bg-stone-50 text-stone-800 font-sans pb-20" onClick={handleInteraction}>
+      <AnimationStyles />
+      <InfoModal isOpen={showInfo} onClose={() => setShowInfo(false)} />
+      
+      <div className={`p-4 shadow-md sticky top-0 z-50 flex justify-between items-center transition-colors duration-1000 ${timeOfDay === 'night' ? 'bg-indigo-900 text-indigo-100' : 'bg-emerald-600 text-white'}`}>
+         <h1 className="font-bold flex gap-2"><Sparkles/> AI-ZOO</h1>
+         <div className="flex gap-2 text-xs items-center">
+            {weather === 'rain' ? <CloudRain/> : <Sun/>} {temperature}°C
+            <button onClick={handleToggleSound} className="p-1 hover:bg-white/20 rounded-full">{isMuted ? <VolumeX size={20}/> : <Volume2 size={20}/>}</button>
+            <button onClick={(e) => { e.stopPropagation(); setShowInfo(true); }}><Info/></button>
+         </div>
+      </div>
+
+      <div className="max-w-md mx-auto p-4 space-y-4">
+        <div className="flex justify-between bg-white p-2 rounded-lg text-xs text-stone-500 shadow-sm">
+           <div className="flex items-center gap-1"><Utensils size={14}/> 空腹 <div className="w-16 h-2 bg-gray-200 rounded"><div className="h-full bg-orange-400 rounded" style={{width: `${hunger}%`}}></div></div></div>
+           <div className="flex items-center gap-1"><Battery size={14}/> 元気 <div className="w-16 h-2 bg-gray-200 rounded"><div className="h-full bg-blue-400 rounded" style={{width: `${100-sleepiness}%`}}></div></div></div>
+        </div>
+
+        <div onClick={() => handleAction('pet')} className="relative h-[400px] rounded-3xl overflow-hidden shadow-inner border-4 border-white bg-sky-200 cursor-pointer">
+           <svg viewBox="0 0 400 400" className="w-full h-full">
+              <defs>
+                 <filter id="blurFilter"><feGaussianBlur in="SourceGraphic" stdDeviation="2" /></filter>
+                 <filter id="fur-filter" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" result="noise" /><feDisplacementMap in="SourceGraphic" in2="noise" scale="3" xChannelSelector="R" yChannelSelector="G" /></filter>
+                 <linearGradient id="skyGradient" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={timeOfDay === 'night' ? '#1e1b4b' : '#bae6fd'} /><stop offset="100%" stopColor={timeOfDay === 'night' ? '#4c1d95' : '#e0f2fe'} /></linearGradient>
+                 <linearGradient id="grassGradient" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#84cc16" /><stop offset="100%" stopColor="#4d7c0f" /></linearGradient>
+                 <radialGradient id="furWhite" cx="40%" cy="30%" r="70%"><stop offset="0%" stopColor="#fff"/><stop offset="100%" stopColor="#e5e5e5"/></radialGradient>
+                 <radialGradient id="furBlack" cx="30%" cy="30%" r="80%"><stop offset="0%" stopColor="#444"/><stop offset="100%" stopColor="#111"/></radialGradient>
+                 <filter id="shadow"><feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000" floodOpacity="0.3"/></filter>
+              </defs>
+
+              <rect width="400" height="400" fill="url(#skyGradient)" />
+              
+              <g transform={`translate(${isNaN(scrollX) ? 0 : -scrollX}, 0)`}>
+                 <path d="M-100,400 Q200,300 500,400" fill="#22c55e" opacity="0.6" />
+                 <path d="M-100,450 C100,380 300,380 500,450 V320 H-100 Z" fill="url(#grassGradient)" transform="translate(0, -20)" />
+
+                 <g transform="translate(280, 50)">
+                    <path d="M20,350 L25,100" stroke="#78350f" strokeWidth="28" strokeLinecap="round" />
+                    <path d="M20,120 Q-40,140 -100,120" stroke="#78350f" strokeWidth="18" strokeLinecap="round" />
+                    <g className="animate-tree-sway origin-top" filter="url(#shadow)">
+                       <circle cx="20" cy="80" r="55" fill="#16a34a" />
+                       <circle cx="-15" cy="110" r="45" fill="#15803d" />
+                       <circle cx="55" cy="110" r="45" fill="#15803d" />
+                    </g>
+                 </g>
+                 <path d="M50,330 Q80,260 140,290 L50,350 Z" fill="#64748b" transform="translate(0, 0)" filter="url(#shadow)" />
+                 <g transform="translate(450, 280)">
+                    <ellipse cx="0" cy="0" rx="150" ry="40" fill="#38bdf8" />
+                 </g>
+              </g>
+
+              {/* Ensure TireSwing renders but only shows panda if occupied AND not walking */}
+              <TireSwing isOccupied={activity === 'playing_tire' && !isWalking} mood={mood} action={action} scrollX={scrollX} />
+              
+              <PandaScene mood={mood} action={action} activity={activity} isWalking={isWalking} pandaPos={pandaPos} walkDirection={walkDirection} scrollX={scrollX} />
+
+              {weather === 'rain' && rainDrops.map(drop => (
+                  <line 
+                    key={drop.id} 
+                    x1={drop.x} y1={-20} 
+                    x2={drop.x - 5} y2={20} // Short, slightly tilted drops
+                    stroke="white" 
+                    strokeWidth="1.5" 
+                    opacity="0.4" 
+                    className="animate-rain" 
+                    style={{ animationDelay: `${drop.delay}s`, animationDuration: `${drop.duration}s` }} 
+                  />
+              ))}
+              {timeOfDay === 'night' && <rect width="400" height="400" fill="#000033" opacity="0.3" style={{ mixBlendMode: 'multiply' }} pointerEvents="none" />}
+
+           </svg>
+           
+           <ActionEffects action={action} />
+           {pandaSpeech && <div className="absolute top-1/3 left-1/2 -translate-x-1/2 bg-white/90 px-3 py-1 rounded-full text-xs font-bold shadow-md animate-bounce">{pandaSpeech}</div>}
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+           <button onClick={() => handleAction('feed')} className="flex flex-col items-center bg-white p-3 rounded-xl shadow-sm"><Leaf className="text-emerald-500"/> <span className="text-xs font-bold">おやつ</span></button>
+           <button onClick={() => handleAction('pet')} className="flex flex-col items-center bg-white p-3 rounded-xl shadow-sm"><Heart className="text-pink-500"/> <span className="text-xs font-bold">なでる</span></button>
+           <button onClick={() => { if(activity === 'sleeping_rock') transitionToActivity('ground'); else transitionToActivity('sleeping_rock'); }} className="flex flex-col items-center bg-white p-3 rounded-xl shadow-sm"><Sparkles className="text-blue-500"/> <span className="text-xs font-bold">寝/起</span></button>
+        </div>
+
+        <form onSubmit={handleSend} className="flex gap-2 bg-white p-2 rounded-xl shadow-sm">
+           <input className="flex-1 bg-gray-100 rounded px-3 text-sm" placeholder="話しかける..." value={inputMessage} onChange={e => setInputMessage(e.target.value)} />
+           <button type="submit" className="bg-emerald-500 text-white p-2 rounded-lg"><Send size={18}/></button>
+        </form>
+
+        <div className="bg-white rounded-xl p-4 shadow-sm space-y-2">
+           <h3 className="font-bold text-sm text-stone-600 flex gap-2"><MessageCircle size={16}/> みんなの広場</h3>
+           {recentMessages.map(m => (
+              <div key={m.id} className="bg-stone-50 p-2 rounded text-xs text-stone-600">{m.text}</div>
+           ))}
+           {recentMessages.length === 0 && <p className="text-xs text-center text-stone-400">メッセージはありません</p>}
+        </div>
+
+        <div className="text-center text-xs text-stone-400 pt-8">
+           <p>Total Visitors: {globalStats.visitors.toLocaleString()} | Love: {globalStats.lovePoints.toLocaleString()}</p>
+           <p className="mt-1">Created by grace of touch</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError(error) { return { hasError: true }; }
+  componentDidCatch(error, errorInfo) { console.error("Uncaught error:", error, errorInfo); }
+  render() {
+    if (this.state.hasError) return <div className="p-4 text-center">エラーが発生しました。再読み込みしてください。</div>;
+    return this.props.children;
+  }
+}
+
+function AIZooApp() {
+  return (
+    <ErrorBoundary>
+      <AIZooContent />
+    </ErrorBoundary>
+  );
+}
+
+
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<AIZooApp />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "date": "2026-03-27",
+  "changes": [
+    {"app": "Panda Keeper", "type": "new", "desc": "2Dパンダ自律生活シミュレーション"},
+    {"app": "Panda Guardian", "type": "new", "desc": "パンダ保護区ドローン監視"},
+    {"app": "Traffic Simulator", "type": "new", "desc": "未来都市交通シミュレーション"},
+    {"app": "TrackForge", "type": "fix", "desc": "再生バー・インポート問題修正"},
+    {"app": "Portal", "type": "update", "desc": "訪問者カウンター・リピーター検出追加"}
+  ],
+  "posted": false
+}

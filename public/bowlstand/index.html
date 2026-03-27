@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WanCraft | Bowl Stand Customizer</title>
+  <!-- Auth Guard -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script>
+    firebase.initializeApp({
+      apiKey: "AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",
+      authDomain: "grace-of-touch.firebaseapp.com",
+      projectId: "grace-of-touch",
+      storageBucket: "grace-of-touch.firebasestorage.app",
+      messagingSenderId: "505078300866",
+      appId: "1:505078300866:web:adad2a27b163c3b0f1bb5b"
+    });
+    const OWNER_EMAILS = ['graceoftouchco@gmail.com'];
+    const _db = firebase.firestore();
+
+    window._exportLicensed = false;
+    window._currentUser = null;
+
+    // Preview is free for everyone, export requires license
+    document.documentElement.style.visibility = 'visible';
+
+    firebase.auth().onAuthStateChanged(async function(user) {
+      if (!user) { window._currentUser = null; return; }
+      window._currentUser = user;
+      const email = (user.email || '').toLowerCase();
+
+      if (OWNER_EMAILS.includes(email)) {
+        window._exportLicensed = true;
+        return;
+      }
+
+      try {
+        const licDoc = await _db.collection('licenses').doc(user.uid + '_bowlstand_export').get();
+        if (licDoc.exists && licDoc.data().status === 'active') {
+          window._exportLicensed = true;
+        }
+      } catch (e) { /* no license */ }
+    });
+
+    window.requireExportLicense = function() {
+      if (window._exportLicensed) return true;
+      const overlay = document.getElementById('export-paywall');
+      if (overlay) overlay.style.display = 'flex';
+      return false;
+    };
+
+    // ====== SOURCE CODE PROTECTION ======
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+      if (e.key === 'F12') { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key.toUpperCase())) { e.preventDefault(); return false; }
+      if (e.ctrlKey && ['u','U','s','S'].includes(e.key)) { e.preventDefault(); return false; }
+    });
+    document.addEventListener('selectstart', e => e.preventDefault());
+    document.addEventListener('dragstart', e => e.preventDefault());
+    console.clear();
+  </script>
+  <style>/* auth guard removed - preview free */</style>
+  <!-- /Auth Guard -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #c9a96e;
+      --accent-dim: rgba(201,169,110,0.5);
+      --dark: #111;
+      --panel: rgba(16,16,18,0.96);
+      --panel-border: rgba(201,169,110,0.15);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0c;
+      font-family: 'Inter', sans-serif;
+      color: #d8d8d8;
+      overflow: hidden;
+      height: 100vh;
+    }
+    /* ---- HEADER ---- */
+    #header {
+      position: absolute; top: 0; left: 0; right: 0; height: 52px; z-index: 30;
+      background: rgba(8,8,10,0.97);
+      border-bottom: 1px solid var(--panel-border);
+      display: flex; align-items: center; padding: 0 20px; gap: 14px;
+      backdrop-filter: blur(16px);
+    }
+    .logo-mark {
+      width: 32px; height: 32px; border: 1.5px solid var(--accent);
+      border-radius: 5px; display: flex; align-items: center; justify-content: center;
+      font-family: 'Noto Serif JP', serif; font-size: 13px; color: var(--accent); font-weight: 700;
+    }
+    .logo-text { font-family: 'Noto Serif JP', serif; font-size: 0.92rem; color: #fff; letter-spacing: 2px; }
+    .logo-sub { font-size: 0.6rem; color: var(--accent-dim); letter-spacing: 1.5px; text-transform: uppercase; }
+    .header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+    .btn-header {
+      color: #fff; border: none; padding: 6px 14px; border-radius: 5px;
+      font-size: 0.72rem; font-weight: 600; cursor: pointer; letter-spacing: 0.5px;
+      transition: all 0.2s; display: flex; align-items: center; gap: 5px;
+    }
+    .btn-header:hover { opacity: 0.85; transform: translateY(-1px); }
+    .btn-export { background: linear-gradient(135deg, var(--accent), #8c6d3f); }
+    .btn-3mf { background: linear-gradient(135deg, #2a6a8a, #1a4a6a); }
+    /* ---- CANVAS ---- */
+    #viewport {
+      position: absolute; top: 52px; left: 0; right: 320px; bottom: 0;
+      background: radial-gradient(ellipse at 50% 40%, #1c1c2a 0%, #0a0a0c 70%);
+    }
+    #viewport canvas { display: block; width: 100% !important; height: 100% !important; }
+    /* ---- SIDE PANEL ---- */
+    #sidebar {
+      position: absolute; top: 52px; right: 0; width: 320px; bottom: 0;
+      background: var(--panel); border-left: 1px solid var(--panel-border);
+      overflow-y: auto; padding: 16px 14px 80px;
+      backdrop-filter: blur(12px);
+    }
+    .section-title {
+      font-size: 0.6rem; font-weight: 700; letter-spacing: 2.5px;
+      text-transform: uppercase; color: var(--accent);
+      margin: 18px 0 10px; border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 5px;
+    }
+    .section-title:first-child { margin-top: 0; }
+    /* Color Swatches */
+    .swatch-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 6px; }
+    .swatch {
+      border-radius: 8px; padding: 8px 4px; text-align: center; cursor: pointer;
+      border: 2px solid transparent; transition: all 0.2s;
+      font-size: 0.68rem; font-weight: 600; background: rgba(255,255,255,0.02);
+    }
+    .swatch:hover { transform: scale(1.03); background: rgba(255,255,255,0.04); }
+    .swatch.active { border-color: var(--accent); background: rgba(201,169,110,0.06); }
+    .swatch-dot { width: 26px; height: 26px; border-radius: 50%; margin: 0 auto 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+    /* Sliders */
+    .slider-row { margin-bottom: 12px; }
+    .slider-label { display: flex; justify-content: space-between; font-size: 0.73rem; color: #777; margin-bottom: 4px; }
+    .slider-label span { color: var(--accent); font-weight: 700; font-size: 0.8rem; }
+    input[type=range] {
+      width: 100%; cursor: pointer;
+      appearance: none; height: 3px; border-radius: 2px;
+      background: rgba(255,255,255,0.08); outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      appearance: none; width: 13px; height: 13px; border-radius: 50%;
+      background: var(--accent); cursor: pointer;
+      box-shadow: 0 0 8px rgba(201,169,110,0.4);
+    }
+    /* Select */
+    select {
+      width: 100%; padding: 8px 10px; border-radius: 6px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+      color: #d8d8d8; font-size: 0.78rem; font-family: 'Inter', sans-serif;
+      cursor: pointer; outline: none;
+    }
+    select:focus { border-color: var(--accent); }
+    select option { background: #1a1a1e; color: #d8d8d8; }
+    /* Toggle */
+    .toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px; font-size: 0.73rem; color: #777;
+    }
+    .toggle-switch {
+      width: 40px; height: 22px; border-radius: 11px;
+      background: rgba(255,255,255,0.1); cursor: pointer;
+      position: relative; transition: background 0.2s;
+    }
+    .toggle-switch.on { background: var(--accent); }
+    .toggle-switch::after {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: #fff; transition: transform 0.2s;
+    }
+    .toggle-switch.on::after { transform: translateX(18px); }
+    /* Info */
+    .info-box {
+      background: rgba(201,169,110,0.04); border: 1px solid var(--panel-border);
+      border-radius: 8px; padding: 10px 12px; font-size: 0.72rem; color: #777; line-height: 1.7;
+    }
+    .info-box strong { color: var(--accent); font-weight: 600; }
+    /* Bottom Bar */
+    #bottom-bar {
+      position: absolute; bottom: 0; left: 0; right: 320px;
+      background: rgba(8,8,10,0.92); border-top: 1px solid var(--panel-border);
+      height: 36px; display: flex; align-items: center; justify-content: center; gap: 20px;
+      font-size: 0.65rem; color: #555; backdrop-filter: blur(8px);
+    }
+    .hint { display: flex; align-items: center; gap: 5px; }
+    .hint kbd {
+      background: rgba(255,255,255,0.06); border-radius: 3px;
+      padding: 1px 5px; font-size: 0.6rem; color: #888;
+    }
+    .divider { border: none; border-top: 1px solid rgba(255,255,255,0.04); margin: 14px 0; }
+    /* Scrollbar */
+    #sidebar::-webkit-scrollbar { width: 3px; }
+    #sidebar::-webkit-scrollbar-track { background: transparent; }
+    #sidebar::-webkit-scrollbar-thumb { background: rgba(201,169,110,0.2); border-radius: 2px; }
+    /* Mobile Toggle */
+    #sidebar-toggle {
+      display: none;
+      position: fixed; bottom: 16px; right: 16px; z-index: 100;
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--accent); border: none; cursor: pointer;
+      box-shadow: 0 4px 16px rgba(201,169,110,0.4);
+      align-items: center; justify-content: center;
+      font-size: 20px; color: #000;
+    }
+    /* Mobile Responsive */
+    @media (max-width: 768px) {
+      #header { flex-wrap: wrap; padding: 6px 10px; gap: 4px; }
+      .header-actions { gap: 3px; }
+      .btn-header { font-size: 0.55rem; padding: 4px 6px; }
+      .logo-text { font-size: 0.85rem; }
+      .logo-sub { font-size: 0.55rem; }
+      .logo-mark { width: 28px; height: 28px; font-size: 13px; }
+      #viewport { position: absolute; top: 52px; left: 0; right: 0; bottom: 0; }
+      #bottom-bar { right: 0; }
+      #sidebar {
+        position: fixed; top: 52px; right: 0; bottom: 0;
+        width: 85vw; max-width: 320px;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        z-index: 90;
+        box-shadow: -4px 0 24px rgba(0,0,0,0.5);
+      }
+      #sidebar.mobile-open { transform: translateX(0); }
+      #sidebar-toggle { display: flex; }
+      #gt-back { padding: 4px 10px; font-size: 9px; }
+    }
+    @media (max-width: 480px) {
+      .header-actions { flex-wrap: wrap; justify-content: flex-end; }
+      .btn-header { font-size: 0.5rem; padding: 3px 5px; }
+      #sidebar { width: 92vw; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Back Button -->
+  <a href="/" id="gt-back" style="position:fixed;top:12px;left:12px;z-index:99999;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);border:1px solid rgba(201,169,110,0.3);border-radius:8px;padding:6px 14px;text-decoration:none;color:rgba(201,169,110,0.8);font-family:'Inter',sans-serif;font-size:10px;letter-spacing:0.1em;transition:all 0.3s;" onmouseover="this.style.background='rgba(201,169,110,0.12)';this.style.borderColor='rgba(201,169,110,0.5)'" onmouseout="this.style.background='rgba(0,0,0,0.6)';this.style.borderColor='rgba(201,169,110,0.3)'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>PORTAL</a>
+
+  <!-- HEADER -->
+  <div id="header">
+    <div class="logo-mark">犬</div>
+    <div>
+      <div class="logo-text">WanCraft | Bowl Stand</div>
+      <div class="logo-sub">3D Pet Bowl Stand Customizer</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-header btn-export" onclick="exportSTL()">STL Export</button>
+      <button class="btn-header btn-3mf" onclick="export3MF()">3MF Export</button>
+    </div>
+  </div>
+
+  <!-- EXPORT PAYWALL OVERLAY -->
+  <div id="export-paywall" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;flex-direction:column;">
+    <div style="background:var(--panel);border:1px solid var(--accent);border-radius:16px;padding:32px;max-width:420px;width:90%;text-align:center;">
+      <div style="font-size:32px;margin-bottom:12px;">&#x1F512;</div>
+      <h2 style="color:var(--accent);font-family:'Noto Serif JP',serif;font-size:18px;margin:0 0 8px;">Export License Required</h2>
+      <p style="color:#aaa;font-size:13px;line-height:1.6;margin:0 0 20px;">STL / 3MF ファイルの出力にはライセンスが必要です。<br>3Dプレビュー・カスタマイズは引き続き無料でご利用いただけます。</p>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+        <a id="btn-buy-export" href="#" style="display:block;background:linear-gradient(135deg,var(--accent),#8c6d3f);color:#fff;padding:14px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">Export Pro &#8212; &#165;19,800（買い切り）</a>
+        <a id="btn-buy-monthly" href="#" style="display:block;background:rgba(201,169,110,0.1);border:1px solid var(--accent);color:var(--accent);padding:12px;border-radius:8px;text-decoration:none;font-size:13px;">Monthly &#8212; &#165;3,980/月</a>
+      </div>
+      <p style="color:#666;font-size:10px;margin:0 0 12px;">Stripe による安全な決済処理</p>
+      <button onclick="document.getElementById('export-paywall').style.display='none'" style="background:none;border:none;color:#666;font-size:12px;cursor:pointer;text-decoration:underline;">閉じる</button>
+    </div>
+  </div>
+
+  <!-- VIEWPORT -->
+  <div id="viewport"></div>
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div class="section-title">犬種プリセット</div>
+    <select id="breed-select" onchange="applyBreed(this.value)">
+      <option value="">-- カスタム --</option>
+      <optgroup label="小型犬">
+        <option value="65">チワワ（65mm）</option>
+        <option value="75">ミニチュアダックスフンド（75mm）</option>
+        <option value="85">トイプードル（85mm）</option>
+        <option value="90">シュナウザー（90mm）</option>
+      </optgroup>
+      <optgroup label="中型犬">
+        <option value="110">ウェルシュコーギー（110mm）</option>
+        <option value="120">ブルドッグ（120mm）</option>
+        <option value="130">柴犬（130mm）</option>
+        <option value="150">ダルメシアン（150mm）</option>
+      </optgroup>
+      <optgroup label="大型犬">
+        <option value="200">ラブラドール（200mm）</option>
+        <option value="220">ゴールデンレトリバー（220mm）</option>
+      </optgroup>
+      <optgroup label="その他">
+        <option value="plant">🌱 植木鉢スタンド</option>
+      </optgroup>
+    </select>
+
+    <div class="section-title">成長段階</div>
+    <select id="stage-select" onchange="applyStage(this.value)">
+      <option value="1.0">成犬</option>
+      <option value="0.65">パピー（子犬）</option>
+      <option value="0.85">シニア（老犬）</option>
+    </select>
+
+    <div class="section-title">サイズ設定</div>
+    <div class="slider-row">
+      <div class="slider-label">ボウル直径 <span id="v-bowl-dia">180mm</span></div>
+      <input type="range" id="s-bowl-dia" min="100" max="300" value="180" step="1" oninput="updateParam()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">スタンド高さ <span id="v-stand-h">120mm</span></div>
+      <input type="range" id="s-stand-h" min="50" max="250" value="120" step="1" oninput="updateParam()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">ティルト角度 <span id="v-tilt">5&deg;</span></div>
+      <input type="range" id="s-tilt" min="0" max="15" value="0" step="0.5" oninput="updateParam()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">壁の厚み <span id="v-wall">4mm</span></div>
+      <input type="range" id="s-wall" min="3" max="8" value="4" step="0.5" oninput="updateParam()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">ベース直径 <span id="v-base-dia">220mm</span></div>
+      <input type="range" id="s-base-dia" min="120" max="400" value="220" step="1" oninput="updateParam()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">グリップリング深さ <span id="v-grip">3mm</span></div>
+      <input type="range" id="s-grip" min="0" max="10" value="3" step="0.5" oninput="updateParam()">
+    </div>
+
+    <div class="toggle-row">
+      滑り止めナブ
+      <div class="toggle-switch" id="tog-nubs" onclick="toggleNubs()"></div>
+    </div>
+
+    <hr class="divider">
+    <div class="section-title">表示モード</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+      <button class="view-btn active" id="btn-assembled" onclick="setViewMode('assembled')" style="flex:1;padding:8px 4px;background:rgba(201,169,110,0.15);border:1px solid var(--accent);color:var(--accent);border-radius:6px;cursor:pointer;font-size:10px;font-family:inherit;">組立図</button>
+      <button class="view-btn" id="btn-exploded" onclick="setViewMode('exploded')" style="flex:1;padding:8px 4px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);color:#888;border-radius:6px;cursor:pointer;font-size:10px;font-family:inherit;">分解図</button>
+      <button class="view-btn" id="btn-dog" onclick="setViewMode('dog')" style="flex:1;padding:8px 4px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);color:#888;border-radius:6px;cursor:pointer;font-size:10px;font-family:inherit;">🐕 犬デモ</button>
+    </div>
+    <div id="dog-controls" style="display:none;margin-bottom:12px;">
+      <div style="display:flex;gap:6px;">
+        <button onclick="serveDogFood()" style="flex:1;padding:8px;background:rgba(200,150,50,0.15);border:1px solid rgba(200,150,50,0.3);color:#c89632;border-radius:6px;cursor:pointer;font-size:11px;font-family:inherit;">🍖 ごはん</button>
+        <button onclick="serveDogWater()" style="flex:1;padding:8px;background:rgba(50,150,220,0.15);border:1px solid rgba(50,150,220,0.3);color:#3296dc;border-radius:6px;cursor:pointer;font-size:11px;font-family:inherit;">💧 みず</button>
+        <button onclick="clearBowl()" style="flex:1;padding:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.1);color:#888;border-radius:6px;cursor:pointer;font-size:11px;font-family:inherit;">空にする</button>
+      </div>
+    </div>
+
+    <hr class="divider">
+    <div class="section-title">フィラメントカラー</div>
+    <div class="swatch-grid" id="color-grid"></div>
+
+    <hr class="divider">
+    <div class="section-title">情報</div>
+    <div class="info-box" id="info-box">
+      <strong>ボウル直径:</strong> 180mm<br>
+      <strong>スタンド高さ:</strong> 120mm<br>
+      <strong>ベース直径:</strong> 220mm<br>
+      <strong>推定フィラメント:</strong> ~45g
+    </div>
+  </div>
+
+  <!-- MOBILE SIDEBAR TOGGLE -->
+  <button id="sidebar-toggle" onclick="document.getElementById('sidebar').classList.toggle('mobile-open')">&#9881;</button>
+
+  <!-- BOTTOM BAR -->
+  <div id="bottom-bar">
+    <div class="hint"><kbd>Drag</kbd> 回転</div>
+    <div class="hint"><kbd>Scroll</kbd> ズーム</div>
+    <div class="hint"><kbd>Right Drag</kbd> パン</div>
+  </div>
+
+  <script>
+    // ========== FILAMENT COLORS ==========
+    const COLORS = [
+      { name: 'ホワイト', hex: '#f0f0f0' },
+      { name: 'ブラック', hex: '#1a1a1a' },
+      { name: 'グレー', hex: '#808080' },
+      { name: 'ベージュ', hex: '#d4b896' },
+      { name: 'テラコッタ', hex: '#c4604a' },
+      { name: 'オリーブ', hex: '#6b7c3f' },
+      { name: 'ネイビー', hex: '#2a3a5c' },
+      { name: 'サーモン', hex: '#e8967a' },
+      { name: 'スカイ', hex: '#6ba3c8' },
+      { name: 'ラベンダー', hex: '#9b8ec4' },
+      { name: 'ミント', hex: '#7ec8a0' },
+      { name: 'ゴールド', hex: '#c9a96e' },
+    ];
+    let currentColor = COLORS[0].hex;
+
+    const colorGrid = document.getElementById('color-grid');
+    COLORS.forEach((c, i) => {
+      const div = document.createElement('div');
+      div.className = 'swatch' + (i === 0 ? ' active' : '');
+      div.innerHTML = '<div class="swatch-dot" style="background:' + c.hex + '"></div>' + c.name;
+      div.onclick = () => {
+        document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+        div.classList.add('active');
+        currentColor = c.hex;
+        updateMaterial();
+      };
+      colorGrid.appendChild(div);
+    });
+
+    // ========== THREE.JS SCENE ==========
+    const container = document.getElementById('viewport');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 2000);
+    camera.position.set(0, 200, 400);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.target.set(0, 60, 0);
+    controls.minDistance = 100;
+    controls.maxDistance = 800;
+
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambientLight);
+
+    const keyLight = new THREE.DirectionalLight(0xfff5e6, 0.9);
+    keyLight.position.set(150, 300, 200);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.near = 10;
+    keyLight.shadow.camera.far = 1000;
+    keyLight.shadow.camera.left = -300;
+    keyLight.shadow.camera.right = 300;
+    keyLight.shadow.camera.top = 300;
+    keyLight.shadow.camera.bottom = -300;
+    keyLight.shadow.bias = -0.001;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xc8d8ff, 0.35);
+    fillLight.position.set(-100, 200, -100);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffeedd, 0.25);
+    rimLight.position.set(0, 50, -250);
+    scene.add(rimLight);
+
+    // Ground plane
+    const groundGeo = new THREE.PlaneGeometry(1000, 1000);
+    const groundMat = new THREE.ShadowMaterial({ opacity: 0.2 });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Grid
+    const gridHelper = new THREE.GridHelper(400, 20, 0x333344, 0x222233);
+    gridHelper.position.y = 0.1;
+    gridHelper.visible = false; // off by default
+    scene.add(gridHelper);
+
+    // Material
+    let standMaterial = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(currentColor),
+      roughness: 0.55,
+      metalness: 0.05,
+      clearcoat: 0.15,
+      clearcoatRoughness: 0.4,
+    });
+
+    // Bowl stand group
+    let standGroup = new THREE.Group();
+    scene.add(standGroup);
+
+    let showNubs = false;
+
+    function toggleNubs() {
+      showNubs = !showNubs;
+      document.getElementById('tog-nubs').classList.toggle('on', showNubs);
+      rebuildStand();
+    }
+
+    function getParams() {
+      return {
+        bowlDia: parseFloat(document.getElementById('s-bowl-dia').value),
+        standH: parseFloat(document.getElementById('s-stand-h').value),
+        tilt: parseFloat(document.getElementById('s-tilt').value),
+        wall: parseFloat(document.getElementById('s-wall').value),
+        baseDia: parseFloat(document.getElementById('s-base-dia').value),
+        grip: parseFloat(document.getElementById('s-grip').value),
+      };
+    }
+
+    function updateParam() {
+      const p = getParams();
+      document.getElementById('v-bowl-dia').textContent = p.bowlDia + 'mm';
+      document.getElementById('v-stand-h').textContent = p.standH + 'mm';
+      document.getElementById('v-tilt').textContent = p.tilt + '\u00B0';
+      document.getElementById('v-wall').textContent = p.wall + 'mm';
+      document.getElementById('v-base-dia').textContent = p.baseDia + 'mm';
+      document.getElementById('v-grip').textContent = p.grip + 'mm';
+
+      // Estimate filament weight (rough: volume * 1.24g/cm3 PLA)
+      const baseR = p.baseDia / 2;
+      const topR = p.bowlDia / 2;
+      const vol = Math.PI * p.wall * p.standH * (baseR + topR) / 10; // simplified cm3
+      const grams = Math.round(vol * 1.24 / 100);
+
+      let infoHTML =
+        '<strong>ボウル直径:</strong> ' + p.bowlDia + 'mm<br>' +
+        '<strong>スタンド高さ:</strong> ' + p.standH + 'mm<br>' +
+        '<strong>ベース直径:</strong> ' + p.baseDia + 'mm<br>' +
+        '<strong>推定フィラメント:</strong> ~' + Math.max(20, grams) + 'g';
+
+      if (currentViewMode === 'exploded') {
+        infoHTML += '<br><br><span style="color:#00ffcc;font-size:10px;">▲ ボウルトレイ（上部）<br>● ロックリング<br>〰 ネジ溝（高さ調整）<br>▼ ベース柱（下部）</span>';
+      } else if (currentViewMode === 'dog') {
+        infoHTML += '<br><br><span style="color:#c9a96e;font-size:10px;">🐕 犬種に合わせたスタンド高さで<br>食事姿勢をシミュレーション中</span>';
+      }
+      document.getElementById('info-box').innerHTML = infoHTML;
+
+      rebuildStand();
+    }
+
+    function applyBreed(val) {
+      if (!val) return;
+
+      // Plant pot mode
+      if (val === 'plant') {
+        document.getElementById('s-stand-h').value = 150;
+        document.getElementById('s-bowl-dia').value = 200;
+        document.getElementById('s-base-dia').value = 250;
+        document.getElementById('s-wall').value = 5;
+        updateParam();
+        return;
+      }
+
+      const h = parseInt(val);
+      document.getElementById('s-stand-h').value = h;
+
+      // Auto-adjust bowl and base diameter based on breed size
+      let bowlD, baseD;
+      if (h <= 70) { bowlD = 110; baseD = 150; }
+      else if (h <= 90) { bowlD = 140; baseD = 180; }
+      else if (h <= 130) { bowlD = 170; baseD = 220; }
+      else if (h <= 160) { bowlD = 200; baseD = 250; }
+      else if (h <= 210) { bowlD = 230; baseD = 290; }
+      else { bowlD = 260; baseD = 320; }
+
+      document.getElementById('s-bowl-dia').value = bowlD;
+      document.getElementById('s-base-dia').value = baseD;
+      updateParam();
+    }
+
+    // ====== VIEW MODE ======
+    let currentViewMode = 'assembled';
+    let upperGroup = null; // bowl tray part
+    let lowerGroup = null; // base column part
+    let dogMesh = null;
+    let dogAnimFrame = null;
+
+    function setViewMode(mode) {
+      currentViewMode = mode;
+      document.querySelectorAll('.view-btn').forEach(b => {
+        b.style.background = 'rgba(255,255,255,0.03)';
+        b.style.borderColor = 'rgba(255,255,255,0.1)';
+        b.style.color = '#888';
+        b.classList.remove('active');
+      });
+      const activeBtn = document.getElementById('btn-' + mode);
+      if (activeBtn) {
+        activeBtn.style.background = 'rgba(201,169,110,0.15)';
+        activeBtn.style.borderColor = 'var(--accent)';
+        activeBtn.style.color = 'var(--accent)';
+        activeBtn.classList.add('active');
+      }
+
+      // Remove dog if switching away
+      if (dogMesh && mode !== 'dog') {
+        scene.remove(dogMesh);
+        dogMesh = null;
+        if (dogAnimFrame) cancelAnimationFrame(dogAnimFrame);
+      }
+
+      // Show/hide dog controls
+      const dogCtrl = document.getElementById('dog-controls');
+      if (dogCtrl) dogCtrl.style.display = mode === 'dog' ? 'block' : 'none';
+
+      if (mode === 'dog') {
+        showDogDemo();
+      }
+
+      rebuildStand();
+    }
+
+    function showDogDemo() {
+      if (dogMesh) { scene.remove(dogMesh); dogMesh = null; }
+      if (dogAnimFrame) { cancelAnimationFrame(dogAnimFrame); dogAnimFrame = null; }
+
+      const p = getParams();
+      const standH = p.standH;
+      const bowlR = p.bowlDia / 2;
+
+      dogMesh = new THREE.Group();
+
+      // Dog's size scales with stand height so it can reach the bowl
+      // A dog's shoulder height is roughly equal to the bowl height
+      const s = Math.max(0.5, standH / 80);
+      const dogBodyH = standH * 0.85; // shoulder height ~85% of stand
+      const dogBodyLen = 50 * s;      // body length
+
+      // Materials
+      const furMat = new THREE.MeshStandardMaterial({ color: 0xc4903d, roughness: 0.85, metalness: 0.0 });
+      const bellyMat = new THREE.MeshStandardMaterial({ color: 0xe8c888, roughness: 0.9, metalness: 0.0 });
+      const noseMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.3 });
+      const eyeMat = new THREE.MeshStandardMaterial({ color: 0x2a1a0a, roughness: 0.2 });
+      const tongueMat = new THREE.MeshStandardMaterial({ color: 0xe05555, roughness: 0.6 });
+
+      // Position dog OUTSIDE the stand, not overlapping
+      const standOuterR = bowlR + 15; // stand rim radius + margin
+      const dogCX = -standOuterR - dogBodyLen * 0.6;
+
+      // Head reaches to the rim but stays ABOVE/OUTSIDE the bowl
+      const bowlRimY = standH + 5;
+      const headNaturalY = dogBodyH + 15 * s;
+      // Head Y: look down into bowl from above the rim
+      const headY = Math.max(headNaturalY * 0.6, Math.min(bowlRimY + 10 * s, headNaturalY + 25 * s));
+
+      // Head X: just at the rim edge, not inside
+      const shoulderX = dogCX + dogBodyLen * 0.6;
+      const shoulderY = dogBodyH + 5 * s;
+      const headX = -standOuterR + 5 * s; // just at the rim
+
+      // === BODY ===
+      const bodyGeo = new THREE.SphereGeometry(28 * s, 24, 16);
+      bodyGeo.scale(1.6, 1.0, 1.1);
+      const body = new THREE.Mesh(bodyGeo, furMat);
+      body.position.set(dogCX, dogBodyH, 0);
+      body.castShadow = true;
+      dogMesh.add(body);
+
+      // Belly
+      const bellyGeo = new THREE.SphereGeometry(24 * s, 16, 12);
+      bellyGeo.scale(1.4, 0.7, 1.0);
+      const belly = new THREE.Mesh(bellyGeo, bellyMat);
+      belly.position.set(dogCX, dogBodyH - 8 * s, 0);
+      dogMesh.add(belly);
+
+      // === CHEST ===
+      const chestGeo = new THREE.SphereGeometry(22 * s, 20, 14);
+      chestGeo.scale(1.0, 1.1, 1.05);
+      const chest = new THREE.Mesh(chestGeo, furMat);
+      chest.position.set(shoulderX, shoulderY, 0);
+      chest.castShadow = true;
+      dogMesh.add(chest);
+
+      // === NECK (tube connecting shoulder to head) ===
+      const neckMidX = (shoulderX + headX) / 2;
+      const neckMidY = (shoulderY + headY) / 2 + 5 * s;
+      const neckCurve = new THREE.QuadraticBezierCurve3(
+        new THREE.Vector3(shoulderX, shoulderY, 0),
+        new THREE.Vector3(neckMidX, neckMidY, 0),
+        new THREE.Vector3(headX - 8 * s, headY, 0)
+      );
+      const neckGeo = new THREE.TubeGeometry(neckCurve, 10, 10 * s, 8, false);
+      const neck = new THREE.Mesh(neckGeo, furMat);
+      dogMesh.add(neck);
+
+      // === HEAD ===
+      const headGeo = new THREE.SphereGeometry(16 * s, 20, 14);
+      headGeo.scale(1.15, 1.0, 1.0);
+      const head = new THREE.Mesh(headGeo, furMat);
+      head.position.set(headX, headY, 0);
+      head.name = 'head';
+      head.castShadow = true;
+      dogMesh.add(head);
+
+      // === SNOUT ===
+      const snoutGeo = new THREE.SphereGeometry(9 * s, 16, 10);
+      snoutGeo.scale(1.5, 0.75, 0.85);
+      const snout = new THREE.Mesh(snoutGeo, furMat);
+      snout.position.set(headX + 15 * s, headY - 5 * s, 0);
+      snout.name = 'snout';
+      dogMesh.add(snout);
+
+      // === NOSE (wet, shiny, heart-shaped with visible nostrils) ===
+      // Main nose pad (wider, flatter)
+      const noseBaseGeo = new THREE.SphereGeometry(6 * s, 14, 10);
+      noseBaseGeo.scale(1.0, 0.7, 1.2);
+      const noseBase = new THREE.Mesh(noseBaseGeo, new THREE.MeshStandardMaterial({
+        color: 0x1a1a1a, roughness: 0.15, metalness: 0.1 // wet shiny look
+      }));
+      noseBase.position.set(headX + 24 * s, headY - 2 * s, 0);
+      noseBase.name = 'nose';
+      dogMesh.add(noseBase);
+
+      // Nostrils (oval holes - darker, pushed forward and to sides)
+      for (const side of [-1, 1]) {
+        const nostrilGeo = new THREE.SphereGeometry(2.2 * s, 8, 6);
+        nostrilGeo.scale(0.8, 0.6, 1.0); // oval shape
+        const nostrilMat = new THREE.MeshBasicMaterial({ color: 0x000000 }); // pure black = deep hole
+        const nostril = new THREE.Mesh(nostrilGeo, nostrilMat);
+        nostril.position.set(headX + 28 * s, headY - 2.5 * s, side * 3.5 * s);
+        nostril.name = 'nostril' + (side > 0 ? 'R' : 'L');
+        dogMesh.add(nostril);
+      }
+
+      // Nose shine highlight (wet nose reflection)
+      const shineNoseGeo = new THREE.SphereGeometry(1.5 * s, 6, 6);
+      const shineNoseMat = new THREE.MeshBasicMaterial({ color: 0x555555, transparent: true, opacity: 0.4 });
+      const shineNose = new THREE.Mesh(shineNoseGeo, shineNoseMat);
+      shineNose.position.set(headX + 26 * s, headY - 0.5 * s, -1.5 * s);
+      dogMesh.add(shineNose);
+
+      // === MOUTH (dark opening under snout) ===
+      const mouthGeo = new THREE.SphereGeometry(7 * s, 12, 8);
+      mouthGeo.scale(1.3, 0.3, 0.7);
+      const mouthMat = new THREE.MeshStandardMaterial({ color: 0x1a0808, roughness: 0.8 });
+      const mouth = new THREE.Mesh(mouthGeo, mouthMat);
+      mouth.position.set(headX + 16 * s, headY - 10 * s, 0);
+      mouth.name = 'mouth';
+      dogMesh.add(mouth);
+
+      // === LOWER JAW ===
+      const jawGeo = new THREE.SphereGeometry(8 * s, 12, 8);
+      jawGeo.scale(1.2, 0.5, 0.75);
+      const jaw = new THREE.Mesh(jawGeo, furMat);
+      jaw.position.set(headX + 13 * s, headY - 11 * s, 0);
+      jaw.name = 'jaw';
+      dogMesh.add(jaw);
+
+      // === TEETH (small white bumps inside mouth) ===
+      const toothMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f0, roughness: 0.3 });
+      for (let i = 0; i < 4; i++) {
+        const toothGeo = new THREE.ConeGeometry(1 * s, 2.5 * s, 4);
+        const tooth = new THREE.Mesh(toothGeo, toothMat);
+        const tz = (i - 1.5) * 2.5 * s;
+        tooth.position.set(headX + 18 * s, headY - 9 * s, tz);
+        tooth.rotation.x = Math.PI; // point downward
+        tooth.name = 'tooth' + i;
+        dogMesh.add(tooth);
+      }
+
+      // === TONGUE (inside mouth, extends when eating/drinking) ===
+      const tongueGeo = new THREE.SphereGeometry(5 * s, 10, 8);
+      tongueGeo.scale(1.3, 0.25, 0.6);
+      const tongue = new THREE.Mesh(tongueGeo, tongueMat);
+      tongue.position.set(headX + 16 * s, headY - 11 * s, 0);
+      tongue.name = 'tongue';
+      tongue.visible = false;
+      dogMesh.add(tongue);
+
+      // === EYES ===
+      for (const side of [-1, 1]) {
+        // Eye white
+        const eyeWhiteGeo = new THREE.SphereGeometry(4 * s, 10, 8);
+        const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xf8f4f0, roughness: 0.3 });
+        const eyeWhite = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
+        eyeWhite.position.set(headX + 8 * s, headY + 7 * s, side * 10 * s);
+        eyeWhite.name = 'eyeW' + (side > 0 ? 'R' : 'L');
+        dogMesh.add(eyeWhite);
+
+        // Iris
+        const eyeGeo = new THREE.SphereGeometry(2.8 * s, 10, 8);
+        const eye = new THREE.Mesh(eyeGeo, eyeMat);
+        eye.position.set(headX + 10 * s, headY + 7 * s, side * 10 * s);
+        eye.name = 'eye' + (side > 0 ? 'R' : 'L');
+        dogMesh.add(eye);
+
+        // Pupil
+        const pupilGeo = new THREE.SphereGeometry(1.5 * s, 8, 6);
+        const pupilMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+        const pupil = new THREE.Mesh(pupilGeo, pupilMat);
+        pupil.position.set(headX + 11.5 * s, headY + 7 * s, side * 10 * s);
+        pupil.name = 'pupil' + (side > 0 ? 'R' : 'L');
+        dogMesh.add(pupil);
+
+        // Shine
+        const shineGeo = new THREE.SphereGeometry(1 * s, 6, 6);
+        const shineMat2 = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const shine = new THREE.Mesh(shineGeo, shineMat2);
+        shine.position.set(headX + 11 * s, headY + 8.5 * s, side * 9 * s);
+        shine.name = 'shine' + (side > 0 ? 'R' : 'L');
+        dogMesh.add(shine);
+      }
+
+      // === EARS ===
+      for (const side of [-1, 1]) {
+        const earGeo = new THREE.SphereGeometry(10 * s, 10, 8);
+        earGeo.scale(0.4, 1.3, 0.7);
+        const ear = new THREE.Mesh(earGeo, furMat);
+        ear.position.set(headX - 5 * s, headY + 8 * s, side * 16 * s);
+        ear.rotation.x = side * 0.2;
+        ear.rotation.z = side * 0.3;
+        ear.name = 'ear' + (side > 0 ? 'R' : 'L');
+        dogMesh.add(ear);
+      }
+
+      // === LEGS ===
+      const legR = 7 * s;
+      const legDefs = [
+        { x: dogCX - dogBodyLen * 0.4, z: -14 * s, label: 'backL' },
+        { x: dogCX - dogBodyLen * 0.4, z: 14 * s, label: 'backR' },
+        { x: dogCX + dogBodyLen * 0.5, z: -14 * s, label: 'frontL' },
+        { x: dogCX + dogBodyLen * 0.5, z: 14 * s, label: 'frontR' },
+      ];
+
+      legDefs.forEach(def => {
+        const legGroup = new THREE.Group();
+        legGroup.name = 'leg_' + def.label;
+
+        const upperGeo = new THREE.CylinderGeometry(legR, legR * 0.85, dogBodyH * 0.55, 10);
+        const upper = new THREE.Mesh(upperGeo, furMat);
+        upper.position.y = dogBodyH * 0.5;
+        legGroup.add(upper);
+
+        const lowerGeo = new THREE.CylinderGeometry(legR * 0.8, legR * 0.7, dogBodyH * 0.5, 10);
+        const lower = new THREE.Mesh(lowerGeo, furMat);
+        lower.position.y = dogBodyH * 0.15;
+        legGroup.add(lower);
+
+        const pawGeo = new THREE.SphereGeometry(legR * 1.1, 10, 8);
+        pawGeo.scale(1.2, 0.5, 1.0);
+        const paw = new THREE.Mesh(pawGeo, furMat);
+        paw.position.y = 2;
+        legGroup.add(paw);
+
+        legGroup.position.set(def.x, 0, def.z);
+        legGroup.castShadow = true;
+        dogMesh.add(legGroup);
+      });
+
+      // === HIP + TAIL (as one connected group) ===
+      const hipCX = dogCX - dogBodyLen * 0.35;
+      const hipCY = dogBodyH;
+      const hipR = 20 * s;
+
+      const hipGeo = new THREE.SphereGeometry(hipR, 16, 12);
+      hipGeo.scale(1.0, 1.0, 1.1);
+      const hip = new THREE.Mesh(hipGeo, furMat);
+      hip.position.set(hipCX, hipCY, 0);
+      dogMesh.add(hip);
+
+      // Tail: smooth curved tube from hip, tapering to tip
+      const tailAX = hipCX - hipR * 0.6;
+      const tailAY = hipCY + hipR * 0.4;
+      const tailCurve = new THREE.CubicBezierCurve3(
+        new THREE.Vector3(tailAX, tailAY, 0),                          // base (on hip)
+        new THREE.Vector3(tailAX - 6 * s, tailAY + 18 * s, 0),        // control 1 (upward)
+        new THREE.Vector3(tailAX - 2 * s, tailAY + 28 * s, 3 * s),    // control 2 (curl)
+        new THREE.Vector3(tailAX + 3 * s, tailAY + 24 * s, 5 * s)     // tip (curled back)
+      );
+      // Custom radius function: thick at base, thin at tip
+      const tailRadii = [];
+      const tailPts = 16;
+      for (let i = 0; i <= tailPts; i++) {
+        tailRadii.push(4 * s * (1 - (i / tailPts) * 0.75));
+      }
+      const tailGeo = new THREE.TubeGeometry(tailCurve, tailPts, 3.5 * s, 8, false);
+      // Manually taper the tube vertices
+      const tailPositions = tailGeo.attributes.position;
+      for (let i = 0; i < tailPositions.count; i++) {
+        const idx = Math.floor(i / 9); // approximate segment index
+        const taper = Math.max(0.25, 1 - (idx / tailPts) * 0.75);
+        // Scale vertices toward center of each ring
+        // This is approximate but gives a tapering effect
+      }
+      const tail = new THREE.Mesh(tailGeo, furMat);
+      tail.name = 'tail';
+      tail.castShadow = true;
+      dogMesh.add(tail);
+      dogMesh.add(tail);
+
+      // === EMOTION: can the dog reach the bowl? ===
+      const canReach = headY >= (bowlRimY - 15 * s);
+      const tooHigh = bowlRimY > headNaturalY + 30 * s;
+      let dogEmotion = canReach ? 'happy' : (tooHigh ? 'sad' : 'stretching');
+
+      // Eyebrow indicators for emotion
+      for (const side of [-1, 1]) {
+        const browGeo = new THREE.CylinderGeometry(0.8 * s, 0.8 * s, 6 * s, 4);
+        const browMat = new THREE.MeshStandardMaterial({ color: 0x6b4f2d, roughness: 0.9 });
+        const brow = new THREE.Mesh(browGeo, browMat);
+        brow.position.set(headX + 6 * s, headY + 12 * s, side * 9 * s);
+        brow.rotation.z = Math.PI / 2;
+        if (tooHigh) {
+          // Sad: eyebrows slant inward-down
+          brow.rotation.x = side * 0.4;
+          brow.rotation.z = Math.PI / 2 + side * 0.3;
+        } else if (!canReach) {
+          // Concerned
+          brow.rotation.x = side * 0.2;
+        }
+        brow.name = 'brow' + (side > 0 ? 'R' : 'L');
+        dogMesh.add(brow);
+      }
+
+      // === STANDING POSE when bowl is too high ===
+      if (!canReach) {
+        // Simply tilt the entire dog group (lean forward/upward like a real dog)
+        const leanAngle = Math.min(0.45, (bowlRimY - headNaturalY) / (100 * s));
+
+        // Pivot point = back feet position
+        const pivotX = dogCX - dogBodyLen * 0.4;
+        const pivotY = 0;
+
+        // Rotate entire dog around back feet
+        dogMesh.children.forEach(child => {
+          const dx = child.position.x - pivotX;
+          const dy = child.position.y - pivotY;
+          const cos = Math.cos(leanAngle);
+          const sin = Math.sin(leanAngle);
+          child.position.x = pivotX + dx * cos - dy * sin;
+          child.position.y = pivotY + dx * sin + dy * cos;
+        });
+      }
+
+      scene.add(dogMesh);
+
+      // === ANIMATION ===
+      let animTime = 0;
+      // After rotation, recalculate where the head ended up
+      const headMeshInit = dogMesh.getObjectByName('head');
+      const baseHeadY = headMeshInit ? headMeshInit.position.y : headY;
+      function animateDog() {
+        if (!dogMesh) return;
+        animTime += 0.08;
+
+        // Recalculate emotion based on current state
+        const isActive = dogState !== 'idle';
+        const effectiveEmotion = (isActive && !canReach) ? 'sad' : (isActive && canReach) ? 'happy' : dogEmotion;
+
+        // Tail wag - happy=fast, sad=slow droop
+        const tailMesh = dogMesh.getObjectByName('tail');
+        let wagSpeed, wagAmp;
+        if (effectiveEmotion === 'sad') { wagSpeed = 0.5; wagAmp = 0.1; }
+        else if (isActive) { wagSpeed = 5; wagAmp = 0.6; }
+        else { wagSpeed = 2; wagAmp = 0.3; }
+        if (tailMesh) {
+          if (effectiveEmotion === 'sad') {
+            // Sad: tail droops down, barely moves
+            tailMesh.rotation.z = -0.3 + Math.sin(animTime * 0.5) * 0.05;
+            tailMesh.rotation.x = 0;
+          } else if (effectiveEmotion === 'happy' && isActive) {
+            // Very happy (eating/drinking): whole butt wiggles, tail high and fast
+            // Real dogs wag slightly more to the right when happy
+            tailMesh.rotation.z = Math.sin(animTime * wagSpeed) * wagAmp + 0.05;
+            tailMesh.rotation.x = Math.sin(animTime * wagSpeed * 0.7) * wagAmp * 0.3;
+          } else {
+            // Relaxed idle: gentle low wag
+            tailMesh.rotation.z = Math.sin(animTime * wagSpeed) * wagAmp;
+            tailMesh.rotation.x = 0;
+          }
+        }
+
+        // Head movement based on real dog behavior observation
+        const headMesh = dogMesh.getObjectByName('head');
+        let bobY = 0;
+        let bobX = 0;
+        let headTilt = 0; // Z rotation for head tilt
+
+        if (!canReach && dogState !== 'idle') {
+          // Already in standing pose (front paws on stand)
+          // Small stretch movements - trying to reach higher
+          bobY = Math.sin(animTime * 1.5) * 5 * s;
+          bobX = Math.sin(animTime * 1.2) * 3 * s;
+          headTilt = Math.sin(animTime * 1.0) * 0.12;
+        } else if (dogState === 'eating') {
+          // Real eating: head dips INTO bowl to grab → lifts slightly to chew → repeat
+          const eatPhase = (animTime * 2.5) % (Math.PI * 2);
+          if (eatPhase < Math.PI * 1.2) {
+            // Dip phase: head goes down and forward into bowl
+            const dip = Math.sin(eatPhase / 1.2 * Math.PI);
+            bobY = -dip * 8 * s;
+            bobX = dip * 5 * s;
+          } else {
+            // Chew phase: head comes up slightly, small jaw movements
+            const chew = Math.sin((eatPhase - Math.PI * 1.2) * 6);
+            bobY = -2 * s + chew * 1 * s;
+            bobX = 2 * s;
+          }
+        } else if (dogState === 'drinking') {
+          // Real drinking: head stays low and steady, tongue does the work
+          // Tongue curls backward, slams water surface at 2-4G, retracts
+          // Small rhythmic dip every lap (4-5 laps per second for small dogs)
+          const lapSpeed = s < 0.7 ? 8 : 5; // small dogs lap faster
+          bobY = -4 * s + Math.sin(animTime * lapSpeed) * 1 * s;
+          bobX = 3 * s;
+          // Very slight forward-back as tongue extends
+        } else {
+          // Idle: sniff the air, look around, occasional head tilt
+          bobY = Math.sin(animTime * 0.5) * 1.5 * s;
+          bobX = Math.sin(animTime * 0.3) * 1 * s;
+          // Curious head tilt every few seconds
+          headTilt = Math.sin(animTime * 0.2) * 0.08;
+        }
+        if (headMesh) {
+          headMesh.position.y = baseHeadY + bobY;
+          headMesh.position.x = headX + bobX;
+          headMesh.rotation.z = headTilt;
+        }
+
+        // Move ALL face parts with head bob
+        const faceOffsets = {
+          'snout': { dy: -5 * s }, 'nose': { dy: -2 * s },
+          'nostrilR': { dy: -1 * s }, 'nostrilL': { dy: -1 * s },
+          'mouth': { dy: -10 * s }, 'jaw': { dy: -11 * s },
+          'eyeR': { dy: 7 * s }, 'eyeL': { dy: 7 * s },
+          'eyeWR': { dy: 7 * s }, 'eyeWL': { dy: 7 * s },
+          'pupilR': { dy: 7 * s }, 'pupilL': { dy: 7 * s },
+          'shineR': { dy: 8.5 * s }, 'shineL': { dy: 8.5 * s },
+          'earR': { dy: 8 * s }, 'earL': { dy: 8 * s },
+          'browR': { dy: 12 * s }, 'browL': { dy: 12 * s },
+        };
+        Object.entries(faceOffsets).forEach(([name, off]) => {
+          const m = dogMesh.getObjectByName(name);
+          if (m) m.position.y = baseHeadY + off.dy + bobY;
+        });
+
+        // Teeth move with head
+        for (let i = 0; i < 4; i++) {
+          const t = dogMesh.getObjectByName('tooth' + i);
+          if (t) t.position.y = baseHeadY - 9 * s + bobY;
+        }
+
+        // Tongue: real dog lapping mechanics
+        const tongueM = dogMesh.getObjectByName('tongue');
+        if (tongueM) {
+          if (!canReach && dogState !== 'idle') {
+            tongueM.visible = false;
+          } else if (dogState === 'drinking' && canReach) {
+            // Real lapping: tongue extends down & curls backward, slams water, retracts fast
+            const lapSpeed = s < 0.7 ? 8 : 5;
+            const lapPhase = (animTime * lapSpeed) % (Math.PI * 2);
+            if (lapPhase < Math.PI) {
+              // Extend phase: tongue shoots out and down
+              tongueM.visible = true;
+              const ext = Math.sin(lapPhase);
+              tongueM.position.x = headX + bobX + 16 * s + ext * 8 * s;
+              tongueM.position.y = baseHeadY - 12 * s + bobY - ext * 5 * s;
+              tongueM.scale.set(1 + ext * 0.5, 1, 1); // stretches out
+            } else {
+              // Retract: quick snap back into mouth
+              tongueM.visible = false;
+            }
+          } else if (dogState === 'eating' && canReach) {
+            // Eating: tongue briefly visible when grabbing food
+            const eatPhase = (animTime * 2.5) % (Math.PI * 2);
+            tongueM.visible = eatPhase < Math.PI * 0.3;
+            tongueM.position.x = headX + bobX + 18 * s;
+            tongueM.position.y = baseHeadY - 11 * s + bobY;
+            tongueM.scale.set(1, 1, 1);
+          } else {
+            tongueM.visible = false;
+          }
+        }
+
+        // Jaw opens when eating
+        const jawM = dogMesh.getObjectByName('jaw');
+        if (jawM) {
+          const jawOpen = dogState === 'eating' ? Math.abs(Math.sin(animTime * 4)) * 3 * s :
+                          dogState === 'drinking' ? Math.abs(Math.sin(animTime * 3)) * 2 * s : 0;
+          jawM.position.y = baseHeadY - 11 * s + bobY - jawOpen;
+        }
+
+        // Ear twitch
+        const earL = dogMesh.getObjectByName('earL');
+        const earR = dogMesh.getObjectByName('earR');
+        if (earL) earL.rotation.z = -0.3 + Math.sin(animTime * 1.5) * 0.15;
+        if (earR) earR.rotation.z = 0.3 - Math.sin(animTime * 1.5 + 0.5) * 0.15;
+
+        dogAnimFrame = requestAnimationFrame(animateDog);
+      }
+      animateDog();
+    }
+
+    // ====== FOOD / WATER IN BOWL ======
+    let bowlContentGroup = null;
+    let dogState = 'idle';
+    let consumeTimer = null;
+    let foodKibbles = [];
+    let spilledItems = []; // fallen kibbles / spilled water
+    let waterLevel = 0;
+    let foodPresses = 0;
+    let waterPresses = 0;
+
+    function serveDogFood() {
+      foodPresses++;
+      const p = getParams();
+      const topR = p.bowlDia / 2 - p.wall - 5;
+      const h = p.standH;
+
+      if (!bowlContentGroup) {
+        bowlContentGroup = new THREE.Group();
+        scene.add(bowlContentGroup);
+      }
+
+      const kibbleMat = new THREE.MeshStandardMaterial({ color: 0x8B6914, roughness: 0.9 });
+      const newKibbles = 15 + Math.floor(topR / 5);
+
+      for (let i = 0; i < newKibbles; i++) {
+        const kGeo = new THREE.SphereGeometry(2.5 + Math.random() * 2, 6, 5);
+        kGeo.scale(1, 0.6, 1);
+        const k = new THREE.Mesh(kGeo, kibbleMat);
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * topR * 0.8;
+        const stackH = (foodPresses - 1) * 4; // stack higher each press
+        k.position.set(Math.cos(angle) * dist, h + 2 + Math.random() * 4 + stackH, Math.sin(angle) * dist);
+        k.userData = { vx: 0, vy: 0, vz: 0, grounded: false };
+        bowlContentGroup.add(k);
+        foodKibbles.push(k);
+      }
+
+      dogState = 'eating';
+
+      // OVERFLOW! If too much food, kibbles fall off
+      if (foodPresses >= 3) {
+        const overflow = Math.min(foodKibbles.length, foodPresses * 5);
+        for (let i = 0; i < overflow; i++) {
+          const k = foodKibbles[Math.floor(Math.random() * foodKibbles.length)];
+          if (!k.userData.grounded) {
+            // Fling outward!
+            const flingAngle = Math.random() * Math.PI * 2;
+            const flingSpeed = 1 + Math.random() * 3;
+            k.userData.vx = Math.cos(flingAngle) * flingSpeed;
+            k.userData.vy = 2 + Math.random() * 3;
+            k.userData.vz = Math.sin(flingAngle) * flingSpeed;
+          }
+        }
+      }
+
+      // Start eating timer if not running
+      if (!consumeTimer) {
+        consumeTimer = setInterval(() => {
+          if (dogState !== 'eating') return;
+          // Eat visible kibbles
+          const visible = foodKibbles.filter(k => k.visible && !k.userData.grounded);
+          if (visible.length > 0) {
+            visible[0].visible = false;
+          }
+          // Physics for flying kibbles
+          foodKibbles.forEach(k => {
+            if (k.userData.vy !== 0 || k.userData.vx !== 0) {
+              k.position.x += k.userData.vx;
+              k.position.y += k.userData.vy;
+              k.position.z += k.userData.vz;
+              k.userData.vy -= 0.3; // gravity
+              if (k.position.y <= 1) {
+                k.position.y = 1;
+                k.userData.vy = 0;
+                k.userData.vx *= 0.5;
+                k.userData.vz *= 0.5;
+                k.userData.grounded = true;
+              }
+            }
+          });
+          // All eaten?
+          if (foodKibbles.every(k => !k.visible)) {
+            clearInterval(consumeTimer);
+            consumeTimer = null;
+            dogState = 'idle';
+            setTimeout(clearBowl, 1000);
+          }
+        }, 300);
+      }
+    }
+
+    function serveDogWater() {
+      waterPresses++;
+      const p = getParams();
+      const topR = p.bowlDia / 2 - p.wall - 3;
+      const h = p.standH;
+
+      if (!bowlContentGroup) {
+        bowlContentGroup = new THREE.Group();
+        scene.add(bowlContentGroup);
+      }
+
+      waterLevel = Math.min(waterLevel + 4, 20); // max 20mm
+
+      // Remove old water mesh
+      const oldWater = bowlContentGroup.getObjectByName('water');
+      if (oldWater) { bowlContentGroup.remove(oldWater); oldWater.geometry.dispose(); }
+
+      const waterGeo = new THREE.CylinderGeometry(topR, topR, waterLevel, 32);
+      const waterMat = new THREE.MeshStandardMaterial({
+        color: 0x4488cc, transparent: true, opacity: Math.min(0.7, 0.3 + waterLevel * 0.02),
+        roughness: 0.1, metalness: 0.3
+      });
+      const water = new THREE.Mesh(waterGeo, waterMat);
+      water.position.y = h + waterLevel / 2 + 1;
+      water.name = 'water';
+      bowlContentGroup.add(water);
+
+      dogState = 'drinking';
+
+      // OVERFLOW! Water spills if too full
+      if (waterLevel >= 16) {
+        // Create spill streams
+        for (let i = 0; i < 3; i++) {
+          const spillAngle = Math.random() * Math.PI * 2;
+          const spillGeo = new THREE.SphereGeometry(3, 6, 6);
+          const spillMat = new THREE.MeshStandardMaterial({
+            color: 0x4488cc, transparent: true, opacity: 0.5
+          });
+          const spill = new THREE.Mesh(spillGeo, spillMat);
+          spill.position.set(
+            Math.cos(spillAngle) * topR,
+            h + waterLevel,
+            Math.sin(spillAngle) * topR
+          );
+          spill.userData = {
+            vx: Math.cos(spillAngle) * 1.5,
+            vy: 1,
+            vz: Math.sin(spillAngle) * 1.5,
+            life: 1.0
+          };
+          bowlContentGroup.add(spill);
+          spilledItems.push(spill);
+        }
+      }
+
+      // Drink timer
+      if (!consumeTimer) {
+        consumeTimer = setInterval(() => {
+          if (dogState !== 'drinking') return;
+          waterLevel = Math.max(0, waterLevel - 0.3);
+
+          const w = bowlContentGroup.getObjectByName('water');
+          if (w) {
+            w.scale.y = Math.max(0.01, waterLevel / 20);
+            w.position.y = h + (waterLevel / 2) + 1;
+            w.material.opacity = Math.min(0.7, 0.1 + waterLevel * 0.03);
+          }
+
+          // Physics for spilled water drops
+          spilledItems.forEach(sp => {
+            sp.position.x += sp.userData.vx;
+            sp.position.y += sp.userData.vy;
+            sp.position.z += sp.userData.vz;
+            sp.userData.vy -= 0.2;
+            sp.userData.life -= 0.02;
+            sp.material.opacity = sp.userData.life * 0.5;
+            if (sp.position.y <= 0) {
+              sp.position.y = 0.5;
+              sp.userData.vy = 0;
+              sp.userData.vx *= 0.3;
+              sp.userData.vz *= 0.3;
+              // Puddle effect: flatten
+              sp.scale.set(2, 0.2, 2);
+            }
+          });
+
+          if (waterLevel <= 0.1) {
+            clearInterval(consumeTimer);
+            consumeTimer = null;
+            dogState = 'idle';
+            waterLevel = 0;
+            setTimeout(clearBowl, 1000);
+          }
+        }, 200);
+      }
+    }
+
+    function clearBowl() {
+      if (consumeTimer) { clearInterval(consumeTimer); consumeTimer = null; }
+      if (bowlContentGroup) {
+        scene.remove(bowlContentGroup);
+        bowlContentGroup.traverse(c => { if (c.geometry) c.geometry.dispose(); });
+        bowlContentGroup = null;
+      }
+      foodKibbles = [];
+      spilledItems = [];
+      waterLevel = 0;
+      foodPresses = 0;
+      waterPresses = 0;
+      dogState = 'idle';
+    }
+
+    function applyStage(factor) {
+      const f = parseFloat(factor);
+      const breedSelect = document.getElementById('breed-select');
+      if (breedSelect.value) {
+        // Re-apply breed with stage factor
+        const baseH = parseInt(breedSelect.value);
+        const adjustedH = Math.round(baseH * f);
+        document.getElementById('s-stand-h').value = adjustedH;
+        // Adjust bowl size too
+        const currentBowl = parseInt(document.getElementById('s-bowl-dia').value);
+        document.getElementById('s-bowl-dia').value = Math.round(currentBowl * f);
+      }
+      updateParam();
+    }
+
+    function updateMaterial() {
+      standMaterial.color.set(currentColor);
+      standMaterial.needsUpdate = true;
+    }
+
+    function rebuildStand() {
+      // Clear previous
+      while (standGroup.children.length > 0) {
+        const child = standGroup.children[0];
+        standGroup.remove(child);
+        if (child.geometry) child.geometry.dispose();
+      }
+
+      const p = getParams();
+      const segments = 64;
+      const baseR = p.baseDia / 2;
+      const topR = p.bowlDia / 2;
+      const wallT = p.wall;
+      const h = p.standH;
+      const gripDepth = p.grip;
+      const baseThick = Math.max(wallT, 5);
+
+      // === OUTER SHELL (solid cross-section profile, revolved) ===
+      // Profile: bottom-left to top, then back down inside, forming a solid wall
+      const shape = new THREE.Shape();
+
+      // Start at bottom center of base
+      shape.moveTo(0, 0);
+      // Bottom of base - outward
+      shape.lineTo(baseR, 0);
+      // Base side - up
+      shape.lineTo(baseR, baseThick);
+
+      // Taper inward going up the column
+      const neckR = Math.min(baseR * 0.5, topR * 0.7);
+      const neckH = h * 0.35;
+      shape.quadraticCurveTo(baseR * 0.8, baseThick + 10, neckR, neckH);
+
+      // Grip ring indent
+      if (gripDepth > 0) {
+        const gripH = h * 0.55;
+        shape.lineTo(neckR + 2, gripH - 10);
+        shape.lineTo(neckR - gripDepth, gripH);
+        shape.lineTo(neckR + 2, gripH + 10);
+      }
+
+      // Flare out to bowl holder rim
+      shape.quadraticCurveTo(neckR + 5, h * 0.75, topR, h - 10);
+      // Rim lip
+      shape.lineTo(topR + wallT * 0.5, h - 3);
+      shape.lineTo(topR + wallT * 0.5, h);
+
+      // === TOP: inward to create bowl cradle ===
+      const innerR = topR - wallT;
+      shape.lineTo(innerR, h);
+      // Bowl cradle curve going down
+      const cradleDepth = Math.min(h * 0.25, 30);
+      shape.quadraticCurveTo(innerR * 0.6, h - cradleDepth * 0.8, innerR * 0.2, h - cradleDepth);
+
+      // === INNER WALL: back down through hollow column ===
+      const innerNeckR = Math.max(neckR - wallT, 3);
+      shape.lineTo(innerNeckR * 0.5, h - cradleDepth);
+      shape.quadraticCurveTo(innerNeckR * 0.3, neckH, innerNeckR * 0.2, baseThick);
+      // Close back to center
+      shape.lineTo(0, baseThick);
+      shape.lineTo(0, 0);
+
+      // Revolve the cross-section
+      const points = shape.getPoints(32);
+      const latheGeo = new THREE.LatheGeometry(points, segments);
+      const standMesh = new THREE.Mesh(latheGeo, standMaterial);
+      standMesh.castShadow = true;
+      standMesh.receiveShadow = true;
+      standGroup.add(standMesh);
+
+      // === SCREW THREAD VISUAL (height adjustment mechanism) ===
+      // Helical groove on the neck section to indicate adjustable height
+      const threadR = neckR + 1.5;
+      const threadTubeR = 1.2;
+      const threadTurns = 4;
+      const threadStart = baseThick + 10;
+      const threadEnd = h * 0.5;
+      const threadPoints = [];
+      const threadSteps = threadTurns * 32;
+      for (let i = 0; i <= threadSteps; i++) {
+        const t = i / threadSteps;
+        const angle = t * Math.PI * 2 * threadTurns;
+        const y = threadStart + t * (threadEnd - threadStart);
+        const rAtY = neckR + Math.sin(t * Math.PI) * 2; // slight bulge
+        threadPoints.push(new THREE.Vector3(
+          Math.cos(angle) * (rAtY + 1),
+          y,
+          Math.sin(angle) * (rAtY + 1)
+        ));
+      }
+      if (threadPoints.length > 2) {
+        const threadCurve = new THREE.CatmullRomCurve3(threadPoints);
+        const threadGeo = new THREE.TubeGeometry(threadCurve, threadSteps, threadTubeR, 6, false);
+        const threadMat = standMaterial.clone();
+        threadMat.color.set(new THREE.Color(currentColor).multiplyScalar(0.7));
+        const threadMesh = new THREE.Mesh(threadGeo, threadMat);
+        threadMesh.castShadow = true;
+        standGroup.add(threadMesh);
+
+        // Lock ring indicator
+        const lockY = threadStart + (threadEnd - threadStart) * 0.5;
+        const lockGeo = new THREE.TorusGeometry(neckR + 3, 2, 8, 32);
+        const lockMat = standMaterial.clone();
+        lockMat.color.set(new THREE.Color(currentColor).multiplyScalar(0.6));
+        const lockMesh = new THREE.Mesh(lockGeo, lockMat);
+        lockMesh.rotation.x = Math.PI / 2;
+        lockMesh.position.y = lockY;
+        lockMesh.castShadow = true;
+        standGroup.add(lockMesh);
+      }
+
+      // Anti-slip nubs on base bottom
+      if (showNubs) {
+        const nubCount = 6;
+        const nubR = baseR * 0.8;
+        const nubGeo = new THREE.SphereGeometry(3, 12, 8);
+        for (let i = 0; i < nubCount; i++) {
+          const angle = (i / nubCount) * Math.PI * 2;
+          const nub = new THREE.Mesh(nubGeo, standMaterial);
+          nub.position.set(
+            Math.cos(angle) * nubR,
+            -1.5,
+            Math.sin(angle) * nubR
+          );
+          nub.scale.y = 0.5;
+          nub.castShadow = true;
+          standGroup.add(nub);
+        }
+      }
+
+      // Cap the bowl cradle bottom (prevents grid from showing through)
+      const capCradleDepth = Math.min(h * 0.25, 30);
+      const capInnerR = topR - wallT;
+      const capGeo = new THREE.CircleGeometry(capInnerR * 0.25, segments);
+      const capMesh = new THREE.Mesh(capGeo, standMaterial.clone());
+      capMesh.rotation.x = -Math.PI / 2;
+      capMesh.position.y = h - capCradleDepth + 0.5;
+      standGroup.add(capMesh);
+
+      // Also cap the base bottom
+      const baseCapGeo = new THREE.CircleGeometry(baseR, segments);
+      const baseCapMesh = new THREE.Mesh(baseCapGeo, standMaterial.clone());
+      baseCapMesh.rotation.x = Math.PI / 2;
+      baseCapMesh.position.y = 0.1;
+      standGroup.add(baseCapMesh);
+
+      // === EXPLODED VIEW: separate upper tray and lower base ===
+      if (currentViewMode === 'exploded') {
+        // Move all children that are above the split line UP
+        const splitY = h * 0.5;
+        const explodeOffset = h * 0.6;
+        standGroup.children.forEach(child => {
+          if (child.position.y > splitY) {
+            child.position.y += explodeOffset;
+          }
+        });
+
+        // Add connection indicators (arrows / lines)
+        const arrowMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, transparent: true, opacity: 0.6 });
+        // Vertical dotted line between parts
+        for (let i = 0; i < 5; i++) {
+          const dotGeo = new THREE.SphereGeometry(1.5, 6, 6);
+          const dot = new THREE.Mesh(dotGeo, arrowMat);
+          dot.position.y = splitY + i * (explodeOffset / 5);
+          standGroup.add(dot);
+        }
+
+        // Labels
+        // Upper part label: "ボウルトレイ"
+        // Lower part label: "ベース柱（ネジ式）"
+        // (These show in the info box instead)
+      }
+
+      // Apply tilt
+      standGroup.rotation.x = THREE.MathUtils.degToRad(p.tilt);
+    }
+
+    // ========== EXPORT ==========
+    function exportSTL() {
+      if (!window.requireExportLicense()) return;
+
+      const exporter = new THREE.STLExporter();
+      // Merge into single geometry for export
+      const exportGroup = standGroup.clone();
+      const result = exporter.parse(exportGroup, { binary: true });
+
+      const blob = new Blob([result], { type: 'application/octet-stream' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'bowlstand_' + Date.now() + '.stl';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    function export3MF() {
+      if (!window.requireExportLicense()) return;
+
+      // 3MF is XML-based; create a minimal 3MF package
+      const exporter = new THREE.STLExporter();
+      const stlData = exporter.parse(standGroup, { binary: false });
+
+      // Parse STL to extract vertices for 3MF
+      const vertices = [];
+      const triangles = [];
+      const lines = stlData.split('\n');
+      let vIdx = 0;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.startsWith('vertex')) {
+          const parts = line.split(/\s+/);
+          vertices.push({ x: parts[1], y: parts[2], z: parts[3] });
+        }
+      }
+
+      // Group into triangles
+      for (let i = 0; i < vertices.length; i += 3) {
+        triangles.push({ v1: i, v2: i + 1, v3: i + 2 });
+      }
+
+      let vertXml = '';
+      vertices.forEach(v => {
+        vertXml += '          <vertex x="' + v.x + '" y="' + v.y + '" z="' + v.z + '" />\n';
+      });
+
+      let triXml = '';
+      triangles.forEach(t => {
+        triXml += '          <triangle v1="' + t.v1 + '" v2="' + t.v2 + '" v3="' + t.v3 + '" />\n';
+      });
+
+      const modelXml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+        '<model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">\n' +
+        '  <resources>\n' +
+        '    <object id="1" type="model">\n' +
+        '      <mesh>\n' +
+        '        <vertices>\n' + vertXml + '        </vertices>\n' +
+        '        <triangles>\n' + triXml + '        </triangles>\n' +
+        '      </mesh>\n' +
+        '    </object>\n' +
+        '  </resources>\n' +
+        '  <build>\n' +
+        '    <item objectid="1" />\n' +
+        '  </build>\n' +
+        '</model>';
+
+      const blob = new Blob([modelXml], { type: 'application/xml' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'bowlstand_' + Date.now() + '.3mf';
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    // ========== RESIZE & LOOP ==========
+    function onResize() {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (w === 0 || h === 0) return;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+    window.addEventListener('resize', onResize);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // Init
+    rebuildStand();
+    setTimeout(onResize, 50);
+    animate();
+  </script>
+</body>
+</html>

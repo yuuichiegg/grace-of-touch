@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DroneGuard - 点検・準備</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --surface: #141926;
+    --surface2: #1c2236;
+    --border: #262e45;
+    --text: #e2e6f0;
+    --text2: #7a839e;
+    --accent: #4a8aff;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app { max-width: 480px; margin: 0 auto; min-height: 100vh; }
+
+  .header {
+    padding: 16px 20px; display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--border); position: sticky; top: 0;
+    background: var(--bg); z-index: 50;
+  }
+  .back-btn {
+    background: none; border: none; color: var(--accent); font-size: 20px;
+    cursor: pointer; padding: 4px;
+  }
+  .header h1 { font-size: 17px; font-weight: 700; color: var(--accent); }
+
+  .content { padding: 16px 20px 100px; }
+
+  /* === Menu: 3 independent cards === */
+  .menu-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px; margin-bottom: 12px;
+    cursor: pointer; transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .menu-card:active { transform: scale(0.98); }
+  .mc-icon { font-size: 32px; flex-shrink: 0; }
+  .mc-body { flex: 1; }
+  .mc-title { font-size: 16px; font-weight: 700; }
+  .mc-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .mc-progress {
+    margin-top: 8px; display: flex; align-items: center; gap: 8px;
+  }
+  .mc-bar {
+    flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;
+  }
+  .mc-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+  .mc-pct { font-size: 11px; color: var(--text2); min-width: 36px; text-align: right; }
+  .mc-arrow { color: var(--text2); font-size: 20px; }
+
+  .mc-done .mc-title { color: var(--green); }
+  .mc-done { border-color: rgba(52,211,153,0.3); }
+
+  .mc-timing {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 600; margin-left: 6px;
+  }
+  .timing-daily { background: rgba(74,138,255,0.15); color: var(--accent); }
+  .timing-prep { background: rgba(251,191,36,0.15); color: var(--yellow); }
+  .timing-final { background: rgba(248,113,113,0.15); color: var(--red); }
+
+  /* === Checklist view === */
+  .checklist-view { display: none; }
+  .checklist-view.active { display: block; }
+
+  .cl-header {
+    text-align: center; padding: 20px 0; border-bottom: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .cl-header .cl-icon { font-size: 40px; }
+  .cl-header .cl-title { font-size: 18px; font-weight: 700; margin-top: 8px; }
+  .cl-header .cl-sub { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  /* Progress ring */
+  .ring-area { display: flex; justify-content: center; margin: 16px 0; }
+  .ring-wrap { position: relative; width: 56px; height: 56px; }
+  .ring-bg, .ring-fg {
+    position: absolute; top: 0; left: 0; width: 56px; height: 56px;
+    fill: none; stroke-width: 5; transform: rotate(-90deg); transform-origin: center;
+  }
+  .ring-bg { stroke: var(--border); }
+  .ring-fg { stroke: var(--green); stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
+  .ring-text {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    font-size: 14px; font-weight: 700; color: var(--green);
+  }
+
+  /* Focus card */
+  .focus-card {
+    background: var(--surface); border: 2px solid var(--border);
+    border-radius: 16px; padding: 28px 24px; margin-bottom: 12px;
+    text-align: center; transition: all 0.3s;
+    min-height: 180px; display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+  }
+  .focus-card.checking { border-color: var(--accent); }
+  .focus-card.passed { border-color: var(--green); background: rgba(52,211,153,0.05); }
+  .focus-icon { font-size: 48px; margin-bottom: 16px; transition: transform 0.3s; }
+  .focus-card.passed .focus-icon { animation: iconPop 0.4s ease; }
+  @keyframes iconPop { 0%{transform:scale(1);} 50%{transform:scale(1.3);} 100%{transform:scale(1);} }
+
+  .focus-group { font-size: 11px; color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .focus-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .focus-sub { font-size: 13px; color: var(--text2); line-height: 1.7; }
+  .focus-counter { margin-top: 16px; font-size: 12px; color: var(--text2); }
+
+  .confirm-btn {
+    width: 100%; padding: 16px; margin-top: 16px;
+    background: var(--accent); color: #fff; border: none;
+    border-radius: 12px; font-size: 16px; font-weight: 700;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .confirm-btn:active { transform: scale(0.97); }
+  .confirm-btn.confirmed { background: var(--green); animation: btnFlash 0.3s ease; }
+  @keyframes btnFlash { 0%{transform:scale(1);} 30%{transform:scale(1.03);} 100%{transform:scale(1);} }
+
+  .action-row { display: flex; justify-content: center; gap: 16px; margin-top: 12px; }
+  .action-link { background: none; border: none; color: var(--text2); font-size: 13px; cursor: pointer; padding: 4px 8px; }
+
+  /* Trail */
+  .trail { margin-top: 20px; }
+  .trail-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .trail-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+    font-size: 13px; color: var(--text2); animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn { from{opacity:0;transform:translateY(-8px);} to{opacity:1;transform:translateY(0);} }
+  .trail-check { color: var(--green); font-size: 14px; }
+  .trail-time { font-size: 11px; margin-left: auto; }
+
+  /* Complete */
+  .complete-banner {
+    display: none; text-align: center; padding: 24px;
+    background: linear-gradient(135deg, rgba(52,211,153,0.15), rgba(74,138,255,0.1));
+    border: 1px solid rgba(52,211,153,0.3); border-radius: 14px; margin: 16px 0;
+  }
+  .complete-banner.visible { display: block; }
+  .complete-banner .cb-icon { font-size: 48px; animation: completePulse 1s ease infinite; }
+  @keyframes completePulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.08);} }
+  .complete-banner h2 { font-size: 18px; color: var(--green); margin-top: 8px; }
+  .complete-banner p { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  .cl-actions { display: flex; gap: 8px; margin-top: 16px; justify-content: center; }
+  .cl-btn {
+    padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; border: none;
+  }
+  .cl-btn-back { background: var(--surface); border: 1px solid var(--border); color: var(--text2); }
+  .cl-btn-reset { background: none; border: 1px solid var(--border); color: var(--text2); }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <button class="back-btn" id="backBtn" onclick="goBack()">&#8249;</button>
+    <h1 id="headerTitle">点検・準備</h1>
+  </div>
+
+  <div class="content">
+    <!-- === MENU === -->
+    <div id="menuView">
+      <div class="menu-card" id="menuDaily" onclick="openChecklist(0)">
+        <div class="mc-icon">&#128295;</div>
+        <div class="mc-body">
+          <div class="mc-title">日常点検 <span class="mc-timing timing-daily">いつでも</span></div>
+          <div class="mc-sub">機体・プロペラ・モーター・バッテリー</div>
+          <div class="mc-progress">
+            <div class="mc-bar"><div class="mc-bar-fill" id="bar0" style="width:0%; background:var(--accent);"></div></div>
+            <div class="mc-pct" id="pct0">0%</div>
+          </div>
+        </div>
+        <div class="mc-arrow">&#8250;</div>
+      </div>
+
+      <div class="menu-card" id="menuPrep" onclick="openChecklist(1)">
+        <div class="mc-icon">&#128196;</div>
+        <div class="mc-body">
+          <div class="mc-title">飛行前準備 <span class="mc-timing timing-prep">前日まで</span></div>
+          <div class="mc-sub">書類・通報・連絡・運航体制</div>
+          <div class="mc-progress">
+            <div class="mc-bar"><div class="mc-bar-fill" id="bar1" style="width:0%; background:var(--yellow);"></div></div>
+            <div class="mc-pct" id="pct1">0%</div>
+          </div>
+        </div>
+        <div class="mc-arrow">&#8250;</div>
+      </div>
+
+      <div class="menu-card" id="menuFinal" onclick="openChecklist(2)">
+        <div class="mc-icon">&#128225;</div>
+        <div class="mc-body">
+          <div class="mc-title">飛行前点検 <span class="mc-timing timing-final">直前</span></div>
+          <div class="mc-sub">通信・フェールセーフ・飛行環境</div>
+          <div class="mc-progress">
+            <div class="mc-bar"><div class="mc-bar-fill" id="bar2" style="width:0%; background:var(--red);"></div></div>
+            <div class="mc-pct" id="pct2">0%</div>
+          </div>
+        </div>
+        <div class="mc-arrow">&#8250;</div>
+      </div>
+    </div>
+
+    <!-- === CHECKLIST === -->
+    <div class="checklist-view" id="checklistView">
+      <div class="cl-header">
+        <div class="cl-icon" id="clIcon"></div>
+        <div class="cl-title" id="clTitle"></div>
+        <div class="cl-sub" id="clSub"></div>
+      </div>
+
+      <div class="ring-area">
+        <div class="ring-wrap">
+          <svg class="ring-bg" viewBox="0 0 56 56"><circle cx="28" cy="28" r="24"/></svg>
+          <svg class="ring-fg" viewBox="0 0 56 56"><circle cx="28" cy="28" r="24" id="ringCircle" stroke-dasharray="150.8" stroke-dashoffset="150.8"/></svg>
+          <div class="ring-text" id="ringPct">0%</div>
+        </div>
+      </div>
+
+      <div id="focusArea">
+        <div class="focus-card checking" id="focusCard">
+          <div class="focus-icon" id="focusIcon"></div>
+          <div class="focus-group" id="focusGroup"></div>
+          <div class="focus-title" id="focusTitle"></div>
+          <div class="focus-sub" id="focusSub"></div>
+          <div class="focus-counter" id="focusCounter"></div>
+        </div>
+        <button class="confirm-btn" id="confirmBtn" onclick="confirmItem()">確認OK</button>
+        <div class="action-row">
+          <button class="action-link" onclick="undoItem()">&#8249; 前に戻る</button>
+        </div>
+      </div>
+
+      <div class="complete-banner" id="completeBanner">
+        <div class="cb-icon">&#9989;</div>
+        <h2 id="completeTitle">完了</h2>
+        <p id="completeText"></p>
+      </div>
+
+      <div class="trail" id="trail">
+        <div class="trail-label">完了した項目</div>
+        <div id="trailList"></div>
+      </div>
+
+      <div class="cl-actions">
+        <button class="cl-btn cl-btn-back" onclick="goBack()">&#8249; 一覧に戻る</button>
+        <button class="cl-btn cl-btn-reset" onclick="resetCurrent()">リセット</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const phases = [
+  {
+    name: '日常点検', sub: '機体・プロペラ・モーター・バッテリー', icon: '&#128295;',
+    groups: [
+      { name: '機体', items: [
+        { icon:'&#128295;', title:'機器の取り付け', sub:'ネジの脱落・ゆるみがないか目視と手で確認' },
+        { icon:'&#128065;', title:'外観の損傷・変形', sub:'フレーム、アーム、ランディングギアを確認' },
+        { icon:'&#128268;', title:'コネクタの接続', sub:'ケーブル類の断線・抜けがないか' },
+        { icon:'&#127380;', title:'機体番号の表示', sub:'機体番号（JUxxxxxxxx）が正しく表示されているか' },
+      ]},
+      { name: 'プロペラ', items: [
+        { icon:'&#127744;', title:'欠け・破損の確認', sub:'全てのプロペラの先端と縁を目視' },
+        { icon:'&#128260;', title:'歪み・変形の確認', sub:'プロペラを回してブレがないか' },
+      ]},
+      { name: 'モーター', items: [
+        { icon:'&#9881;', title:'外観の異常確認', sub:'モーターケースの傷・汚れ・異物' },
+        { icon:'&#128266;', title:'回転の異常確認', sub:'手で軽く回して異音・引っかかりがないか' },
+      ]},
+      { name: 'バッテリー', items: [
+        { icon:'&#128267;', title:'充電量の確認', sub:'飛行に十分な充電量があるか' },
+        { icon:'&#9888;', title:'膨らみ・損傷', sub:'少しでも膨らんでいたら使用禁止・即交換' },
+        { icon:'&#128161;', title:'端子の状態', sub:'汚れ・腐食がないか。接触不良の原因' },
+      ]},
+    ]
+  },
+  {
+    name: '飛行前準備', sub: '書類・通報・運航体制（前日まで）', icon: '&#128196;',
+    groups: [
+      { name: '書類・資格', items: [
+        { icon:'&#127380;', title:'技能証明書の携帯', sub:'有効期間内であることを確認' },
+        { icon:'&#128196;', title:'飛行許可・承認書', sub:'原本または写しを携帯' },
+        { icon:'&#128179;', title:'保険加入の確認', sub:'賠償責任保険の有効期間を確認' },
+        { icon:'&#128214;', title:'飛行日誌の準備', sub:'記録用紙またはデジタル記録の準備' },
+      ]},
+      { name: '通報・連絡', items: [
+        { icon:'&#128225;', title:'DIPS飛行計画通報', sub:'出発地・経路・日時を入力して通報済みか' },
+        { icon:'&#127970;', title:'関係機関への連絡', sub:'空港事務所等、必要に応じて連絡済みか' },
+        { icon:'&#128205;', title:'土地管理者の許可', sub:'離着陸場所の使用許可を取得済みか → 飛行許可ヘルパーで申請書作成', link:'https://drone-flight-helper.web.app/' },
+        { icon:'&#128222;', title:'緊急連絡先の確認', sub:'警察・消防・国交省・土地管理者の番号' },
+      ]},
+      { name: '運航体制', items: [
+        { icon:'&#128566;', title:'操縦者の体調確認', sub:'十分な睡眠、アルコールの影響なし' },
+        { icon:'&#129309;', title:'補助者との役割確認', sub:'担当範囲・連絡手段・合図の確認' },
+        { icon:'&#128680;', title:'異常時手順の共有', sub:'緊急着陸・中止判断の基準を全員で確認' },
+        { icon:'&#129509;', title:'服装・保護具', sub:'ヘルメット・保護メガネ・関係者識別の着用' },
+      ]},
+    ]
+  },
+  {
+    name: '飛行前点検', sub: '飛ばす直前の最終確認', icon: '&#128225;',
+    groups: [
+      { name: '通信・制御', items: [
+        { icon:'&#128225;', title:'送信機と機体のリンク', sub:'正常にペアリングされているか' },
+        { icon:'&#127918;', title:'操縦系統の動作', sub:'各スティック操作に正しく応答するか' },
+        { icon:'&#128752;', title:'自動制御系統', sub:'GPS捕捉数・高度安定・姿勢安定' },
+        { icon:'&#128705;', title:'リモートIDの動作', sub:'ランプが正常に点灯しているか' },
+      ]},
+      { name: 'フェールセーフ', items: [
+        { icon:'&#127968;', title:'RTH高度の設定', sub:'周囲の障害物より高い高度に設定されているか' },
+        { icon:'&#128267;', title:'バッテリー低下時の動作', sub:'警告・緊急レベルの閾値と動作を確認' },
+        { icon:'&#128246;', title:'通信途絶時の動作', sub:'ホバリング/帰還/着陸 — どれに設定されているか' },
+      ]},
+      { name: '飛行環境', items: [
+        { icon:'&#127780;', title:'気象情報の確認', sub:'風速・天候・警報・注意報を最新で確認' },
+        { icon:'&#128506;', title:'飛行空域の確認', sub:'DID・空港周辺・緊急用務空域の該当有無' },
+        { icon:'&#9889;', title:'障害物・電線の確認', sub:'飛行経路上および周辺に危険物がないか' },
+        { icon:'&#128694;', title:'第三者の有無', sub:'立入管理措置の実施状況を確認' },
+        { icon:'&#128205;', title:'緊急着陸地点の確認', sub:'異常時に着陸可能なスペースを目視で特定' },
+      ]},
+    ]
+  }
+];
+
+// Per-phase state saved to localStorage
+function getState(pi) {
+  const saved = localStorage.getItem('dg_check_' + pi);
+  return saved ? JSON.parse(saved) : { index: 0, trail: [] };
+}
+function saveState(pi, state) {
+  localStorage.setItem('dg_check_' + pi, JSON.stringify(state));
+}
+
+let activePhase = -1;
+
+// Flatten items for a phase
+function getItems(pi) {
+  const items = [];
+  phases[pi].groups.forEach(g => {
+    g.items.forEach(item => items.push({ ...item, group: g.name }));
+  });
+  return items;
+}
+
+function updateMenuProgress() {
+  phases.forEach((ph, pi) => {
+    const items = getItems(pi);
+    const state = getState(pi);
+    const done = Math.min(state.index, items.length);
+    const pct = items.length > 0 ? Math.round((done / items.length) * 100) : 0;
+    document.getElementById('bar' + pi).style.width = pct + '%';
+    document.getElementById('pct' + pi).textContent = done === items.length ? '完了' : `${done}/${items.length}`;
+
+    const card = document.getElementById(['menuDaily','menuPrep','menuFinal'][pi]);
+    card.classList.toggle('mc-done', done === items.length);
+  });
+}
+
+function openChecklist(pi) {
+  activePhase = pi;
+  document.getElementById('menuView').style.display = 'none';
+  document.getElementById('checklistView').classList.add('active');
+
+  const ph = phases[pi];
+  document.getElementById('clIcon').innerHTML = ph.icon;
+  document.getElementById('clTitle').textContent = ph.name;
+  document.getElementById('clSub').textContent = ph.sub;
+  document.getElementById('headerTitle').textContent = ph.name;
+
+  renderTrail(pi);
+  renderFocus(pi);
+}
+
+function renderFocus(pi) {
+  const items = getItems(pi);
+  const state = getState(pi);
+  const focusArea = document.getElementById('focusArea');
+  const banner = document.getElementById('completeBanner');
+
+  if (state.index >= items.length) {
+    focusArea.style.display = 'none';
+    banner.classList.add('visible');
+    document.getElementById('completeTitle').textContent = phases[pi].name + ' 完了';
+    document.getElementById('completeText').textContent = `全${items.length}項目のチェックが完了しました`;
+    updateRing(100);
+    return;
+  }
+
+  focusArea.style.display = '';
+  banner.classList.remove('visible');
+
+  const item = items[state.index];
+  document.getElementById('focusIcon').innerHTML = item.icon;
+  document.getElementById('focusGroup').textContent = item.group;
+  document.getElementById('focusTitle').textContent = item.title;
+  document.getElementById('focusSub').textContent = item.sub;
+
+  // Show link button if item has a link
+  let linkArea = document.getElementById('focusLink');
+  if (!linkArea) {
+    linkArea = document.createElement('div');
+    linkArea.id = 'focusLink';
+    document.getElementById('focusCard').appendChild(linkArea);
+  }
+  if (item.link) {
+    linkArea.innerHTML = `<a href="${item.link}" target="_blank" style="
+      display:inline-block; margin-top:12px; padding:8px 16px;
+      background:rgba(251,191,36,0.15); color:var(--yellow);
+      border-radius:8px; font-size:13px; font-weight:600;
+      text-decoration:none;">&#128196; 飛行許可ヘルパーを開く</a>`;
+  } else {
+    linkArea.innerHTML = '';
+  }
+
+  document.getElementById('focusCounter').textContent = `${state.index + 1} / ${items.length}`;
+
+  const card = document.getElementById('focusCard');
+  card.className = 'focus-card checking';
+  const btn = document.getElementById('confirmBtn');
+  btn.className = 'confirm-btn';
+  btn.textContent = '確認OK';
+
+  const pct = Math.round((state.index / items.length) * 100);
+  updateRing(pct);
+}
+
+function updateRing(pct) {
+  const circumference = 2 * Math.PI * 24;
+  const offset = circumference - (circumference * pct / 100);
+  document.getElementById('ringCircle').style.strokeDashoffset = offset;
+  document.getElementById('ringPct').textContent = pct + '%';
+}
+
+function confirmItem() {
+  const pi = activePhase;
+  const items = getItems(pi);
+  const state = getState(pi);
+
+  const card = document.getElementById('focusCard');
+  const btn = document.getElementById('confirmBtn');
+  card.classList.remove('checking');
+  card.classList.add('passed');
+  btn.classList.add('confirmed');
+  btn.innerHTML = '&#10003; 確認完了';
+
+  const item = items[state.index];
+  const now = new Date();
+  const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+
+  state.trail.unshift({ title: item.title, time: timeStr });
+  state.index++;
+  saveState(pi, state);
+
+  addTrailItem(item.title, timeStr);
+
+  setTimeout(() => {
+    renderFocus(pi);
+    updateMenuProgress();
+  }, 400);
+}
+
+function undoItem() {
+  const pi = activePhase;
+  const state = getState(pi);
+  if (state.index <= 0) return;
+
+  state.index--;
+  state.trail.shift();
+  saveState(pi, state);
+
+  const trailList = document.getElementById('trailList');
+  if (trailList.firstChild) trailList.removeChild(trailList.firstChild);
+
+  renderFocus(pi);
+  updateMenuProgress();
+}
+
+function addTrailItem(title, time) {
+  const trailList = document.getElementById('trailList');
+  const el = document.createElement('div');
+  el.className = 'trail-item';
+  el.innerHTML = `<span class="trail-check">&#10003;</span><span>${title}</span><span class="trail-time">${time}</span>`;
+  trailList.insertBefore(el, trailList.firstChild);
+}
+
+function renderTrail(pi) {
+  const state = getState(pi);
+  const trailList = document.getElementById('trailList');
+  trailList.innerHTML = '';
+  state.trail.forEach(t => addTrailItem(t.title, t.time));
+}
+
+function resetCurrent() {
+  if (!confirm('この点検のチェックをリセットしますか？')) return;
+  const pi = activePhase;
+  saveState(pi, { index: 0, trail: [] });
+  renderTrail(pi);
+  renderFocus(pi);
+  updateMenuProgress();
+}
+
+function goBack() {
+  if (activePhase >= 0) {
+    activePhase = -1;
+    document.getElementById('checklistView').classList.remove('active');
+    document.getElementById('menuView').style.display = '';
+    document.getElementById('headerTitle').textContent = '点検・準備';
+    updateMenuProgress();
+  } else {
+    location.href = 'index.html';
+  }
+}
+
+// Init
+updateMenuProgress();
+
+// === Firebase Auth + Cloud Sync ===
+firebase.initializeApp({
+  apiKey: "AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",
+  authDomain: "grace-of-touch.firebaseapp.com",
+  projectId: "grace-of-touch",
+  storageBucket: "grace-of-touch.firebasestorage.app",
+  messagingSenderId: "505078300866",
+  appId: "1:505078300866:web:adad2a27b163c3b0f1bb5b"
+});
+const dgAuth = firebase.auth();
+const dgDb = firebase.firestore();
+
+// Sync checklist completion to Firestore
+function syncChecklistToCloud(phase, data) {
+  const user = dgAuth.currentUser;
+  if (!user) return;
+  dgDb.collection('droneguard_users').doc(user.uid)
+    .collection('preflight_logs').add({
+      phase: phase,
+      data: data,
+      completedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(e => console.warn('Cloud sync failed:', e));
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1664 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌙</text></svg>">
+  <title>神経OS | GRACE OF TOUCH</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #000; height: 100%; overflow: hidden; }
+    #root { height: 100%; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0);   }
+    }
+    .animate-fade-in { animation: fadeIn 0.8s ease-out both; }
+    .duration-2000   { transition-duration: 2000ms !important; }
+    .custom-scrollbar::-webkit-scrollbar       { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 2px; }
+    .pb-safe { padding-bottom: max(env(safe-area-inset-bottom, 8px), 8px); }
+    /* Overlay screens must scroll on small devices */
+    .overlay-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  </style>
+</head>
+<body class="bg-black"><a href="/" id="gt-back" style="position:fixed;top:12px;left:12px;z-index:99999;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);border:1px solid rgba(0,255,255,0.2);border-radius:8px;padding:6px 14px;text-decoration:none;color:rgba(0,255,255,0.8);font-family:Orbitron,monospace;font-size:10px;letter-spacing:0.1em;transition:all 0.3s;" onmouseover="this.style.background='rgba(0,255,255,0.12)';this.style.borderColor='rgba(0,255,255,0.5)'" onmouseout="this.style.background='rgba(0,0,0,0.6)';this.style.borderColor='rgba(0,255,255,0.2)'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>PORTAL</a>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    // --- Lucide icon components (inline SVG) ---
+    const makeIcon = (svgContent) => function Icon({ size = 24, className = "", style }) {
+      return React.createElement("svg", {
+        xmlns: "http://www.w3.org/2000/svg",
+        width: size, height: size,
+        viewBox: "0 0 24 24",
+        fill: "none",
+        stroke: "currentColor",
+        strokeWidth: "2",
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+        className,
+        style,
+        dangerouslySetInnerHTML: { __html: svgContent }
+      });
+    };
+
+    const Activity      = makeIcon('<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>');
+    const MessageSquare = makeIcon('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>');
+    const ShieldAlert   = makeIcon('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>');
+    const ArrowRight    = makeIcon('<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>');
+    const Clock         = makeIcon('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>');
+    const Lock          = makeIcon('<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>');
+    const Moon          = makeIcon('<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>');
+    const RefreshCcw    = makeIcon('<polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>');
+    const Fingerprint   = makeIcon('<path d="M2 12C2 6.5 6.5 2 12 2a10 10 0 0 1 8 4"/><path d="M5 19.5C5.5 18 6 15 6 12c0-.7.12-1.37.34-2"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M9 6.8a6 6 0 0 1 9 5.2c0 .47 0 1.17-.02 2"/>');
+    const PenLine       = makeIcon('<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>');
+    const X             = makeIcon('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>');
+    const ShieldCheck   = makeIcon('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>');
+    const Copy          = makeIcon('<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>');
+    const UserX         = makeIcon('<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="18" y1="8" x2="23" y2="13"/><line x1="23" y1="8" x2="18" y2="13"/>');
+    const Type          = makeIcon('<polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>');
+    const Heart         = makeIcon('<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>');
+    const Wind          = makeIcon('<path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/>');
+    const Sun           = makeIcon('<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>');
+
+
+// --- 定数・ヘルパーロジック ---
+const LOCAL_STORAGE_KEY_TOUCH = 'grace_touch_logs_v9';
+const LOCAL_STORAGE_KEY_BOUNDARY = 'grace_boundary_v1';
+const LOCAL_STORAGE_KEY_UNSENT = 'grace_unsent_v2';
+const LOCAL_STORAGE_KEY_ONBOARDING = 'grace_onboarded_v1';
+const LOCAL_STORAGE_KEY_BASELINE = 'grace_baseline_v2';
+const LOCAL_STORAGE_KEY_CHECKIN = 'grace_checkin_v1';
+const LOCAL_STORAGE_KEY_INTENTION = 'grace_intention_v1';
+const APP_VERSION_KEY = 'grace_app_version';
+const APP_VERSION = 5;
+
+// Auto-migration: clear stale data when app version changes
+(() => {
+  const stored = Number(localStorage.getItem(APP_VERSION_KEY) || 0);
+  if (stored < APP_VERSION) {
+    [LOCAL_STORAGE_KEY_TOUCH, LOCAL_STORAGE_KEY_BOUNDARY, LOCAL_STORAGE_KEY_UNSENT,
+     LOCAL_STORAGE_KEY_BASELINE, LOCAL_STORAGE_KEY_CHECKIN, LOCAL_STORAGE_KEY_INTENTION,
+     'grace_danger_target_v1'].forEach(k => localStorage.removeItem(k));
+    localStorage.setItem(APP_VERSION_KEY, String(APP_VERSION));
+    console.log('[GraceOS] Migration: cleared stale localStorage (v' + stored + ' → v' + APP_VERSION + ')');
+  }
+})();
+
+// --- Firebase + Cloud Sync ---
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",
+  authDomain: "grace-of-touch.firebaseapp.com",
+  projectId: "grace-of-touch",
+  storageBucket: "grace-of-touch.firebasestorage.app",
+  messagingSenderId: "505078300866",
+  appId: "1:505078300866:web:adad2a27b163c3b0f1bb5b"
+};
+
+const LOCAL_STORAGE_KEY_SYNC = 'grace_sync_hash_v1';
+
+let db = null;
+try {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.firestore();
+  console.log('[GraceOS] Firestore connected');
+} catch (e) {
+  console.warn('[GraceOS] Firestore init failed:', e.message);
+}
+
+// Simple hash from icon passphrase
+const hashPassphrase = async (icons) => {
+  const data = new TextEncoder().encode(icons.join(''));
+  const buf = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+};
+
+const CloudSync = {
+  async save(hash, data) {
+    if (!db) return;
+    try {
+      await db.collection('sync').doc(hash).set({
+        ...data,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      console.log('[GraceOS] Cloud save OK');
+    } catch (e) { console.warn('[GraceOS] Cloud save failed:', e.message); }
+  },
+  async load(hash) {
+    if (!db) return null;
+    try {
+      const doc = await db.collection('sync').doc(hash).get();
+      if (doc.exists) {
+        console.log('[GraceOS] Cloud load OK');
+        return doc.data();
+      }
+      return null;
+    } catch (e) { console.warn('[GraceOS] Cloud load failed:', e.message); return null; }
+  }
+};
+
+const safeSave = (key, data, limit = 120) => {
+  try {
+    const trimmed = data.slice(-limit);
+    localStorage.setItem(key, JSON.stringify(trimmed));
+  } catch(e) {
+    console.warn("Storage limit reached for key:", key);
+    try {
+      localStorage.setItem(key, JSON.stringify(data.slice(-10)));
+    } catch(err) {
+      localStorage.removeItem(key); 
+    }
+  }
+};
+
+const mean = arr => arr.length ? arr.reduce((a,b)=>a+b,0) / arr.length : 0;
+const std = arr => {
+  if (!arr.length) return 0;
+  const m = mean(arr);
+  return Math.sqrt(arr.reduce((s,x)=>s+(x-m)*(x-m),0) / arr.length);
+};
+const zScore = (value, m, s) => (s === 0 || isNaN(s)) ? 0 : (value - m) / s;
+
+const computeBaseline = (logs) => {
+  const speeds = logs.map(l => l.vital.avgSpeed);
+  const jitters = logs.map(l => l.vital.jitter);
+  const ruminations = logs.map(l => l.vital.rumination);
+  const rhythms = logs.map(l => l.vital.rhythmIrregularity);
+  return {
+    speedMean: mean(speeds), speedStd: std(speeds),
+    jitterMean: mean(jitters), jitterStd: std(jitters),
+    ruminationMean: mean(ruminations), ruminationStd: std(ruminations),
+    rhythmMean: mean(rhythms), rhythmStd: std(rhythms)
+  };
+};
+
+// --- 音響管理カスタムフック (安全なUnlock強化版) ---
+class GraceAudioManager {
+  constructor() {
+    this.ctx = null;
+    this.masterGain = null;
+    this.isInitialized = false;
+  }
+
+  unlock() {
+    if (!this.ctx) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AudioContext();
+    }
+    
+    // すでに running なら初期化チェックのみ
+    if (this.ctx.state === 'running') {
+      if (!this.isInitialized) this._initializeOscillators();
+      return;
+    }
+
+    // suspended なら resume を試す（ユーザー gesture 内で呼ばれることを期待）
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume().then(() => {
+        console.log("AudioContext resumed successfully. State:", this.ctx.state);
+        if (!this.isInitialized) this._initializeOscillators();
+      }).catch(err => {
+        console.warn("Resume failed. Gesture might be required:", err);
+      });
+    } else {
+      // interrupted などの場合
+      this.ctx.resume().catch(err => console.warn(err));
+    }
+  }
+
+  _initializeOscillators() {
+    this.masterGain = this.ctx.createGain();
+    this.masterGain.gain.setValueAtTime(0, this.ctx.currentTime);
+    this.masterGain.connect(this.ctx.destination);
+
+    const oscLeft = this.ctx.createOscillator();
+    const oscRight = this.ctx.createOscillator();
+    oscLeft.type = 'sine'; oscRight.type = 'sine';
+    oscLeft.frequency.value = 174; oscRight.frequency.value = 178; 
+
+    if (this.ctx.createStereoPanner) {
+      const pannerLeft = this.ctx.createStereoPanner();
+      const pannerRight = this.ctx.createStereoPanner();
+      pannerLeft.pan.value = -1; pannerRight.pan.value = 1;
+      oscLeft.connect(pannerLeft).connect(this.masterGain);
+      oscRight.connect(pannerRight).connect(this.masterGain);
+    } else {
+      oscLeft.connect(this.masterGain); oscRight.connect(this.masterGain);
+    }
+
+    const droneOsc = this.ctx.createOscillator();
+    droneOsc.type = 'triangle'; droneOsc.frequency.value = 87; 
+
+    const lfo = this.ctx.createOscillator();
+    const lfoGain = this.ctx.createGain();
+    lfo.type = 'sine'; lfo.frequency.value = 0.05; 
+    
+    const droneBaseGain = this.ctx.createGain();
+    droneBaseGain.gain.value = 0.15; 
+
+    lfo.connect(lfoGain.gain); lfoGain.gain.value = 0.4; 
+    droneOsc.connect(lfoGain).connect(droneBaseGain).connect(this.masterGain);
+
+    oscLeft.start(); oscRight.start(); lfo.start(); droneOsc.start();
+    this.isInitialized = true;
+    console.log("Audio initialized: Oscillators started");
+  }
+
+  setVolume(vol) {
+    if (this.ctx && this.masterGain) {
+      console.log(`Setting volume to ${vol}, context state: ${this.ctx.state}`);
+      this.masterGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, this.ctx.currentTime);
+      this.masterGain.gain.linearRampToValueAtTime(vol, this.ctx.currentTime + 1.5);
+    } else {
+      console.warn("Cannot set volume: ctx or masterGain missing", { ctx: !!this.ctx, gain: !!this.masterGain });
+    }
+  }
+
+  suspend() {
+    if (this.ctx && this.ctx.state === 'running') {
+      this.ctx.suspend().then(() => console.log("Audio suspended"));
+    }
+  }
+
+  resume() {
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().then(() => console.log("Audio resumed")).catch(err => console.warn(err));
+    }
+  }
+}
+
+const audioManager = new GraceAudioManager();
+
+const useGraceAudio = (targetVolume, isPlaying) => {
+  useEffect(() => {
+    if (!isPlaying) {
+      audioManager.setVolume(0);
+      return;
+    }
+    audioManager.setVolume(targetVolume);
+  }, [targetVolume, isPlaying]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        audioManager.suspend();
+      } else {
+        // 画面復帰時は即 resume 試行 + 少し遅延で再試行 (iOS対策)
+        const tryResume = () => {
+          if (audioManager.ctx && audioManager.ctx.state === 'suspended') {
+            audioManager.ctx.resume()
+              .then(() => console.log("Resumed after visibilitychange"))
+              .catch(e => console.warn("Resume after visibilitychange failed", e));
+          }
+        };
+        tryResume();
+        setTimeout(tryResume, 300);
+        setTimeout(tryResume, 1000);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+};
+
+function useLatestRef(val) {
+  const ref = useRef(val);
+  useEffect(() => { ref.current = val; }, [val]);
+  return ref;
+}
+
+// --- コンポー群 ---
+
+// 受諾ブロッカー & 前頭葉再起動
+const ConsentGuard = ({ onExit }) => {
+  const [step, setStep] = useState(0);
+  const [seconds, setSeconds] = useState(90);
+  const [showManualText, setShowManualText] = useState(false);
+
+  const proxyMessage = `ご連絡ありがとうございます。内容確認いたしました。現在、他の優先事項の調整中につき、正式な回答を明日以降に保留させていただけますでしょうか。改めてこちらからご連絡いたします。`;
+
+  useEffect(() => {
+    let t;
+    if (step === 3) {
+      t = setInterval(() => {
+        setSeconds(v => (v <= 1 ? (clearInterval(t), 0) : v - 1));
+      }, 1000);
+    }
+    return () => { if (t) clearInterval(t); };
+  }, [step]);
+
+  if (showManualText) {
+    return (
+      <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black z-[110] flex flex-col p-6 overlay-scroll animate-fade-in">
+        <div className="flex justify-between items-center mb-8 mt-2">
+          <span className="text-xs tracking-[0.4em] text-indigo-500">MANUAL RE-ENTRY MODE</span>
+          <button aria-label="閉じる" onClick={() => setShowManualText(false)} className="text-slate-600 min-h-[44px] min-w-[44px] flex items-center justify-center"><X size={24} /></button>
+        </div>
+        <p className="text-slate-400 text-xs mb-6 leading-loose tracking-widest">
+          コピペは禁止されています。この文章を目視で確認しながら、<br/>
+          相手に一文字ずつ手打ちで入力してください。<br/>
+          指を動かすことで、前頭葉を再起動します。
+        </p>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-slate-200 text-base sm:text-lg leading-[2.2] sm:leading-[2.4] font-light tracking-widest text-justify select-none border-l-2 border-indigo-500/30 pl-4 sm:pl-6">
+            {proxyMessage}
+          </p>
+        </div>
+        <div className="mt-8 mb-4 text-center shrink-0">
+          <button onClick={onExit} className="text-xs text-slate-500 hover:text-slate-300 underline tracking-[0.3em] transition-colors min-h-[44px] px-4">
+            入力が完了したら閉じる
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-10 animate-fade-in py-6">
+      <div className="text-center mb-8">
+        <h2 className="text-sm font-light tracking-[0.3em] text-slate-400">CONSENT GUARD</h2>
+        <p className="text-xs tracking-widest mt-2 text-red-900/60 font-medium">※反射的受諾を遮断中</p>
+      </div>
+
+      {step === 0 && (
+        <div className="space-y-8 animate-fade-in">
+          <p className="text-slate-300 text-sm text-center leading-loose font-light">
+            今すぐ返事が必要な内容ですか？<br/>
+            <span className="text-xs text-slate-500">（物理的な緊急性がありますか？）</span>
+          </p>
+          <div className="grid grid-cols-1 gap-4">
+            <button onClick={() => setStep(1)} className="py-4 min-h-[44px] rounded-xl border border-slate-800 text-sm text-slate-400 hover:bg-slate-900">いいえ（数時間〜数日待てる）</button>
+            <button onClick={() => setStep(1)} className="py-4 min-h-[44px] rounded-xl border border-red-900/20 bg-red-950/5 text-sm text-red-400/70 italic">はい（今すぐ返さないと実害が出る）</button>
+          </div>
+        </div>
+      )}
+
+      {step === 1 && (
+        <div className="space-y-8 animate-fade-in">
+          <p className="text-slate-300 text-sm text-center leading-loose font-light">
+            これはあなたの「役割」ですか？<br/>それとも「善意」ですか？
+          </p>
+          <div className="grid grid-cols-1 gap-4">
+            <button onClick={() => setStep(2)} className="py-4 min-h-[44px] rounded-xl border border-slate-800 text-sm text-slate-400 hover:bg-slate-900">契約・職務上の義務である</button>
+            <button onClick={() => setStep(2)} className="py-4 min-h-[44px] rounded-xl border border-indigo-900/30 bg-indigo-950/10 text-sm text-indigo-300/70 italic">断るのが悪いという「罪悪感」</button>
+          </div>
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="space-y-8 animate-fade-in">
+          <p className="text-slate-300 text-sm text-center leading-loose font-light">
+            今日のあなたの余力は何％ですか？
+          </p>
+          <div className="flex flex-wrap gap-3 justify-center">
+            {[80, 50, 20, 0].map(v => (
+              <button key={v} onClick={() => setStep(3)} className="w-16 h-16 min-h-[44px] min-w-[44px] rounded-full border border-slate-800 flex items-center justify-center text-sm text-slate-400 hover:bg-slate-900">{v}%</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="space-y-8 animate-fade-in text-center">
+          <p className="text-slate-300 text-sm leading-loose font-light">
+            神経系を冷却しています。<br/>この90秒の間、操作を休止してください。
+          </p>
+          <div className="text-6xl font-light text-slate-600 font-mono tracking-tighter">
+            {seconds}
+          </div>
+          <div className="pt-8">
+            <button 
+              onClick={() => setShowManualText(true)}
+              className="w-full py-5 min-h-[44px] rounded-full bg-slate-900 border border-indigo-500/30 text-indigo-300 text-xs tracking-[0.3em] flex items-center justify-center"
+            >
+              <Type className="w-5 h-5 mr-3" />
+              手打ち用のテキストを表示
+            </button>
+            <p className="text-xs text-slate-500 mt-6 leading-relaxed italic">
+              ※コピペではなく、一文字ずつ打つことで<br/>感情を運動神経へ逃がしてください。
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// 静寂の観測空間（Grace Space）
+const GraceSpace = ({ onSave, isEmergency, baseline }) => {
+  const canvasRef = useRef(null);
+  const [message, setMessage] = useState("");
+  const [isObserving, setIsObserving] = useState(false);
+  
+  const onSaveRef = useLatestRef(onSave);
+  const baselineRef = useLatestRef(baseline);
+
+  const points = useRef([]);
+  const tracking = useRef(false);
+  const analyzeTimeout = useRef(null);
+  const particlesRef = useRef([]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const resize = () => {
+      const parent = canvas.parentElement;
+      const w = parent.clientWidth || window.innerWidth;
+      const h = parent.clientHeight || Math.max(200, window.innerHeight - 160);
+      canvas.width = w; canvas.height = h;
+    };
+    resize(); window.addEventListener("resize", resize);
+    setTimeout(resize, 150);
+
+    let running = true;
+    let animationFrameId;
+    const renderLoop = () => {
+      if (!running) return;
+      ctx.fillStyle = isEmergency ? "rgba(0, 0, 0, 0.1)" : "rgba(11, 15, 26, 0.15)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      particlesRef.current = particlesRef.current.filter(p => {
+        ctx.fillStyle = isEmergency ? `rgba(100, 110, 140, ${p.alpha})` : `rgba(160, 190, 255, ${p.alpha})`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+        p.x += p.vx; p.y += p.vy; p.alpha -= 0.015;
+        return p.alpha > 0;
+      });
+      animationFrameId = requestAnimationFrame(renderLoop);
+    };
+    renderLoop();
+
+    const start = (e) => {
+      if (analyzeTimeout.current) clearTimeout(analyzeTimeout.current);
+      tracking.current = true; setIsObserving(true); setMessage(""); points.current = [];
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+      points.current.push({ x, y, time: performance.now(), angle: 0, speed: 0 });
+    };
+
+    const move = (e) => {
+      if (!tracking.current) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+      const now = performance.now();
+      const lastP = points.current[points.current.length - 1];
+      const dt = Math.max(1, now - lastP.time);
+      const dx = x - lastP.x; const dy = y - lastP.y;
+      const speed = Math.sqrt(dx*dx + dy*dy) / dt;
+      const angle = Math.atan2(dy, dx);
+      points.current.push({ x, y, speed, angle, time: now });
+      for(let i=0; i<Math.min(6, Math.floor(speed * 3) + 1); i++) {
+        particlesRef.current.push({ x: x + (Math.random()-0.5)*15, y: y + (Math.random()-0.5)*15, vx: (Math.random()-0.5)*(speed*4+1), vy: (Math.random()-0.5)*(speed*4+1), size: Math.random()*2+0.5, alpha: 1 });
+      }
+      if (analyzeTimeout.current) clearTimeout(analyzeTimeout.current);
+      analyzeTimeout.current = setTimeout(() => { tracking.current = false; setIsObserving(false); analyze(); }, 2000);
+    };
+
+    const endAndAnalyze = () => { tracking.current = false; setIsObserving(false); analyze(); };
+
+    const analyze = () => {
+      const p = points.current;
+      if (p.length < 10) return;
+      let changes = 0, totalSpeed = 0, totalDist = 0, intervals = [], totalAngleChange = 0, fixationTime = 0, sharpTurns = 0, longMoves = 0;
+      for (let i = 1; i < p.length; i++) {
+        let dx = p[i].x - p[i-1].x, dy = p[i].y - p[i-1].y, dist = Math.sqrt(dx*dx + dy*dy), dt = p[i].time - p[i-1].time;
+        intervals.push(dt); if (dt > 0) totalSpeed += dist / dt; totalDist += dist;
+        if (dist < 5) fixationTime += dt;
+        if (dist > 20 || (dist / Math.max(dt, 1) > 2.0)) longMoves++;
+        if (i >= 2) {
+          let a1 = p[i-1].angle, a2 = p[i].angle, diff = a2 - a1;
+          if (diff > Math.PI) diff -= 2 * Math.PI; if (diff < -Math.PI) diff += 2 * Math.PI;
+          totalAngleChange += diff;
+          if (Math.abs(diff) > 2.4) sharpTurns++;
+          if (Math.abs(diff) > 1.0) changes++;
+        }
+      }
+      const totalTime = p[p.length - 1].time - p[0].time;
+      const avgSpeed = (totalSpeed / p.length) * 10, jitter = changes / p.length;
+      let rhythmIrregularity = 0; if (intervals.length > 0) { const m = mean(intervals); rhythmIrregularity = Math.sqrt(intervals.reduce((s,x)=>s+(x-m)*(x-m),0)/intervals.length); }
+      const straightDist = Math.sqrt(Math.pow(p[p.length - 1].x - p[0].x, 2) + Math.pow(p[p.length - 1].y - p[0].y, 2));
+      const rumination = (totalDist / (straightDist || 1));
+      const loopIntensity = Math.abs(totalAngleChange) / (2 * Math.PI), pressureFixation = fixationTime / totalTime, threatReflex = sharpTurns / p.length, releaseFlow = longMoves / p.length;
+
+      const currentBaseline = baselineRef.current;
+      let state = "calm", messageToDisplay = "";
+      
+      if (!currentBaseline) {
+        messageToDisplay = "神経の基準を計測しています。\n（自動校正中）";
+        if (threatReflex > 0.4) state = "pre_impulse";
+        else if (pressureFixation > 0.35) state = "suppression";
+        else if (loopIntensity > 1.2) state = "rumination";
+        else if (releaseFlow > 0.18) state = "regulated";
+      } else {
+        const speedZ = zScore(avgSpeed, currentBaseline.speedMean, currentBaseline.speedStd);
+        const jitterZ = zScore(jitter, currentBaseline.jitterMean, currentBaseline.jitterStd);
+        if (threatReflex > 0.4) state = "pre_impulse";
+        else if (pressureFixation > 0.35) state = "suppression";
+        else if (loopIntensity > 1.2) state = "rumination";
+        else if (releaseFlow > 0.18) state = "regulated";
+        else if (speedZ > 1.2 && jitterZ > 1.2) state = "anxious";
+        else state = "calm";
+        
+        const msgs = { pre_impulse: "運動反射の兆候（衝動）\n返信の前に「境界」を引くことを推奨します。", suppression: "感情の抑圧・固着\n言えない感情を抑え込んでいませんか。", rumination: "未完了タスクの反芻\n思考が同じ軌道を回っています。", regulated: "安全な着地（解放）\n神経系が安全な状態に着地しています。", anxious: "神経が警戒モードです。\n刺激を強く受け取っています。", calm: "体が安全だと判断しています。" };
+        messageToDisplay = msgs[state];
+      }
+      
+      setMessage(messageToDisplay);
+      onSaveRef.current({ id: Date.now(), type: 'touch_vital', stateLabel: state, vital: { avgSpeed, jitter, rumination, rhythmIrregularity, loopIntensity, pressureFixation, threatReflex, releaseFlow }, timestamp: new Date().toISOString() });
+    };
+
+    canvas.addEventListener("mousedown", start); canvas.addEventListener("mousemove", move, { passive: true }); window.addEventListener("mouseup", endAndAnalyze); 
+    canvas.addEventListener("touchstart", start, { passive: true }); canvas.addEventListener("touchmove", move, { passive: true }); window.addEventListener("touchend", endAndAnalyze);
+    
+    return () => { 
+      running = false;
+      window.removeEventListener("resize", resize); cancelAnimationFrame(animationFrameId); if (analyzeTimeout.current) clearTimeout(analyzeTimeout.current); 
+      canvas.removeEventListener("mousedown", start); canvas.removeEventListener("mousemove", move); window.removeEventListener("mouseup", endAndAnalyze); 
+      canvas.removeEventListener("touchstart", start); canvas.removeEventListener("touchmove", move); window.removeEventListener("touchend", endAndAnalyze); 
+    };
+  }, []); 
+
+  return (
+    <div className="flex flex-col animate-fade-in relative" style={{ height: 'calc(100dvh - 9rem)' }}>
+      <div className="absolute top-6 left-0 right-0 text-center z-10 pointer-events-none" style={{ opacity: (isObserving || message) ? 0 : 0.6 }}>
+        <p className="text-xs tracking-widest font-light text-slate-300">いまの気持ちを、言葉じゃなく、<br/>指で置いていってください。</p>
+      </div>
+      <div className="flex-1 relative w-full">
+        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full rounded-2xl transition-colors duration-1000 shadow-inner" style={{ background: '#0b0f1a', touchAction: 'none' }} />
+        <div className="absolute inset-0 pointer-events-none flex items-center justify-center px-4 transition-all duration-2000 ease-out" style={{ opacity: message ? 1 : 0, transform: message ? 'translateY(0)' : 'translateY(10px)' }}>
+          <p className="text-center text-sm leading-loose tracking-wide font-light whitespace-pre-line text-indigo-100/90 bg-slate-950/40 p-4 rounded-2xl backdrop-blur-sm border border-slate-800/30">{message}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const VitalZMeter = ({ label, z, color, isEmergency }) => {
+  const mapZToPercent = (zVal) => Math.max(0, Math.min(100, ((zVal + 3) / 6) * 100));
+  return (
+    <div className="flex items-center justify-between">
+      <span className={`text-xs tracking-widest ${isEmergency ? 'text-slate-600' : 'text-slate-500'} w-28`}>{label}</span>
+      <div className="flex-1 h-2 bg-slate-800/50 rounded-full overflow-hidden flex relative">
+        <div className={`h-full ${color} transition-all duration-1000 absolute left-0`} style={{ width: `${mapZToPercent(z)}%` }} />
+      </div>
+    </div>
+  );
+};
+
+// --- セルフチェックイン ---
+const MOOD_LABELS = ['😔', '😕', '😐', '🙂', '😊'];
+const ENERGY_LABELS = ['🪫', '🔋', '⚡', '🔥', '💫'];
+
+const SelfCheckIn = ({ checkins, onSave }) => {
+  const [mood, setMood] = useState(null);
+  const [energy, setEnergy] = useState(null);
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    if (mood === null || energy === null) return;
+    onSave({ mood, energy, timestamp: new Date().toISOString() });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+    setMood(null);
+    setEnergy(null);
+  };
+
+  const recent = checkins.slice(-7);
+  const barMax = 4;
+
+  return (
+    <div className="p-5 rounded-lg bg-indigo-950/10 border border-indigo-900/20 animate-fade-in">
+      <h4 className="text-xs tracking-[0.2em] text-indigo-400/70 mb-5 flex items-center"><Heart className="w-4 h-4 mr-2" />SELF CHECK-IN</h4>
+
+      <div className="mb-4">
+        <p className="text-xs text-slate-500 mb-2 tracking-widest">気分</p>
+        <div className="flex gap-2 justify-center">
+          {MOOD_LABELS.map((emoji, i) => (
+            <button key={i} onClick={() => setMood(i)}
+              className={`w-10 h-10 rounded-full text-lg transition-all ${mood === i ? 'bg-indigo-900/40 scale-110 ring-1 ring-indigo-500/40' : 'bg-slate-900/50 hover:bg-slate-800/50'}`}>
+              {emoji}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <p className="text-xs text-slate-500 mb-2 tracking-widest">エネルギー</p>
+        <div className="flex gap-2 justify-center">
+          {ENERGY_LABELS.map((emoji, i) => (
+            <button key={i} onClick={() => setEnergy(i)}
+              className={`w-10 h-10 rounded-full text-lg transition-all ${energy === i ? 'bg-indigo-900/40 scale-110 ring-1 ring-indigo-500/40' : 'bg-slate-900/50 hover:bg-slate-800/50'}`}>
+              {emoji}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button onClick={handleSave} disabled={mood === null || energy === null}
+        className={`w-full py-2 rounded-lg text-xs tracking-widest transition-all ${mood !== null && energy !== null ? 'bg-indigo-900/30 text-indigo-300 hover:bg-indigo-900/50' : 'bg-slate-900/30 text-slate-600 cursor-not-allowed'}`}>
+        {saved ? '✓ 記録しました' : '記録する'}
+      </button>
+
+      {recent.length > 0 && (
+        <div className="mt-5 pt-4 border-t border-slate-800/50">
+          <p className="text-xs text-slate-600 mb-3 tracking-widest">最近の推移</p>
+          <div className="flex gap-1 items-end justify-center h-16">
+            {recent.map((c, i) => (
+              <div key={i} className="flex flex-col items-center gap-1" title={new Date(c.timestamp).toLocaleString('ja-JP')}>
+                <div className="flex gap-px">
+                  <div className="w-3 rounded-t bg-indigo-500/50 transition-all" style={{ height: `${((c.mood + 1) / 5) * 48}px` }} />
+                  <div className="w-3 rounded-t bg-amber-500/50 transition-all" style={{ height: `${((c.energy + 1) / 5) * 48}px` }} />
+                </div>
+                <span className="text-[8px] text-slate-600">{new Date(c.timestamp).getDate()}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-center gap-4 mt-2">
+            <span className="text-[9px] text-indigo-400/60">■ 気分</span>
+            <span className="text-[9px] text-amber-400/60">■ エネルギー</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- 呼吸ガイド ---
+const BreathingGuide = () => {
+  const [active, setActive] = useState(false);
+  const [phase, setPhase] = useState('ready'); // ready, inhale, hold, exhale
+  const [count, setCount] = useState(0);
+  const [cycles, setCycles] = useState(0);
+  const timerRef = useRef(null);
+
+  const INHALE = 4, HOLD = 4, EXHALE = 6;
+
+  useEffect(() => {
+    if (!active) return;
+    let currentPhase = 'inhale';
+    let currentCount = INHALE;
+    setPhase('inhale');
+    setCount(INHALE);
+
+    timerRef.current = setInterval(() => {
+      currentCount--;
+      if (currentCount <= 0) {
+        if (currentPhase === 'inhale') { currentPhase = 'hold'; currentCount = HOLD; }
+        else if (currentPhase === 'hold') { currentPhase = 'exhale'; currentCount = EXHALE; }
+        else { currentPhase = 'inhale'; currentCount = INHALE; setCycles(c => c + 1); }
+      }
+      setPhase(currentPhase);
+      setCount(currentCount);
+    }, 1000);
+
+    return () => clearInterval(timerRef.current);
+  }, [active]);
+
+  const phaseLabel = { ready: 'タップして開始', inhale: '吸う', hold: '止める', exhale: '吐く' };
+  const phaseColor = { ready: 'text-slate-500', inhale: 'text-sky-400', hold: 'text-amber-400', exhale: 'text-indigo-400' };
+  const circleScale = { ready: 0.4, inhale: 1, hold: 1, exhale: 0.4 };
+
+  return (
+    <div className="p-5 rounded-lg bg-sky-950/10 border border-sky-900/20 animate-fade-in">
+      <h4 className="text-xs tracking-[0.2em] text-sky-400/70 mb-5 flex items-center"><Wind className="w-4 h-4 mr-2" />BREATHING GUIDE</h4>
+
+      <div className="flex flex-col items-center py-4">
+        <button onClick={() => { setActive(!active); setCycles(0); setPhase('ready'); setCount(0); }}
+          className="relative w-32 h-32 rounded-full flex items-center justify-center mb-4">
+          <div className={`absolute inset-0 rounded-full bg-sky-500/10 border border-sky-500/20 transition-transform duration-1000 ease-in-out`}
+            style={{ transform: `scale(${circleScale[phase]})` }} />
+          <div className="relative z-10 text-center">
+            <div className={`text-3xl font-light mb-1 transition-colors duration-500 ${phaseColor[phase]}`}>
+              {active ? count : ''}
+            </div>
+            <div className={`text-xs tracking-widest ${phaseColor[phase]}`}>{phaseLabel[phase]}</div>
+          </div>
+        </button>
+        {active && (
+          <div className="flex gap-4 items-center">
+            <span className="text-xs text-slate-600 tracking-widest">{cycles} サイクル</span>
+            <button onClick={() => { setActive(false); setPhase('ready'); }} className="text-xs text-slate-500 underline hover:text-slate-300 min-h-[44px] px-2">停止</button>
+          </div>
+        )}
+        {!active && (
+          <p className="text-xs text-slate-600 tracking-wider text-center leading-relaxed mt-2">4-4-6 呼吸法<br/>副交感神経を活性化します</p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// --- 今日のインテンション ---
+const DailyIntention = ({ intention, onSave }) => {
+  const [text, setText] = useState('');
+  const [editing, setEditing] = useState(false);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const todayIntention = intention && intention.date === today ? intention.text : null;
+
+  const handleSave = () => {
+    if (!text.trim()) return;
+    onSave({ text: text.trim(), date: today, timestamp: new Date().toISOString() });
+    setEditing(false);
+    setText('');
+  };
+
+  return (
+    <div className="p-5 rounded-lg bg-amber-950/10 border border-amber-900/20 animate-fade-in">
+      <h4 className="text-xs tracking-[0.2em] text-amber-400/70 mb-4 flex items-center"><Sun className="w-4 h-4 mr-2" />TODAY'S INTENTION</h4>
+
+      {todayIntention && !editing ? (
+        <div>
+          <p className="text-slate-300 text-sm leading-loose font-light tracking-wide text-center py-3">
+            「{todayIntention}」
+          </p>
+          <button onClick={() => { setEditing(true); setText(todayIntention); }}
+            className="text-xs text-slate-600 underline hover:text-slate-400 tracking-widest block mx-auto min-h-[44px]">
+            変更する
+          </button>
+        </div>
+      ) : (
+        <div>
+          <input type="text" value={text} onChange={(e) => setText(e.target.value)}
+            placeholder="今日、大切にしたいこと..."
+            maxLength={60}
+            onKeyDown={(e) => e.key === 'Enter' && handleSave()}
+            className="w-full bg-transparent border-b border-slate-800 text-sm text-slate-300 outline-none focus:border-amber-900/40 transition-colors py-2 placeholder-slate-700 tracking-wide" />
+          <div className="flex justify-between items-center mt-3">
+            <span className="text-[10px] text-slate-700">{text.length}/60</span>
+            <button onClick={handleSave} disabled={!text.trim()}
+              className={`text-xs tracking-widest px-4 py-1 rounded-lg transition-all ${text.trim() ? 'text-amber-300 bg-amber-900/20 hover:bg-amber-900/40' : 'text-slate-700 cursor-not-allowed'}`}>
+              設定
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// 記録と解析（Insight）
+const Insight = ({ logs, unsentLogs, clearLogs, baseline, checkins, onCheckin, intention, onIntention, isEmergency }) => {
+  const [readingMessage, setReadingMessage] = useState(null); 
+  const combinedTimeline = [...logs, ...unsentLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  const touchLogs = logs.filter(l => l.type === 'touch_vital' && l.vital);
+  const latestVital = touchLogs.length > 0 ? touchLogs[touchLogs.length - 1].vital : null;
+
+  const formatDate = (isoString) => {
+    const d = new Date(isoString);
+    return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="space-y-5 sm:space-y-8 animate-fade-in pb-6 mt-4 relative">
+      {readingMessage && (
+        <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-6 backdrop-blur-sm animate-fade-in">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm relative">
+            <button aria-label="閉じる" onClick={() => setReadingMessage(null)} className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 min-h-[44px] min-w-[44px] flex items-center justify-center"><X size={20} /></button>
+            <h3 className="text-xs text-indigo-400 tracking-widest mb-6 font-light">過去のあなたからの通信</h3>
+            <p className="text-slate-300 text-sm leading-loose whitespace-pre-line font-light">{readingMessage}</p>
+          </div>
+        </div>
+      )}
+
+      <DailyIntention intention={intention} onSave={onIntention} />
+
+      <SelfCheckIn checkins={checkins} onSave={onCheckin} />
+
+      <BreathingGuide />
+
+      <div className="mb-6 flex justify-between items-end">
+        <h2 className="text-sm font-light tracking-widest text-slate-400">観測記録</h2>
+        <button onClick={clearLogs} className="text-xs underline text-slate-500 hover:text-slate-300 min-h-[44px] px-2 flex items-center">初期化</button>
+      </div>
+
+      {latestVital && baseline && (
+        <div className="p-5 rounded-lg bg-slate-900/30 border border-slate-800/50 mb-6 animate-fade-in relative">
+          <h4 className="text-xs tracking-[0.2em] text-slate-500 mb-6 text-center">BIOMETRIC DEVIATION</h4>
+          <div className="absolute top-[48px] bottom-5 left-1/2 w-px bg-slate-700/50 z-0"></div>
+          <div className="space-y-4 relative z-10">
+            <VitalZMeter label="IMPULSE" z={latestVital.threatReflex * 10 - 2} color="bg-red-500/60" isEmergency={isEmergency} />
+            <VitalZMeter label="SUPPRESSION" z={latestVital.pressureFixation * 10 - 2} color="bg-orange-500/60" isEmergency={isEmergency} />
+            <VitalZMeter label="RHYTHM" z={zScore(latestVital.rhythmIrregularity, baseline.rhythmMean, baseline.rhythmStd)} color="bg-blue-500/60" isEmergency={isEmergency} />
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-5">
+        {combinedTimeline.map(log => {
+           const isLocked = log.type === 'unsent_message' && Date.now() < log.unlockAt;
+           return (
+            <div key={log.id} className="text-xs flex flex-col gap-2 border-l border-slate-800 pl-3">
+              <span className="font-mono text-slate-500 tracking-wider text-xs">{formatDate(log.timestamp)}</span>
+              {log.type === 'touch_vital' ? (
+                <span className="text-slate-400 font-light italic">神経の律動を記録: {log.stateLabel}</span>
+              ) : log.type === 'unsent_message' ? (
+                <div className="flex flex-col items-start gap-1">
+                  <span className="italic flex items-center tracking-wide text-slate-400">
+                    {isLocked ? <Lock className="w-4 h-4 mr-1.5 opacity-50" /> : <PenLine className="w-4 h-4 mr-1.5 opacity-50 text-indigo-400" />}
+                    {isLocked ? "未来の自分へ感情を転送中 (7日後に解錠)" : "過去のあなたから届いた通信があります"}
+                  </span>
+                  {!isLocked && <button onClick={() => setReadingMessage(log.body)} className="text-xs text-indigo-400 hover:text-indigo-300 underline tracking-widest mt-1 py-1">開く</button>}
+                </div>
+              ) : <span className="text-purple-400/80">反射行動を検知・遮断</span>}
+            </div>
+           );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// --- 防衛・介入オーバーレイ群 ---
+
+const ResponseGuard = ({ onAllow }) => {
+  const [time, setTime] = useState(90);
+  useEffect(() => { 
+    const t = setInterval(() => { setTime(v => v <= 1 ? (clearInterval(t), 0) : v - 1); }, 1000); 
+    return () => clearInterval(t); 
+  }, []);
+
+  return (
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black z-50 overlay-scroll flex items-center justify-center text-center px-6 py-8 animate-fade-in">
+      <div className="max-w-sm w-full">
+        <h2 className="text-slate-500 text-xs tracking-[0.4em] mb-8 sm:mb-12 flex justify-center items-center"><Lock className="w-4 h-4 mr-2 opacity-50" />RESPONSE CHECK</h2>
+        <p className="text-slate-300 text-[15px] leading-loose mb-6 sm:mb-10 font-light tracking-wide">今、何かに<br/>返信しようとしていますね。</p>
+        <p className="text-slate-500 text-xs leading-loose mb-8 sm:mb-12 font-light tracking-wider">それは「義務」ではなく<br/>過負荷による反射・防衛反応の<br/>可能性があります。</p>
+        <div className={`text-5xl sm:text-6xl font-light mb-8 sm:mb-12 transition-colors duration-1000 ${time === 0 ? 'text-indigo-900/50' : 'text-slate-600'}`}>{time}</div>
+        <div className={`transition-all duration-1000 ${time === 0 ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+          <button onClick={onAllow} className="px-8 py-3 min-h-[44px] rounded-full border border-slate-800 text-slate-300 text-xs tracking-widest hover:bg-slate-900 transition-colors">次へ進む</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const InterventionScreen = ({ onComplete }) => {
+  const [seconds, setSeconds] = useState(60);
+  const [canSkip, setCanSkip] = useState(false);
+  useEffect(() => { 
+    const timer = setInterval(() => { setSeconds(s => s <= 1 ? (clearInterval(timer), 0) : s - 1); }, 1000); 
+    const skipTimer = setTimeout(() => setCanSkip(true), 10000);
+    return () => { clearInterval(timer); clearTimeout(skipTimer); };
+  }, []);
+  
+  return (
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black overlay-scroll flex items-center justify-center text-center px-6 py-8 z-50 animate-fade-in">
+      <div className="max-w-sm w-full">
+        <h2 className="text-slate-500 tracking-[0.3em] text-xs mb-8 sm:mb-12 flex justify-center items-center"><ShieldAlert className="w-4 h-4 mr-2 opacity-50 animate-pulse" />SYSTEM INTERVENTION</h2>
+        <p className="text-slate-300 text-[15px] leading-loose mb-8 sm:mb-12 font-light tracking-wide">今、あなたは<br/>判断してはいけない状態です。</p>
+        <div className={`text-5xl sm:text-6xl font-light mb-8 sm:mb-12 transition-colors duration-1000 ${seconds === 0 ? 'text-indigo-900/50' : 'text-slate-600'}`}>{seconds}</div>
+        <p className="text-slate-500 text-sm leading-loose mb-8 sm:mb-16 font-light tracking-wider">この60秒の間、<br/>返信・決断・謝罪を禁止します。<br/><br/>これは逃避ではなく、<br/>神経系の保護です。</p>
+        <div className={`transition-all duration-1000 ${seconds === 0 ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+          <button onClick={onComplete} className="px-8 py-3 min-h-[44px] rounded-full border border-slate-800 text-slate-300 text-xs tracking-widest hover:bg-slate-900 transition-colors">呼吸が落ち着いたら、次へ</button>
+        </div>
+        <div className={`transition-all duration-1000 mt-4 ${canSkip && seconds > 0 ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+          <button onClick={onComplete} className="text-xs text-slate-600 hover:text-slate-400 underline tracking-widest transition-colors min-h-[44px] px-4">スキップ</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ReturnGate = ({ onFinish }) => {
+  const [text, setText] = useState("");
+  const [saved, setSaved] = useState(false);
+  const handleRelease = () => {
+    if (text.trim()) {
+      const draft = { id: Date.now(), type: "unsent_message", body: text, timestamp: new Date().toISOString(), unlockAt: Date.now() + (7 * 24 * 60 * 60 * 1000) };
+      const prev = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_UNSENT) || "[]");
+      safeSave(LOCAL_STORAGE_KEY_UNSENT, [...prev, draft], 50);
+    }
+    setSaved(true);
+    setTimeout(onFinish, 2000);
+  };
+  return (
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black z-50 overlay-scroll flex items-center justify-center text-center px-6 py-8 animate-fade-in">
+      <div className="max-w-sm w-full">
+        <p className="text-slate-400 text-sm leading-loose tracking-wider font-light mb-6">送らなくていいです。<br/>ここに書いてください。<br/>これは未来の自分へ保管されます。</p>
+        <textarea autoFocus value={text} onChange={(e)=>setText(e.target.value)} className="w-full h-40 sm:h-48 bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 text-slate-200 text-sm leading-relaxed outline-none resize-none transition-colors focus:border-slate-600 custom-scrollbar pointer-events-auto" placeholder="今、頭に浮かんでいる言葉をそのまま..." disabled={saved} style={{ touchAction: 'pan-y' }} />
+        <div className="mt-4 flex flex-col items-center gap-3">
+          {saved ? <p className="text-slate-500 text-xs tracking-widest animate-fade-in">未来のあなたへ転送しました。</p> : (
+            <>
+              <button onClick={handleRelease} className="px-8 py-3 min-h-[44px] rounded-full border border-slate-800 text-slate-300 text-xs tracking-widest hover:bg-slate-900 transition-colors pointer-events-auto">外に出す</button>
+              <button onClick={onFinish} className="text-xs text-slate-700 hover:text-slate-500 underline tracking-widest min-h-[44px] px-4 pointer-events-auto">スキップ</button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const AftercareScreen = ({ onDone }) => {
+  const [phase, setPhase] = useState(0);
+  const [canSkip, setCanSkip] = useState(false);
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase(1), 3000);
+    const t2 = setTimeout(() => setPhase(2), 6000);
+    const t3 = setTimeout(onDone, 10000);
+    const ts = setTimeout(() => setCanSkip(true), 3000);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(ts); };
+  }, [onDone]);
+  return (
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black flex items-center justify-center text-center px-6 py-8 z-50 animate-fade-in">
+      <div className="max-w-sm w-full">
+        {phase === 0 && <p className="text-slate-400 text-sm leading-loose tracking-wider font-light animate-fade-in">もう、何もしなくて大丈夫です。</p>}
+        {phase === 1 && <p className="text-slate-400 text-sm leading-loose tracking-wider font-light animate-fade-in">体を安全側に戻しています。</p>}
+        {phase === 2 && <p className="text-slate-400 text-sm leading-loose tracking-wider font-light animate-fade-in">もう少しで戻れます。</p>}
+        <div className={`mt-8 transition-all duration-1000 ${canSkip ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+          <button onClick={onDone} className="text-xs text-slate-600 hover:text-slate-400 underline tracking-widest min-h-[44px] px-4">スキップ</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const MotorCooldownScreen = ({ onFinish }) => {
+  const [time, setTime] = useState(60);
+  const canvasRef = useRef(null);
+  useEffect(() => { const t = setInterval(()=>{ setTime(v=> v<=1 ? (clearInterval(t), 0) : v-1); }, 1000); return ()=>clearInterval(t); }, []);
+  
+  useEffect(() => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    resize(); window.addEventListener("resize", resize);
+    
+    let running = true;
+    let animationFrameId;
+    const draw = (e) => {
+      const x = e.touches ? e.touches[0].clientX : e.clientX; const y = e.touches ? e.touches[0].clientY : e.clientY;
+      ctx.fillStyle = "rgba(100, 140, 200, 0.08)"; ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI * 2); ctx.fill();
+    };
+    const renderFade = () => {
+      if (!running) return;
+      ctx.fillStyle = "rgba(0, 0, 0, 0.05)"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      animationFrameId = requestAnimationFrame(renderFade);
+    };
+    renderFade();
+
+    canvas.addEventListener("touchmove", draw, { passive: true }); canvas.addEventListener("mousemove", draw);
+    return () => {
+      running = false;
+      window.removeEventListener("resize", resize); cancelAnimationFrame(animationFrameId);
+      canvas.removeEventListener("touchmove", draw); canvas.removeEventListener("mousemove", draw);
+    };
+  }, []);
+
+  return (
+    <div role="dialog" aria-modal="true" className="fixed inset-0 bg-black z-50 flex items-center justify-center text-center animate-fade-in" style={{ touchAction: 'auto' }}>
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-60" style={{ touchAction: 'none' }} />
+      <div className="max-w-sm w-full relative z-10 px-6">
+        <p className="text-slate-400 text-sm leading-loose mb-8 font-light tracking-wide">神経系を回復しています。<br/>画面をゆっくりなぞってください。</p>
+        <div className={`text-5xl sm:text-6xl font-light mb-8 tracking-widest transition-colors duration-1000 ${time === 0 ? 'text-indigo-900/50' : 'text-slate-600'}`}>{time}</div>
+        <div className={`transition-all duration-1000 ${time === 0 ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+          <button onClick={onFinish} className="px-8 py-3 min-h-[44px] rounded-full border border-slate-800 text-slate-300 text-xs tracking-widest hover:bg-slate-900 transition-colors">日常に戻る</button>
+        </div>
+        <div className={`mt-4 transition-all duration-1000 ${time <= 55 && time > 0 ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+          <button onClick={onFinish} className="text-xs text-slate-700 hover:text-slate-500 underline tracking-widest min-h-[44px] px-4">スキップ</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- パスフレーズ（秘密の質問＋回答） ---
+const PassphraseScreen = ({ onLogin, onSkip }) => {
+  const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState('');
+  const [mode, setMode] = useState('input'); // input, confirm, loading
+  const [savedQA, setSavedQA] = useState(null);
+  const [isNew, setIsNew] = useState(true);
+  const [error, setError] = useState('');
+
+  const isValid = question.trim().length >= 2 && answer.trim().length >= 2;
+
+  const handleSubmit = () => {
+    if (!isValid) return;
+    setError('');
+    const q = question.trim();
+    const a = answer.trim();
+
+    if (isNew && !savedQA) {
+      setSavedQA({ q, a });
+      setQuestion('');
+      setAnswer('');
+      setMode('confirm');
+    } else if (isNew && savedQA) {
+      if (q === savedQA.q && a === savedQA.a) {
+        doLogin(q, a);
+      } else {
+        setError('質問または回答が一致しません');
+        setAnswer('');
+      }
+    } else {
+      doLogin(q, a);
+    }
+  };
+
+  const doLogin = async (q, a) => {
+    setMode('loading');
+    const hash = await hashPassphrase([q, ':', a]);
+    const cloudData = await CloudSync.load(hash);
+    localStorage.setItem(LOCAL_STORAGE_KEY_SYNC, hash);
+    onLogin(hash, cloudData);
+  };
+
+  const reset = () => {
+    setQuestion(''); setAnswer(''); setSavedQA(null); setMode('input'); setError('');
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black z-[100] overlay-scroll flex items-center justify-center px-6 py-8 animate-fade-in">
+      <div className="max-w-sm w-full text-center">
+        {mode === 'loading' ? (
+          <div className="animate-fade-in">
+            <div className="text-slate-400 text-lg mb-4 animate-pulse tracking-widest">...</div>
+            <p className="text-slate-500 text-xs tracking-widest">同期中</p>
+          </div>
+        ) : (
+          <>
+            <h2 className="text-slate-400 text-xs tracking-[0.3em] mb-2">
+              {mode === 'confirm' ? '確認のためもう一度' : isNew ? 'あなただけの秘密の質問' : '秘密の質問でログイン'}
+            </h2>
+            <p className="text-slate-600 text-[10px] tracking-widest mb-6 leading-relaxed whitespace-pre-line">
+              {isNew && !savedQA
+                ? '自分だけが知っている質問と答えを決めてください\n他の端末でも同じ質問と答えでデータを引き継げます'
+                : mode === 'confirm'
+                ? '同じ質問と答えを入力してください'
+                : '設定した質問と答えを入力してください'}
+            </p>
+
+            <div className="space-y-4 mb-6 text-left">
+              <div>
+                <label className="text-[10px] text-slate-600 tracking-widest block mb-1 ml-1">質問</label>
+                <input
+                  type="text"
+                  value={question}
+                  onChange={(e) => { setQuestion(e.target.value); setError(''); }}
+                  placeholder={isNew && !savedQA ? '例: いちばんすきなばしょは' : '質問を入力'}
+                  autoFocus
+                  className="w-full bg-slate-900/30 border border-slate-800 focus:border-indigo-500/30 rounded-lg text-sm text-slate-200 outline-none px-4 py-3 tracking-wide placeholder-slate-700 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-600 tracking-widest block mb-1 ml-1">答え</label>
+                <input
+                  type="text"
+                  value={answer}
+                  onChange={(e) => { setAnswer(e.target.value); setError(''); }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                  placeholder={isNew && !savedQA ? '例: おばあちゃんのいえ' : '答えを入力'}
+                  className="w-full bg-slate-900/30 border border-slate-800 focus:border-indigo-500/30 rounded-lg text-sm text-slate-200 outline-none px-4 py-3 tracking-wide placeholder-slate-700 transition-colors"
+                />
+              </div>
+            </div>
+
+            {error && <p className="text-red-400/70 text-xs mb-4 tracking-widest">{error}</p>}
+
+            <button onClick={handleSubmit} disabled={!isValid}
+              className={`w-full py-3 rounded-xl text-xs tracking-[0.2em] transition-all min-h-[44px] ${
+                isValid ? 'bg-indigo-900/30 text-indigo-300 hover:bg-indigo-900/50 border border-indigo-500/20' : 'bg-slate-900/30 text-slate-700 cursor-not-allowed border border-slate-800/50'
+              }`}>
+              {mode === 'confirm' ? '確認して始める' : isNew ? '設定する' : 'ログイン'}
+            </button>
+
+            {savedQA && (
+              <button onClick={reset}
+                className="text-xs text-slate-600 hover:text-slate-400 underline tracking-widest min-h-[44px] px-3 mt-3 block mx-auto">
+                最初からやり直す
+              </button>
+            )}
+
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <button onClick={() => { setIsNew(!isNew); reset(); }}
+                className="text-xs text-indigo-400/60 hover:text-indigo-400 tracking-widest min-h-[44px] px-3">
+                {isNew ? '前に使ったことがある' : '初めて使う'}
+              </button>
+              <button onClick={onSkip}
+                className="text-xs text-slate-700 hover:text-slate-500 tracking-widest min-h-[44px] px-3">
+                この端末だけで使う（同期なし）
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// --- オンボーディング ---
+const OnboardingScreen = ({ onComplete, onUnlockAudio }) => {
+  const [step, setStep] = useState(0); 
+  const [vitalMessage, setVitalMessage] = useState(""); 
+  const canvasRef = useRef(null); 
+  const points = useRef([]); 
+  const tracking = useRef(false);
+  const onUnlockAudioRef = useLatestRef(onUnlockAudio);
+
+  useEffect(() => { 
+    let t1, t2;
+    if (step === 0) t1 = setTimeout(() => setStep(1), 3500); 
+    if (step === 1) t2 = setTimeout(() => setStep(2), 3500); 
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [step]);
+  
+  useEffect(() => {
+    if (step !== 2) return; 
+    const canvas = canvasRef.current; const ctx = canvas.getContext("2d"); 
+    let particles = [];
+    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }; resize();
+    
+    let running = true;
+    let animationFrameId;
+    const drawParticles = () => { 
+      if (!running) return;
+      ctx.fillStyle = "rgba(0, 0, 0, 0.1)"; ctx.fillRect(0, 0, canvas.width, canvas.height); 
+      particles = particles.filter(p => { 
+        ctx.fillStyle = `rgba(160, 180, 255, ${p.alpha})`; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill(); 
+        p.x += p.vx; p.y += p.vy; p.alpha -= 0.02; 
+        return p.alpha > 0;
+      }); 
+      animationFrameId = requestAnimationFrame(drawParticles); 
+    }; 
+    drawParticles();
+    
+    const move = (e) => { 
+      if (!tracking.current) return; 
+      const x = (e.touches ? e.touches[0].clientX : e.clientX); const y = (e.touches ? e.touches[0].clientY : e.clientY); 
+      const now = performance.now(); const lastP = points.current[points.current.length - 1]; 
+      const speed = Math.sqrt(Math.pow(x-lastP.x,2)+Math.pow(y-lastP.y,2))/(Math.max(1, now-lastP.time)); 
+      points.current.push({ x, y, time: now, angle: Math.atan2(y-lastP.y, x-lastP.x) }); 
+      for(let i=0; i<Math.min(5, Math.floor(speed*2)+1); i++) particles.push({ x, y, vx: (Math.random()-0.5)*speed*5, vy: (Math.random()-0.5)*speed*5, size: Math.random()*2+1, alpha: 1 }); 
+    };
+    
+    const end = () => { tracking.current = false; setStep(3); setVitalMessage("体が安全だと判断しています。"); };
+
+    const handleMouseDown = (e) => { onUnlockAudioRef.current(); tracking.current = true; points.current = [{x:e.clientX, y:e.clientY, time:performance.now()}]; };
+    const handleTouchStart = (e) => { onUnlockAudioRef.current(); tracking.current = true; points.current = [{x:e.touches[0].clientX, y:e.touches[0].clientY, time:performance.now()}]; };
+
+    canvas.addEventListener("mousedown", handleMouseDown); 
+    canvas.addEventListener("mousemove", move, { passive: true }); 
+    window.addEventListener("mouseup", end);
+    
+    canvas.addEventListener("touchstart", handleTouchStart, { passive: true }); 
+    canvas.addEventListener("touchmove", move, { passive: true }); 
+    window.addEventListener("touchend", end);
+    
+    return () => {
+      running = false;
+      window.removeEventListener("resize", resize); cancelAnimationFrame(animationFrameId);
+      canvas.removeEventListener("mousedown", handleMouseDown);
+      canvas.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", end);
+      canvas.removeEventListener("touchstart", handleTouchStart);
+      canvas.removeEventListener("touchmove", move);
+      window.removeEventListener("touchend", end);
+    };
+  }, [step, onUnlockAudioRef]);
+
+  useEffect(() => { 
+    let t3, t4;
+    if (step === 3) t3 = setTimeout(() => setStep(4), 4000); 
+    if (step === 4) t4 = setTimeout(() => { localStorage.setItem(LOCAL_STORAGE_KEY_ONBOARDING, 'true'); onComplete(); }, 4000); 
+    return () => { clearTimeout(t3); clearTimeout(t4); };
+  }, [step, onComplete]);
+  
+  return (
+    <div className="fixed inset-0 bg-black z-[100] flex items-center justify-center text-center px-6 py-8" style={{ touchAction: 'none' }}>
+      <div className="max-w-sm w-full relative z-10 pointer-events-none">
+        <div className={`transition-opacity duration-2000 ${step === 0 ? 'opacity-100' : 'opacity-0 absolute'}`}><p className="text-slate-400 text-sm tracking-widest font-light animate-fade-in">言葉は、嘘をつきます。</p></div>
+        <div className={`transition-opacity duration-2000 ${step === 1 ? 'opacity-100' : 'opacity-0 absolute'}`}><p className="text-slate-400 text-sm tracking-widest font-light animate-fade-in">でも、指先は嘘をつけない。</p></div>
+        <div className={`transition-opacity duration-2000 ${step === 2 ? 'opacity-100' : 'opacity-0 absolute'}`}>
+          <p className="text-slate-400 text-xs tracking-[0.2em] font-light animate-fade-in">いまの気持ちを、言葉じゃなく、<br/>この暗闇に置いていってください。<br/><span className="text-[10px] opacity-50 mt-4 block">（触れると、深い音が始まります）</span></p>
+        </div>
+        <div className={`transition-opacity duration-2000 ${step === 3 ? 'opacity-100' : 'opacity-0 absolute'}`}><p className="text-indigo-200/80 text-sm tracking-wider animate-fade-in">{vitalMessage}</p></div>
+        <div className={`transition-opacity duration-2000 ${step === 4 ? 'opacity-100' : 'opacity-0 absolute'}`}><p className="text-slate-400 text-sm tracking-widest font-light animate-fade-in">ここは、言葉にならないものを<br/>置いていく場所です。</p></div>
+      </div>
+      {step === 2 && <canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-80 cursor-crosshair" />}
+    </div>
+  );
+};
+
+// --- メインアプリケーション ---
+function App() {
+  const [syncHash, setSyncHash] = useState(localStorage.getItem(LOCAL_STORAGE_KEY_SYNC) || null);
+  const [showPassphrase, setShowPassphrase] = useState(!localStorage.getItem(LOCAL_STORAGE_KEY_SYNC));
+  const [isOnboarded, setIsOnboarded] = useState(false);
+  const [activeTab, setActiveTab] = useState('grace');
+  const [logs, setLogs] = useState([]);
+  const [unsentLogs, setUnsentLogs] = useState([]);
+  const [baseline, setBaseline] = useState(null);
+  const [checkins, setCheckins] = useState([]);
+  const [intention, setIntention] = useState(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+  
+  const [isEmergency, setIsEmergency] = useState(false);
+  const [interventionResolved, setInterventionResolved] = useState(false);
+  const [boundaryMode, setBoundaryMode] = useState(false);
+  const [showReturnGate, setShowReturnGate] = useState(false);
+  const [aftercare, setAftercare] = useState(false);
+  const [motorCooldown, setMotorCooldown] = useState(false);
+  const [lastResolvedLogId, setLastResolvedLogId] = useState(null);
+
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  const [targetVolume, setTargetVolume] = useState(0.4);
+  const [isMuted, setIsMuted] = useState(false);
+
+  const hiddenTimeRef = useRef(null);
+  const initialLogCountRef = useRef(null);
+  const lastStateWasCriticalRef = useRef(false);
+
+  const handleUnlockAudio = useCallback(() => {
+    audioManager.unlock();
+    setIsAudioPlaying(true);
+  }, []);
+
+  useGraceAudio(isMuted ? 0 : targetVolume, isAudioPlaying);
+
+  useEffect(() => {
+    let vol = 0.4;
+    if (isEmergency && !interventionResolved) vol = 0.15;
+    else if (aftercare || motorCooldown) vol = 0.25;
+    
+    setTargetVolume(vol);
+  }, [interventionResolved, boundaryMode, aftercare, motorCooldown, isEmergency]);
+
+  useEffect(() => {
+    const onboarded = localStorage.getItem(LOCAL_STORAGE_KEY_ONBOARDING);
+    if (onboarded) {
+      setIsOnboarded(true);
+    }
+
+    try {
+      const savedLogs = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_TOUCH) || "[]");
+      if (Array.isArray(savedLogs)) setLogs(savedLogs);
+    } catch { localStorage.removeItem(LOCAL_STORAGE_KEY_TOUCH); }
+
+    try {
+      const savedUnsent = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_UNSENT) || "[]");
+      if (Array.isArray(savedUnsent)) setUnsentLogs(savedUnsent);
+    } catch { localStorage.removeItem(LOCAL_STORAGE_KEY_UNSENT); }
+
+    try {
+      const b = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_BASELINE));
+      if (b && typeof b === 'object' && !Array.isArray(b) && b.speedMean !== undefined) {
+        setBaseline(b);
+      } else if (Array.isArray(b) && b.length > 0 && b[0].speedMean !== undefined) {
+        setBaseline(b[0]); 
+      }
+    } catch { localStorage.removeItem(LOCAL_STORAGE_KEY_BASELINE); }
+
+    const lastBoundary = localStorage.getItem(LOCAL_STORAGE_KEY_BOUNDARY);
+    if (lastBoundary && (Date.now() - Number(lastBoundary) < 1800000)) {
+      setBoundaryMode(true);
+    }
+
+    try {
+      const savedCheckins = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_CHECKIN) || "[]");
+      if (Array.isArray(savedCheckins)) setCheckins(savedCheckins);
+    } catch { localStorage.removeItem(LOCAL_STORAGE_KEY_CHECKIN); }
+
+    try {
+      const savedIntention = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_INTENTION));
+      if (savedIntention && savedIntention.text) setIntention(savedIntention);
+    } catch { localStorage.removeItem(LOCAL_STORAGE_KEY_INTENTION); }
+
+    setIsLoaded(true);
+  }, []);
+
+  // [追加] App全体での初回タッチによる確実なUnlockキャッチ
+  useEffect(() => {
+    const unlockOnFirstInteraction = () => {
+      handleUnlockAudio();
+      document.removeEventListener('touchstart', unlockOnFirstInteraction);
+      document.removeEventListener('click', unlockOnFirstInteraction);
+    };
+
+    if (isOnboarded) {
+      document.addEventListener('touchstart', unlockOnFirstInteraction, { once: true });
+      document.addEventListener('click', unlockOnFirstInteraction, { once: true });
+    }
+
+    return () => {
+      document.removeEventListener('touchstart', unlockOnFirstInteraction);
+      document.removeEventListener('click', unlockOnFirstInteraction);
+    };
+  }, [isOnboarded, handleUnlockAudio]);
+
+  const handleCheckin = useCallback((entry) => {
+    setCheckins(prev => {
+      const updated = [...prev, entry].slice(-30);
+      safeSave(LOCAL_STORAGE_KEY_CHECKIN, updated, 30);
+      return updated;
+    });
+  }, []);
+
+  const handleIntention = useCallback((entry) => {
+    setIntention(entry);
+    try { localStorage.setItem(LOCAL_STORAGE_KEY_INTENTION, JSON.stringify(entry)); } catch {}
+  }, []);
+
+  // --- Cloud sync: login handler ---
+  const handlePassphraseLogin = useCallback((hash, cloudData) => {
+    setSyncHash(hash);
+    setShowPassphrase(false);
+    if (cloudData) {
+      // Restore from cloud (logs/unsent are NOT synced — session-specific)
+      if (cloudData.checkins) { setCheckins(cloudData.checkins); safeSave(LOCAL_STORAGE_KEY_CHECKIN, cloudData.checkins, 30); }
+      if (cloudData.intention) { setIntention(cloudData.intention); try { localStorage.setItem(LOCAL_STORAGE_KEY_INTENTION, JSON.stringify(cloudData.intention)); } catch {} }
+      if (cloudData.onboarded) { setIsOnboarded(true); localStorage.setItem(LOCAL_STORAGE_KEY_ONBOARDING, 'true'); }
+      console.log('[GraceOS] Restored from cloud');
+    }
+  }, []);
+
+  const handlePassphraseSkip = useCallback(() => {
+    setShowPassphrase(false);
+  }, []);
+
+  // --- Cloud sync: auto-save on data change (debounced) ---
+  const syncTimerRef = useRef(null);
+  useEffect(() => {
+    if (!syncHash || !isLoaded) return;
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(() => {
+      CloudSync.save(syncHash, {
+        checkins: checkins.slice(-30),
+        intention,
+        onboarded: isOnboarded
+      });
+    }, 5000);
+    return () => clearTimeout(syncTimerRef.current);
+  }, [syncHash, checkins, intention, isOnboarded, isLoaded]);
+
+  const handleSaveLog = useCallback((newLog) => {
+    setLogs(prev => {
+      const updated = [...prev, newLog].slice(-100);
+      safeSave(LOCAL_STORAGE_KEY_TOUCH, updated, 100);
+      return updated;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!baseline) {
+      const vitalLogs = logs.filter(l => l.type === 'touch_vital' && l.vital);
+      if (vitalLogs.length >= 4) {
+        const newBaseline = computeBaseline(vitalLogs);
+        safeSave(LOCAL_STORAGE_KEY_BASELINE, [newBaseline], 1); 
+        setBaseline(newBaseline);
+      }
+    }
+  }, [logs, baseline]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) {
+        hiddenTimeRef.current = Date.now();
+        setLogs(currentLogs => {
+          const vitalLogs = currentLogs.filter(l => l.type === 'touch_vital' && l.vital);
+          if (vitalLogs.length > 0) {
+            const latest = vitalLogs[vitalLogs.length - 1];
+            if (latest.stateLabel === 'pre_impulse' || latest.vital.threatReflex > 0.5) {
+              lastStateWasCriticalRef.current = true;
+            }
+          }
+          return currentLogs;
+        });
+      } else if (hiddenTimeRef.current) {
+        const diff = Date.now() - hiddenTimeRef.current;
+        
+        if (diff > 15 * 60 * 1000) {
+          setActiveTab('grace');
+          setBoundaryMode(false);
+          setShowReturnGate(false);
+          setAftercare(false);
+          setMotorCooldown(false);
+          setIsEmergency(false);
+          setInterventionResolved(false);
+        } 
+        else if (diff < 300000 && lastStateWasCriticalRef.current) {
+          setBoundaryMode(true);
+          setActiveTab('guard'); 
+          handleSaveLog({ id: Date.now(), type: "reflex_return", timestamp: new Date().toISOString() });
+        }
+        hiddenTimeRef.current = null; 
+        lastStateWasCriticalRef.current = false;
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [handleSaveLog]);
+
+  const consecutiveCriticalRef = useRef(0);
+
+  useEffect(() => {
+    const vitalLogs = logs.filter(l => l.type === 'touch_vital' && l.vital);
+    // Skip emergency detection for data loaded from localStorage (only trigger on NEW logs)
+    if (initialLogCountRef.current === null) {
+      initialLogCountRef.current = vitalLogs.length;
+      return;
+    }
+    if (vitalLogs.length <= initialLogCountRef.current) return;
+
+    // Need at least 8 logs for stable baseline before triggering emergency
+    if (baseline && vitalLogs.length >= 8) {
+      const latestLog = vitalLogs[vitalLogs.length - 1];
+
+      if (latestLog.id === lastResolvedLogId) {
+        setIsEmergency(false);
+        consecutiveCriticalRef.current = 0;
+        return;
+      }
+
+      const latest = latestLog.vital;
+      const sz = Math.abs(zScore(latest.avgSpeed, baseline.speedMean, baseline.speedStd));
+      const jz = Math.abs(zScore(latest.jitter, baseline.jitterMean, baseline.jitterStd));
+      const rz = Math.abs(zScore(latest.rhythmIrregularity, baseline.rhythmMean, baseline.rhythmStd));
+      const isCritical = Math.sqrt(sz*sz + jz*jz + rz*rz) > 5.0 || latest.threatReflex > 0.5;
+
+      if (isCritical) {
+        consecutiveCriticalRef.current++;
+      } else {
+        consecutiveCriticalRef.current = 0;
+        setIsEmergency(false);
+      }
+
+      // Only trigger emergency after 3 consecutive critical readings
+      if (consecutiveCriticalRef.current >= 3) {
+        setIsEmergency(true);
+        setInterventionResolved(false);
+      }
+    }
+  }, [logs, baseline, lastResolvedLogId]);
+
+  const hasReflex = logs.some(l => l.type === 'reflex_return' && (Date.now() - new Date(l.timestamp).getTime()) < 86400000);
+  const handleClearLogs = useCallback(() => {
+    if(window.confirm('観測記録と基準線を初期化しますか？（設定やオンボーディング状態は保持されます）')) { 
+      localStorage.removeItem(LOCAL_STORAGE_KEY_TOUCH);
+      localStorage.removeItem(LOCAL_STORAGE_KEY_UNSENT);
+      localStorage.removeItem(LOCAL_STORAGE_KEY_BASELINE);
+      
+      setLogs([]);
+      setUnsentLogs([]);
+      setBaseline(null);
+      setIsEmergency(false);
+      setInterventionResolved(false);
+      setLastResolvedLogId(null);
+    }
+  }, []);
+
+  const resetAllOverlays = useCallback(() => {
+    setShowReturnGate(false);
+    setAftercare(false);
+    setMotorCooldown(false);
+    setIsEmergency(false);
+    setInterventionResolved(false);
+  }, []);
+
+  const handleReturnGateFinish = () => {
+    try {
+      const savedUnsent = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY_UNSENT) || "[]");
+      if (Array.isArray(savedUnsent)) setUnsentLogs(savedUnsent);
+    } catch(e) {}
+    resetAllOverlays();
+  };
+
+  const handleInterventionComplete = () => {
+    setInterventionResolved(true);
+    setShowReturnGate(true);
+    const vitalLogs = logs.filter(l => l.type === 'touch_vital' && l.vital);
+    if (vitalLogs.length > 0) {
+      setLastResolvedLogId(vitalLogs[vitalLogs.length - 1].id);
+    }
+  };
+
+  if (!isLoaded) return <div className="min-h-screen bg-black"></div>;
+
+  if (showPassphrase) {
+    return (
+      <PassphraseScreen
+        onLogin={handlePassphraseLogin}
+        onSkip={handlePassphraseSkip}
+      />
+    );
+  }
+
+  if (!isOnboarded) {
+    return (
+      <OnboardingScreen
+        onComplete={() => {
+          setIsOnboarded(true);
+          handleUnlockAudio();
+        }}
+        onUnlockAudio={handleUnlockAudio}
+      />
+    );
+  }
+
+  return (
+    <div className={`h-full font-sans bg-[#0b0f1a] text-slate-200 selection:bg-indigo-900/50 flex justify-center transition-colors duration-1000 ${isEmergency ? 'bg-black' : ''}`}>
+
+      {boundaryMode && !isEmergency && !showReturnGate && !aftercare && !motorCooldown && (
+        <ResponseGuard onAllow={() => { setBoundaryMode(false); }} />
+      )}
+      {isEmergency && !interventionResolved && !showReturnGate && !aftercare && !motorCooldown && (
+        <InterventionScreen onComplete={handleInterventionComplete} />
+      )}
+      {showReturnGate && (
+        <ReturnGate onFinish={handleReturnGateFinish} />
+      )}
+      {aftercare && (
+        <AftercareScreen onDone={resetAllOverlays} />
+      )}
+      {motorCooldown && (
+        <MotorCooldownScreen onFinish={resetAllOverlays} />
+      )}
+
+      <div className="w-full max-w-lg h-full flex flex-col relative border-x border-slate-900/50 shadow-2xl">
+        <header className="shrink-0 px-4 py-4 sm:py-6 flex items-center justify-between">
+          <button onClick={() => setIsMuted(m => !m)} className="w-8 h-8 flex items-center justify-center" title={isMuted ? '音声ON' : '音声OFF'}>
+            {isMuted ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400/60">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <line x1="23" y1="9" x2="17" y2="15"/>
+                <line x1="17" y1="9" x2="23" y2="15"/>
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              </svg>
+            )}
+          </button>
+          <h1 className="text-xs tracking-[0.4em] font-light text-slate-500">神経OS</h1>
+          <button onClick={() => setShowPassphrase(true)} className="w-8 h-8 flex items-center justify-center" title={syncHash ? 'クラウド同期中' : 'クラウド未接続'}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={syncHash ? 'text-indigo-400/60' : 'text-slate-700'}>
+              <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+            </svg>
+          </button>
+        </header>
+
+        <main className="flex-1 min-h-0 px-4 sm:px-6 overflow-y-auto pb-20 custom-scrollbar">
+          {activeTab === 'grace' && (
+            <GraceSpace onSave={handleSaveLog} isEmergency={isEmergency} baseline={baseline} />
+          )}
+          {activeTab === 'guard' && (
+            <ConsentGuard onExit={() => setActiveTab('grace')} />
+          )}
+          {activeTab === 'insight' && (
+            <Insight
+              logs={logs}
+              unsentLogs={unsentLogs}
+              checkins={checkins}
+              onCheckin={handleCheckin}
+              intention={intention}
+              onIntention={handleIntention}
+              clearLogs={handleClearLogs}
+              baseline={baseline}
+              isEmergency={isEmergency}
+            />
+          )}
+        </main>
+
+        <nav className="shrink-0 w-full backdrop-blur-md bg-[#0b0f1a]/80 border-t border-slate-900 pb-safe z-20">
+          <div className="flex justify-center items-center p-2 gap-6">
+            <NavButton
+                icon={<Fingerprint />}
+                label="観測"
+                isActive={activeTab === 'grace'}
+                onClick={() => { setActiveTab('grace'); }}
+              />
+            <NavButton
+              icon={<Lock />}
+              label="守る"
+              isActive={activeTab === 'guard'}
+              onClick={() => { setActiveTab('guard'); }}
+            />
+            <NavButton
+              icon={<Activity />}
+              label="洞察"
+              isActive={activeTab === 'insight'}
+              onClick={() => { setActiveTab('insight'); }}
+            />
+          </div>
+        </nav>
+
+      </div>
+    </div>
+  );
+}
+
+    // --- ナビゲーションボタン ---
+    const NavButton = ({ icon, label, isActive, onClick }) => (
+      <button
+        onClick={onClick}
+        className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all min-h-[44px] ${isActive ? 'text-sky-400' : 'text-slate-500'}`}
+      >
+        <div className={`transition-transform duration-200 ${isActive ? 'scale-110' : ''}`}>
+          {React.cloneElement(icon, { size: 22 })}
+        </div>
+        <span className="text-[10px] font-semibold tracking-wider">{label}</span>
+      </button>
+    );
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

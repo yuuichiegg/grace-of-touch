@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DroneGuard - 緊急時QRH</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --surface: #141926;
+    --surface2: #1c2236;
+    --border: #262e45;
+    --text: #e2e6f0;
+    --text2: #7a839e;
+    --accent: #4a8aff;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --orange: #fb923c;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app { max-width: 480px; margin: 0 auto; min-height: 100vh; }
+
+  .header {
+    padding: 16px 20px; display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--border); position: sticky; top: 0;
+    background: var(--bg); z-index: 50;
+  }
+  .back-btn {
+    background: none; border: none; color: var(--accent); font-size: 20px;
+    cursor: pointer; padding: 4px;
+  }
+  .header h1 { font-size: 17px; font-weight: 700; color: var(--red); }
+
+  .content { padding: 16px 20px 100px; }
+
+  /* === Menu view === */
+  .menu-view {}
+  .severity-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; margin: 16px 0 8px; padding-left: 4px;
+  }
+
+  .sos-card {
+    background: rgba(248,113,113,0.08);
+    border: 2px solid var(--red);
+    border-radius: 14px; padding: 18px; margin-bottom: 16px;
+    cursor: pointer; transition: all 0.15s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .sos-card:active { transform: scale(0.98); }
+  .sos-icon { font-size: 28px; margin-bottom: 8px; }
+  .sos-title { font-size: 17px; font-weight: 700; color: var(--red); }
+  .sos-sub { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  .scenario-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px; margin-bottom: 8px;
+    cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; gap: 14px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .scenario-card:active { transform: scale(0.98); }
+  .sc-icon { font-size: 28px; flex-shrink: 0; }
+  .sc-body { flex: 1; }
+  .sc-title { font-size: 15px; font-weight: 600; }
+  .sc-hint { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .sc-arrow { color: var(--text2); font-size: 18px; }
+  .sc-severity {
+    display: inline-block; padding: 2px 6px; border-radius: 4px;
+    font-size: 10px; font-weight: 700; margin-left: 6px;
+  }
+  .sev-red { background: rgba(248,113,113,0.15); color: var(--red); }
+  .sev-orange { background: rgba(251,146,60,0.15); color: var(--orange); }
+  .sev-yellow { background: rgba(251,191,36,0.15); color: var(--yellow); }
+
+  /* === Procedure view === */
+  .proc-view { display: none; }
+  .proc-view.active { display: block; }
+
+  .proc-header {
+    text-align: center; padding: 20px 0 16px;
+    border-bottom: 1px solid var(--border); margin-bottom: 16px;
+  }
+  .proc-header .p-icon { font-size: 48px; }
+  .proc-header .p-title { font-size: 20px; font-weight: 700; margin-top: 8px; }
+  .proc-header .p-severity { margin-top: 6px; }
+  .proc-header .p-summary {
+    font-size: 13px; color: var(--text2); margin-top: 8px; max-width: 320px;
+    margin-left: auto; margin-right: auto;
+  }
+
+  /* Step by step — all visible, no buttons */
+  .step {
+    display: flex; gap: 14px; padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .step:last-child { border-bottom: none; }
+  .step-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .step-num.sev-red { background: rgba(248,113,113,0.2); color: var(--red); }
+  .step-num.sev-orange { background: rgba(251,146,60,0.2); color: var(--orange); }
+  .step-num.sev-yellow { background: rgba(251,191,36,0.2); color: var(--yellow); }
+  .step-content { flex: 1; }
+  .step-action {
+    font-size: 16px; font-weight: 700; color: var(--text);
+  }
+  .step-detail {
+    font-size: 13px; color: var(--text2); margin-top: 4px; line-height: 1.8;
+  }
+  .step-warning {
+    margin-top: 8px; padding: 8px 12px;
+    background: rgba(248,113,113,0.1); border-radius: 8px;
+    font-size: 13px; color: var(--red); font-weight: 600;
+    border-left: 3px solid var(--red);
+  }
+
+  /* Emergency contacts */
+  .contacts {
+    margin: 16px 0; padding: 16px;
+    background: rgba(248,113,113,0.06);
+    border: 1px solid rgba(248,113,113,0.2);
+    border-radius: 12px;
+  }
+  .contacts-title {
+    font-size: 12px; font-weight: 700; color: var(--red);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
+  }
+  .contact-btn {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 6px; cursor: pointer;
+    text-decoration: none; color: var(--text); transition: all 0.15s;
+    font-size: 14px;
+  }
+  .contact-btn:active { transform: scale(0.98); background: var(--surface2); }
+  .contact-btn .c-icon { font-size: 20px; }
+  .contact-btn .c-name { flex: 1; font-weight: 600; }
+  .contact-btn .c-num { color: var(--accent); font-size: 13px; }
+
+  /* Procedure complete */
+  .proc-complete {
+    display: none; text-align: center; padding: 24px;
+    background: rgba(52,211,153,0.08); border: 1px solid rgba(52,211,153,0.2);
+    border-radius: 12px; margin-top: 16px;
+  }
+  .proc-complete.visible { display: block; }
+  .proc-complete .pc-icon { font-size: 36px; }
+  .proc-complete .pc-text { font-size: 15px; font-weight: 600; color: var(--green); margin-top: 8px; }
+  .proc-complete .pc-sub { font-size: 13px; color: var(--text2); margin-top: 4px; }
+
+  .back-to-menu {
+    display: block; margin: 16px auto; padding: 10px 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text2); border-radius: 10px; font-size: 14px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <button class="back-btn" id="headerBack" onclick="goBack()">&#8249;</button>
+    <h1>&#9888; 緊急時QRH</h1>
+  </div>
+
+  <div class="content">
+    <!-- === MENU VIEW === -->
+    <div class="menu-view" id="menuView">
+
+      <div class="sos-card" onclick="openProc('accident')">
+        <div class="sos-icon">&#128680;</div>
+        <div class="sos-title">事故が発生した</div>
+        <div class="sos-sub">人身事故・物損・墜落 → 通報・救護の手順</div>
+      </div>
+
+      <div class="severity-label" style="color:var(--red);">&#9679; 緊急</div>
+
+      <div class="scenario-card" onclick="openProc('battery_critical')">
+        <div class="sc-icon">&#128267;</div>
+        <div class="sc-body">
+          <div class="sc-title">バッテリー残量が急低下 <span class="sc-severity sev-red">緊急</span></div>
+          <div class="sc-hint">電圧低下警告・残量異常</div>
+        </div>
+        <div class="sc-arrow">&#8250;</div>
+      </div>
+
+      <div class="scenario-card" onclick="openProc('signal_lost')">
+        <div class="sc-icon">&#128246;</div>
+        <div class="sc-body">
+          <div class="sc-title">通信途絶 <span class="sc-severity sev-red">緊急</span></div>
+          <div class="sc-hint">送信機と機体の接続が切れた</div>
+        </div>
+        <div class="sc-arrow">&#8250;</div>
+      </div>
+
+      <div class="scenario-card" onclick="openProc('flyaway')">
+        <div class="sc-icon">&#128640;</div>
+        <div class="sc-body">
+          <div class="sc-title">フライアウェイ（暴走） <span class="sc-severity sev-red">緊急</span></div>
+          <div class="sc-hint">制御不能で機体が飛び去った</div>
+        </div>
+        <div class="sc-arrow">&#8250;</div>
+      </div>
+
+      <div class="severity-label" style="color:var(--orange);">&#9679; 警告</div>
+
+      <div class="scenario-card" onclick="openProc('gnss_error')">
+        <div class="sc-icon">&#128752;</div>
+        <div class="sc-body">
+          <div class="sc-title">GNSS異常 <span class="sc-severity sev-orange">警告</span></div>
+          <div class="sc-hint">位置が不安定・衛星数不足</div>
+        </div>
+        <div class="sc-arrow">&#8250;</div>
+      </div>
+
+      <div class="scenario-card" onclick="openProc('vortex')">
+        <div class="sc-icon">&#127744;</div>
+        <div class="sc-body">
+          <div class="sc-title">ボルテックス・リング・ステート <span class="sc-severity sev-orange">警告</span></div>
+          <div class="sc-hint">機体が小刻みに揺れ始めた</div>
+        </div>
+        <div class="sc-arrow">&#8250;</div>
+      </div>
+
+      <div class="scenario-card" onclick="openProc('motor_abnormal')">
+        <div class="sc-icon">&#9881;</div>
+        <div class="sc-body">
+          <div class="sc-title">モーター異常・異音 <span class="sc-severity sev-orange">警告</span></div>
+          <div class="sc-hint">飛行中に異音または振動の増大</div>
+        </div>
+        <div class="sc-arrow">&#8250;</div>
+      </div>
+
+      <div class="severity-label" style="color:var(--yellow);">&#9679; 注意</div>
+
+      <div class="scenario-card" onclick="openProc('wind')">
+        <div class="sc-icon">&#127788;</div>
+        <div class="sc-body">
+          <div class="sc-title">急な強風 <span class="sc-severity sev-yellow">注意</span></div>
+          <div class="sc-hint">風速が増大し安定飛行が困難</div>
+        </div>
+        <div class="sc-arrow">&#8250;</div>
+      </div>
+
+      <div class="scenario-card" onclick="openProc('bird')">
+        <div class="sc-icon">&#128038;</div>
+        <div class="sc-body">
+          <div class="sc-title">鳥の接近・妨害 <span class="sc-severity sev-yellow">注意</span></div>
+          <div class="sc-hint">鳥が機体に接近または攻撃</div>
+        </div>
+        <div class="sc-arrow">&#8250;</div>
+      </div>
+
+      <div class="scenario-card" onclick="openProc('intruder')">
+        <div class="sc-icon">&#128694;</div>
+        <div class="sc-body">
+          <div class="sc-title">第三者の立入り <span class="sc-severity sev-yellow">注意</span></div>
+          <div class="sc-hint">飛行エリア内に人が侵入</div>
+        </div>
+        <div class="sc-arrow">&#8250;</div>
+      </div>
+
+      <div class="scenario-card" onclick="openProc('aircraft')">
+        <div class="sc-icon">&#9992;</div>
+        <div class="sc-body">
+          <div class="sc-title">有人航空機の接近 <span class="sc-severity sev-yellow">注意</span></div>
+          <div class="sc-hint">ヘリコプターや飛行機を目視</div>
+        </div>
+        <div class="sc-arrow">&#8250;</div>
+      </div>
+    </div>
+
+    <!-- === PROCEDURE VIEW === -->
+    <div class="proc-view" id="procView">
+      <div class="proc-header">
+        <div class="p-icon" id="procIcon"></div>
+        <div class="p-title" id="procTitle"></div>
+        <div class="p-severity" id="procSeverity"></div>
+        <div class="p-summary" id="procSummary"></div>
+      </div>
+
+      <div id="contactsArea"></div>
+
+      <div id="stepsContainer"></div>
+
+      <div style="margin-top:16px; padding:12px; background:var(--surface); border-radius:10px; font-size:12px; color:var(--text2); text-align:center; line-height:1.8;">
+        対応完了後は<strong style="color:var(--text);">飛行日誌に記録</strong>してください
+      </div>
+
+      <button class="back-to-menu" onclick="showMenu()">&#8249; 症状一覧に戻る</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// === Procedure data ===
+const procedures = {
+  accident: {
+    icon: '&#128680;', title: '事故が発生した',
+    severity: 'red', severityText: '緊急',
+    summary: '人命救助を最優先に行動する',
+    showContacts: true,
+    steps: [
+      { action: '直ちに飛行を中止', detail: '機体が通電している場合は電源を切る', warning: '二次被害の防止が最優先' },
+      { action: '負傷者の確認・救護', detail: 'ケガの有無と程度を確認。応急処置を実施' },
+      { action: '消防（119）に通報', detail: '負傷者がいる場合。現場の住所と状況を伝える' },
+      { action: '警察（110）に通報', detail: '事故の状況を報告' },
+      { action: '国土交通省に報告', detail: '「無⼈航空機の事故及び重⼤インシデントの報告要領」に従い報告' },
+      { action: '飛行ログの保全', detail: 'フライトデータ・写真・動画を保存。事故原因究明のため現場を保全', warning: '機体を動かす前に証拠を記録' },
+    ]
+  },
+  battery_critical: {
+    icon: '&#128267;', title: 'バッテリー残量が急低下',
+    severity: 'red', severityText: '緊急',
+    summary: '残量低下で急激に出力が弱まり墜落の原因に。冬季は特に注意',
+    steps: [
+      { action: '即座に最寄りの安全な場所を選定', detail: '帰還を試みず、最も近い無人の場所を選ぶ' },
+      { action: '高度を維持しながら移動', detail: '急降下は避ける。エネルギー効率の良い高度で水平移動' },
+      { action: '着陸態勢に入る', detail: 'ゆっくりと降下。急な操作は電力を消費する', warning: '垂直降下はボルテックス・リング・ステートの危険あり' },
+      { action: '周囲に着陸を声で知らせる', detail: '補助者や周囲の人に着陸地点を伝える' },
+      { action: '着陸・電源OFF', detail: '接地後、速やかにモーター停止' },
+      { action: '原因の確認', detail: 'バッテリーの状態を確認。膨らみ・異常発熱がないか。飛行日誌に記録' },
+    ]
+  },
+  signal_lost: {
+    icon: '&#128246;', title: '通信途絶',
+    severity: 'red', severityText: '緊急',
+    summary: 'フェールセーフの設定通りに機体が自動動作するのを待つ',
+    steps: [
+      { action: 'フェールセーフの動作を確認', detail: '事前設定に従い、機体がホバリング/帰還/着陸のいずれかを実行しているか目視で確認' },
+      { action: '送信機の状態を確認', detail: 'バッテリー残量、アンテナの向き、障害物による遮蔽がないか' },
+      { action: '送信機の再接続を試みる', detail: '送信機の電源OFF→ON。機体に近づいて通信を回復させる' },
+      { action: '回復しない場合は機体を目視で追跡', detail: 'RTH動作中なら帰還経路上で待機。周囲の安全を確保', warning: 'RTH高度の設定が低いと障害物に衝突する可能性あり' },
+      { action: '着陸を確認したら機体を回収', detail: '機体の状態を確認し、飛行日誌に記録' },
+    ]
+  },
+  flyaway: {
+    icon: '&#128640;', title: 'フライアウェイ（暴走）',
+    severity: 'red', severityText: '緊急',
+    summary: '制御不能。人的被害の防止が最優先',
+    steps: [
+      { action: '緊急停止（CSC）を試みる', detail: 'スティックを両方内側下に倒すなど、機種ごとの緊急停止操作', warning: '市街地上空での停止は墜落事故になる。周囲の状況を判断' },
+      { action: '周囲の人に大声で警告', detail: '機体の飛行方向を指さしながら「ドローン注意！」と叫ぶ' },
+      { action: '機体の方向を目視で追跡', detail: '見失うまで方向を追い、最後に見えた方向を記録' },
+      { action: '警察に通報', detail: '機体の特徴・最後に見えた方向・飛行エリアを伝える' },
+      { action: '国土交通省に報告', detail: '機体紛失は報告義務のある事象' },
+    ]
+  },
+  gnss_error: {
+    icon: '&#128752;', title: 'GNSS異常',
+    severity: 'orange', severityText: '警告',
+    summary: '位置情報が不正確に。手動操縦に切り替える',
+    steps: [
+      { action: '手動操縦モードに切り替え', detail: 'ATTIモードまたは手動モードに切り替え。GPSに頼らない操縦に移行' },
+      { action: 'ホバリングを維持', detail: '自分でスティック操作して高度と位置を安定させる', warning: 'GNSS復帰まで自動操縦は使わない' },
+      { action: '安全な場所へ移動', detail: '目視で障害物を確認しながら、開けた場所へ移動' },
+      { action: '着陸', detail: '安全を確認して着陸。GNSS復帰を待ってから再離陸を判断' },
+    ]
+  },
+  vortex: {
+    icon: '&#127744;', title: 'ボルテックス・リング・ステート',
+    severity: 'orange', severityText: '警告',
+    summary: '垂直降下で揚力を失う。前兆は機体の小刻みな揺れ',
+    steps: [
+      { action: '即座に前進操作', detail: 'エレベーター（ピッチ）を前方に倒す。前後左右いずれかに水平移動', warning: 'スロットルを上げても回復しない。水平移動が唯一の脱出法' },
+      { action: '高度を回復', detail: '水平移動で気流の循環を断ち切ったら、ゆっくりスロットルを上げる' },
+      { action: '安定したらホバリング', detail: '機体が安定したことを確認。異常な振動がないか観察' },
+      { action: '以降は垂直降下を避ける', detail: '着陸時は斜めに降下する。飛行機の着陸アプローチのように' },
+    ]
+  },
+  motor_abnormal: {
+    icon: '&#9881;', title: 'モーター異常・異音',
+    severity: 'orange', severityText: '警告',
+    summary: 'プロペラ・モーターの不具合。飛行継続は危険',
+    steps: [
+      { action: '飛行を中止し着陸準備', detail: '異音や振動が増大した場合、速やかに着陸判断', warning: '飛行を継続すると墜落のリスクが増大' },
+      { action: '最寄りの安全な場所に着陸', detail: '急な操作を避け、ゆっくりと降下' },
+      { action: 'モーター停止後に確認', detail: 'プロペラの破損、モーターの異物噛み込み、ベアリングの摩耗を確認' },
+      { action: '飛行日誌に記録', detail: '発生状況（高度・操作内容・症状）を詳細に記録。同じ機体での再飛行は原因特定後に' },
+    ]
+  },
+  wind: {
+    icon: '&#127788;', title: '急な強風',
+    severity: 'yellow', severityText: '注意',
+    summary: '風速が機体の限界に近づいている',
+    steps: [
+      { action: '高度を下げる', detail: '上空ほど風が強い。地面に近いほど風は弱まる' },
+      { action: '風上に向かって帰還', detail: '追い風での帰還は制御が難しくなる場合がある' },
+      { action: '帰還が困難なら即着陸', detail: '無理に帰還せず、近くの安全な場所に着陸', warning: '風速が機体の最大速度を超えると帰還不能になる' },
+      { action: 'しばらく様子を見て判断', detail: '風が収まれば再離陸。収まらなければ本日の飛行を中止' },
+    ]
+  },
+  bird: {
+    icon: '&#128038;', title: '鳥の接近・妨害',
+    severity: 'yellow', severityText: '注意',
+    summary: '鳥は縄張り意識で攻撃してくることがある',
+    steps: [
+      { action: '高度または場所を変える', detail: '鳥が縄張りを主張している場合、その空域から離れる' },
+      { action: '急な回避操作は避ける', detail: '急操作は制御不能の原因に。ゆっくりと移動' },
+      { action: '攻撃が続くなら着陸', detail: '機体を回収して安全を確保。プロペラで鳥を傷つけるリスクも考慮' },
+    ]
+  },
+  intruder: {
+    icon: '&#128694;', title: '第三者の立入り',
+    severity: 'yellow', severityText: '注意',
+    summary: '飛行エリア内に想定外の人。安全最優先',
+    steps: [
+      { action: '機体を第三者から離す', detail: '人のいない方向に移動。高度を上げて距離を取る' },
+      { action: '補助者に声掛けを指示', detail: '補助者が立入者に退避を依頼。危険エリアであることを説明' },
+      { action: '退避を確認してから飛行再開', detail: '第三者が完全にエリア外に出たことを確認', warning: '退避しない場合は飛行を中止' },
+    ]
+  },
+  aircraft: {
+    icon: '&#9992;', title: '有人航空機の接近',
+    severity: 'yellow', severityText: '注意',
+    summary: '航空機の安全が最優先。即座に回避',
+    steps: [
+      { action: '即座に高度を下げる', detail: '地上に近づけて航空機との距離を確保', warning: '航空機側にドローンは見えていない可能性がある' },
+      { action: '可能であれば着陸', detail: '着陸可能な場所があれば即着陸。機体を地上に固定' },
+      { action: '航空機が離れるまで待機', detail: '航空機が完全に離れたことを目視で確認してから再離陸を判断' },
+    ]
+  },
+};
+
+// === Rendering ===
+let currentProc = null;
+let currentStep = 0;
+
+function openProc(id) {
+  currentProc = id;
+  const proc = procedures[id];
+
+  document.getElementById('menuView').style.display = 'none';
+  const pv = document.getElementById('procView');
+  pv.classList.add('active');
+
+  document.getElementById('procIcon').innerHTML = proc.icon;
+  document.getElementById('procTitle').textContent = proc.title;
+  document.getElementById('procSummary').textContent = proc.summary;
+
+  document.getElementById('procSeverity').innerHTML =
+    `<span class="sc-severity sev-${proc.severity}">${proc.severityText}</span>`;
+
+  // Contacts first (if emergency, contacts are most important)
+  const contactsArea = document.getElementById('contactsArea');
+  if (proc.showContacts) {
+    contactsArea.innerHTML = `
+      <div class="contacts">
+        <div class="contacts-title">緊急連絡先</div>
+        <a href="tel:119" class="contact-btn"><span class="c-icon">&#128657;</span><span class="c-name">消防（救急）</span><span class="c-num">119</span></a>
+        <a href="tel:110" class="contact-btn"><span class="c-icon">&#128110;</span><span class="c-name">警察</span><span class="c-num">110</span></a>
+        <div class="contact-btn"><span class="c-icon">&#127970;</span><span class="c-name">国土交通省</span><span class="c-num">報告義務</span></div>
+        <div class="contact-btn"><span class="c-icon">&#128205;</span><span class="c-name">土地管理者</span><span class="c-num">事前登録番号</span></div>
+      </div>`;
+  } else {
+    contactsArea.innerHTML = '';
+  }
+
+  // Render all steps — fully visible, no buttons
+  const container = document.getElementById('stepsContainer');
+  container.innerHTML = '';
+  proc.steps.forEach((s, i) => {
+    const stepEl = document.createElement('div');
+    stepEl.className = 'step';
+    let html = `
+      <div class="step-num sev-${proc.severity}">${i + 1}</div>
+      <div class="step-content">
+        <div class="step-action">${s.action}</div>
+        <div class="step-detail">${s.detail}</div>`;
+    if (s.warning) {
+      html += `<div class="step-warning">&#9888; ${s.warning}</div>`;
+    }
+    html += `</div>`;
+    stepEl.innerHTML = html;
+    container.appendChild(stepEl);
+  });
+
+  // Scroll to top of procedure
+  pv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+
+function showMenu() {
+  document.getElementById('menuView').style.display = '';
+  document.getElementById('procView').classList.remove('active');
+  currentProc = null;
+}
+
+function goBack() {
+  if (currentProc) {
+    showMenu();
+  } else {
+    location.href = 'index.html';
+  }
+}
+
+// === Firebase Auth (read-only, QRH doesn't write data) ===
+firebase.initializeApp({
+  apiKey: "AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",
+  authDomain: "grace-of-touch.firebaseapp.com",
+  projectId: "grace-of-touch",
+  storageBucket: "grace-of-touch.firebasestorage.app",
+  messagingSenderId: "505078300866",
+  appId: "1:505078300866:web:adad2a27b163c3b0f1bb5b"
+});
+</script>
+</body>
+</html>

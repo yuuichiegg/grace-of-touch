@@ -1,0 +1,2400 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TunnelDrone Simulator v8 - トンネルインフラ点検</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; cursor: default; }
+#canvas3d { display: block; width: 100vw; height: 100vh; }
+
+/* HUD Overlay */
+#hud { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+#hud > * { pointer-events: auto; }
+
+/* Top Bar */
+#topbar {
+  position: absolute; top: 0; left: 0; right: 0; height: 48px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 100%);
+  display: flex; align-items: center; justify-content: space-between; padding: 0 20px;
+  border-bottom: 1px solid rgba(0,200,255,0.3);
+}
+.top-section { display: flex; align-items: center; gap: 16px; }
+.status-pill {
+  background: rgba(0,200,255,0.15); border: 1px solid rgba(0,200,255,0.4);
+  border-radius: 12px; padding: 2px 12px; font-size: 11px; color: #0cf; white-space: nowrap;
+}
+.status-pill.warning { background: rgba(255,200,0,0.15); border-color: rgba(255,200,0,0.4); color: #ffa; }
+.status-pill.danger { background: rgba(255,60,60,0.15); border-color: rgba(255,60,60,0.4); color: #f66; }
+.status-pill.active-look { background: rgba(0,255,100,0.15); border-color: rgba(0,255,100,0.4); color: #0f8; }
+.status-pill.safe { background: rgba(0,255,100,0.15); border-color: rgba(0,255,100,0.4); color: #0f8; }
+#title { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: 1px; }
+
+/* Telemetry Panel (left) */
+#telemetry {
+  position: absolute; top: 60px; left: 12px; width: 220px;
+  background: rgba(0,0,0,0.75); border: 1px solid rgba(0,200,255,0.3);
+  border-radius: 8px; padding: 12px; color: #ccc; font-size: 11px;
+}
+.telem-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.telem-label { color: #888; }
+.telem-value { color: #0cf; font-family: 'Consolas', monospace; font-weight: 600; }
+.telem-divider { border-top: 1px solid rgba(0,200,255,0.2); margin: 6px 0; }
+
+/* LiDAR / Sensor Panel (right) */
+#sensorPanel {
+  position: absolute; top: 60px; right: 12px; width: 240px;
+  background: rgba(0,0,0,0.75); border: 1px solid rgba(0,200,255,0.3);
+  border-radius: 8px; padding: 12px; color: #ccc; font-size: 11px;
+}
+#lidarCanvas { width: 100%; height: 160px; border: 1px solid rgba(0,200,255,0.2); border-radius: 4px; margin-bottom: 8px; background: #000; }
+.sensor-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.sensor-toggle {
+  width: 36px; height: 18px; border-radius: 9px; position: relative; cursor: pointer;
+  background: rgba(100,100,100,0.5); border: 1px solid #555; transition: all 0.3s;
+}
+.sensor-toggle.on { background: rgba(0,200,255,0.4); border-color: #0cf; }
+.sensor-toggle .knob {
+  width: 14px; height: 14px; border-radius: 50%; background: #aaa;
+  position: absolute; top: 1px; left: 1px; transition: all 0.3s;
+}
+.sensor-toggle.on .knob { left: 19px; background: #0cf; }
+
+/* Minimap */
+#minimap {
+  position: absolute; bottom: 12px; left: 12px; width: 180px; height: 180px;
+  background: rgba(0,0,0,0.8); border: 1px solid rgba(0,200,255,0.3);
+  border-radius: 8px; overflow: hidden;
+}
+#minimapCanvas { width: 100%; height: 100%; }
+
+/* Control Help */
+#controls-help {
+  position: absolute; bottom: 12px; right: 12px; width: 260px;
+  background: rgba(0,0,0,0.75); border: 1px solid rgba(0,200,255,0.3);
+  border-radius: 8px; padding: 10px; color: #aaa; font-size: 10px;
+}
+.ctrl-row { display: flex; gap: 8px; margin-bottom: 3px; }
+.ctrl-key { color: #0cf; font-family: monospace; min-width: 100px; text-align: right; }
+.ctrl-desc { color: #aaa; }
+
+/* Mode Selector */
+#modeSelector {
+  position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px;
+}
+.mode-btn {
+  background: rgba(0,0,0,0.7); border: 1px solid rgba(0,200,255,0.3);
+  border-radius: 6px; padding: 6px 16px; color: #888; font-size: 11px;
+  cursor: pointer; transition: all 0.3s;
+}
+.mode-btn.active { background: rgba(0,200,255,0.2); color: #0cf; border-color: #0cf; }
+.mode-btn:hover { border-color: #0cf; color: #ccc; }
+
+/* Tunnel Selector */
+#tunnelSelector {
+  position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; z-index: 11;
+}
+.tunnel-btn {
+  background: rgba(0,0,0,0.8); border: 1px solid rgba(100,100,100,0.4);
+  border-radius: 6px; padding: 4px 12px; color: #888; font-size: 10px;
+  cursor: pointer; transition: all 0.3s;
+}
+.tunnel-btn.active { background: rgba(0,200,255,0.15); color: #0cf; border-color: #0cf; }
+.tunnel-btn:hover { border-color: #0cf; }
+
+/* Drone Selector */
+#droneSelector {
+  position: absolute; top: 88px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; z-index: 11;
+}
+.drone-btn {
+  background: rgba(0,0,0,0.8); border: 1px solid rgba(100,100,100,0.4);
+  border-radius: 6px; padding: 4px 12px; color: #888; font-size: 10px;
+  cursor: pointer; transition: all 0.3s;
+}
+.drone-btn.active { background: rgba(0,255,150,0.15); color: #0f8; border-color: #0f8; }
+.drone-btn:hover { border-color: #0f8; }
+
+/* View Mode Pill */
+.status-pill.view-mode { background: rgba(150,0,255,0.15); border-color: rgba(150,0,255,0.4); color: #c8f; }
+
+/* Crosshair */
+#crosshair {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  width: 24px; height: 24px; pointer-events: none; z-index: 15; display: none;
+}
+#crosshair::before, #crosshair::after {
+  content: ''; position: absolute; background: rgba(0,200,255,0.6);
+}
+#crosshair::before { width: 2px; height: 24px; left: 11px; top: 0; }
+#crosshair::after { width: 24px; height: 2px; top: 11px; left: 0; }
+
+/* Damage Alert */
+#damageAlert {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  background: rgba(255,0,0,0.15); border: 2px solid rgba(255,60,60,0.6);
+  border-radius: 12px; padding: 12px 24px; color: #f66;
+  font-size: 14px; font-weight: 700; display: none; text-align: center;
+  animation: pulse 1s infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+@keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+@keyframes countPop { 0% { transform:translate(-50%,-50%) scale(0.3); opacity:0; }
+  50% { transform:translate(-50%,-50%) scale(1.2); opacity:1; }
+  100% { transform:translate(-50%,-50%) scale(1); opacity:1; } }
+@keyframes sysCheck { 0% { opacity:0; transform:translateY(10px); } 100% { opacity:1; transform:translateY(0); } }
+
+/* v9: Launch sequence overlay */
+#launchOverlay {
+  display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0.85); z-index:200; color:#fff;
+  font-family:'Courier New',monospace;
+}
+#launchCount {
+  position:absolute; top:45%; left:50%; transform:translate(-50%,-50%);
+  font-size:120px; font-weight:bold; color:#00ffcc;
+  text-shadow:0 0 40px #00ffcc, 0 0 80px #00cccc;
+  animation: countPop 0.8s ease-out;
+}
+#launchStatus {
+  position:absolute; top:62%; left:50%; transform:translateX(-50%);
+  font-size:14px; color:#aaa; text-align:center; width:400px;
+}
+.sys-line { animation: sysCheck 0.3s ease-out forwards; opacity:0; margin:4px 0; }
+.sys-ok { color:#00ff88; }
+.sys-label { color:#888; }
+
+/* Safety Distance Warning */
+#safetyWarning {
+  position: absolute; top: 100px; left: 50%; transform: translateX(-50%);
+  background: rgba(255,60,0,0.2); border: 2px solid rgba(255,120,0,0.7);
+  border-radius: 8px; padding: 8px 20px; color: #f90;
+  font-size: 12px; font-weight: 700; display: none; text-align: center;
+  z-index: 16; animation: pulse 0.8s infinite;
+}
+
+/* Capture Flash */
+#captureFlash {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(255,255,255,0.3); pointer-events: none; opacity: 0;
+  transition: opacity 0.1s; z-index: 20;
+}
+
+/* Data Panel */
+#dataPanel {
+  position: absolute; top: 50%; right: 260px; transform: translateY(-50%);
+  width: 280px; background: rgba(0,0,0,0.85); border: 1px solid rgba(0,200,255,0.3);
+  border-radius: 8px; padding: 16px; color: #ccc; font-size: 11px;
+  display: none; max-height: 400px; overflow-y: auto;
+}
+#dataPanel h3 { color: #0cf; margin-bottom: 8px; font-size: 13px; }
+.data-entry {
+  background: rgba(0,200,255,0.05); border: 1px solid rgba(0,200,255,0.15);
+  border-radius: 4px; padding: 6px 8px; margin-bottom: 4px; font-size: 10px;
+}
+.data-entry .timestamp { color: #666; }
+.data-entry .dtype { color: #0cf; }
+
+/* ============================================ */
+/* START SCREEN                                 */
+/* ============================================ */
+#startScreen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(ellipse at center, #0a1520 0%, #000 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  z-index: 100; color: #fff;
+}
+#startScreen h1 { font-size: 36px; margin-bottom: 8px; color: #0cf; }
+#startScreen p { color: #888; margin-bottom: 24px; font-size: 14px; }
+#startBtn {
+  background: linear-gradient(135deg, #0cf, #06a); border: none;
+  border-radius: 8px; padding: 14px 40px; color: #fff; font-size: 16px;
+  font-weight: 700; cursor: pointer; transition: all 0.3s;
+}
+#startBtn:hover { transform: scale(1.05); box-shadow: 0 0 30px rgba(0,200,255,0.4); }
+.start-info { color: #555; font-size: 11px; margin-top: 16px; max-width: 500px; text-align: center; line-height: 1.6; }
+
+/* ============================================ */
+/* PRE-FLIGHT CHECKLIST                         */
+/* ============================================ */
+#preflightScreen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(ellipse at center, #0a1520 0%, #000 100%);
+  display: none; z-index: 99; color: #fff; overflow-y: auto;
+}
+#preflightInner {
+  max-width: 700px; margin: 30px auto; padding: 20px;
+}
+#preflightInner h2 {
+  color: #0cf; font-size: 22px; margin-bottom: 6px; text-align: center;
+}
+#preflightInner .subtitle {
+  color: #888; font-size: 12px; text-align: center; margin-bottom: 24px;
+}
+
+/* Checklist sections */
+.cl-section {
+  background: rgba(0,20,40,0.6); border: 1px solid rgba(0,200,255,0.2);
+  border-radius: 8px; margin-bottom: 16px; overflow: hidden;
+}
+.cl-section-header {
+  background: rgba(0,200,255,0.08); padding: 10px 16px;
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid rgba(0,200,255,0.15);
+}
+.cl-section-num {
+  background: rgba(0,200,255,0.2); color: #0cf; width: 28px; height: 28px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; flex-shrink: 0;
+}
+.cl-section-title { font-size: 14px; font-weight: 600; color: #ddd; }
+.cl-section-body { padding: 12px 16px; }
+
+/* Checklist items */
+.cl-item {
+  display: flex; align-items: center; gap: 10px; padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer;
+  transition: background 0.2s; user-select: none;
+}
+.cl-item:last-child { border-bottom: none; }
+.cl-item:hover { background: rgba(0,200,255,0.05); }
+.cl-check {
+  width: 22px; height: 22px; border: 2px solid #555; border-radius: 4px;
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  transition: all 0.3s; font-size: 14px; color: transparent;
+}
+.cl-item.checked .cl-check {
+  border-color: #0f8; background: rgba(0,255,100,0.15); color: #0f8;
+}
+.cl-text { font-size: 12px; color: #bbb; flex: 1; }
+.cl-item.checked .cl-text { color: #0f8; }
+.cl-note {
+  font-size: 10px; color: #666; padding: 2px 0 4px 32px;
+}
+
+/* Input fields in checklist */
+.cl-input-row {
+  display: flex; align-items: center; gap: 10px; padding: 6px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.cl-input-row label { font-size: 12px; color: #bbb; min-width: 120px; }
+.cl-input-row input, .cl-input-row select {
+  background: rgba(0,0,0,0.5); border: 1px solid rgba(0,200,255,0.3);
+  border-radius: 4px; padding: 4px 8px; color: #0cf; font-size: 11px;
+  outline: none; flex: 1;
+}
+.cl-input-row input:focus, .cl-input-row select:focus { border-color: #0cf; }
+.cl-input-row select option { background: #111; color: #ccc; }
+
+/* Proceed button */
+#preflightProceed {
+  display: block; margin: 20px auto; padding: 12px 36px;
+  background: rgba(100,100,100,0.3); border: 1px solid #555;
+  border-radius: 8px; color: #666; font-size: 14px; font-weight: 700;
+  cursor: not-allowed; transition: all 0.3s;
+}
+#preflightProceed.ready {
+  background: linear-gradient(135deg, #0c6, #083); border-color: #0f8;
+  color: #fff; cursor: pointer; box-shadow: 0 0 20px rgba(0,255,100,0.2);
+}
+#preflightProceed.ready:hover { transform: scale(1.05); }
+
+/* Progress bar */
+.cl-progress {
+  width: 100%; height: 6px; background: rgba(255,255,255,0.1);
+  border-radius: 3px; margin: 16px 0 8px; overflow: hidden;
+}
+.cl-progress-bar {
+  height: 100%; background: linear-gradient(90deg, #0cf, #0f8);
+  border-radius: 3px; transition: width 0.4s ease; width: 0%;
+}
+.cl-progress-text {
+  text-align: center; font-size: 11px; color: #888; margin-bottom: 16px;
+}
+
+/* Look mode hint overlay */
+#lookHint {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.7); border: 1px solid rgba(0,200,255,0.4);
+  border-radius: 8px; padding: 8px 20px; color: #0cf; font-size: 12px;
+  z-index: 15; pointer-events: none; transition: opacity 0.3s;
+}
+
+/* Flight log overlay */
+#flightLog {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  width: 500px; max-height: 80vh; overflow-y: auto;
+  background: rgba(0,10,20,0.95); border: 1px solid rgba(0,200,255,0.4);
+  border-radius: 12px; padding: 20px; color: #ccc; font-size: 11px;
+  display: none; z-index: 18;
+}
+#flightLog h3 { color: #0cf; margin-bottom: 12px; font-size: 15px; text-align: center; }
+.log-section { margin-bottom: 12px; }
+.log-section-title { color: #0cf; font-size: 12px; font-weight: 600; margin-bottom: 4px; border-bottom: 1px solid rgba(0,200,255,0.2); padding-bottom: 2px; }
+.log-row { display: flex; justify-content: space-between; padding: 2px 0; }
+.log-label { color: #888; }
+.log-val { color: #ddd; }
+.log-val.ok { color: #0f8; }
+.log-close {
+  display: block; margin: 12px auto 0; padding: 6px 20px;
+  background: rgba(0,200,255,0.15); border: 1px solid #0cf;
+  border-radius: 4px; color: #0cf; cursor: pointer; font-size: 11px;
+}
+</style>
+</head>
+<body>
+
+<!-- ============================== -->
+<!-- START SCREEN                   -->
+<!-- ============================== -->
+<div id="startScreen">
+  <h1>TunnelDrone Simulator</h1>
+  <p>トンネルインフラ点検 訓練システム v8</p>
+  <button id="startBtn" onclick="showPreflight()">ミッション開始</button>
+  <div class="start-info">
+    トンネルインフラ点検のためのドローンパイロット訓練シミュレーター。<br>
+    飛行前チェックリスト、安全プロトコル、データ取得機能を搭載。
+  </div>
+</div>
+
+<!-- ============================== -->
+<!-- PRE-FLIGHT CHECKLIST           -->
+<!-- ============================== -->
+<!-- v9: Launch Sequence Overlay -->
+<div id="launchOverlay">
+  <div id="launchCount"></div>
+  <div id="launchStatus"></div>
+</div>
+
+<div id="preflightScreen">
+  <div id="preflightInner">
+    <h2>飛行前チェックリスト</h2>
+    <div class="subtitle">航空安全基準マニュアル - トンネル点検プロトコル</div>
+
+    <!-- Progress -->
+    <div class="cl-progress"><div class="cl-progress-bar" id="clProgressBar"></div></div>
+    <div class="cl-progress-text" id="clProgressText">0 / 0 completed</div>
+    <div style="text-align:center;margin-bottom:12px;">
+      <button id="bulkCheckBtn" onclick="bulkCheckAll()" style="background:rgba(0,200,255,0.15);border:1px solid rgba(0,200,255,0.4);border-radius:6px;padding:6px 20px;color:#0cf;font-size:12px;cursor:pointer;transition:all 0.3s;">
+        全項目を一括チェック / Check All
+      </button>
+      <button id="bulkUncheckBtn" onclick="bulkUncheckAll()" style="background:rgba(255,100,100,0.1);border:1px solid rgba(255,100,100,0.3);border-radius:6px;padding:6px 20px;color:#f88;font-size:12px;cursor:pointer;margin-left:8px;transition:all 0.3s;">
+        全解除 / Uncheck All
+      </button>
+    </div>
+
+    <!-- Section 1: Mission Planning -->
+    <div class="cl-section">
+      <div class="cl-section-header">
+        <div class="cl-section-num">1</div>
+        <div class="cl-section-title">ミッション計画 / ブリーフィング</div>
+      </div>
+      <div class="cl-section-body">
+        <div class="cl-input-row">
+          <label>操縦者名</label>
+          <input type="text" id="pilotName" placeholder="操縦者名を入力" oninput="validateInputs()">
+        </div>
+        <div class="cl-input-row">
+          <label>免許番号</label>
+          <input type="text" id="licenseNo" placeholder="ドローン免許番号" oninput="validateInputs()">
+        </div>
+        <div class="cl-input-row">
+          <label>対象トンネル</label>
+          <select id="targetTunnel" onchange="validateInputs()">
+            <option value="">-- 選択 --</option>
+            <option value="standard">標準高速道路トンネル</option>
+            <option value="aqualine">東京湾アクアライン</option>
+            <option value="mountain">山岳トンネル</option>
+            <option value="metro">地下鉄トンネル</option>
+          </select>
+        </div>
+        <div class="cl-input-row">
+          <label>実施日</label>
+          <input type="date" id="missionDate" oninput="validateInputs()">
+        </div>
+        <div class="cl-input-row">
+          <label>天候/状況</label>
+          <select id="weatherCondition" onchange="validateInputs()">
+            <option value="">-- 選択 --</option>
+            <option value="clear">晴天 - 入口付近降雨なし</option>
+            <option value="cloudy">曇り - 入口乾燥</option>
+            <option value="rain">雨天 - 入口付近濡れあり</option>
+            <option value="indoor_only">屋内のみ - 入口飛行なし</option>
+          </select>
+        </div>
+        <div class="cl-input-row">
+          <label>使用機体</label>
+          <select id="droneModel" onchange="validateInputs()">
+            <option value="dji_matrice">DJI Matrice 300 RTK</option>
+            <option value="dji_mini">DJI Mini 4 Pro</option>
+            <option value="aibis">AIBIS (Liberaware)</option>
+            <option value="elios">Elios 3 (Flyability)</option>
+            <option value="skydio">Skydio X10</option>
+          </select>
+        </div>
+        <!-- v9: Flight mode selection -->
+        <div class="cl-input-row">
+          <label>飛行モード</label>
+          <select id="flightModeSelect" onchange="validateInputs()">
+            <option value="manual">手動操縦</option>
+            <option value="auto">自動飛行</option>
+            <option value="scan">自動スキャン</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Permissions & Notifications -->
+    <div class="cl-section">
+      <div class="cl-section-header">
+        <div class="cl-section-num">2</div>
+        <div class="cl-section-title">許可・事前届出</div>
+      </div>
+      <div class="cl-section-body">
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">施設所有者・管理者の同意を取得済み</div>
+        </div>
+        <div class="cl-note">トンネル及び周辺施設の管理権限者の承認が必要</div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">事前届出を提出済み（飛行計画報告）</div>
+        </div>
+        <div class="cl-note">飛行エリア、時間、目的、緊急連絡先を登録済み</div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">保険加入を確認済み（賠償責任保険有効）</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">DIPS登録を確認済み（入口付近の飛行に該当する場合）</div>
+        </div>
+        <div class="cl-note">DIPS = ドローン情報基盤システム</div>
+      </div>
+    </div>
+
+    <!-- Section 3: Access Control / Site Safety -->
+    <div class="cl-section">
+      <div class="cl-section-header">
+        <div class="cl-section-num">3</div>
+        <div class="cl-section-title">立入制限・現場安全対策</div>
+      </div>
+      <div class="cl-section-body">
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">交通規制・トンネル通行止めを手配済み</div>
+        </div>
+        <div class="cl-note">道路管理者と全面または部分通行止めを調整済み</div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">安全コーン・警告標識を入口/出口に設置済み</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">補助者・監視員を要所に配置済み</div>
+        </div>
+        <div class="cl-note">最低限：トンネル入口、出口、300m超の場合は中間地点</div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">人・構造物から30m以上の離隔距離を確認済み</div>
+        </div>
+        <div class="cl-note">航空安全基準：人及び物件から常に30m以上の距離を維持</div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">トンネル内の緊急着陸地点を特定済み</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: Pre-Flight Machine Inspection -->
+    <div class="cl-section">
+      <div class="cl-section-header">
+        <div class="cl-section-num">4</div>
+        <div class="cl-section-title">飛行前機体点検</div>
+      </div>
+      <div class="cl-section-body">
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">機体外観検査（損傷・緩みなし）</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">プロペラ：状態及び取付けを確認済み</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">バッテリー残量90%以上・状態正常</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">LiDARセンサー校正済み・動作確認済み</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">360度カメラレンズ清掃済み・録画準備完了</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">LEDヘッドライト動作確認（ハイ/ロービーム）</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">GPS/SLAMナビゲーション初期化済み</div>
+        </div>
+        <div class="cl-note">トンネル内はGPS不可 - SLAM（自己位置推定と環境地図作成）が有効であること</div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">障害物回避センサー テスト済み</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">記録メディア容量確認（64GB以上の空き）</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">フェールセーフRTH（帰還機能）設定済み</div>
+        </div>
+        <div class="cl-note">トンネル内はホバリング待機に設定（標準RTHは衝突の危険あり）</div>
+      </div>
+    </div>
+
+    <!-- Section 5: Communication & Emergency -->
+    <div class="cl-section">
+      <div class="cl-section-header">
+        <div class="cl-section-num">5</div>
+        <div class="cl-section-title">通信・緊急時対応</div>
+      </div>
+      <div class="cl-section-body">
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">補助者との無線通信を確認済み</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">緊急時対応手順のブリーフィング完了</div>
+        </div>
+        <div class="cl-note">内容：通信途絶時プロトコル、緊急着陸、火災・煙発生時の対応</div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">緊急連絡先を確認・携帯済み</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">救急セットを現場に配備済み</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 6: Final Confirmation -->
+    <div class="cl-section">
+      <div class="cl-section-header">
+        <div class="cl-section-num">6</div>
+        <div class="cl-section-title">最終確認</div>
+      </div>
+      <div class="cl-section-body">
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">全チームメンバーへのブリーフィング完了・配置済み</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">飛行計画を操縦者が確認・理解済み</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">操縦者の体調：飛行に支障なし</div>
+        </div>
+
+        <div class="cl-item" onclick="toggleCheck(this)" data-required="true">
+          <div class="cl-check">V</div>
+          <div class="cl-text">航空安全基準マニュアルへの準拠を確認</div>
+        </div>
+        <div class="cl-note">国土交通省航空安全基準に基づくトンネル専用安全プロトコルで運用</div>
+      </div>
+    </div>
+
+    <button id="preflightProceed" onclick="proceedToFlight()">
+      全項目を完了して飛行へ進む
+    </button>
+  </div>
+</div>
+
+<!-- 3D Canvas -->
+<canvas id="canvas3d"></canvas>
+
+<!-- HUD -->
+<div id="hud" style="display:none;">
+  <!-- Top Bar -->
+  <div id="topbar">
+    <div class="top-section">
+      <span id="title">TunnelDrone SIM</span>
+      <span class="status-pill" id="modePill">MANUAL</span>
+      <span class="status-pill" id="tunnelPill">Standard Tunnel</span>
+      <span class="status-pill view-mode" id="viewPill">FPS視点</span>
+      <span class="status-pill" id="pausePill" style="display:none; background:#ff4444; animation: blink 1s infinite;">PAUSED</span>
+      <span class="status-pill" id="lookPill">視点: OFF</span>
+    </div>
+    <div class="top-section">
+      <span class="status-pill safe" id="safetyPill">30m: OK</span>
+      <span class="status-pill" id="batteryPill">電池: 100%</span>
+      <span class="status-pill" id="signalPill">電波: 強</span>
+      <span class="status-pill" id="dataPill">データ: 0件</span>
+    </div>
+  </div>
+
+  <!-- Tunnel Selector -->
+  <div id="tunnelSelector">
+    <div class="tunnel-btn active" data-tunnel="standard" onclick="switchTunnel('standard')">1: 標準</div>
+    <div class="tunnel-btn" data-tunnel="aqualine" onclick="switchTunnel('aqualine')">2: アクアライン</div>
+    <div class="tunnel-btn" data-tunnel="mountain" onclick="switchTunnel('mountain')">3: 山岳</div>
+    <div class="tunnel-btn" data-tunnel="metro" onclick="switchTunnel('metro')">4: 地下鉄</div>
+  </div>
+
+  <!-- Drone Selector -->
+  <div id="droneSelector">
+    <div class="drone-btn active" data-drone="dji_matrice" onclick="switchDrone('dji_matrice')">DJI Matrice</div>
+    <div class="drone-btn" data-drone="dji_mini" onclick="switchDrone('dji_mini')">DJI Mini</div>
+    <div class="drone-btn" data-drone="aibis" onclick="switchDrone('aibis')">AIBIS</div>
+    <div class="drone-btn" data-drone="elios" onclick="switchDrone('elios')">Elios</div>
+    <div class="drone-btn" data-drone="skydio" onclick="switchDrone('skydio')">Skydio</div>
+  </div>
+
+  <!-- Telemetry -->
+  <div id="telemetry">
+    <div class="telem-row"><span class="telem-label">位置 X</span><span class="telem-value" id="posX">0.00</span></div>
+    <div class="telem-row"><span class="telem-label">位置 Y</span><span class="telem-value" id="posY">0.00</span></div>
+    <div class="telem-row"><span class="telem-label">位置 Z</span><span class="telem-value" id="posZ">0.00</span></div>
+    <div class="telem-divider"></div>
+    <div class="telem-row"><span class="telem-label">速度</span><span class="telem-value" id="speed">0.0 m/s</span></div>
+    <div class="telem-row"><span class="telem-label">高度</span><span class="telem-value" id="altitude">2.0 m</span></div>
+    <div class="telem-row"><span class="telem-label">方位</span><span class="telem-value" id="heading">0.0 deg</span></div>
+    <div class="telem-divider"></div>
+    <div class="telem-row"><span class="telem-label">最近壁面距離</span><span class="telem-value" id="nearestWall">-- m</span></div>
+    <div class="telem-row"><span class="telem-label">走行距離</span><span class="telem-value" id="distance">0.0 m</span></div>
+    <div class="telem-row"><span class="telem-label">進捗</span><span class="telem-value" id="progress">0%</span></div>
+    <div class="telem-divider"></div>
+    <div class="telem-row"><span class="telem-label">検出損傷数</span><span class="telem-value" id="damagesFound">0</span></div>
+    <div class="telem-row"><span class="telem-label">撮影枚数</span><span class="telem-value" id="photosTaken">0</span></div>
+  </div>
+
+  <!-- Sensor Panel -->
+  <div id="sensorPanel">
+    <canvas id="lidarCanvas" width="216" height="160"></canvas>
+    <div class="sensor-row">
+      <span>ライト</span>
+      <div class="sensor-toggle on" id="toggleFlash" onclick="toggleSensor('flash')"><div class="knob"></div></div>
+    </div>
+    <div class="sensor-row">
+      <span>LiDAR</span>
+      <div class="sensor-toggle" id="toggleLidar" onclick="toggleSensor('lidar')"><div class="knob"></div></div>
+    </div>
+    <div class="sensor-row">
+      <span>360度カメラ</span>
+      <div class="sensor-toggle on" id="toggle360" onclick="toggleSensor('cam360')"><div class="knob"></div></div>
+    </div>
+    <div class="sensor-row">
+      <span>損傷検出</span>
+      <div class="sensor-toggle on" id="toggleDamage" onclick="toggleSensor('damage')"><div class="knob"></div></div>
+    </div>
+  </div>
+
+  <!-- Minimap -->
+  <div id="minimap">
+    <canvas id="minimapCanvas" width="180" height="180"></canvas>
+  </div>
+
+  <!-- Controls Help -->
+  <div id="controls-help">
+    <div class="ctrl-row"><span class="ctrl-key">右ドラッグ</span><span class="ctrl-desc">右ボタン押しながらマウス移動で視点操作</span></div>
+    <div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-desc">前進/左/後退/右 移動</span></div>
+    <div class="ctrl-row"><span class="ctrl-key">Space/Shift</span><span class="ctrl-desc">手動:上昇/下降 | 自動:一時停止/再開</span></div>
+    <div class="ctrl-row"><span class="ctrl-key">Tab</span><span class="ctrl-desc">自動/手動 切替</span></div>
+    <div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-desc">ライト ON/OFF</span></div>
+    <div class="ctrl-row"><span class="ctrl-key">L</span><span class="ctrl-desc">LiDAR ON/OFF</span></div>
+    <div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-desc">写真撮影</span></div>
+    <div class="ctrl-row"><span class="ctrl-key">E</span><span class="ctrl-desc">データパネル表示</span></div>
+    <div class="ctrl-row"><span class="ctrl-key">P</span><span class="ctrl-desc">飛行ログ / レポート</span></div>
+    <div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-desc">1人称/3人称 視点切替</span></div>
+    <div class="ctrl-row"><span class="ctrl-key">1-4</span><span class="ctrl-desc">トンネル選択</span></div>
+    <div class="ctrl-row"><span class="ctrl-key">右ボタン離す</span><span class="ctrl-desc">視点操作を終了</span></div>
+  </div>
+
+  <!-- Mode Buttons -->
+  <div id="modeSelector">
+    <div class="mode-btn active" id="btnManual" onclick="setFlightMode('manual')">手動操縦</div>
+    <div class="mode-btn" id="btnAuto" onclick="setFlightMode('auto')">自動飛行</div>
+    <div class="mode-btn" id="btnScan" onclick="setFlightMode('scan')">スキャン</div>
+  </div>
+
+  <!-- v9: Auto-flight progress bar -->
+  <div id="autoProgressBar" style="display:none; position:fixed; bottom:60px; left:50%; transform:translateX(-50%);
+    width:300px; height:20px; background:rgba(0,0,0,0.6); border:1px solid rgba(0,255,255,0.4); border-radius:10px; overflow:hidden; z-index:50;">
+    <div id="autoProgressFill" style="height:100%; width:0%; background:linear-gradient(90deg,#00cccc,#00ffcc);
+      border-radius:10px; transition:width 0.3s ease;"></div>
+    <span id="autoProgressText" style="position:absolute; top:0; left:0; width:100%; text-align:center;
+      font-size:11px; line-height:20px; color:#fff; text-shadow:0 0 4px #000;">0%</span>
+  </div>
+
+  <!-- Crosshair -->
+  <div id="crosshair"></div>
+
+  <!-- Damage Alert -->
+  <div id="damageAlert">
+    損傷検出<br><span id="damageType" style="font-size:11px;font-weight:400;"></span>
+  </div>
+
+  <!-- Safety Distance Warning -->
+  <div id="safetyWarning">
+    警告: 30m安全距離内に物体あり
+  </div>
+
+  <!-- Capture Flash -->
+  <div id="captureFlash"></div>
+
+  <!-- Data Panel -->
+  <div id="dataPanel">
+    <h3>点検データ</h3>
+    <div id="dataEntries"></div>
+    <div style="margin-top:8px;text-align:center;">
+      <button onclick="exportAllData()" style="background:rgba(0,200,255,0.2);border:1px solid #0cf;color:#0cf;padding:4px 16px;border-radius:4px;cursor:pointer;font-size:11px;">JSON出力</button>
+      <button onclick="exportDXF()" style="background:rgba(0,255,100,0.2);border:1px solid #0f6;color:#0f6;padding:4px 16px;border-radius:4px;cursor:pointer;font-size:11px;margin-left:4px;">DXF出力</button>
+    </div>
+  </div>
+
+  <!-- Flight Log Panel -->
+  <div id="flightLog">
+    <h3>飛行ログ / ミッションレポート</h3>
+    <div id="flightLogContent"></div>
+    <button class="log-close" onclick="document.getElementById('flightLog').style.display='none'">閉じる</button>
+  </div>
+
+  <!-- Look mode hint -->
+  <div id="lookHint">右ボタンを押しながらマウスを動かして視点操作</div>
+</div>
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+// ============================================================
+// TunnelDrone Simulator v8
+// - NEW: 3rd person camera view (V key toggle)
+// - NEW: Drone model selection (DJI Matrice, DJI Mini, AIBIS, Elios, Skydio)
+// - Each drone model has distinct visual appearance
+// ============================================================
+
+let scene, camera, renderer, clock;
+let drone, droneLight, droneSpotLight;
+let tunnelGroup;
+let lidarPoints = [];
+let damageMarkers = [];
+let capturedData = [];
+let photoCount = 0;
+
+let obstacles = [];
+
+// v6: Store current tunnel path for collision detection
+let currentPath = null;
+
+const preflightData = {
+  pilotName: '',
+  licenseNo: '',
+  targetTunnel: '',
+  missionDate: '',
+  weather: '',
+  startTime: null,
+};
+
+const state = {
+  mode: 'manual',
+  tunnel: 'standard',
+  droneType: 'dji_matrice',
+  viewMode: 'fps', // 'fps' or 'thirdPerson'
+  sensors: { flash: true, lidar: false, cam360: true, damage: true },
+  battery: 100,
+  speed: 0,
+  distance: 0,
+  damagesFound: 0,
+  isRunning: false,
+  lookMode: false,
+  autoProgress: 0,
+  autoPaused: false, // v9: pause/resume for auto/scan mode
+  nearestWallDist: 99,
+  safetyViolations: 0,
+  missionStartTime: null,
+};
+
+const keys = {};
+const mouse = { x: 0, y: 0, dx: 0, dy: 0 };
+
+// v5 FIX: Track last mouse position for manual delta calculation
+let lastMouseX = 0, lastMouseY = 0;
+
+// v7: Drone position tracking (separate from camera for 3rd person)
+const dronePos = new THREE.Vector3(0, 2, -5);
+const droneQuat = new THREE.Quaternion();
+const droneEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+// Smooth camera follow for 3rd person
+const camFollowPos = new THREE.Vector3();
+const camFollowTarget = new THREE.Vector3();
+
+const TUNNELS = {
+  standard: {
+    name: '標準高速道路トンネル', radius: 5.5, length: 500, segments: 200,
+    hasCurve: false, laneCount: 2, lighting: 'fluorescent',
+    color: 0x5a5a55, description: 'Standard 2-lane highway tunnel'
+  },
+  aqualine: {
+    name: '東京湾アクアライン', radius: 6.5, length: 800, segments: 300,
+    hasCurve: true, curveRadius: 2000, laneCount: 2, lighting: 'led',
+    color: 0x505868, description: 'Undersea tunnel with gentle curve'
+  },
+  mountain: {
+    name: '山岳トンネル', radius: 4.5, length: 400, segments: 160,
+    hasCurve: true, curveRadius: 500, laneCount: 1, lighting: 'sodium',
+    color: 0x6a5f50, description: 'Single lane mountain road tunnel'
+  },
+  metro: {
+    name: '地下鉄トンネル', radius: 3.5, length: 600, segments: 240,
+    hasCurve: true, curveRadius: 800, laneCount: 0, lighting: 'minimal',
+    color: 0x484850, description: 'Round subway tunnel with rails'
+  }
+};
+
+const DAMAGE_TYPES = [
+  { type: 'crack', name: 'Crack', color: 0xff3333, severity: 'high' },
+  { type: 'leak', name: 'Water Leak', color: 0x3366ff, severity: 'medium' },
+  { type: 'spall', name: 'Spalling', color: 0xffaa33, severity: 'high' },
+  { type: 'corrosion', name: 'Corrosion', color: 0x886633, severity: 'low' },
+  { type: 'deformation', name: 'Deformation', color: 0xff66ff, severity: 'critical' },
+];
+
+// v7: Drone model definitions
+const DRONE_MODELS = {
+  dji_matrice: {
+    name: 'DJI Matrice 300 RTK',
+    bodyColor: 0x2a2a2a, accentColor: 0xcc0000,
+    bodySize: [0.45, 0.14, 0.45], armLen: 0.38, propRadius: 0.12,
+    description: '産業用大型機 - 高精度RTK搭載'
+  },
+  dji_mini: {
+    name: 'DJI Mini 4 Pro',
+    bodyColor: 0x888888, accentColor: 0xff6600,
+    bodySize: [0.2, 0.06, 0.2], armLen: 0.2, propRadius: 0.07,
+    description: 'コンパクト民生機 - 軽量249g'
+  },
+  aibis: {
+    name: 'AIBIS (Liberaware)',
+    bodyColor: 0x1a1a1a, accentColor: 0x00ff88,
+    bodySize: [0.12, 0.08, 0.12], armLen: 0.1, propRadius: 0.05,
+    description: '超小型点検ドローン - 狭小空間特化'
+  },
+  elios: {
+    name: 'Elios 3 (Flyability)',
+    bodyColor: 0x333333, accentColor: 0xffaa00,
+    bodySize: [0.3, 0.15, 0.3], armLen: 0.25, propRadius: 0.1,
+    hasCage: true,
+    description: 'ケージ搭載 - 衝突耐性'
+  },
+  skydio: {
+    name: 'Skydio X10',
+    bodyColor: 0x1e1e2a, accentColor: 0x3399ff,
+    bodySize: [0.35, 0.1, 0.35], armLen: 0.3, propRadius: 0.1,
+    description: '自律飛行AI搭載 - 障害物回避'
+  }
+};
+
+// ============================================================
+// PRE-FLIGHT CHECKLIST LOGIC
+// ============================================================
+function showPreflight() {
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('preflightScreen').style.display = 'block';
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('missionDate').value = today;
+  updateChecklistProgress();
+}
+
+function toggleCheck(el) {
+  el.classList.toggle('checked');
+  updateChecklistProgress();
+}
+
+function bulkCheckAll() {
+  document.querySelectorAll('.cl-item[data-required]').forEach(el => {
+    if (!el.classList.contains('checked')) el.classList.add('checked');
+  });
+  updateChecklistProgress();
+}
+
+function bulkUncheckAll() {
+  document.querySelectorAll('.cl-item[data-required]').forEach(el => {
+    el.classList.remove('checked');
+  });
+  updateChecklistProgress();
+}
+
+function validateInputs() {
+  updateChecklistProgress();
+}
+
+function updateChecklistProgress() {
+  const allItems = document.querySelectorAll('.cl-item[data-required]');
+  const checkedItems = document.querySelectorAll('.cl-item.checked[data-required]');
+  const total = allItems.length;
+  const done = checkedItems.length;
+
+  const pilotName = document.getElementById('pilotName').value.trim();
+  const licenseNo = document.getElementById('licenseNo').value.trim();
+  const targetTunnel = document.getElementById('targetTunnel').value;
+  const missionDate = document.getElementById('missionDate').value;
+  const weather = document.getElementById('weatherCondition').value;
+
+  const inputsFilled = pilotName && licenseNo && targetTunnel && missionDate && weather;
+  const inputCount = [pilotName, licenseNo, targetTunnel, missionDate, weather].filter(Boolean).length;
+
+  const totalAll = total + 5;
+  const doneAll = done + inputCount;
+
+  const pct = Math.round((doneAll / totalAll) * 100);
+  document.getElementById('clProgressBar').style.width = pct + '%';
+  document.getElementById('clProgressText').textContent = `${doneAll} / ${totalAll} 完了 (${pct}%)`;
+
+  const btn = document.getElementById('preflightProceed');
+  if (done === total && inputsFilled) {
+    btn.classList.add('ready');
+    btn.textContent = 'ALL CLEAR - 飛行開始';
+  } else {
+    btn.classList.remove('ready');
+    btn.textContent = `全項目を完了して飛行へ進む (残り${totalAll - doneAll}項目)`;
+  }
+}
+
+function proceedToFlight() {
+  const btn = document.getElementById('preflightProceed');
+  if (!btn.classList.contains('ready')) return;
+
+  preflightData.pilotName = document.getElementById('pilotName').value.trim();
+  preflightData.licenseNo = document.getElementById('licenseNo').value.trim();
+  preflightData.targetTunnel = document.getElementById('targetTunnel').value;
+  preflightData.missionDate = document.getElementById('missionDate').value;
+  preflightData.weather = document.getElementById('weatherCondition').value;
+  preflightData.startTime = new Date().toISOString();
+
+  // v7: Set selected drone model
+  const selectedDrone = document.getElementById('droneModel').value;
+  state.droneType = selectedDrone;
+
+  // v9: Get selected flight mode
+  const selectedMode = document.getElementById('flightModeSelect').value;
+
+  state.missionStartTime = Date.now();
+
+  document.getElementById('preflightScreen').style.display = 'none';
+
+  // v9: Initialize scene first (needed for countdown view)
+  switchDrone(selectedDrone);
+  switchTunnel(preflightData.targetTunnel || 'standard');
+
+  // v9: Launch sequence with countdown
+  if (selectedMode !== 'manual') {
+    runLaunchSequence(selectedMode);
+  } else {
+    // Manual mode: start immediately
+    document.getElementById('hud').style.display = 'block';
+    setFlightMode('manual');
+    state.isRunning = true;
+    animate();
+  }
+}
+
+// v9: Cinematic launch sequence
+function runLaunchSequence(mode) {
+  const overlay = document.getElementById('launchOverlay');
+  const countEl = document.getElementById('launchCount');
+  const statusEl = document.getElementById('launchStatus');
+  overlay.style.display = 'block';
+
+  // Show HUD behind overlay
+  document.getElementById('hud').style.display = 'block';
+  state.isRunning = true;
+  state.autoPaused = true; // Hold drone still during countdown
+  setFlightMode(mode);
+  animate();
+
+  const sysChecks = [
+    { label: 'ドローンシステム', status: 'ONLINE' },
+    { label: 'GPS/SLAM位置補正', status: 'LOCKED' },
+    { label: 'LiDARセンサー', status: 'READY' },
+    { label: '損傷検出AI', status: 'LOADED' },
+    { label: '通信リンク', status: 'STABLE' },
+    { label: '飛行経路計算', status: 'COMPLETE' },
+  ];
+
+  let step = 0;
+  statusEl.innerHTML = '';
+
+  // Phase 1: System checks (0-2.4s)
+  countEl.textContent = '';
+  countEl.style.fontSize = '24px';
+  countEl.style.color = '#888';
+  countEl.textContent = 'SYSTEM CHECK';
+
+  const checkInterval = setInterval(() => {
+    if (step < sysChecks.length) {
+      const c = sysChecks[step];
+      const line = document.createElement('div');
+      line.className = 'sys-line';
+      line.style.animationDelay = '0s';
+      line.innerHTML = `<span class="sys-label">[${String(step+1).padStart(2,'0')}]</span> ${c.label} ... <span class="sys-ok">${c.status}</span>`;
+      statusEl.appendChild(line);
+      step++;
+    } else {
+      clearInterval(checkInterval);
+      // Phase 2: Countdown 3-2-1
+      countEl.style.fontSize = '120px';
+      countEl.style.color = '#00ffcc';
+      statusEl.innerHTML = `<div style="color:#00ffcc; font-size:16px; margin-top:20px;">${mode === 'scan' ? '自動スキャン' : '自動飛行'}モード 起動中...</div>`;
+
+      let count = 3;
+      countEl.textContent = count;
+      const countInterval = setInterval(() => {
+        count--;
+        if (count > 0) {
+          countEl.textContent = count;
+          countEl.style.animation = 'none';
+          void countEl.offsetWidth; // trigger reflow
+          countEl.style.animation = 'countPop 0.8s ease-out';
+        } else {
+          clearInterval(countInterval);
+          countEl.textContent = 'GO';
+          countEl.style.color = '#00ff88';
+          countEl.style.animation = 'none';
+          void countEl.offsetWidth;
+          countEl.style.animation = 'countPop 0.8s ease-out';
+
+          // Phase 3: Start flight
+          setTimeout(() => {
+            overlay.style.display = 'none';
+            state.autoPaused = false;
+            const pausePill = document.getElementById('pausePill');
+            if (pausePill) pausePill.style.display = 'none';
+          }, 600);
+        }
+      }, 1000);
+    }
+  }, 400);
+}
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+function init() {
+  const canvas = document.getElementById('canvas3d');
+
+  scene = new THREE.Scene();
+  // v6: Dark fog matching deep tunnel interior
+  scene.fog = new THREE.FogExp2(0x080810, 0.012);
+  scene.background = new THREE.Color(0x080810);
+
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 0, 5);
+  camera.rotation.order = 'YXZ';
+
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  // v6: Lower exposure for realistic tunnel darkness
+  renderer.toneMappingExposure = 1.0;
+
+  clock = new THREE.Clock();
+
+  // v6: Very low ambient - tunnel lights are the main source
+  const ambient = new THREE.AmbientLight(0x202028, 0.25);
+  scene.add(ambient);
+  const hemiLight = new THREE.HemisphereLight(0x334455, 0x221100, 0.15);
+  scene.add(hemiLight);
+
+  createDrone();
+  buildTunnel('standard');
+
+  window.addEventListener('resize', onResize);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('mousemove', onMouseMove);
+
+  // Right-click drag for look mode (NO pointer lock)
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 2) {
+      state.lookMode = true;
+      // v5: Record starting position for delta calculation
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+      updateLookModeUI();
+    }
+  });
+
+  window.addEventListener('mouseup', (e) => {
+    if (e.button === 2) {
+      state.lookMode = false;
+      updateLookModeUI();
+    }
+  });
+}
+
+function updateLookModeUI() {
+  const pill = document.getElementById('lookPill');
+  const crosshair = document.getElementById('crosshair');
+  const hint = document.getElementById('lookHint');
+
+  if (state.lookMode) {
+    pill.textContent = '視点: ON';
+    pill.className = 'status-pill active-look';
+    crosshair.style.display = 'block';
+    hint.style.opacity = '0';
+  } else {
+    pill.textContent = '視点: OFF';
+    pill.className = 'status-pill';
+    crosshair.style.display = 'none';
+    hint.style.opacity = '1';
+  }
+}
+
+function createDrone(modelType) {
+  modelType = modelType || state.droneType;
+  const mdl = DRONE_MODELS[modelType];
+
+  if (drone) scene.remove(drone);
+  drone = new THREE.Group();
+
+  const bodyMat = new THREE.MeshStandardMaterial({ color: mdl.bodyColor, metalness: 0.8, roughness: 0.3 });
+  const accentMat = new THREE.MeshStandardMaterial({ color: mdl.accentColor, metalness: 0.6, roughness: 0.4 });
+  const propMat = new THREE.MeshStandardMaterial({ color: 0x00ccff, transparent: true, opacity: 0.3 });
+
+  // Body
+  const bs = mdl.bodySize;
+  const bodyGeom = new THREE.BoxGeometry(bs[0], bs[1], bs[2]);
+  drone.add(new THREE.Mesh(bodyGeom, bodyMat));
+
+  // Accent stripe on body
+  const stripeGeom = new THREE.BoxGeometry(bs[0]*1.02, bs[1]*0.3, bs[2]*0.3);
+  const stripe = new THREE.Mesh(stripeGeom, accentMat);
+  stripe.position.set(0, bs[1]*0.3, bs[2]*0.3);
+  drone.add(stripe);
+
+  // Camera lens (front)
+  const lensGeom = new THREE.SphereGeometry(bs[0]*0.12, 8, 8);
+  const lensMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9, roughness: 0.1 });
+  const lens = new THREE.Mesh(lensGeom, lensMat);
+  lens.position.set(0, -bs[1]*0.2, bs[2]*0.5);
+  drone.add(lens);
+
+  // Arms and props
+  for (let i = 0; i < 4; i++) {
+    const angle = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    const armGeom = new THREE.CylinderGeometry(0.015, 0.015, mdl.armLen);
+    const arm = new THREE.Mesh(armGeom, new THREE.MeshStandardMaterial({ color: 0x222222 }));
+    arm.rotation.z = Math.PI / 2; arm.rotation.y = angle;
+    arm.position.set(Math.cos(angle) * mdl.armLen * 0.45, 0, Math.sin(angle) * mdl.armLen * 0.45);
+    drone.add(arm);
+
+    // Motor hub
+    const motorGeom = new THREE.CylinderGeometry(0.02, 0.02, 0.03, 8);
+    const motor = new THREE.Mesh(motorGeom, accentMat);
+    motor.position.set(Math.cos(angle) * mdl.armLen * 0.65, 0.02, Math.sin(angle) * mdl.armLen * 0.65);
+    drone.add(motor);
+
+    const propGeom = new THREE.CylinderGeometry(mdl.propRadius, mdl.propRadius, 0.01, 16);
+    const prop = new THREE.Mesh(propGeom, propMat);
+    prop.position.set(Math.cos(angle) * mdl.armLen * 0.65, 0.04, Math.sin(angle) * mdl.armLen * 0.65);
+    prop.userData.isProp = true;
+    drone.add(prop);
+  }
+
+  // Landing gear (legs)
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
+  for (let i = -1; i <= 1; i += 2) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, bs[1]*1.5), legMat);
+    leg.position.set(i * bs[0]*0.3, -bs[1]*0.9, 0);
+    drone.add(leg);
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.008, bs[2]*0.6), legMat);
+    foot.position.set(i * bs[0]*0.3, -bs[1]*1.6, 0);
+    drone.add(foot);
+  }
+
+  // Elios: protective cage
+  if (mdl.hasCage) {
+    const cageGeom = new THREE.SphereGeometry(mdl.armLen * 1.1, 12, 8);
+    const cageMat = new THREE.MeshStandardMaterial({
+      color: 0x666666, metalness: 0.5, roughness: 0.6,
+      wireframe: true, transparent: true, opacity: 0.4
+    });
+    drone.add(new THREE.Mesh(cageGeom, cageMat));
+  }
+
+  // LED status lights
+  const ledGeom = new THREE.SphereGeometry(0.015, 6, 6);
+  const ledGreen = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+  const ledRed = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+  const led1 = new THREE.Mesh(ledGeom, ledGreen);
+  led1.position.set(0, bs[1]*0.5, -bs[2]*0.4);
+  drone.add(led1);
+  const led2 = new THREE.Mesh(ledGeom, ledRed);
+  led2.position.set(0, bs[1]*0.5, bs[2]*0.4);
+  drone.add(led2);
+
+  // Spotlight
+  droneSpotLight = new THREE.SpotLight(0xffeedd, 4, 80, Math.PI / 5, 0.5, 1.0);
+  droneSpotLight.position.set(0, -0.05, 0.2);
+  droneSpotLight.castShadow = true;
+  droneSpotLight.shadow.mapSize.set(1024, 1024);
+  drone.add(droneSpotLight);
+  drone.add(droneSpotLight.target);
+  droneSpotLight.target.position.set(0, -0.05, 5);
+
+  droneLight = new THREE.PointLight(0x88aaff, 1.5, 20);
+  drone.add(droneLight);
+
+  drone.position.set(0, 2, -5);
+  drone.visible = (state.viewMode === 'thirdPerson');
+  scene.add(drone);
+}
+
+// ============================================================
+// TUNNEL BUILDING
+// ============================================================
+function buildTunnel(type) {
+  if (tunnelGroup) scene.remove(tunnelGroup);
+  tunnelGroup = new THREE.Group();
+  lidarPoints = [];
+  damageMarkers = [];
+  obstacles = [];
+
+  const cfg = TUNNELS[type];
+  const path = createTunnelPath(cfg);
+  currentPath = path;  // Store for collision detection
+
+  // v6: Concrete walls - rough, dark, no shine
+  const tubeGeom = new THREE.TubeGeometry(path, cfg.segments, cfg.radius, 32, false);
+  tubeGeom.scale(-1, -1, -1);
+  const tunnelMat = new THREE.MeshStandardMaterial({
+    color: cfg.color, roughness: 0.95, metalness: 0.0, side: THREE.FrontSide
+  });
+  const tunnel = new THREE.Mesh(tubeGeom, tunnelMat);
+  tunnel.receiveShadow = true;
+  tunnelGroup.add(tunnel);
+
+  // Road surface - darker asphalt
+  const roadWidth = cfg.radius * 1.6;
+  const roadPath = createTunnelPath(cfg);
+  const roadShape = new THREE.Shape();
+  roadShape.moveTo(-roadWidth/2, -cfg.radius+0.1);
+  roadShape.lineTo(roadWidth/2, -cfg.radius+0.1);
+  roadShape.lineTo(roadWidth/2, -cfg.radius+0.2);
+  roadShape.lineTo(-roadWidth/2, -cfg.radius+0.2);
+  roadShape.closePath();
+  const road = new THREE.Mesh(
+    new THREE.ExtrudeGeometry(roadShape, { steps: cfg.segments, extrudePath: roadPath }),
+    new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.95, metalness: 0.0 })
+  );
+  road.receiveShadow = true;
+  tunnelGroup.add(road);
+
+  if (cfg.laneCount > 0) addLaneMarkings(cfg, path);
+  if (type === 'metro') addRails(cfg, path);
+  addTunnelLights(cfg, path);
+  addConcretePanels(cfg, path);
+  addCableTrays(cfg, path);
+  addEmergencySigns(cfg, path);
+  addWallStrips(cfg, path);
+  generateDamagePoints(cfg, path);
+  addPortals(cfg, path);
+  addVentilation(cfg, path);
+  addObstacles(cfg, path);
+
+  scene.add(tunnelGroup);
+
+  // v7: Start inside tunnel entrance, set dronePos and droneEuler
+  const startPt = path.getPointAt(0.01);
+  const startTg = path.getTangentAt(0.01);
+  dronePos.set(startPt.x, startPt.y, startPt.z);
+  // Calculate initial orientation from tangent
+  const lookTarget = startPt.clone().add(startTg.multiplyScalar(10));
+  const tempCam = new THREE.Object3D();
+  tempCam.position.copy(startPt);
+  tempCam.lookAt(lookTarget);
+  droneEuler.setFromQuaternion(tempCam.quaternion, 'YXZ');
+  droneQuat.setFromEuler(droneEuler);
+  // Set camera to match
+  camera.position.copy(dronePos);
+  camera.quaternion.copy(droneQuat);
+  camera.rotation.order = 'YXZ';
+  camFollowPos.copy(dronePos);
+  camFollowTarget.copy(dronePos);
+  state.distance = 0;
+  state.autoProgress = 0;
+  state.autoPaused = false;
+
+  document.getElementById('tunnelPill').textContent = cfg.name;
+  document.querySelectorAll('.tunnel-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tunnel === type);
+  });
+}
+
+function createTunnelPath(cfg) {
+  const points = [];
+  for (let i = 0; i <= cfg.segments; i++) {
+    const t = i / cfg.segments;
+    let x = 0, y = 0, z = t * cfg.length;
+    if (cfg.hasCurve && cfg.curveRadius) {
+      const angle = (t * cfg.length) / cfg.curveRadius;
+      x = cfg.curveRadius * (1 - Math.cos(angle));
+      z = cfg.curveRadius * Math.sin(angle);
+    }
+    if (cfg === TUNNELS.mountain) y = Math.sin(t * Math.PI * 3) * 1.5;
+    points.push(new THREE.Vector3(x, y, z));
+  }
+  return new THREE.CatmullRomCurve3(points);
+}
+
+function addLaneMarkings(cfg, path) {
+  const mat = new THREE.MeshBasicMaterial({ color: 0xffff66 });
+  for (let i = 0; i < cfg.segments; i += 3) {
+    const t = i / cfg.segments;
+    const pt = path.getPointAt(t);
+    const tg = path.getTangentAt(t);
+    if (i % 6 < 3) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.15, cfg.length/cfg.segments*2.5), mat);
+      m.position.copy(pt); m.position.y = -cfg.radius + 0.22;
+      m.rotation.x = -Math.PI/2; m.lookAt(pt.clone().add(tg)); m.rotation.x = -Math.PI/2;
+      tunnelGroup.add(m);
+    }
+  }
+  // White edge lines
+  const edgeMat = new THREE.MeshBasicMaterial({ color: 0xeeeeee });
+  for (let i = 0; i < cfg.segments; i += 2) {
+    const t = i / cfg.segments;
+    const pt = path.getPointAt(t);
+    for (const side of [-1, 1]) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.1, cfg.length/cfg.segments*1.8), edgeMat);
+      m.position.copy(pt);
+      m.position.y = -cfg.radius + 0.22;
+      m.position.x += side * (cfg.radius * 0.75);
+      m.rotation.x = -Math.PI/2;
+      tunnelGroup.add(m);
+    }
+  }
+}
+
+function addRails(cfg, path) {
+  const mat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.9, roughness: 0.3 });
+  const geom = new THREE.BoxGeometry(0.08, 0.1, cfg.length);
+  const r1 = new THREE.Mesh(geom, mat); r1.position.set(-0.75, -cfg.radius+0.15, cfg.length/2); tunnelGroup.add(r1);
+  const r2 = new THREE.Mesh(geom, mat); r2.position.set(0.75, -cfg.radius+0.15, cfg.length/2); tunnelGroup.add(r2);
+}
+
+function addTunnelLights(cfg, path) {
+  // v6: Reduced intensity for visible light pools, not white flood
+  const spacing = cfg.lighting === 'minimal' ? 18 : 10;
+  const intensity = cfg.lighting === 'led' ? 1.2 : cfg.lighting === 'sodium' ? 1.0 : cfg.lighting === 'minimal' ? 0.4 : 0.8;
+  const color = cfg.lighting === 'sodium' ? 0xffaa44 : cfg.lighting === 'led' ? 0xffeedd : cfg.lighting === 'minimal' ? 0xffddaa : 0xccddcc;
+  const range = 20;
+  const step = Math.max(1, Math.floor(spacing / (cfg.length / cfg.segments)));
+
+  for (let i = 0; i < cfg.segments; i += step) {
+    const t = i / cfg.segments;
+    const pt = path.getPointAt(Math.min(t, 0.999));
+
+    // Ceiling light - creates a visible pool of light
+    const light = new THREE.PointLight(color, intensity, range);
+    light.position.copy(pt); light.position.y += cfg.radius - 0.5;
+    tunnelGroup.add(light);
+
+    // Light fixture (visible glowing box) - the actual lamp body
+    const fixMat = new THREE.MeshStandardMaterial({
+      color: 0x444444, emissive: color, emissiveIntensity: 1.5
+    });
+    const fix = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.08, 0.3), fixMat);
+    fix.position.copy(light.position); fix.position.y += 0.08;
+    tunnelGroup.add(fix);
+
+    // Side wall wash lights (every other fixture, alternating sides)
+    if (i % (step * 2) === 0) {
+      const sl = new THREE.PointLight(color, intensity * 0.2, range * 0.4);
+      sl.position.copy(pt);
+      sl.position.x += (i % (step * 4) === 0 ? 1 : -1) * (cfg.radius - 0.4);
+      sl.position.y += 1.0;
+      tunnelGroup.add(sl);
+    }
+  }
+}
+
+// v5 NEW: Concrete panel segments for visual texture
+function addConcretePanels(cfg, path) {
+  const panelStep = Math.max(1, Math.floor(5 / (cfg.length / cfg.segments)));
+  const colors = [0x4a4a46, 0x3e3e3a, 0x525250, 0x444440];
+
+  for (let i = 0; i < cfg.segments; i += panelStep) {
+    const t = i / cfg.segments;
+    const pt = path.getPointAt(t);
+
+    // Horizontal joint lines on walls
+    for (const side of [-1, 1]) {
+      const jointColor = colors[i % colors.length];
+      const joint = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.04, cfg.length / cfg.segments * 4.5),
+        new THREE.MeshStandardMaterial({ color: jointColor, roughness: 1.0, metalness: 0 })
+      );
+      joint.position.copy(pt);
+      joint.position.x += side * (cfg.radius - 0.02);
+      joint.position.y += 0;
+      joint.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+      tunnelGroup.add(joint);
+    }
+
+    // Vertical seam lines (every 3rd panel)
+    if (i % (panelStep * 3) === 0) {
+      for (const side of [-1, 1]) {
+        const seam = new THREE.Mesh(
+          new THREE.PlaneGeometry(cfg.radius * 1.2, 0.03),
+          new THREE.MeshStandardMaterial({ color: 0x555550, roughness: 1.0 })
+        );
+        seam.position.copy(pt);
+        seam.position.x += side * (cfg.radius - 0.02);
+        seam.position.y += 0;
+        seam.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+        tunnelGroup.add(seam);
+      }
+    }
+  }
+}
+
+// v5 NEW: Cable trays running along ceiling
+function addCableTrays(cfg, path) {
+  const trayMat = new THREE.MeshStandardMaterial({ color: 0x444448, metalness: 0.6, roughness: 0.5 });
+  const cableMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
+  const trayStep = Math.max(1, Math.floor(6 / (cfg.length / cfg.segments)));
+
+  for (let i = 0; i < cfg.segments; i += trayStep) {
+    const t = i / cfg.segments;
+    const pt = path.getPointAt(t);
+    const segLen = cfg.length / cfg.segments * trayStep * 0.95;
+
+    // Metal tray bracket
+    for (const side of [-0.7, 0.7]) {
+      const tray = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, segLen), trayMat);
+      tray.position.copy(pt);
+      tray.position.x += side * cfg.radius * 0.6;
+      tray.position.y += cfg.radius - 0.8;
+      tunnelGroup.add(tray);
+
+      // Cables (thin dark tubes on tray)
+      if (i % (trayStep * 3) === 0) {
+        for (let c = -1; c <= 1; c++) {
+          const cable = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, segLen * 3, 4), cableMat);
+          cable.position.copy(pt);
+          cable.position.x += side * cfg.radius * 0.6 + c * 0.08;
+          cable.position.y += cfg.radius - 0.73;
+          cable.rotation.x = Math.PI / 2;
+          tunnelGroup.add(cable);
+        }
+      }
+    }
+  }
+}
+
+// v5 NEW: Emergency signs and distance markers
+function addEmergencySigns(cfg, path) {
+  // Distance markers every 50m
+  for (let dist = 50; dist < cfg.length - 20; dist += 50) {
+    const t = dist / cfg.length;
+    if (t > 0.99) continue;
+    const pt = path.getPointAt(t);
+
+    // Distance sign (green)
+    const signMat = new THREE.MeshStandardMaterial({
+      color: 0x006633, emissive: 0x003311, emissiveIntensity: 0.4
+    });
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.35, 0.04), signMat);
+    sign.position.copy(pt);
+    sign.position.x += cfg.radius - 0.15;
+    sign.position.y += 1.5;
+    sign.rotation.y = -Math.PI / 2;
+    tunnelGroup.add(sign);
+
+    // White text area on sign
+    const textMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const text = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.15), textMat);
+    text.position.copy(sign.position);
+    text.position.x -= 0.025;
+    text.rotation.y = -Math.PI / 2;
+    tunnelGroup.add(text);
+  }
+
+  // Emergency phone/fire extinguisher signs every 100m (orange)
+  for (let dist = 100; dist < cfg.length - 20; dist += 100) {
+    const t = dist / cfg.length;
+    if (t > 0.99) continue;
+    const pt = path.getPointAt(t);
+
+    const emergMat = new THREE.MeshStandardMaterial({
+      color: 0xff6600, emissive: 0x662200, emissiveIntensity: 0.5
+    });
+    const emergSign = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.04), emergMat);
+    emergSign.position.copy(pt);
+    emergSign.position.x -= cfg.radius - 0.15;
+    emergSign.position.y += 1.5;
+    emergSign.rotation.y = Math.PI / 2;
+    tunnelGroup.add(emergSign);
+
+    // Small light below emergency sign
+    const el = new THREE.PointLight(0xff6600, 0.3, 5);
+    el.position.copy(emergSign.position);
+    el.position.y -= 0.3;
+    tunnelGroup.add(el);
+  }
+
+  // Exit signs at start and end
+  for (const t of [0.02, 0.98]) {
+    const pt = path.getPointAt(t);
+    const exitMat = new THREE.MeshStandardMaterial({
+      color: 0x00cc44, emissive: 0x00cc44, emissiveIntensity: 1.5
+    });
+    const exitSign = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 0.04), exitMat);
+    exitSign.position.copy(pt);
+    exitSign.position.y += cfg.radius - 0.8;
+    tunnelGroup.add(exitSign);
+
+    const exitLight = new THREE.PointLight(0x00ff44, 0.5, 8);
+    exitLight.position.copy(exitSign.position);
+    tunnelGroup.add(exitLight);
+  }
+}
+
+function addWallStrips(cfg, path) {
+  // v5: Brighter reflective strips with more colors
+  const m1 = new THREE.MeshBasicMaterial({ color: 0x66ff66, transparent: true, opacity: 0.7 });
+  const m2 = new THREE.MeshBasicMaterial({ color: 0xff8833, transparent: true, opacity: 0.7 });
+  // Lower curb strips (white)
+  const m3 = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.5 });
+
+  for (let i = 0; i < cfg.segments; i += 4) {
+    const t = i / cfg.segments;
+    const pt = path.getPointAt(t);
+    const segLen = cfg.length / cfg.segments * 3.5;
+
+    // Left green strip (upper wall)
+    const s1 = new THREE.Mesh(new THREE.PlaneGeometry(0.1, segLen), m1);
+    s1.position.copy(pt); s1.position.x -= cfg.radius - 0.05; s1.position.y -= 0.5; s1.rotation.y = Math.PI / 2;
+    tunnelGroup.add(s1);
+
+    // Right orange strip (upper wall)
+    const s2 = new THREE.Mesh(new THREE.PlaneGeometry(0.1, segLen), m2);
+    s2.position.copy(pt); s2.position.x += cfg.radius - 0.05; s2.position.y -= 0.5; s2.rotation.y = -Math.PI / 2;
+    tunnelGroup.add(s2);
+
+    // Lower curb strips (both sides)
+    for (const side of [-1, 1]) {
+      const s3 = new THREE.Mesh(new THREE.PlaneGeometry(0.06, segLen), m3);
+      s3.position.copy(pt);
+      s3.position.x += side * (cfg.radius - 0.05);
+      s3.position.y -= cfg.radius + 0.6;
+      s3.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+      tunnelGroup.add(s3);
+    }
+  }
+}
+
+function addObstacles(cfg, path) {
+  const obstacleCount = 3 + Math.floor(Math.random() * 4);
+
+  for (let i = 0; i < obstacleCount; i++) {
+    const t = 0.1 + Math.random() * 0.8;
+    const pt = path.getPointAt(t);
+    const isWorker = Math.random() > 0.4;
+
+    let mesh;
+    if (isWorker) {
+      const group = new THREE.Group();
+      const bodyGeom = new THREE.CylinderGeometry(0.2, 0.2, 1.2, 8);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff8800, emissive: 0x442200, emissiveIntensity: 0.3 });
+      const body = new THREE.Mesh(bodyGeom, bodyMat);
+      body.position.y = 0.6;
+      group.add(body);
+
+      const headGeom = new THREE.SphereGeometry(0.18, 8, 8);
+      const headMat = new THREE.MeshStandardMaterial({ color: 0xffdd00 });
+      const head = new THREE.Mesh(headGeom, headMat);
+      head.position.y = 1.35;
+      group.add(head);
+
+      // Reflective vest strip
+      const vestMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+      const vest = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.08, 8), vestMat);
+      vest.position.y = 0.9;
+      group.add(vest);
+
+      mesh = group;
+    } else {
+      const eqGeom = new THREE.BoxGeometry(0.8, 0.6, 0.6);
+      const eqMat = new THREE.MeshStandardMaterial({ color: 0x2266cc, emissive: 0x112244, emissiveIntensity: 0.2 });
+      mesh = new THREE.Mesh(eqGeom, eqMat);
+      mesh.position.y = 0.3;
+    }
+
+    const xOff = (Math.random() - 0.5) * (cfg.radius * 0.8);
+    mesh.position.x = pt.x + xOff;
+    mesh.position.z = pt.z;
+    mesh.position.y += (-cfg.radius + 0.2);
+
+    mesh.userData.obstacle = true;
+    mesh.userData.type = isWorker ? 'Worker' : 'Equipment';
+    mesh.userData.progress = t;
+
+    tunnelGroup.add(mesh);
+    obstacles.push(mesh);
+  }
+}
+
+function generateDamagePoints(cfg, path) {
+  const count = 15 + Math.floor(Math.random() * 20);
+  damageMarkers = [];
+  for (let i = 0; i < count; i++) {
+    const t = 0.05 + Math.random() * 0.9;
+    const pt = path.getPointAt(t);
+    const angle = Math.random() * Math.PI * 2;
+    const dmg = DAMAGE_TYPES[Math.floor(Math.random() * DAMAGE_TYPES.length)];
+    const pos = pt.clone();
+    pos.x += Math.cos(angle) * (cfg.radius - 0.3);
+    pos.y += Math.sin(angle) * (cfg.radius - 0.3);
+
+    const marker = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.3 + Math.random()*0.8, 0.1 + Math.random()*0.5),
+      new THREE.MeshBasicMaterial({ color: dmg.color, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false })
+    );
+    marker.position.copy(pos);
+    const toCenter = pt.clone().sub(pos).normalize();
+    marker.lookAt(pos.clone().add(toCenter));
+    marker.userData = { detected: false, type: dmg, progress: t,
+      width: (0.1+Math.random()*2).toFixed(1)+' mm', length: (10+Math.random()*200).toFixed(0)+' mm' };
+    tunnelGroup.add(marker);
+    damageMarkers.push(marker);
+
+    if (dmg.type === 'crack') {
+      const pts = [];
+      const s = 5 + Math.floor(Math.random()*8);
+      for (let j = 0; j <= s; j++) pts.push(new THREE.Vector3((j/s-0.5)*(0.5+Math.random()*1.5),(Math.random()-0.5)*0.3,0.01));
+      const cl = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color: 0xff2222, transparent: true, opacity: 0, linewidth: 2 }));
+      cl.position.copy(pos); cl.lookAt(pos.clone().add(toCenter));
+      tunnelGroup.add(cl);
+      marker.userData.crackLine = cl;
+    }
+    if (dmg.type === 'leak') {
+      marker.userData.drips = [];
+      for (let d = 0; d < 3; d++) {
+        const drip = new THREE.Mesh(new THREE.SphereGeometry(0.02,6,6),
+          new THREE.MeshBasicMaterial({ color: 0x3366ff, transparent: true, opacity: 0 }));
+        drip.position.copy(pos); drip.position.y -= d*0.15;
+        drip.userData.dripSpeed = 0.5+Math.random();
+        tunnelGroup.add(drip);
+        marker.userData.drips.push(drip);
+      }
+    }
+  }
+}
+
+function addPortals(cfg, path) {
+  const startPt = path.getPointAt(0);
+
+  // Entrance ring
+  const ent = new THREE.Mesh(new THREE.RingGeometry(cfg.radius, cfg.radius+1.5, 32),
+    new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.7, side: THREE.DoubleSide }));
+  ent.position.copy(startPt); ent.position.z -= 0.5;
+  tunnelGroup.add(ent);
+
+  // Decorative arch
+  const arch = new THREE.Mesh(new THREE.TorusGeometry(cfg.radius+0.5, 0.3, 8, 32, Math.PI),
+    new THREE.MeshStandardMaterial({ color: 0x555555 }));
+  arch.position.copy(startPt); arch.position.z -= 0.5; arch.rotation.x = Math.PI/2;
+  tunnelGroup.add(arch);
+
+  // Entrance light (simulates outside daylight spilling in)
+  const el = new THREE.PointLight(0xaabbcc, 2.0, 30);
+  el.position.copy(startPt); el.position.y += 3; tunnelGroup.add(el);
+
+  // End of tunnel - faint daylight glow
+  const endPt = path.getPointAt(0.999);
+  const endLight = new THREE.PointLight(0xaabbcc, 1.5, 30);
+  endLight.position.copy(endPt); endLight.position.y += 3; tunnelGroup.add(endLight);
+}
+
+function addVentilation(cfg, path) {
+  const n = Math.floor(cfg.length/100);
+  for (let i = 1; i <= n; i++) {
+    const pt = path.getPointAt(i/(n+1));
+    const fan = new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.6,0.15,8),
+      new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.7 }));
+    fan.position.copy(pt); fan.position.y += cfg.radius-0.2; fan.rotation.x = Math.PI/2;
+    fan.userData.fan = true; tunnelGroup.add(fan);
+
+    // Fan housing
+    const housing = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.7, 0.7, 0.06, 8),
+      new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.8, roughness: 0.3 })
+    );
+    housing.position.copy(fan.position); housing.position.z -= 0.1;
+    housing.rotation.x = Math.PI / 2;
+    tunnelGroup.add(housing);
+  }
+}
+
+// ============================================================
+// FLIGHT CONTROLS
+// ============================================================
+function updateFlight(dt) {
+  const cfg = TUNNELS[state.tunnel];
+  const moveSpeed = 8.0;
+  const lookSpeed = 0.003;
+
+  if (state.mode === 'manual') {
+    // v7: Always control drone orientation via droneEuler
+    if (state.lookMode) {
+      droneEuler.y -= mouse.dx * lookSpeed;
+      droneEuler.x -= mouse.dy * lookSpeed;
+      droneEuler.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, droneEuler.x));
+    }
+    droneQuat.setFromEuler(droneEuler);
+
+    const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(droneQuat);
+    const right = new THREE.Vector3(1,0,0).applyQuaternion(droneQuat);
+    const vel = new THREE.Vector3();
+    if (keys['w']||keys['arrowup']) vel.add(fwd);
+    if (keys['s']||keys['arrowdown']) vel.sub(fwd);
+    if (keys['a']||keys['arrowleft']) vel.sub(right);
+    if (keys['d']||keys['arrowright']) vel.add(right);
+    vel.y = 0; if (vel.length()>0) vel.normalize();
+    if (keys[' ']) vel.y += 1;
+    if (keys['shift']) vel.y -= 1;
+    vel.multiplyScalar(moveSpeed * dt);
+    dronePos.add(vel);
+    state.speed = vel.length() / dt;
+    state.distance += vel.length();
+  } else {
+    const path = currentPath || createTunnelPath(cfg);
+
+    // v9: Skip movement if paused
+    if (!state.autoPaused) {
+      const baseSpeed = state.mode === 'scan' ? 0.0003 : 0.001;
+
+      // v9: Easing — smooth acceleration at start, deceleration near end
+      const p = state.autoProgress;
+      const easeIn = Math.min(1, p / 0.05);           // ramp up over first 5%
+      const easeOut = Math.min(1, (0.98 - p) / 0.05); // ramp down over last 5%
+      const easeFactor = Math.min(easeIn, easeOut);
+
+      // v9: Curvature-based speed reduction
+      let curveFactor = 1.0;
+      if (p > 0.01 && p < 0.97) {
+        const step = 0.005;
+        const tgA = path.getTangentAt(Math.max(0, p - step));
+        const tgB = path.getTangentAt(Math.min(1, p + step));
+        const curvature = 1 - tgA.dot(tgB); // 0=straight, ~2=U-turn
+        curveFactor = Math.max(0.3, 1 - curvature * 8); // slow to 30% in tight curves
+      }
+
+      const autoSpeed = baseSpeed * easeFactor * curveFactor;
+      state.autoProgress += autoSpeed * dt * 60;
+      if (state.autoProgress > 0.98) state.autoProgress = 0.98;
+      state.speed = autoSpeed * cfg.length;
+    } else {
+      state.speed = 0;
+    }
+
+    state.distance = state.autoProgress * cfg.length;
+
+    const pt = path.getPointAt(state.autoProgress);
+    const tg = path.getTangentAt(state.autoProgress);
+    const lookAt = pt.clone().add(tg.clone().multiplyScalar(5));
+    // v8 FIX: Direct position set for auto/scan mode (prevents wall clipping)
+    const targetPos = new THREE.Vector3(pt.x, pt.y + 2, pt.z);
+    dronePos.copy(targetPos);
+    const tq = new THREE.Quaternion();
+    tq.setFromRotationMatrix(new THREE.Matrix4().lookAt(dronePos, lookAt, new THREE.Vector3(0,1,0)));
+    droneQuat.slerp(tq, 0.08);
+    droneEuler.setFromQuaternion(droneQuat, 'YXZ');
+
+    // v9: Improved scan pattern — systematic wall sweep (up→right→down→left cycle)
+    if (state.mode === 'scan' && !state.autoPaused) {
+      const scanCycle = state.autoProgress * 40; // full cycle per ~2.5% progress
+      const scanPhase = scanCycle % 4; // 0-1: look up, 1-2: look right, 2-3: look down, 3-4: look left
+      const scanT = (scanPhase % 1); // 0→1 within each phase
+      const smoothT = Math.sin(scanT * Math.PI); // smooth oscillation
+      if (scanPhase < 1) {
+        droneEuler.x -= smoothT * 0.5; // look up
+      } else if (scanPhase < 2) {
+        droneEuler.y += smoothT * 0.6; // look right
+      } else if (scanPhase < 3) {
+        droneEuler.x += smoothT * 0.4; // look down
+      } else {
+        droneEuler.y -= smoothT * 0.6; // look left
+      }
+    }
+  }
+
+  // v6: Path-based collision - find nearest point on tunnel path
+  if (currentPath) {
+    const maxR = cfg.radius - 0.5;
+    let nearestT = 0, nearestDist = Infinity;
+    for (let s = 0; s <= 40; s++) {
+      const t = s / 40;
+      const pt = currentPath.getPointAt(t);
+      const dist = dronePos.distanceTo(pt);
+      if (dist < nearestDist) { nearestDist = dist; nearestT = t; }
+    }
+    const step = 1 / 40;
+    for (let s = -10; s <= 10; s++) {
+      const t = Math.max(0, Math.min(1, nearestT + s * step / 10));
+      const pt = currentPath.getPointAt(t);
+      const dist = dronePos.distanceTo(pt);
+      if (dist < nearestDist) { nearestDist = dist; nearestT = t; }
+    }
+    if (nearestDist > maxR) {
+      const center = currentPath.getPointAt(nearestT);
+      const toPos = dronePos.clone().sub(center);
+      toPos.normalize().multiplyScalar(maxR);
+      dronePos.copy(center.clone().add(toPos));
+    }
+  }
+
+  // v7: Update drone group position/rotation
+  drone.position.copy(dronePos);
+  drone.quaternion.copy(droneQuat);
+
+  // v7: Camera placement based on view mode
+  if (state.viewMode === 'fps') {
+    camera.position.copy(dronePos);
+    camera.quaternion.copy(droneQuat);
+    drone.visible = false;
+  } else {
+    // 3rd person: camera behind and above drone
+    drone.visible = true;
+    const backDir = new THREE.Vector3(0, 0, 1).applyQuaternion(droneQuat); // behind
+    const upOffset = new THREE.Vector3(0, 1.2, 0);
+    const targetCamPos = dronePos.clone().add(backDir.multiplyScalar(3.5)).add(upOffset);
+    camFollowPos.lerp(targetCamPos, 0.08);
+    camera.position.copy(camFollowPos);
+    // Camera looks at drone
+    camFollowTarget.lerp(dronePos, 0.1);
+    camera.lookAt(camFollowTarget);
+    camera.rotation.order = 'YXZ';
+  }
+
+  // Spin props
+  drone.children.forEach(c => {
+    if (c.userData && c.userData.isProp) c.rotation.y += dt * 40;
+  });
+
+  state.battery = Math.max(0, state.battery - dt * 0.05);
+  mouse.dx = 0; mouse.dy = 0;
+}
+
+// ============================================================
+// SAFETY DISTANCE CHECK (30m rule)
+// ============================================================
+function checkSafetyDistance() {
+  let nearestDist = Infinity;
+  let nearestType = '';
+
+  obstacles.forEach(obs => {
+    const dist = dronePos.distanceTo(obs.position);
+    if (dist < nearestDist) {
+      nearestDist = dist;
+      nearestType = obs.userData.type || 'Object';
+    }
+  });
+
+  const SAFETY_DIST_SIM = 3.0;
+  const SAFETY_DIST_REAL = 30;
+
+  const warningEl = document.getElementById('safetyWarning');
+  const safetyPill = document.getElementById('safetyPill');
+
+  const realDist = nearestDist * 10;
+  state.nearestWallDist = realDist;
+
+  if (nearestDist < SAFETY_DIST_SIM) {
+    warningEl.style.display = 'block';
+    warningEl.textContent = `警告: ${nearestType} ${realDist.toFixed(0)}m (最低${SAFETY_DIST_REAL}m必要)`;
+    safetyPill.textContent = `30m: NG (${realDist.toFixed(0)}m)`;
+    safetyPill.className = 'status-pill danger';
+    state.safetyViolations++;
+  } else {
+    warningEl.style.display = 'none';
+    safetyPill.textContent = `30m: OK (${realDist.toFixed(0)}m)`;
+    safetyPill.className = 'status-pill safe';
+  }
+}
+
+// ============================================================
+// SENSOR SIMULATION
+// ============================================================
+function updateSensors(dt) {
+  droneSpotLight.visible = state.sensors.flash;
+  droneSpotLight.position.copy(dronePos);
+  const fwd = new THREE.Vector3(0,0,-1).applyQuaternion(droneQuat);
+  droneSpotLight.target.position.copy(dronePos.clone().add(fwd.multiplyScalar(30)));
+  droneLight.position.copy(dronePos);
+  droneLight.visible = state.sensors.flash;
+
+  if (state.sensors.damage) detectDamage();
+  if (state.sensors.lidar) updateLidarDisplay();
+
+  checkSafetyDistance();
+}
+
+function detectDamage() {
+  const range = 12;
+  let nearest = null, nearDist = Infinity;
+  damageMarkers.forEach(m => {
+    const d = dronePos.distanceTo(m.position);
+    if (d < range) {
+      if (!m.userData.detected) {
+        m.material.opacity = Math.min(0.8, m.material.opacity+0.02);
+        if (m.material.opacity > 0.5) {
+          m.userData.detected = true;
+          state.damagesFound++;
+          if (m.userData.crackLine) m.userData.crackLine.material.opacity = 0.8;
+          if (m.userData.drips) m.userData.drips.forEach(dr => dr.material.opacity = 0.6);
+          capturedData.push({
+            timestamp: new Date().toISOString(), type: 'damage_detection',
+            damageType: m.userData.type.name, severity: m.userData.type.severity,
+            position: { x: m.position.x.toFixed(2), y: m.position.y.toFixed(2), z: m.position.z.toFixed(2) },
+            width: m.userData.width, length: m.userData.length,
+            progress: (m.userData.progress*100).toFixed(1)+'%',
+          });
+          updateDataPanel();
+        }
+      }
+      if (d < nearDist) { nearDist = d; nearest = m; }
+    }
+  });
+  const al = document.getElementById('damageAlert');
+  if (nearest && nearDist < 5 && nearest.userData.detected) {
+    al.style.display = 'block';
+    document.getElementById('damageType').textContent =
+      `${nearest.userData.type.name} | ${nearest.userData.type.severity.toUpperCase()} | W:${nearest.userData.width} L:${nearest.userData.length}`;
+  } else al.style.display = 'none';
+
+  damageMarkers.forEach(m => {
+    if (m.userData.drips && m.userData.detected)
+      m.userData.drips.forEach(dr => { dr.position.y -= dr.userData.dripSpeed*0.016; if (dr.position.y < m.position.y-2) dr.position.y = m.position.y; });
+  });
+}
+
+function updateLidarDisplay() {
+  const canvas = document.getElementById('lidarCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  const cx = canvas.width/2, cy = canvas.height/2, maxR = 20;
+  ctx.strokeStyle = 'rgba(0,200,255,0.15)';
+  for (let r = 1; r <= 4; r++) { ctx.beginPath(); ctx.arc(cx,cy,(r/4)*Math.min(cx,cy)*0.9,0,Math.PI*2); ctx.stroke(); }
+  const rc = new THREE.Raycaster();
+  for (let i = 0; i < 72; i++) {
+    const a = (i/72)*Math.PI*2;
+    const dir = new THREE.Vector3(Math.cos(a),Math.sin(a),0).applyQuaternion(droneQuat);
+    rc.set(dronePos, dir); rc.far = maxR;
+    const hits = rc.intersectObjects(tunnelGroup.children, false);
+    if (hits.length) {
+      const d = hits[0].distance;
+      const sr = (d/maxR)*Math.min(cx,cy)*0.9;
+      ctx.fillStyle = `hsla(${Math.max(0,120-(d/maxR)*120)},100%,50%,0.8)`;
+      ctx.beginPath(); ctx.arc(cx+Math.cos(a)*sr, cy+Math.sin(a)*sr, 2, 0, Math.PI*2); ctx.fill();
+    }
+  }
+  ctx.fillStyle = '#0cf'; ctx.beginPath(); ctx.arc(cx,cy,3,0,Math.PI*2); ctx.fill();
+}
+
+// ============================================================
+// MINIMAP
+// ============================================================
+function updateMinimap() {
+  const canvas = document.getElementById('minimapCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  const cfg = TUNNELS[state.tunnel];
+  const path = createTunnelPath(cfg);
+  ctx.strokeStyle = 'rgba(0,200,255,0.4)'; ctx.lineWidth = 6; ctx.beginPath();
+  const sc = 0.3, ox = 90, oy = 20;
+  for (let i = 0; i <= 50; i++) {
+    const t = i/50, pt = path.getPointAt(t);
+    if (i===0) ctx.moveTo(ox+pt.x*sc, oy+pt.z*sc);
+    else ctx.lineTo(ox+pt.x*sc, oy+pt.z*sc);
+  }
+  ctx.stroke();
+
+  obstacles.forEach(ob => {
+    const opt = path.getPointAt(ob.userData.progress);
+    ctx.fillStyle = '#ff8800';
+    ctx.beginPath(); ctx.arc(ox+opt.x*sc, oy+opt.z*sc, 3, 0, Math.PI*2); ctx.fill();
+  });
+
+  // Draw drone position on minimap
+  ctx.fillStyle = '#0f0'; ctx.beginPath();
+  ctx.arc(ox+dronePos.x*sc, oy+dronePos.z*sc, 4, 0, Math.PI*2); ctx.fill();
+
+  damageMarkers.forEach(m => {
+    const mp = path.getPointAt(m.userData.progress);
+    ctx.fillStyle = m.userData.detected ? `#${m.userData.type.color.toString(16).padStart(6,'0')}` : 'rgba(100,100,100,0.3)';
+    ctx.beginPath(); ctx.arc(ox+mp.x*sc, oy+mp.z*sc, m.userData.detected?3:1.5, 0, Math.PI*2); ctx.fill();
+  });
+
+  ctx.fillStyle = '#666'; ctx.font = '9px sans-serif';
+  ctx.fillText(cfg.name, 6, canvas.height-6);
+}
+
+// ============================================================
+// HUD UPDATE
+// ============================================================
+function updateHUD() {
+  document.getElementById('posX').textContent = dronePos.x.toFixed(2);
+  document.getElementById('posY').textContent = dronePos.y.toFixed(2);
+  document.getElementById('posZ').textContent = dronePos.z.toFixed(2);
+  document.getElementById('speed').textContent = state.speed.toFixed(1)+' m/s';
+  document.getElementById('altitude').textContent = (dronePos.y+TUNNELS[state.tunnel].radius).toFixed(1)+' m';
+  document.getElementById('heading').textContent = (((-droneEuler.y*180/Math.PI)%360+360)%360).toFixed(1)+' deg';
+  document.getElementById('nearestWall').textContent = state.nearestWallDist.toFixed(0)+' m';
+  document.getElementById('distance').textContent = state.distance.toFixed(1)+' m';
+  document.getElementById('progress').textContent = Math.min(100,(state.distance/TUNNELS[state.tunnel].length)*100).toFixed(0)+'%';
+  document.getElementById('damagesFound').textContent = state.damagesFound;
+  document.getElementById('photosTaken').textContent = photoCount;
+
+  const be = document.getElementById('batteryPill');
+  be.textContent = `電池: ${Math.round(state.battery)}%`;
+  be.className = 'status-pill'+(state.battery<20?' danger':state.battery<50?' warning':'');
+
+  const se = document.getElementById('signalPill');
+  const ss = state.distance>300?'弱':state.distance>150?'中':'強';
+  se.textContent = `電波: ${ss}`;
+  se.className = 'status-pill'+(ss==='弱'?' danger':ss==='中'?' warning':'');
+
+  document.getElementById('dataPill').textContent = `データ: ${capturedData.length}件`;
+
+  // v9: Update auto-flight progress bar
+  if (state.mode !== 'manual') {
+    const pct = Math.min(100, state.autoProgress / 0.98 * 100);
+    const fill = document.getElementById('autoProgressFill');
+    const text = document.getElementById('autoProgressText');
+    if (fill) fill.style.width = pct.toFixed(1) + '%';
+    if (text) text.textContent = pct.toFixed(0) + '% — ' + state.distance.toFixed(0) + 'm / ' + TUNNELS[state.tunnel].length + 'm';
+  }
+}
+
+function updateDataPanel() {
+  const c = document.getElementById('dataEntries');
+  c.innerHTML = capturedData.slice(-5).reverse().map(d => `
+    <div class="data-entry">
+      <span class="timestamp">${d.timestamp.substring(11,19)}</span>
+      <span class="dtype">[${d.type==='damage_detection'?d.damageType:'Photo'}]</span>
+      ${d.severity?`<span style="color:${d.severity==='critical'?'#f00':d.severity==='high'?'#f60':'#ff0'}">${d.severity}</span>`:''}
+      <br>Pos: (${d.position.x}, ${d.position.y}, ${d.position.z})
+      ${d.width?`<br>W:${d.width} L:${d.length}`:''}
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// FLIGHT LOG / MISSION REPORT
+// ============================================================
+function showFlightLog() {
+  const log = document.getElementById('flightLog');
+  const elapsed = state.missionStartTime ? Math.floor((Date.now() - state.missionStartTime) / 1000) : 0;
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+
+  document.getElementById('flightLogContent').innerHTML = `
+    <div class="log-section">
+      <div class="log-section-title">ミッション情報</div>
+      <div class="log-row"><span class="log-label">操縦者</span><span class="log-val">${preflightData.pilotName || 'N/A'}</span></div>
+      <div class="log-row"><span class="log-label">免許番号</span><span class="log-val">${preflightData.licenseNo || 'N/A'}</span></div>
+      <div class="log-row"><span class="log-label">実施日</span><span class="log-val">${preflightData.missionDate || 'N/A'}</span></div>
+      <div class="log-row"><span class="log-label">トンネル</span><span class="log-val">${TUNNELS[state.tunnel].name}</span></div>
+      <div class="log-row"><span class="log-label">天候</span><span class="log-val">${preflightData.weather || 'N/A'}</span></div>
+    </div>
+    <div class="log-section">
+      <div class="log-section-title">飛行統計</div>
+      <div class="log-row"><span class="log-label">飛行時間</span><span class="log-val">${mins}分 ${secs}秒</span></div>
+      <div class="log-row"><span class="log-label">走行距離</span><span class="log-val">${state.distance.toFixed(1)} m</span></div>
+      <div class="log-row"><span class="log-label">進捗</span><span class="log-val">${Math.min(100,(state.distance/TUNNELS[state.tunnel].length)*100).toFixed(0)}%</span></div>
+      <div class="log-row"><span class="log-label">バッテリー</span><span class="log-val">${Math.round(state.battery)}%</span></div>
+    </div>
+    <div class="log-section">
+      <div class="log-section-title">点検結果</div>
+      <div class="log-row"><span class="log-label">検出損傷数</span><span class="log-val">${state.damagesFound}</span></div>
+      <div class="log-row"><span class="log-label">撮影枚数</span><span class="log-val">${photoCount}</span></div>
+      <div class="log-row"><span class="log-label">データポイント</span><span class="log-val">${capturedData.length}</span></div>
+    </div>
+    <div class="log-section">
+      <div class="log-section-title">安全コンプライアンス</div>
+      <div class="log-row"><span class="log-label">30m規則違反</span><span class="log-val ${state.safetyViolations===0?'ok':''}">${state.safetyViolations === 0 ? 'なし' : state.safetyViolations + ' フレーム'}</span></div>
+      <div class="log-row"><span class="log-label">飛行前チェック</span><span class="log-val ok">完了</span></div>
+      <div class="log-row"><span class="log-label">適合判定</span><span class="log-val ${state.safetyViolations===0?'ok':''}">${state.safetyViolations === 0 ? '合格' : '要確認'}</span></div>
+    </div>
+  `;
+
+  log.style.display = log.style.display === 'block' ? 'none' : 'block';
+}
+
+// ============================================================
+// DATA EXPORT
+// ============================================================
+function exportAllData() {
+  const elapsed = state.missionStartTime ? Math.floor((Date.now()-state.missionStartTime)/1000) : 0;
+  const data = {
+    mission: {
+      pilot: preflightData.pilotName, license: preflightData.licenseNo,
+      date: preflightData.missionDate, weather: preflightData.weather,
+      tunnel: TUNNELS[state.tunnel].name, startTime: preflightData.startTime,
+      flightDuration: elapsed + 's',
+    },
+    results: {
+      totalDistance: state.distance.toFixed(1)+'m',
+      damagesFound: state.damagesFound, photosCaptures: photoCount,
+      battery: Math.round(state.battery)+'%',
+    },
+    safety: {
+      preflightCompleted: true,
+      safetyViolations: state.safetyViolations,
+      compliance: state.safetyViolations === 0 ? 'PASS' : 'REVIEW',
+    },
+    entries: capturedData,
+  };
+  const blob = new Blob([JSON.stringify(data,null,2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `tunnel_inspection_${state.tunnel}_${Date.now()}.json`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function exportDXF() {
+  let dxf = '0\nSECTION\n2\nENTITIES\n';
+  capturedData.forEach(d => {
+    if (d.type === 'damage_detection') {
+      dxf += `0\nPOINT\n8\nD-DMG-${d.damageType}-2026\n10\n${d.position.x}\n20\n${d.position.y}\n30\n${d.position.z}\n`;
+      dxf += `0\nTEXT\n8\nD-DMG-${d.damageType}-2026\n10\n${parseFloat(d.position.x)+0.5}\n20\n${d.position.y}\n30\n${d.position.z}\n40\n0.3\n1\n${d.damageType} W:${d.width}\n`;
+    }
+  });
+  dxf += '0\nENDSEC\n0\nEOF\n';
+  const blob = new Blob([dxf], { type: 'application/dxf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `tunnel_inspection_${state.tunnel}_${Date.now()}.dxf`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+function capturePhoto() {
+  photoCount++;
+  const f = document.getElementById('captureFlash');
+  f.style.opacity = '1'; setTimeout(() => f.style.opacity = '0', 150);
+  capturedData.push({
+    timestamp: new Date().toISOString(), type: 'photo_capture',
+    position: { x: dronePos.x.toFixed(2), y: dronePos.y.toFixed(2), z: dronePos.z.toFixed(2) },
+    heading: ((-droneEuler.y*180/Math.PI)%360+360)%360,
+    pitch: droneEuler.x*180/Math.PI,
+  });
+  updateDataPanel();
+}
+
+// ============================================================
+// INPUT HANDLERS
+// ============================================================
+// v8 FIX: Use e.code for movement keys to avoid Shift+key producing uppercase
+const _codeToKey = {KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d',ArrowUp:'arrowup',ArrowDown:'arrowdown',
+  ArrowLeft:'arrowleft',ArrowRight:'arrowright',Space:' ',ShiftLeft:'shift',ShiftRight:'shift'};
+function onKeyDown(e) {
+  const mapped = _codeToKey[e.code];
+  if (mapped) keys[mapped] = true;
+  else keys[e.key.toLowerCase()] = true;
+  if (e.key === 'Tab') { e.preventDefault(); const m=['manual','auto','scan']; setFlightMode(m[(m.indexOf(state.mode)+1)%3]); }
+  // v9: Space toggles pause in auto/scan mode
+  if (e.code === 'Space' && state.mode !== 'manual') {
+    e.preventDefault();
+    state.autoPaused = !state.autoPaused;
+    const pausePill = document.getElementById('pausePill');
+    if (pausePill) {
+      pausePill.style.display = state.autoPaused ? 'inline-block' : 'none';
+      pausePill.textContent = state.autoPaused ? 'PAUSED' : '';
+    }
+  }
+  if (e.key.toLowerCase() === 'f') toggleSensor('flash');
+  if (e.key.toLowerCase() === 'l') toggleSensor('lidar');
+  if (e.key.toLowerCase() === 'c') capturePhoto();
+  if (e.key.toLowerCase() === 'e') {
+    const p = document.getElementById('dataPanel');
+    p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  }
+  if (e.key.toLowerCase() === 'p') showFlightLog();
+  if (e.key.toLowerCase() === 'v') toggleViewMode();
+  if (e.key >= '1' && e.key <= '4') switchTunnel(['standard','aqualine','mountain','metro'][e.key-1]);
+}
+function onKeyUp(e) {
+  const mapped = _codeToKey[e.code];
+  if (mapped) keys[mapped] = false;
+  else keys[e.key.toLowerCase()] = false;
+}
+
+// v6 FIX: Accumulate mouse delta between frames (+=, not =)
+// Prevents lost input when multiple mousemove events fire per frame
+function onMouseMove(e) {
+  if (state.lookMode) {
+    mouse.dx += e.clientX - lastMouseX;
+    mouse.dy += e.clientY - lastMouseY;
+  }
+  lastMouseX = e.clientX;
+  lastMouseY = e.clientY;
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ============================================================
+// UI CONTROLS
+// ============================================================
+function setFlightMode(mode) {
+  const prevMode = state.mode;
+  state.mode = mode;
+  state.autoPaused = false; // v9: reset pause on mode change
+  document.getElementById('modePill').textContent = mode.toUpperCase();
+  document.getElementById('btnManual').classList.toggle('active', mode==='manual');
+  document.getElementById('btnAuto').classList.toggle('active', mode==='auto');
+  document.getElementById('btnScan').classList.toggle('active', mode==='scan');
+  const pausePill = document.getElementById('pausePill');
+  if (pausePill) pausePill.style.display = 'none';
+  // v9: Show/hide progress bar
+  const progBar = document.getElementById('autoProgressBar');
+  if (progBar) progBar.style.display = mode !== 'manual' ? 'block' : 'none';
+
+  // v9: Smooth transition — when switching from manual to auto/scan,
+  // find nearest point on path and set autoProgress there
+  if (prevMode === 'manual' && mode !== 'manual' && currentPath) {
+    let nearestT = 0, nearestDist = Infinity;
+    for (let s = 0; s <= 100; s++) {
+      const t = s / 100;
+      const pt = currentPath.getPointAt(t);
+      const dist = dronePos.distanceTo(pt);
+      if (dist < nearestDist) { nearestDist = dist; nearestT = t; }
+    }
+    // Fine-tune search
+    const step = 0.01;
+    for (let s = -10; s <= 10; s++) {
+      const t = Math.max(0, Math.min(1, nearestT + s * step / 10));
+      const pt = currentPath.getPointAt(t);
+      const dist = dronePos.distanceTo(pt);
+      if (dist < nearestDist) { nearestDist = dist; nearestT = t; }
+    }
+    state.autoProgress = Math.max(0.01, Math.min(0.97, nearestT));
+  }
+}
+function switchTunnel(type) {
+  state.tunnel = type; buildTunnel(type); capturedData = [];
+  state.damagesFound = 0; photoCount = 0; state.battery = 100;
+  state.safetyViolations = 0; updateDataPanel();
+}
+function toggleSensor(sensor) {
+  state.sensors[sensor] = !state.sensors[sensor];
+  const el = document.getElementById({flash:'toggleFlash',lidar:'toggleLidar',cam360:'toggle360',damage:'toggleDamage'}[sensor]);
+  if (el) el.classList.toggle('on', state.sensors[sensor]);
+}
+
+// v7: View mode toggle
+function toggleViewMode() {
+  state.viewMode = state.viewMode === 'fps' ? 'thirdPerson' : 'fps';
+  const pill = document.getElementById('viewPill');
+  if (state.viewMode === 'fps') {
+    pill.textContent = 'FPS視点';
+    drone.visible = false;
+  } else {
+    pill.textContent = '3人称視点';
+    drone.visible = true;
+    // Initialize follow camera position
+    camFollowPos.copy(camera.position);
+    camFollowTarget.copy(dronePos);
+  }
+}
+
+// v7: Drone model switching
+function switchDrone(type) {
+  state.droneType = type;
+  createDrone(type);
+  // Position drone at current location
+  drone.position.copy(dronePos);
+  drone.quaternion.copy(droneQuat);
+  drone.visible = (state.viewMode === 'thirdPerson');
+  // Update UI buttons
+  document.querySelectorAll('.drone-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.drone === type);
+  });
+  document.getElementById('tunnelPill').textContent = TUNNELS[state.tunnel].name;
+}
+
+// ============================================================
+// ANIMATION LOOP
+// ============================================================
+function animate() {
+  if (!state.isRunning) return;
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  updateFlight(dt);
+  updateSensors(dt);
+  updateHUD();
+  updateMinimap();
+  tunnelGroup.children.forEach(c => { if (c.userData.fan) c.rotation.z += dt*3; });
+  renderer.render(scene, camera);
+}
+
+function startSimulation() {
+  document.getElementById('startScreen').style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  state.isRunning = true;
+  state.missionStartTime = Date.now();
+  animate();
+}
+
+init();
+</script>
+</body>
+</html>

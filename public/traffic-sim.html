@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>未来都市交通ラボ Ver 10.0 (Ultimate Non-Stop)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #020617; color: #e2e8f0; }
+        canvas { touch-action: none; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.5); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.5); border-radius: 2px; }
+
+        .glass {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(56, 189, 248, 0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        .btn-active { 
+            background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+            color: white; 
+            border: 1px solid #38bdf8; 
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.4); 
+        }
+        .btn-inactive { 
+            background-color: rgba(30, 41, 59, 0.4); 
+            color: #94a3b8; 
+            border: 1px solid #334155; 
+        }
+        .btn-inactive:hover {
+            border-color: #64748b;
+            background-color: rgba(30, 41, 59, 0.8);
+        }
+
+        /* ネオンエフェクト */
+        .neon-text { text-shadow: 0 0 10px currentColor; }
+    </style>
+</head>
+<body class="h-screen flex flex-col overflow-hidden bg-slate-950">
+
+    <!-- Header -->
+    <header class="bg-slate-900/80 backdrop-blur border-b border-slate-800 p-3 z-30 flex justify-between items-center h-14 shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="bg-cyan-500/20 p-2 rounded-lg border border-cyan-500/50">
+                <span class="text-lg">🚀</span>
+            </div>
+            <div>
+                <h1 class="text-sm font-bold text-white tracking-wider">ULTIMATE MOBILITY LAB</h1>
+                <div class="text-[10px] text-cyan-400 font-mono">Ver 10.0: Non-Stop & Flying Logic</div>
+            </div>
+        </div>
+        <div class="flex gap-4 text-[10px] font-mono text-slate-400">
+            <div class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_cyan]"></span> Flying</div>
+            <div class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Ground</div>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+        
+        <!-- Visualization -->
+        <div class="relative order-1 lg:order-2 h-[55%] lg:h-full lg:flex-1 bg-slate-950 flex justify-center items-center overflow-hidden border-b lg:border-b-0 lg:border-l border-slate-800 z-0" id="canvas-wrapper">
+            <canvas id="sim-canvas" class="block"></canvas>
+            
+            <!-- Mode Overlay -->
+            <div class="absolute top-4 left-4 pointer-events-none">
+                <div class="glass px-4 py-2 rounded-lg">
+                    <span class="block text-[10px] text-slate-400 uppercase tracking-widest mb-1">Current System</span>
+                    <span id="overlay-mode" class="text-lg font-black italic text-white neon-text">STANDARD</span>
+                </div>
+            </div>
+            
+            <!-- Flying Visual Indicator -->
+            <div id="fly-indicator" class="hidden absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div class="w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-900/20 via-transparent to-transparent opacity-50"></div>
+                <div class="absolute top-10 text-cyan-200/40 font-black text-6xl tracking-[1em] opacity-10 animate-pulse">SKYWAY</div>
+            </div>
+
+            <!-- Toast -->
+            <div id="toast-container" class="absolute top-20 right-4 flex flex-col gap-2 pointer-events-none z-30"></div>
+        </div>
+
+        <!-- Controls -->
+        <div class="order-2 lg:order-1 h-[45%] lg:h-full w-full lg:w-96 bg-slate-900 flex flex-col z-10 shadow-2xl border-r border-slate-800">
+            
+            <!-- Stats Dashboard -->
+            <div class="p-4 bg-slate-800/50 border-b border-slate-800 grid grid-cols-2 gap-4 shrink-0">
+                <!-- Efficiency -->
+                <div class="bg-slate-900/80 rounded-xl p-3 border border-slate-700 relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="text-[10px] text-blue-400 font-bold uppercase tracking-wider mb-1">Stop Count</div>
+                    <div class="flex items-baseline gap-2">
+                        <span id="stat-stops" class="text-3xl font-black text-white font-mono tracking-tighter">0.00</span>
+                        <span class="text-[10px] text-slate-500">avg/veh</span>
+                    </div>
+                </div>
+                <!-- Speed -->
+                <div class="bg-slate-900/80 rounded-xl p-3 border border-slate-700 relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-gradient-to-r from-cyan-600/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="text-[10px] text-cyan-400 font-bold uppercase tracking-wider mb-1">Avg Speed</div>
+                    <div class="flex items-baseline gap-2">
+                        <span id="stat-speed" class="text-3xl font-black text-white font-mono tracking-tighter">0.0</span>
+                        <span class="text-[10px] text-slate-500">km/h</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="p-5 space-y-6 overflow-y-auto flex-1 custom-scrollbar pb-10">
+                
+                <!-- Modes -->
+                <div>
+                    <h3 class="text-[10px] font-bold text-slate-500 uppercase mb-3 tracking-widest flex items-center gap-2">
+                        <span class="w-1 h-4 bg-blue-500 rounded-full"></span>
+                        Transportation Mode
+                    </h3>
+                    <div class="space-y-3">
+                        <button onclick="setMode('STANDARD')" id="btn-std" class="w-full btn-inactive rounded-xl p-3 text-left transition-all group relative overflow-hidden">
+                            <div class="relative z-10">
+                                <div class="text-xs font-bold text-white mb-0.5">🚦 標準交差点 (Standard)</div>
+                                <div class="text-[10px] opacity-60">赤信号で必ず停止。効率は低い。</div>
+                            </div>
+                        </button>
+                        
+                        <button onclick="setMode('FLYING')" id="btn-fly" class="w-full btn-active rounded-xl p-3 text-left transition-all group relative overflow-hidden">
+                             <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+                             <div class="relative z-10 flex justify-between items-center">
+                                <div>
+                                    <div class="text-xs font-bold text-white mb-0.5">🚁 エアモビリティ (Flying Car)</div>
+                                    <div class="text-[10px] text-cyan-100/80">高度差を利用し、信号も交差点も無視して直進。</div>
+                                </div>
+                                <span class="text-xl animate-pulse">⚡</span>
+                            </div>
+                        </button>
+
+                        <button onclick="setMode('SMART_CROSS')" id="btn-smt" class="w-full btn-inactive rounded-xl p-3 text-left transition-all group relative overflow-hidden">
+                             <div class="relative z-10">
+                                <div>
+                                    <div class="text-xs font-bold text-white mb-0.5">🧠 スマート交差点 (AI Sync)</div>
+                                    <div class="text-[10px] opacity-60">全車両が通信し、絶妙なタイミングですれ違う。</div>
+                                </div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Parameters -->
+                <div class="glass p-4 rounded-xl space-y-4">
+                    <h3 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Traffic Load</h3>
+                    <div>
+                        <div class="flex justify-between text-xs mb-2 text-slate-300 font-mono">
+                            <span>VOLUME</span>
+                            <span class="text-cyan-400" id="vol-disp">HIGH</span>
+                        </div>
+                        <input type="range" id="rate-car" min="1" max="20" value="8" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500 hover:accent-cyan-400 transition-all">
+                    </div>
+                </div>
+
+                 <button onclick="resetSim()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs font-bold rounded-xl border border-slate-700 transition-all active:scale-95">
+                    RESET SIMULATION
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Traffic Lab V10.0: Ultimate Mobility
+         * Features: Flying Cars (Altitude), Smart Intersection (No-Stop Logic)
+         */
+
+        const CONST = { LANE: 60, ROAD: 140, FPS: 60 };
+
+        const MODES = {
+            STANDARD: { name: '標準交差点', type: 'SIGNAL', desc: 'Stop & Go' },
+            FLYING: { name: 'エアモビリティ', type: 'FLY', desc: 'No Intersection, 3D Layers' },
+            SMART_CROSS: { name: 'スマート交差点', type: 'AI_SYNC', desc: 'Coordinate Velocity, No Stop' }
+        };
+
+        let CONFIG = {
+            mode: 'FLYING',
+            carRate: 0.08
+        };
+
+        let state = {
+            running: true, frame: 0,
+            phase: 0, phaseTimer: 0,
+            agents: [], 
+            stats: { 
+                passed: 0, 
+                totalSpeed: 0,
+                stopsSum: 0, 
+                stopCountVehicles: 0 
+            }
+        };
+
+        // --- Bezier Helper ---
+        function getBezierPoint(t, p0, p1, p2) {
+            const x = (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x;
+            const y = (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y;
+            return { x, y };
+        }
+        function getBezierAngle(t, p0, p1, p2) {
+            const dx = 2 * (1 - t) * (p1.x - p0.x) + 2 * t * (p2.x - p1.x);
+            const dy = 2 * (1 - t) * (p1.y - p0.y) + 2 * t * (p2.y - p1.y);
+            return Math.atan2(dy, dx);
+        }
+
+        class Agent {
+            constructor(dir) {
+                this.id = Math.random().toString(36).substr(2);
+                this.dir = dir; // 0:N, 1:S, 2:E, 3:W
+                this.type = 'CAR';
+                
+                // Physics
+                this.x = 0; this.y = 0;
+                this.speed = 5.0; // Initial speed
+                this.targetSpeed = 5.0;
+                this.angle = 0;
+                this.altitude = 0; // 0:Ground, 1:LowAir, 2:HighAir
+                
+                // State
+                this.removed = false;
+                this.isStopped = false;
+                this.stopCount = 0;
+                
+                this.plan = this.decidePlan();
+                this.initPos();
+                this.initAltitude();
+                
+                // Pathing
+                this.path = null;
+                this.pathProgress = 0;
+                this.inIntersection = false;
+            }
+
+            decidePlan() {
+                const r = Math.random();
+                if (r < 0.2) return 'left';
+                if (r < 0.4) return 'right';
+                return 'straight';
+            }
+
+            initPos() {
+                const cvs = document.getElementById('sim-canvas');
+                const cx = cvs.width/2; const cy = cvs.height/2;
+                const dist = Math.max(cvs.width, cvs.height)/2 + 80;
+                const lane = CONST.LANE/2;
+
+                if (this.dir===0) { this.x = cx-lane; this.y = cy-dist; this.angle=Math.PI/2; }
+                else if (this.dir===1) { this.x = cx+lane; this.y = cy+dist; this.angle=-Math.PI/2; }
+                else if (this.dir===2) { this.x = cx+dist; this.y = cy-lane; this.angle=Math.PI; }
+                else if (this.dir===3) { this.x = cx-dist; this.y = cy+lane; this.angle=0; }
+            }
+
+            initAltitude() {
+                // Determine altitude based on direction to avoid collision in FLYING mode
+                // N/S use Altitude 1, E/W use Altitude 2. Turning uses Altitude 3?
+                // Or randomized layers for visual effect.
+                
+                if (MODES[CONFIG.mode].type === 'FLY') {
+                    // Simple grade separation strategy
+                    // NS Traffic -> Alt 1 (Low)
+                    // EW Traffic -> Alt 2 (High)
+                    // Turns -> Alt 3 (Highest) to fly over everyone
+                    if (this.plan !== 'straight') this.altitude = 30; // High
+                    else if (this.dir <= 1) this.altitude = 10; // Low
+                    else this.altitude = 20; // Med
+                } else {
+                    this.altitude = 0;
+                }
+            }
+
+            update(agents, phase, cx, cy) {
+                const mode = MODES[CONFIG.mode];
+
+                if (mode.type === 'FLY') {
+                    // Constant speed, no collision check needed (assumed 3D separation)
+                    this.speed = 6.0; 
+                    this.move(cx, cy);
+                } 
+                else if (mode.type === 'AI_SYNC') {
+                    // Intelligent speed adjustment to avoid collision without stopping
+                    this.updateSmart(agents, cx, cy);
+                } 
+                else {
+                    // Standard Signal
+                    this.updateSignal(agents, phase, cx, cy);
+                }
+
+                // Stats
+                if (this.speed < 0.1) {
+                    if (!this.isStopped) { this.isStopped = true; this.stopCount++; }
+                } else {
+                    this.isStopped = false;
+                }
+
+                if (Math.abs(this.x-cx) > 1200 || Math.abs(this.y-cy) > 1200) this.complete();
+            }
+
+            updateSmart(agents, cx, cy) {
+                // Smart Crossing Logic
+                // 1. Detect potential collision at intersection center
+                // 2. Adjust speed slightly to arrive earlier or later
+                // 3. Never stop unless physically blocked by car ahead in same lane
+                
+                const distCenter = Math.hypot(this.x - cx, this.y - cy);
+                let targetS = 5.0; // Base speed
+
+                // Check car ahead (Physical constraint)
+                const ahead = this.getAhead(agents);
+                if (ahead) {
+                    const d = Math.hypot(this.x - ahead.x, this.y - ahead.y);
+                    if (d < 80) targetS = ahead.speed; // Match speed
+                    if (d < 40) targetS = 0; // Emergency stop
+                } else {
+                    // Conflict resolution
+                    if (distCenter < 300 && distCenter > 50 && !this.inIntersection) {
+                        // Scan for conflicting agents
+                        let conflict = false;
+                        for (let o of agents) {
+                            if (o === this || o.dir === this.dir) continue; // Same dir handled by ahead check
+                            
+                            // Check if trajectories cross close in time
+                            // Simple heuristic: distance to center comparison
+                            const oDist = Math.hypot(o.x - cx, o.y - cy);
+                            
+                            // If we are roughly equidistant, one must yield (slow down)
+                            if (Math.abs(distCenter - oDist) < 60) {
+                                // Deterministic rule: Yield to Right? Or ID based?
+                                // Let's use ID to decide winner
+                                if (this.id < o.id) {
+                                    targetS = 3.5; // Slow down slightly to let other pass
+                                    conflict = true;
+                                } else {
+                                    targetS = 6.5; // Speed up slightly to pass first
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Smooth speed transition
+                this.speed += (targetS - this.speed) * 0.1;
+                this.move(cx, cy);
+            }
+
+            updateSignal(agents, phase, cx, cy) {
+                let stop = false;
+                const distStop = this.getDistStop(cx, cy);
+
+                if (distStop > 0 && distStop < 150) {
+                    let canGo = false;
+                    if (this.dir<=1 && phase===0) canGo = true;
+                    if (this.dir>=2 && phase===3) canGo = true;
+                    if ((this.dir<=1 && phase===1) || (this.dir>=2 && phase===4)) { // Yellow
+                         if (distStop < 60 && this.speed > 3) canGo = true;
+                    }
+
+                    if (!canGo) stop = true;
+                    else {
+                         // Turn yield
+                         if (this.plan === 'right' && distStop < 40 && this.checkOncoming(agents)) stop = true;
+                    }
+                }
+
+                if (this.getAhead(agents)) stop = true; // Check ahead blocked
+
+                if (stop) {
+                    this.speed *= 0.85; if(this.speed < 0.1) this.speed = 0;
+                } else {
+                    if (this.speed < 4.5) this.speed += 0.2;
+                }
+                this.move(cx, cy);
+            }
+
+            move(cx, cy) {
+                const m = CONST.LANE;
+                let inInter = false;
+                if (this.dir===0) inInter = this.y > cy - m - 20;
+                if (this.dir===1) inInter = this.y < cy + m + 20;
+                if (this.dir===2) inInter = this.x < cx + m + 20;
+                if (this.dir===3) inInter = this.x > cx - m - 20;
+
+                if (inInter && this.plan !== 'straight' && !this.inIntersection) {
+                    this.inIntersection = true;
+                    this.pathProgress = 0;
+                    
+                    const start = {x: this.x, y: this.y};
+                    let end = {x:0, y:0};
+                    let control = {x: cx, y: cy};
+                    const lane = CONST.LANE/2;
+
+                    if (this.plan === 'left') {
+                        if(this.dir===0) { end = {x: cx+lane+40, y: cy-lane}; control={x: cx-lane, y: cy-lane}; }
+                        if(this.dir===1) { end = {x: cx-lane-40, y: cy+lane}; control={x: cx+lane, y: cy+lane}; }
+                        if(this.dir===2) { end = {x: cx+lane, y: cy+lane+40}; control={x: cx+lane, y: cy-lane}; }
+                        if(this.dir===3) { end = {x: cx-lane, y: cy-lane-40}; control={x: cx-lane, y: cy+lane}; }
+                    } 
+                    else if (this.plan === 'right') {
+                        if(this.dir===0) { end = {x: cx-lane-40, y: cy+lane}; control={x: cx, y: cy}; }
+                        if(this.dir===1) { end = {x: cx+lane+40, y: cy-lane}; control={x: cx, y: cy}; }
+                        if(this.dir===2) { end = {x: cx-lane, y: cy-lane-40}; control={x: cx, y: cy}; }
+                        if(this.dir===3) { end = {x: cx+lane, y: cy+lane+40}; control={x: cx, y: cy}; }
+                    }
+                    this.path = {p0: start, p1: control, p2: end};
+                }
+
+                if (this.inIntersection && this.path) {
+                    this.pathProgress += this.speed / 150; // Arc length approx
+                    if (this.pathProgress > 1.0) {
+                        this.pathProgress = 1.0;
+                        this.inIntersection = false;
+                        this.path = null;
+                        if(this.plan==='left') this.angle -= Math.PI/2;
+                        if(this.plan==='right') this.angle += Math.PI/2;
+                    } else {
+                        const pt = getBezierPoint(this.pathProgress, this.path.p0, this.path.p1, this.path.p2);
+                        this.x = pt.x; this.y = pt.y;
+                        this.angle = getBezierAngle(this.pathProgress, this.path.p0, this.path.p1, this.path.p2);
+                        return;
+                    }
+                }
+
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed;
+            }
+
+            getDistStop(cx, cy) {
+                const m = CONST.LANE + 10;
+                if (this.dir===0) return (cy-m)-this.y;
+                if (this.dir===1) return this.y-(cy+m);
+                if (this.dir===2) return this.x-(cx+m);
+                if (this.dir===3) return (cx-m)-this.x;
+                return 9999;
+            }
+
+            getAhead(agents) {
+                let min = 9999; let target = null;
+                for (let o of agents) {
+                    if (o === this) continue;
+                    // In FLYING mode, ignore agents on different altitude
+                    if (MODES[CONFIG.mode].type === 'FLY' && Math.abs(o.altitude - this.altitude) > 5) continue;
+                    
+                    const d = Math.hypot(this.x - o.x, this.y - o.y);
+                    if (d < 80) {
+                        const dx = o.x - this.x; const dy = o.y - this.y;
+                        const fwd = dx*Math.cos(this.angle) + dy*Math.sin(this.angle);
+                        if (fwd > 0 && fwd < min) { min = fwd; target = o; }
+                    }
+                }
+                return target;
+            }
+            checkOncoming(agents) {
+                let opp = -1;
+                if(this.dir===0) opp=1; if(this.dir===1) opp=0;
+                if(this.dir===2) opp=3; if(this.dir===3) opp=2;
+                const cvs = document.getElementById('sim-canvas');
+                for (let o of agents) {
+                    if (o.dir === opp && o.plan === 'straight') {
+                        const d = Math.hypot(o.x - cvs.width/2, o.y - cvs.height/2);
+                        if (d < 200) return true;
+                    }
+                }
+                return false;
+            }
+
+            complete() {
+                this.removed = true;
+                state.stats.passed++;
+                state.stats.totalSpeed += this.speed;
+                state.stats.stopsSum += this.stopCount;
+                state.stats.stopCountVehicles++;
+            }
+        }
+
+        // --- Core ---
+
+        function setMode(m) {
+            CONFIG.mode = m;
+            resetSim();
+            ['std', 'fly', 'smt'].forEach(k => {
+                document.getElementById('btn-'+k).className = "w-full btn-inactive rounded-xl p-3 text-left transition-all group relative overflow-hidden";
+            });
+            const key = m === 'STANDARD' ? 'std' : m === 'FLYING' ? 'fly' : 'smt';
+            document.getElementById('btn-'+key).className = "w-full btn-active rounded-xl p-3 text-left transition-all group relative overflow-hidden transform scale-105 shadow-lg";
+            
+            document.getElementById('overlay-mode').innerText = MODES[m].type;
+            
+            const isFly = m === 'FLYING';
+            document.getElementById('fly-indicator').className = isFly ? "absolute inset-0 pointer-events-none flex items-center justify-center z-0" : "hidden";
+        }
+
+        function resetSim() {
+            state.agents = [];
+            state.stats = { passed: 0, totalSpeed: 0, stopsSum: 0, stopCountVehicles: 0 };
+            state.phase = 0; state.phaseTimer = 0;
+        }
+
+        function update() {
+            if (!state.running) return;
+
+            if (Math.random() < CONFIG.carRate) state.agents.push(new Agent(Math.floor(Math.random()*4)));
+
+            const mode = MODES[CONFIG.mode];
+            state.phaseTimer++;
+            
+            // Signal logic only for Standard
+            if (mode.type === 'SIGNAL') {
+                let lim = 600;
+                const p = state.phase;
+                if(p===1||p===4) lim = 180; if(p===2||p===5) lim = 120;
+                if (state.phaseTimer > lim) { state.phaseTimer = 0; state.phase = (state.phase+1)%6; }
+            }
+
+            const cvs = document.getElementById('sim-canvas');
+            state.agents.forEach(a => a.update(state.agents, state.phase, cvs.width/2, cvs.height/2));
+            state.agents = state.agents.filter(a => !a.removed);
+
+            state.frame++;
+        }
+
+        function draw() {
+            const cvs = document.getElementById('sim-canvas');
+            const ctx = cvs.getContext('2d');
+            const cx = cvs.width/2; const cy = cvs.height/2;
+
+            // BG
+            ctx.fillStyle = '#0f172a'; ctx.fillRect(0,0,cvs.width,cvs.height);
+            
+            // Grid / Road
+            if (MODES[CONFIG.mode].type === 'FLY') {
+                // Sky Grid
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.1)'; ctx.lineWidth = 1;
+                for(let i=0; i<cvs.width; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,cvs.height); ctx.stroke(); }
+                for(let i=0; i<cvs.height; i+=40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(cvs.width,i); ctx.stroke(); }
+            } else {
+                // Road
+                ctx.fillStyle = '#1e293b'; 
+                const r = CONST.ROAD;
+                ctx.fillRect(0, cy-r/2, cvs.width, r); ctx.fillRect(cx-r/2, 0, r, cvs.height);
+                ctx.fillStyle = '#334155'; ctx.fillRect(cx-r/2, cy-r/2, r, r); 
+            }
+
+            // Agents
+            // Sort by altitude for depth
+            const sorted = [...state.agents].sort((a,b) => a.altitude - b.altitude);
+
+            sorted.forEach(a => {
+                ctx.save(); ctx.translate(a.x, a.y);
+                
+                // Shadow (Ground projection)
+                if (a.altitude > 0) {
+                    ctx.save();
+                    // Shadow offset depends on altitude
+                    ctx.translate(a.altitude/2, a.altitude/2);
+                    ctx.rotate(a.angle);
+                    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                    ctx.beginPath(); ctx.roundRect(-12, -7, 24, 14, 4); ctx.fill();
+                    ctx.restore();
+                }
+
+                // Vehicle Body
+                // Scale based on altitude to simulate height
+                const scale = 1.0 + a.altitude * 0.01;
+                ctx.scale(scale, scale);
+                ctx.rotate(a.angle);
+
+                // Body color
+                let col = '#3b82f6';
+                if (a.altitude > 20) col = '#f472b6'; // Pink for high flyers
+                else if (a.altitude > 0) col = '#22d3ee'; // Cyan for low flyers
+                
+                // Glow for future look
+                ctx.shadowColor = col; ctx.shadowBlur = 10;
+                ctx.fillStyle = col;
+                
+                // Shape
+                if (a.altitude > 0) {
+                    // Futuristic Flying Car Shape
+                    ctx.beginPath();
+                    ctx.moveTo(15, 0); ctx.lineTo(-10, 10); ctx.lineTo(-5, 0); ctx.lineTo(-10, -10); ctx.closePath();
+                    ctx.fill();
+                    // Thrusters
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath(); ctx.arc(-10, 5, 2, 0, Math.PI*2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(-10, -5, 2, 0, Math.PI*2); ctx.fill();
+                } else {
+                    // Ground Car
+                    ctx.beginPath(); ctx.roundRect(-12, -7, 24, 14, 4); ctx.fill();
+                    // Windshield
+                    ctx.fillStyle = '#0f172a'; ctx.fillRect(2, -5, 5, 10);
+                    // Brake lights
+                    if (a.braking) {
+                        ctx.fillStyle = '#ef4444'; ctx.shadowColor='red';
+                        ctx.fillRect(-12, -6, 2, 4); ctx.fillRect(-12, 2, 2, 4);
+                    }
+                }
+                
+                ctx.restore();
+            });
+
+            // Signal Draw (Only Standard)
+            if (MODES[CONFIG.mode].type === 'SIGNAL') drawSignals(ctx, cx, cy);
+        }
+
+        function drawSignals(ctx, cx, cy) {
+            const r = CONST.ROAD/2 + 20;
+            const p = state.phase;
+            let nc = '#333', ec = '#333';
+            if(p===0) nc='#22c55e'; if(p===1) nc='#eab308'; if(p>=2 && p!==3 && p!==4) nc='#ef4444';
+            if(p===3) ec='#22c55e'; if(p===4) ec='#eab308'; if(p!==3 && p!==4) ec='#ef4444';
+            
+            const d = 6;
+            ctx.fillStyle = nc; 
+            ctx.beginPath(); ctx.arc(cx-r, cy-r, d, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx+r, cy+r, d, 0, Math.PI*2); ctx.fill();
+            if(nc!=='#333') { ctx.shadowColor=nc; ctx.shadowBlur=10; ctx.stroke(); }
+            
+            ctx.fillStyle = ec;
+            ctx.beginPath(); ctx.arc(cx+r, cy-r, d, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx-r, cy+r, d, 0, Math.PI*2); ctx.fill();
+            if(ec!=='#333') { ctx.shadowColor=ec; ctx.shadowBlur=10; ctx.stroke(); }
+        }
+
+        function updateUI() {
+            const count = state.stats.stopCountVehicles;
+            const avgStops = count > 0 ? (state.stats.stopsSum / count).toFixed(2) : "0.00";
+            document.getElementById('stat-stops').innerText = avgStops;
+            
+            const avgSpeed = state.stats.passed > 0 ? (state.stats.totalSpeed / state.stats.passed * 10).toFixed(1) : "0.0";
+            document.getElementById('stat-speed').innerText = avgSpeed;
+        }
+
+        function resize() {
+            const cvs = document.getElementById('sim-canvas');
+            const w = document.getElementById('canvas-wrapper');
+            cvs.width = w.clientWidth;
+            cvs.height = w.clientHeight;
+        }
+
+        window.onresize = resize;
+        document.getElementById('rate-car').oninput = e => { CONFIG.carRate = e.target.value/100; document.getElementById('vol-disp').innerText = e.target.value > 10 ? 'EXTREME' : 'NORMAL'; };
+
+        function loop() { update(); draw(); updateUI(); requestAnimationFrame(loop); }
+        setMode('FLYING'); // Default to the requested ideal state
+        setTimeout(resize, 0);
+        loop();
+
+    </script>
+</body>
+</html>

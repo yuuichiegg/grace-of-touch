@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Grace of Touch — Space Terminal v9</title>
+<!-- Firebase SDK (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<meta name="theme-color" content="#00ffff">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;}
+body{margin:0;overflow:hidden;background:#020510;touch-action:none;}
+
+/* ===================== MEGA ROCKET IFRAME ===================== */
+#rocket-bg{position:absolute;inset:0;width:100%;height:100%;border:none;z-index:0;}
+
+/* ===================== STAR FIELD CANVAS ===================== */
+#star-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;opacity:0;transition:opacity 3s ease;}
+#star-canvas.active{opacity:1;}
+
+/* ===================== VIGNETTE OVERLAY ===================== */
+#vignette{position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 40%,rgba(2,5,16,0.6) 100%);
+  transition:opacity 2s ease;}
+
+/* ===================== PHASE INDICATOR (flight telemetry) ===================== */
+#phase-hud{position:absolute;top:20px;left:20px;z-index:15;pointer-events:none;
+  font-family:'Orbitron','Courier New',monospace;opacity:0;transition:opacity 1s ease;}
+#phase-hud.visible{opacity:1;}
+#phase-name{font-size:11px;color:rgba(0,255,255,0.6);letter-spacing:0.3em;}
+#phase-bar{width:160px;height:2px;background:rgba(0,255,255,0.1);margin-top:6px;border-radius:1px;overflow:hidden;}
+#phase-fill{height:100%;background:linear-gradient(90deg,#00ffff,#00ff88);width:0%;transition:width 1s ease;}
+
+/* ===================== TITLE SCREEN ===================== */
+#title-screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;z-index:50;pointer-events:none;transition:opacity 0.6s ease;}
+#title-screen.hidden{opacity:0;pointer-events:none;}
+#title-pre{font-family:'Orbitron',monospace;font-size:clamp(9px,1.2vw,12px);
+  color:rgba(0,255,255,0.4);letter-spacing:0.5em;margin-bottom:16px;}
+#title-main{font-family:'Orbitron',monospace;font-weight:900;
+  font-size:clamp(36px,8vw,90px);color:#00ffff;letter-spacing:0.12em;
+  text-align:center;line-height:1.05;
+  text-shadow:0 0 20px rgba(0,255,255,0.8),0 0 40px rgba(0,255,255,0.4),0 0 80px rgba(0,255,255,0.2);
+  animation:titleGlow 3s ease-in-out infinite alternate;}
+@keyframes titleGlow{
+  from{text-shadow:0 0 20px rgba(0,255,255,0.8),0 0 40px rgba(0,255,255,0.4),0 0 80px rgba(0,255,255,0.2);}
+  to{text-shadow:0 0 30px rgba(0,255,255,1),0 0 60px rgba(0,255,255,0.6),0 0 120px rgba(0,255,255,0.3);}
+}
+#title-sub{font-family:'Noto Sans JP',sans-serif;font-weight:300;
+  font-size:clamp(11px,1.6vw,17px);color:rgba(255,255,255,0.55);
+  letter-spacing:0.35em;margin-top:18px;text-align:center;}
+#title-hint{font-family:'Orbitron',monospace;font-weight:400;
+  font-size:clamp(9px,1.1vw,13px);color:rgba(0,255,255,0.45);
+  letter-spacing:0.25em;margin-top:56px;animation:blink 2.2s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:0.4;}50%{opacity:1;}}
+
+/* ===================== JOURNEY OVERLAY (appears during flight) ===================== */
+#journey-overlay{position:absolute;inset:0;z-index:30;pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  opacity:0;transition:opacity 2s ease;}
+#journey-overlay.visible{opacity:1;}
+#journey-text{font-family:'Orbitron',monospace;font-size:clamp(14px,2.5vw,24px);
+  color:rgba(0,255,255,0.7);letter-spacing:0.2em;text-align:center;
+  text-shadow:0 0 20px rgba(0,255,255,0.5);}
+#journey-sub{font-family:'Noto Sans JP',sans-serif;font-size:clamp(10px,1.3vw,14px);
+  color:rgba(255,255,255,0.4);letter-spacing:0.15em;margin-top:12px;text-align:center;}
+
+/* ===================== TERMINAL ARRIVAL ===================== */
+#terminal-screen{position:absolute;inset:0;z-index:40;pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  opacity:0;transition:opacity 2.5s ease;}
+#terminal-screen.visible{opacity:1;pointer-events:auto;}
+#terminal-title{font-family:'Orbitron',monospace;font-weight:900;
+  font-size:clamp(20px,5vw,48px);color:#00ffff;letter-spacing:0.15em;
+  text-shadow:0 0 30px rgba(0,255,255,0.8),0 0 60px rgba(0,255,255,0.3);
+  text-align:center;animation:terminalPulse 4s ease-in-out infinite alternate;}
+@keyframes terminalPulse{
+  from{text-shadow:0 0 30px rgba(0,255,255,0.8),0 0 60px rgba(0,255,255,0.3);}
+  to{text-shadow:0 0 40px rgba(0,255,255,1),0 0 80px rgba(0,255,255,0.5),0 0 120px rgba(0,255,255,0.2);}
+}
+#terminal-sub{font-family:'Noto Sans JP',sans-serif;font-size:clamp(10px,1.4vw,15px);
+  color:rgba(255,255,255,0.5);letter-spacing:0.3em;margin-top:14px;text-align:center;}
+#terminal-status{font-family:'Orbitron',monospace;font-size:10px;
+  color:rgba(0,255,136,0.6);letter-spacing:0.2em;margin-top:30px;
+  display:flex;align-items:center;gap:8px;}
+#terminal-status .dot{width:6px;height:6px;border-radius:50%;background:#00ff88;
+  animation:dotPulse 2s ease-in-out infinite;}
+@keyframes dotPulse{0%,100%{opacity:0.4;box-shadow:0 0 4px rgba(0,255,136,0.3);}
+  50%{opacity:1;box-shadow:0 0 10px rgba(0,255,136,0.6);}}
+#open-launcher{font-family:'Orbitron',monospace;font-size:clamp(10px,1.2vw,14px);
+  color:#00ffff;letter-spacing:0.2em;margin-top:40px;
+  background:rgba(0,255,255,0.06);border:1px solid rgba(0,255,255,0.3);
+  padding:14px 36px;border-radius:8px;cursor:pointer;pointer-events:auto;
+  transition:all 0.3s;text-shadow:0 0 8px rgba(0,255,255,0.4);}
+#open-launcher:hover{background:rgba(0,255,255,0.12);border-color:rgba(0,255,255,0.6);
+  box-shadow:0 0 25px rgba(0,255,255,0.2);}
+
+/* ===================== LAUNCHER TOGGLE ===================== */
+#launcher-toggle{position:absolute;top:24px;right:24px;width:50px;height:50px;
+  background:rgba(0,255,255,0.04);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-radius:12px;border:1px solid rgba(0,255,255,0.18);cursor:pointer;z-index:100;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  transition:all 0.3s ease;opacity:0;pointer-events:none;}
+#launcher-toggle.visible{opacity:1;pointer-events:auto;}
+#launcher-toggle:hover{background:rgba(0,255,255,0.1);border-color:rgba(0,255,255,0.45);
+  box-shadow:0 0 20px rgba(0,255,255,0.15);}
+#launcher-toggle svg{width:20px;height:20px;fill:rgba(0,255,255,0.8);}
+#launcher-toggle .toggle-label{font-family:'Orbitron',monospace;font-size:7px;
+  color:rgba(0,255,255,0.5);letter-spacing:0.08em;}
+
+/* ===================== LAUNCHER PANEL ===================== */
+#launcher-panel{position:absolute;top:0;right:0;width:min(360px,100vw);height:100%;
+  background:rgba(2,5,16,0.85);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+  border-left:1px solid rgba(0,255,255,0.12);z-index:90;
+  transform:translateX(100%);transition:transform 0.5s cubic-bezier(0.4,0,0.2,1);
+  display:flex;flex-direction:column;overflow:hidden;}
+#launcher-panel.open{transform:translateX(0);}
+.panel-header{padding:32px 28px 22px;border-bottom:1px solid rgba(0,255,255,0.08);flex-shrink:0;}
+.panel-brand{font-family:'Orbitron',monospace;font-size:9px;font-weight:400;
+  color:rgba(0,255,255,0.4);letter-spacing:0.3em;margin-bottom:8px;}
+.panel-title{font-family:'Orbitron',monospace;font-weight:700;font-size:22px;
+  color:#fff;letter-spacing:0.08em;margin:0;}
+.panel-subtitle{font-family:'Noto Sans JP',sans-serif;font-size:11px;
+  color:rgba(255,255,255,0.35);margin-top:7px;letter-spacing:0.05em;}
+.panel-scroll{flex:1;overflow-y:auto;padding:18px 24px 20px;display:flex;
+  flex-direction:column;gap:10px;}
+.panel-scroll::-webkit-scrollbar{width:3px;}
+.panel-scroll::-webkit-scrollbar-track{background:transparent;}
+.panel-scroll::-webkit-scrollbar-thumb{background:rgba(0,255,255,0.2);border-radius:2px;}
+.panel-section-label{font-family:'Orbitron',monospace;font-size:9px;font-weight:400;
+  color:rgba(0,255,255,0.35);letter-spacing:0.35em;padding:10px 0 4px;
+  border-top:1px solid rgba(0,255,255,0.06);margin-top:4px;}
+.panel-section-label:first-child{border-top:none;margin-top:0;padding-top:0;}
+
+/* App Card */
+.app-card{background:rgba(0,255,255,0.02);border:1px solid rgba(0,255,255,0.08);
+  border-radius:14px;padding:16px;cursor:pointer;transition:all 0.3s ease;
+  text-decoration:none;color:inherit;display:block;position:relative;overflow:hidden;}
+.app-card::after{content:'';position:absolute;inset:0;border-radius:14px;
+  background:linear-gradient(135deg,rgba(0,255,255,0.04) 0%,transparent 60%);
+  opacity:0;transition:opacity 0.3s ease;}
+.app-card:hover{background:rgba(0,255,255,0.06);border-color:rgba(0,255,255,0.32);
+  transform:translateX(-6px);box-shadow:6px 0 24px rgba(0,255,255,0.08);}
+.app-card:hover::after{opacity:1;}
+.app-card-top{display:flex;align-items:flex-start;gap:12px;}
+.app-icon{font-size:26px;flex-shrink:0;line-height:1;margin-top:1px;overflow:visible;min-height:32px;display:flex;align-items:center;}
+.app-info{flex:1;min-width:0;}
+.app-title{font-family:'Orbitron',monospace;font-weight:700;font-size:12px;
+  color:#00ffff;letter-spacing:0.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.app-tags{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;}
+.app-tag{font-family:'Orbitron',monospace;font-size:7px;font-weight:400;
+  color:rgba(0,255,255,0.55);background:rgba(0,255,255,0.07);
+  border:1px solid rgba(0,255,255,0.18);border-radius:4px;padding:2px 7px;letter-spacing:0.12em;}
+.app-desc{font-family:'Noto Sans JP',sans-serif;font-size:11px;font-weight:300;
+  color:rgba(255,255,255,0.45);line-height:1.55;margin-top:9px;}
+/* Agent Status */
+.agent-status{display:flex;align-items:center;gap:5px;margin-top:6px;
+  font-family:'Courier New',monospace;font-size:9px;color:rgba(0,255,136,0.6);}
+.agent-dot{width:6px;height:6px;border-radius:50%;background:#00ff88;
+  box-shadow:0 0 6px rgba(0,255,136,0.6);animation:agentPulse 2s infinite;}
+.agent-status.idle .agent-dot{background:#ffaa00;box-shadow:0 0 4px rgba(255,170,0,0.4);animation:none;}
+.agent-status.idle{color:rgba(255,170,0,0.5);}
+.agent-msg{opacity:0.8;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+@keyframes agentPulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(0.8);}}
+.app-launch{display:flex;align-items:center;gap:6px;margin-top:10px;
+  font-family:'Orbitron',monospace;font-size:8px;color:rgba(0,255,255,0.4);
+  letter-spacing:0.22em;transition:color 0.3s ease;}
+.app-card:hover .app-launch{color:rgba(0,255,255,0.75);}
+.app-launch::after{content:'\203A';font-size:14px;line-height:1;}
+.app-card[data-coming-soon] .app-launch{color:rgba(255,200,0,0.45);}
+.app-card[data-coming-soon] .app-launch::after{content:'';}
+#coming-toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(20px);
+  font-family:'Orbitron',monospace;font-size:12px;color:#00ffff;letter-spacing:0.15em;
+  background:rgba(0,20,40,0.85);border:1px solid rgba(0,255,255,0.3);
+  padding:12px 28px;border-radius:8px;pointer-events:none;z-index:200;
+  opacity:0;transition:opacity 0.4s ease, transform 0.4s ease;
+  text-shadow:0 0 8px rgba(0,255,255,0.4);}
+#coming-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.panel-footer{padding:14px 28px;border-top:1px solid rgba(0,255,255,0.07);
+  text-align:center;flex-shrink:0;}
+.panel-footer-text{font-family:'Orbitron',monospace;font-size:8px;
+  color:rgba(255,255,255,0.15);letter-spacing:0.18em;}
+
+/* ===================== RESPONSIVE ===================== */
+@media(max-width:400px){
+  #launcher-panel{width:100%;}
+  .panel-header{padding:20px 16px 16px;}
+  .panel-title{font-size:18px;}
+  .panel-scroll{padding:12px 14px 14px;gap:8px;}
+  .app-card{padding:12px;}
+  .app-icon{font-size:22px;}
+  .app-desc{font-size:10px;}
+}
+@media(max-width:320px){
+  .panel-header{padding:14px 12px 12px;}
+  .panel-title{font-size:15px;letter-spacing:0.04em;}
+  .panel-scroll{padding:10px 10px 12px;gap:6px;}
+  .app-card{padding:10px;border-radius:10px;}
+  #launcher-toggle{top:14px;right:14px;width:42px;height:42px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ======= LAYER 0: MEGA ROCKET 3D SCENE (iframe) ======= -->
+<iframe id="rocket-bg" src="rocket.html" allow="autoplay"></iframe>
+
+<!-- ======= LAYER 1: DEEP SPACE STAR FIELD ======= -->
+<canvas id="star-canvas"></canvas>
+
+<!-- ======= LAYER 2: VIGNETTE ======= -->
+<div id="vignette"></div>
+
+<!-- ======= FLIGHT PHASE HUD ======= -->
+<div id="phase-hud">
+  <div id="phase-name">STANDBY</div>
+  <div id="phase-bar"><div id="phase-fill"></div></div>
+</div>
+
+<!-- ======= TITLE SCREEN (EARTH / PRE-LAUNCH) ======= -->
+<div id="title-screen">
+  <div id="title-pre">SPACE TERMINAL</div>
+  <div id="title-main">GRACE<br>OF TOUCH</div>
+  <div id="title-sub">地球から宇宙へ — 冒険がはじまる</div>
+  <div id="title-hint">— Touch to Launch —</div>
+</div>
+
+<!-- ======= JOURNEY OVERLAY (during flight) ======= -->
+<div id="journey-overlay">
+  <div id="journey-text">ASCENDING</div>
+  <div id="journey-sub">大気圏を突破中...</div>
+</div>
+
+<!-- ======= TERMINAL ARRIVAL (space station) ======= -->
+<div id="terminal-screen">
+  <div id="terminal-title">WELCOME TO<br>SPACE TERMINAL</div>
+  <div id="terminal-sub">軌道ステーション GRACE OF TOUCH へようこそ</div>
+  <div id="visitor-welcome" style="font-family:'Courier New',monospace;font-size:11px;color:rgba(0,255,200,0.7);
+    margin-top:8px;opacity:0;transition:opacity 1.5s ease;letter-spacing:0.05em;"></div>
+  <div id="terminal-status"><span class="dot"></span>SYSTEMS ONLINE</div>
+  <div id="visitor-counter" style="position:absolute;top:20px;right:20px;font-family:'Courier New',monospace;
+    font-size:10px;color:rgba(0,255,255,0.35);letter-spacing:0.1em;text-align:right;opacity:0;transition:opacity 2s ease;">
+    <div>TOTAL VISITORS</div>
+    <div id="visitor-count" style="font-size:18px;color:rgba(0,255,255,0.6);font-weight:bold;">---</div>
+  </div>
+
+  <!-- Real-time Earthquake Monitor -->
+  <div id="quake-monitor" style="position:absolute;bottom:80px;left:20px;right:20px;max-width:480px;opacity:0;transition:opacity 2s ease;pointer-events:none;">
+    <div style="font-family:'Orbitron',monospace;font-size:9px;color:rgba(0,255,255,0.4);letter-spacing:0.2em;margin-bottom:6px;">SEISMIC MONITOR — LIVE</div>
+    <div id="quake-feed" style="font-family:'Courier New',monospace;font-size:10px;line-height:1.8;color:rgba(0,255,255,0.5);max-height:120px;overflow:hidden;"></div>
+  </div>
+
+  <div id="open-launcher">EXPLORE EXPERIENCES</div>
+</div>
+
+<!-- ======= LAUNCHER TOGGLE (always available after arrival) ======= -->
+<div id="launcher-toggle" title="EXPERIENCE MAP">
+  <svg viewBox="0 0 24 24"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>
+  <span class="toggle-label">MENU</span>
+</div>
+
+<!-- ======= LAUNCHER PANEL ======= -->
+<div id="launcher-panel">
+  <div class="panel-header">
+    <div class="panel-brand">SPACE TERMINAL</div>
+    <h2 class="panel-title">EXPERIENCE MAP</h2>
+    <div class="panel-subtitle">目的地を選んでください</div>
+  </div>
+  <div class="panel-scroll">
+
+    <!-- UPDATE LOG -->
+    <div class="panel-section-label" style="color:rgba(0,255,200,0.7);">📋 UPDATE LOG</div>
+    <div id="update-log" style="background:rgba(0,255,200,0.03);border:1px solid rgba(0,255,200,0.12);
+      border-radius:10px;padding:12px 14px;margin-bottom:14px;font-family:'Courier New',monospace;
+      font-size:10px;line-height:1.9;color:rgba(255,255,255,0.65);cursor:pointer;position:relative;"
+      onclick="navigator.clipboard.writeText(this.querySelector('.update-copy-text').textContent).then(()=>{const t=this.querySelector('.copy-toast');t.style.opacity='1';setTimeout(()=>t.style.opacity='0',1500);})">
+      <div class="copy-toast" style="position:absolute;top:8px;right:10px;font-size:9px;color:#00ffcc;opacity:0;transition:opacity 0.3s;">✓ コピーしました</div>
+      <div style="font-size:9px;color:rgba(0,255,200,0.5);letter-spacing:0.1em;margin-bottom:6px;">TAP TO COPY → X に投稿</div>
+      <div class="update-copy-text">🚀 Grace of Touch — 2026-03-27 Update
+
+✨ Panda Keeper: 2Dパンダ自律生活シミュレーション
+✨ Panda Guardian: パンダ保護区ドローン監視
+✨ Traffic Simulator: 未来都市交通シミュレーション
+🔧 TrackForge: 再生バー・インポート問題修正
+📦 Portal: 訪問者カウンター・リピーター検出追加
+
+🌐 https://grace-of-touch.web.app
+#GraceOfTouch #WebApp #Tech</div>
+    </div>
+
+    <div class="panel-section-label">UNIVERSE &amp; SCIENCE</div>
+
+    <a href="earthquake.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🌍</div>
+        <div class="app-info">
+          <div class="app-title">AI地震探偵</div>
+          <div class="app-tags"><span class="app-tag">SCIENCE</span><span class="app-tag">AI</span></div>
+        </div>
+      </div>
+      <div class="app-desc">リアルタイム地震データとAI分析、ドローンシミュレーション</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <a href="phage.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🦠</div>
+        <div class="app-info">
+          <div class="app-title">Phage Therapy</div>
+          <div class="app-tags"><span class="app-tag">BIOLOGY</span><span class="app-tag">STRATEGY</span></div>
+        </div>
+      </div>
+      <div class="app-desc">T4ファージを操り、薬剤耐性菌を撃破せよ</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <div class="panel-section-label">ENGINEERING &amp; DESIGN</div>
+
+    <a href="logo3d.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">💠</div>
+        <div class="app-info">
+          <div class="app-title">3D Logo Designer</div>
+          <div class="app-tags"><span class="app-tag">DESIGN</span><span class="app-tag">3D</span></div>
+        </div>
+      </div>
+      <div class="app-desc">画像から3Dロゴやキーホルダーを作成・STL出力</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <a href="gear.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">⚙️</div>
+        <div class="app-info">
+          <div class="app-title">Gear Designer</div>
+          <div class="app-tags"><span class="app-tag">ENGINEER</span><span class="app-tag">DESIGN</span></div>
+        </div>
+      </div>
+      <div class="app-desc">精密歯車ジェネレーターとシミュレーション</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <a href="/3d-customizer/" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">📦</div>
+        <div class="app-info">
+          <div class="app-title">3D Box Customizer</div>
+          <div class="app-tags"><span class="app-tag">3D PRINT</span><span class="app-tag">CAD</span><span class="app-tag">STL</span></div>
+        </div>
+      </div>
+      <div class="app-desc">カスタムボックスを3Dデザイン。サイズ・素材・色を自由に設定しSTL出力</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <div class="panel-section-label">SPACE &amp; SIMULATION</div>
+
+    <a href="rocketcad.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">📐</div>
+        <div class="app-info">
+          <div class="app-title">Rocket CAD Pro</div>
+          <div class="app-tags"><span class="app-tag">CAD</span><span class="app-tag">ENGINEER</span></div>
+        </div>
+      </div>
+      <div class="app-desc">本格的なロケット設計と3Dモデリング</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <a href="#" class="app-card" id="mega-rocket-card">
+      <div class="app-card-top">
+        <div class="app-icon">🚀</div>
+        <div class="app-info">
+          <div class="app-title">Mega Rocket</div>
+          <div class="app-tags"><span class="app-tag">SIM</span><span class="app-tag">PHYSICS</span>
+            <span class="app-tag" style="background:rgba(0,255,136,0.15);border-color:rgba(0,255,136,0.4);color:rgba(0,255,136,0.8);">LIVE BG</span></div>
+        </div>
+      </div>
+      <div class="app-desc">リアルな物理演算によるロケット着陸シミュレーター（背景でライブ稼働中）</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <a href="traffic-sim.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🚦</div>
+        <div class="app-info">
+          <div class="app-title">Traffic Simulator</div>
+          <div class="app-tags"><span class="app-tag">SMART CITY</span><span class="app-tag">AI</span><span class="app-tag">PLATEAU</span></div>
+        </div>
+      </div>
+      <div class="app-desc">未来都市交通シミュレーション。信号制御・空飛ぶ車・AIスマート交差点</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <div class="panel-section-label">SAFETY &amp; INSPECTION</div>
+
+    <a href="wallguard.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">&#128737;&#65039;</div>
+        <div class="app-info">
+          <div class="app-title">WallGuard FC</div>
+          <div class="app-tags"><span class="app-tag">INSPECTION</span><span class="app-tag">SAFETY</span><span class="app-tag">TEAM</span></div>
+        </div>
+      </div>
+      <div class="app-desc">外壁点検AIチームツール。マーカー配置・安全コックピット・PTT通話</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <a href="tunneldrone.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🚁</div>
+        <div class="app-info">
+          <div class="app-title">TunnelDrone SIM</div>
+          <div class="app-tags"><span class="app-tag">DRONE</span><span class="app-tag">TUNNEL</span><span class="app-tag">INSPECTION</span></div>
+        </div>
+      </div>
+      <div class="app-desc">トンネル点検ドローンシミュレータ。自動飛行・LiDAR・損傷検出AI搭載</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <a href="infrascan.html" class="app-card" id="infrascan-card" style="display:none;">
+      <div class="app-card-top">
+        <div class="app-icon">&#128269;</div>
+        <div class="app-info">
+          <div class="app-title">InfraScan AI</div>
+          <div class="app-tags"><span class="app-tag">AI</span><span class="app-tag">INSPECTION</span><span class="app-tag">INFRA</span><span class="app-tag">INVITE ONLY</span></div>
+        </div>
+      </div>
+      <div class="app-desc">インフラ構造物のAI画像解析エンジン。ひび割れ検出・経年変化追跡・DXF出力</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <div class="panel-section-label">PET &amp; LIFESTYLE</div>
+
+    <a href="/bowlstand/" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🐕</div>
+        <div class="app-info">
+          <div class="app-title">Bowl Stand Designer</div>
+          <div class="app-tags"><span class="app-tag">PET</span><span class="app-tag">3D PRINT</span><span class="app-tag">CUSTOM</span></div>
+        </div>
+      </div>
+      <div class="app-desc">犬種別に最適化されたフードボウルスタンド。高さ・傾斜・グリップを自動調整</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <a href="pandaworld.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🐼</div>
+        <div class="app-info">
+          <div class="app-title">Panda World</div>
+          <div class="app-tags"><span class="app-tag">3D</span><span class="app-tag">DRONE</span><span class="app-tag">NATURE</span></div>
+        </div>
+      </div>
+      <div class="app-desc">パンダ生息地をドローンで探索。エサやり・スピーカー呼び寄せ・昼夜切替</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <a href="panda-keeper.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🎋</div>
+        <div class="app-info">
+          <div class="app-title">Panda Keeper</div>
+          <div class="app-tags"><span class="app-tag">2D</span><span class="app-tag">AI-ZOO</span><span class="app-tag">LIFE SIM</span></div>
+        </div>
+      </div>
+      <div class="app-desc">自律パンダの生活観察。タイヤ遊び・木登り・釣り・睡眠をリアルタイムで</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <a href="panda-guardian.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🔭</div>
+        <div class="app-info">
+          <div class="app-title">Panda Guardian</div>
+          <div class="app-tags"><span class="app-tag">2D</span><span class="app-tag">MONITOR</span><span class="app-tag">DRONE</span></div>
+        </div>
+      </div>
+      <div class="app-desc">パンダ保護区をドローンで監視パトロール。ジャイロ操作・愛情ポイント</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <div class="panel-section-label">DRONE &amp; AERIAL</div>
+
+    <a href="/droneport/" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🛸</div>
+        <div class="app-info">
+          <div class="app-title">Drone Port Designer</div>
+          <div class="app-tags"><span class="app-tag">DRONE</span><span class="app-tag">3D PRINT</span><span class="app-tag">DJI</span></div>
+        </div>
+      </div>
+      <div class="app-desc">ドローン離着陸パッド＆ドック設計。DJI機種別フィッティング・ガイドレール</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <a href="/droneguard/" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🛡️</div>
+        <div class="app-info">
+          <div class="app-title">DroneGuard</div>
+          <div class="app-tags"><span class="app-tag">SAFETY</span><span class="app-tag">PILOT</span><span class="app-tag">OPS</span></div>
+        </div>
+      </div>
+      <div class="app-desc">一等無人航空機操縦士向け運航支援。飛行前チェック・緊急QRH・飛行日誌</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <div class="panel-section-label">MIND &amp; WELLNESS</div>
+
+    <a href="shinkei.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🌙</div>
+        <div class="app-info">
+          <div class="app-title">神経OS</div>
+          <div class="app-tags"><span class="app-tag">WELLNESS</span><span class="app-tag">MIND</span><span class="app-tag">TOUCH</span></div>
+        </div>
+      </div>
+      <div class="app-desc">指先で自律神経を観測・安定化する神経系OS</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <div class="panel-section-label">CERTIFICATION &amp; MANAGEMENT</div>
+
+    <a href="provenance.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">📜</div>
+        <div class="app-info">
+          <div class="app-title">Creator Provenance</div>
+          <div class="app-tags"><span class="app-tag">CERT</span><span class="app-tag">IP</span><span class="app-tag">PROOF</span></div>
+        </div>
+      </div>
+      <div class="app-desc">創作物に証明番号を付与。著作権・知財の証拠記録とタイムスタンプ管理</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <div class="panel-section-label">MUSIC &amp; COLLABORATION</div>
+
+    <a href="/trackforge/" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🎛️</div>
+        <div class="app-info">
+          <div class="app-title">TrackForge</div>
+          <div class="app-tags"><span class="app-tag">MUSIC</span><span class="app-tag">MTR</span><span class="app-tag">COLLAB</span></div>
+        </div>
+      </div>
+      <div class="app-desc">デジタルMTR × 音楽コラボ。録音・ミックス・マスタリング・貢献証明書</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+  </div>
+
+  <!-- Client Exclusive Section (hidden until auth check) -->
+  <div id="client-section" style="display:none;padding:0 16px;">
+    <div class="panel-section-label" style="color:rgba(201,169,110,0.7);">CLIENT EXCLUSIVE</div>
+    <a href="/client/" class="app-card" style="border-color:rgba(201,169,110,0.25);background:rgba(201,169,110,0.04);">
+      <div class="app-card-top">
+        <div class="app-icon" style="background:linear-gradient(135deg,rgba(201,169,110,0.2),rgba(201,169,110,0.05));border-color:rgba(201,169,110,0.3);">
+          <span style="font-size:20px;">🔑</span>
+        </div>
+        <div class="app-info">
+          <div class="app-title" style="color:#c9a96e;">Client Room</div>
+          <div class="app-tags"><span class="app-tag" style="color:rgba(201,169,110,0.7);border-color:rgba(201,169,110,0.2);">PRIVATE</span></div>
+        </div>
+      </div>
+      <div class="app-desc" style="color:rgba(201,169,110,0.5);">Authorized clients only — Custom 3D design tools &amp; project dashboard</div>
+      <div class="app-launch" style="color:rgba(201,169,110,0.5);">ENTER ROOM</div>
+    </a>
+  </div>
+
+  <!-- Contact Form for non-client logged-in users -->
+  <div id="contact-section" style="display:none;padding:0 16px;">
+    <div class="panel-section-label" style="color:rgba(0,255,255,0.5);">CONTACT</div>
+    <div style="background:rgba(0,255,255,0.02);border:1px solid rgba(0,255,255,0.08);border-radius:14px;padding:14px;">
+      <div style="font-family:'Noto Sans JP',sans-serif;font-size:11px;color:rgba(255,255,255,0.45);line-height:1.6;margin-bottom:10px;">
+        制作のご依頼・ご相談はこちらからお送りください。
+      </div>
+      <textarea id="contact-msg" placeholder="ご要望・ご相談内容をご記入ください..." style="width:100%;min-height:80px;background:rgba(0,0,0,0.3);border:1px solid rgba(0,255,255,0.1);border-radius:8px;color:#d8d8d8;font-family:'Noto Sans JP',sans-serif;font-size:12px;padding:10px;resize:vertical;outline:none;"></textarea>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+        <button id="contact-send" style="background:rgba(0,255,255,0.08);border:1px solid rgba(0,255,255,0.2);color:rgba(0,255,255,0.7);padding:6px 16px;border-radius:6px;cursor:pointer;font-family:'Orbitron',monospace;font-size:9px;letter-spacing:0.1em;">SEND</button>
+        <span id="contact-status" style="font-size:10px;color:rgba(0,255,255,0.4);font-family:'Orbitron',monospace;"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auth UI (login/logout) -->
+  <div id="auth-section" style="padding:12px 16px;border-top:1px solid rgba(0,255,255,0.06);margin-top:8px;">
+    <div id="auth-logged-out" style="text-align:center;">
+      <button id="login-btn" style="background:rgba(0,255,255,0.08);border:1px solid rgba(0,255,255,0.2);color:rgba(0,255,255,0.7);padding:8px 20px;border-radius:8px;cursor:pointer;font-family:'Orbitron',monospace;font-size:10px;letter-spacing:0.15em;">LOG IN WITH GOOGLE</button>
+    </div>
+    <div id="auth-logged-in" style="display:none;text-align:center;">
+      <span id="auth-user-name" style="color:rgba(0,255,255,0.5);font-size:10px;font-family:'Orbitron',monospace;letter-spacing:0.1em;"></span>
+      <button id="logout-btn" style="background:none;border:1px solid rgba(255,100,100,0.2);color:rgba(255,100,100,0.5);padding:4px 12px;border-radius:6px;cursor:pointer;font-size:9px;font-family:'Orbitron',monospace;margin-left:8px;">LOGOUT</button>
+    </div>
+  </div>
+
+  <div class="panel-footer">
+    <div class="panel-footer-text">&copy; 2025 GRACE OF TOUCH &middot; ALL WORLDS RESERVED</div>
+  </div>
+</div>
+
+<!-- ======= COMING SOON TOAST ======= -->
+<div id="coming-toast">COMING SOON — 開発中です</div>
+
+<script>
+// =============== GRACE OF TOUCH v9 — Space Terminal Fusion ===============
+const $ = id => document.getElementById(id);
+const rocketFrame = $('rocket-bg');
+const titleScreen = $('title-screen');
+const journeyOverlay = $('journey-overlay');
+const terminalScreen = $('terminal-screen');
+const starCanvas = $('star-canvas');
+const phaseHud = $('phase-hud');
+const toggle = $('launcher-toggle');
+const panel = $('launcher-panel');
+
+// ====== STATE ======
+let state = 'title'; // title → launching → space → terminal
+let phaseQueue = [];
+
+// ====== VISITOR TRACKING (localStorage + Firestore) ======
+const VisitorTracker = {
+  KEY: 'got_visitor',
+  init() {
+    const data = JSON.parse(localStorage.getItem(this.KEY) || 'null') || {
+      visits: 0, firstVisit: new Date().toISOString(), lastVisit: null, viewedApps: {}, id: 'v_'+Math.random().toString(36).slice(2,10)
+    };
+    data.visits++;
+    data.lastVisit = new Date().toISOString();
+    localStorage.setItem(this.KEY, JSON.stringify(data));
+    this.data = data;
+
+    // Welcome message
+    setTimeout(() => {
+      const welEl = document.getElementById('visitor-welcome');
+      if (!welEl) return;
+      if (data.visits === 1) {
+        welEl.textContent = 'はじめまして — 初回ご来場ありがとうございます';
+      } else {
+        const topApp = this.getTopApp();
+        welEl.textContent = `${data.visits}回目のご来場ありがとうございます` + (topApp ? ` — 前回: ${topApp}` : '');
+      }
+      welEl.style.opacity = '1';
+    }, 500);
+
+    // Global counter via Firestore
+    this.updateGlobalCount();
+
+    // Reorder app cards based on viewing history
+    setTimeout(() => this.reorderCards(), 100);
+  },
+
+  trackAppClick(name) {
+    if (!this.data.viewedApps[name]) this.data.viewedApps[name] = 0;
+    this.data.viewedApps[name]++;
+    localStorage.setItem(this.KEY, JSON.stringify(this.data));
+  },
+
+  getTopApp() {
+    const apps = this.data.viewedApps;
+    let top = null, max = 0;
+    for (const [k, v] of Object.entries(apps)) { if (v > max) { max = v; top = k; } }
+    return top;
+  },
+
+  reorderCards() {
+    const apps = this.data.viewedApps;
+    if (Object.keys(apps).length === 0) return;
+    // Find all app cards in the scroll area and sort by view count within each section
+    const cards = document.querySelectorAll('.app-card');
+    cards.forEach(card => {
+      const title = card.querySelector('.app-title');
+      if (title && apps[title.textContent]) {
+        // Add a subtle "recently viewed" indicator
+        const badge = document.createElement('span');
+        badge.style.cssText = 'font-size:8px;color:rgba(0,255,200,0.5);margin-left:6px;font-family:monospace;';
+        badge.textContent = '● RECENT';
+        title.appendChild(badge);
+      }
+    });
+  },
+
+  async updateGlobalCount() {
+    try {
+      if (typeof firebase === 'undefined' || !firebase.firestore) return;
+      const db = firebase.firestore();
+      const ref = db.collection('portal_stats').doc('visitors');
+      await db.runTransaction(async tx => {
+        const doc = await tx.get(ref);
+        const count = doc.exists ? (doc.data().count || 0) + 1 : 1;
+        tx.set(ref, { count, lastVisit: new Date().toISOString() }, { merge: true });
+        const el = document.getElementById('visitor-count');
+        if (el) el.textContent = count.toLocaleString();
+      });
+      const ctrEl = document.getElementById('visitor-counter');
+      if (ctrEl) ctrEl.style.opacity = '1';
+    } catch (e) {
+      // Firestore unavailable — show local count only
+      const el = document.getElementById('visitor-count');
+      if (el) el.textContent = this.data.visits;
+      const ctrEl = document.getElementById('visitor-counter');
+      if (ctrEl) ctrEl.style.opacity = '1';
+    }
+  }
+};
+
+// Track app card clicks
+document.addEventListener('click', e => {
+  const card = e.target.closest('.app-card');
+  if (card) {
+    const title = card.querySelector('.app-title');
+    if (title) VisitorTracker.trackAppClick(title.textContent);
+  }
+});
+
+// ====== APP AGENTS — Live status on each card ======
+const AppAgents = {
+  agents: {
+    'Earthquake Viewer':  {name:'Seismo',  msgs:['地震データ監視中','USGS API polling','M2.5+スキャン中','震源解析中']},
+    'T4 Phage Lab':       {name:'Phage-AI',msgs:['タンパク質折り畳み解析中','ファージ構造シミュレーション中','分子動力学計算中']},
+    '3D Logo Designer':   {name:'Logo-Bot',msgs:['3Dメッシュ最適化待機中','STL品質チェック準備完了','レンダリングエンジン待機中']},
+    'Gear Designer':      {name:'Gear-AI', msgs:['歯車パラメータ監視中','噛み合い解析待機中','トルク計算準備完了']},
+    '3D Box Customizer':  {name:'Box-AI',  msgs:['3Dプリント設定最適化中','フィラメント温度計算中','STLメッシュ検証中']},
+    'RocketCraft CAD':    {name:'Rocket-AI',msgs:['空力解析待機中','推力ベクトル計算中','構造強度シミュレーション準備完了']},
+    'Mega Rocket':        {name:'Mission-C',msgs:['軌道計算中','テレメトリ受信中','打ち上げシーケンス待機中','地球観測データ処理中']},
+    'Traffic Simulator':  {name:'Traffic-AI',msgs:['交差点信号最適化中','渋滞パターン解析中','スマートシティデータ同期中']},
+    'WallGuard FC':       {name:'Wall-AI', msgs:['外壁スキャンデータ待機中','クラック検出モデルロード中','安全パトロール待機中']},
+    'InfraScan AI':       {name:'Infra-AI',msgs:['構造物画像解析モデル待機中','ひび割れ検出エンジン校正中','経年変化データ比較中']},
+    'TunnelDrone SIM':    {name:'Tunnel-AI',msgs:['LiDARセンサー校正中','飛行経路計算中','損傷検出AI待機中']},
+    'Panda World':        {name:'Panda-3D',msgs:['パンダ行動パターン解析中','竹林環境モニタリング中','ドローン飛行ルート計算中']},
+    'Panda Keeper':       {name:'Keeper-AI',msgs:['パンダ自律行動監視中','タイヤ遊び安全確認中','食事スケジュール管理中']},
+    'Panda Guardian':     {name:'Guard-AI', msgs:['保護区ドローンパトロール中','赤外線センサー待機中','侵入者検知システム稼働中']},
+    'Drone Port Designer':{name:'Port-AI', msgs:['離着陸パッド設計最適化中','DJI機種データ同期中','3Dプリント設定検証中']},
+    'DroneGuard':         {name:'Safety-AI',msgs:['飛行前チェック待機中','航空法データ更新中','安全プロトコル確認中']},
+    'Bowl Stand Designer':{name:'Pet-AI',  msgs:['犬種データベース同期中','高さ最適化計算中','3Dモデル検証中']},
+    '神経OS':              {name:'Neuro-AI',msgs:['自律神経データ解析中','バイオフィードバック待機中','リラクゼーション波形生成中']},
+    'TrackForge':         {name:'Audio-AI', msgs:['オーディオエンジン待機中','波形解析準備完了','マスタリングAI学習中']},
+    'Creator Provenance': {name:'Proof-AI', msgs:['証明番号生成待機中','タイムスタンプ検証中','知財レジストリ同期中']},
+  },
+
+  init() {
+    const cards = document.querySelectorAll('.app-card');
+    cards.forEach(card => {
+      const titleEl = card.querySelector('.app-title');
+      if (!titleEl) return;
+      const title = titleEl.textContent.replace(/● RECENT$/, '').trim();
+      const agent = this.agents[title];
+      if (!agent) return;
+
+      const div = document.createElement('div');
+      div.className = 'agent-status';
+      div.innerHTML = `<span class="agent-dot"></span><span class="agent-name" style="font-weight:bold;">${agent.name}</span><span class="agent-msg">${agent.msgs[0]}</span>`;
+
+      // Insert after app-desc
+      const desc = card.querySelector('.app-desc');
+      if (desc) desc.after(div);
+
+      // Rotate messages
+      let idx = 0;
+      setInterval(() => {
+        idx = (idx + 1) % agent.msgs.length;
+        const msgEl = div.querySelector('.agent-msg');
+        if (msgEl) {
+          msgEl.style.opacity = '0';
+          setTimeout(() => { msgEl.textContent = agent.msgs[idx]; msgEl.style.opacity = '0.8'; }, 300);
+        }
+      }, 4000 + Math.random() * 3000); // stagger timing
+    });
+  }
+};
+
+// ====== DEEP SPACE STAR FIELD (Canvas 2D) ======
+const starCtx = starCanvas.getContext('2d');
+let stars = [];
+function initStars(){
+  starCanvas.width = window.innerWidth;
+  starCanvas.height = window.innerHeight;
+  stars = [];
+  for(let i=0;i<400;i++){
+    stars.push({
+      x: Math.random()*starCanvas.width,
+      y: Math.random()*starCanvas.height,
+      r: Math.random()*1.5+0.3,
+      a: Math.random()*0.8+0.2,
+      speed: Math.random()*0.3+0.05,
+      twinkle: Math.random()*Math.PI*2
+    });
+  }
+}
+function drawStars(t){
+  starCtx.clearRect(0,0,starCanvas.width,starCanvas.height);
+  stars.forEach(s=>{
+    const flicker = 0.5+0.5*Math.sin(t*0.001*s.speed*10+s.twinkle);
+    starCtx.globalAlpha = s.a * flicker;
+    starCtx.fillStyle = '#ffffff';
+    starCtx.beginPath();
+    starCtx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    starCtx.fill();
+    // Slow drift
+    s.y += s.speed*0.2;
+    if(s.y > starCanvas.height+5){s.y=-5;s.x=Math.random()*starCanvas.width;}
+  });
+  if(state==='space'||state==='terminal') requestAnimationFrame(drawStars);
+}
+window.addEventListener('resize',initStars);
+initStars();
+
+// ====== FIRST INTERACTION → START LAUNCH ======
+function onFirstTouch(){
+  if(state !== 'title') return;
+  state = 'launching';
+
+  // Hide title instantly on launch
+  titleScreen.classList.add('hidden');
+  setTimeout(()=>{titleScreen.style.display='none';},700);
+  phaseHud.classList.add('visible');
+
+  // Tell the iframe's rocket to launch (click the launch button inside)
+  setTimeout(()=>{
+    try{
+      const iframeDoc = rocketFrame.contentDocument || rocketFrame.contentWindow.document;
+      const launchBtn = iframeDoc.getElementById('launch-btn');
+      if(launchBtn && !launchBtn.disabled) launchBtn.click();
+    }catch(e){
+      // Cross-origin: send message instead
+      rocketFrame.contentWindow.postMessage({type:'PORTAL_LAUNCH'},'*');
+    }
+  },800);
+}
+window.addEventListener('mousedown',onFirstTouch);
+window.addEventListener('touchstart',onFirstTouch,{passive:true});
+
+// ====== LISTEN FOR ROCKET PHASE EVENTS ======
+const journeyMessages = {
+  'COUNTDOWN':    {text:'LAUNCH SEQUENCE',sub:'発射シーケンス開始'},
+  'LIFTOFF':      {text:'LIFTOFF',sub:'リフトオフ！ 地球を離れます'},
+  'MAX-Q':        {text:'MAX-Q PASSAGE',sub:'最大動圧を通過中...'},
+  'MECO':         {text:'ENGINE CUTOFF',sub:'メインエンジン停止'},
+  'SEPARATION':   {text:'STAGE SEPARATION',sub:'段間分離完了'},
+  'BOOSTER FLIP': {text:'BOOSTER RETURN',sub:'ブースター帰還開始'},
+  'LANDING BURN': {text:'LANDING BURN',sub:'着陸燃焼中...'},
+  'MECHAZILLA CATCH':{text:'BOOSTER CAUGHT',sub:'メカジラがキャッチ！'},
+  'UPPER STAGE BURN':{text:'DEEP SPACE BURN',sub:'深宇宙へ加速中...'},
+  'ORBITAL INSERTION':{text:'ORBIT ACHIEVED',sub:'軌道投入成功'},
+  'HANDOFF':      {text:'APPROACHING TERMINAL',sub:'ターミナルに接近中...'},
+  'CYCLE_WAIT':   {text:'DOCKED',sub:'ステーションにドッキング完了'},
+};
+
+const phaseOrder = ['COUNTDOWN','LIFTOFF','MAX-Q','MECO','SEPARATION',
+  'BOOSTER FLIP','LANDING BURN','MECHAZILLA CATCH','UPPER STAGE BURN',
+  'ORBITAL INSERTION','HANDOFF','CYCLE_WAIT'];
+
+window.addEventListener('message',(e)=>{
+  if(!e.data||e.data.type!=='ROCKET_PHASE') return;
+  const phase = e.data.phase;
+  const msg = journeyMessages[phase];
+
+  // Update phase HUD
+  $('phase-name').textContent = phase.replace(/_/g,' ');
+  const idx = phaseOrder.indexOf(phase);
+  if(idx>=0) $('phase-fill').style.width = ((idx+1)/phaseOrder.length*100)+'%';
+
+  // Journey overlay text
+  if(msg && state==='launching'){
+    $('journey-text').textContent = msg.text;
+    $('journey-sub').textContent = msg.sub;
+    journeyOverlay.classList.add('visible');
+  }
+
+  // Transition to space after UPPER STAGE BURN
+  if(phase==='UPPER STAGE BURN' && state==='launching'){
+    state = 'space';
+    // Slight dim during deep space burn (rocket still clearly visible)
+    rocketFrame.style.transition = 'opacity 4s ease';
+    rocketFrame.style.opacity = '0.7';
+  }
+
+  // Transition to terminal after HANDOFF or CYCLE_WAIT
+  if((phase==='HANDOFF'||phase==='CYCLE_WAIT') && (state==='space'||state==='launching')){
+    state = 'terminal';
+    arriveAtTerminal();
+  }
+});
+
+// ====== TERMINAL ARRIVAL SEQUENCE ======
+function arriveAtTerminal(){
+  journeyOverlay.classList.remove('visible');
+  phaseHud.classList.remove('visible');
+
+  // Keep rocket background visible as live backdrop (just slightly dimmed)
+  rocketFrame.style.transition = 'opacity 3s ease';
+  rocketFrame.style.opacity = '0.55';
+
+  // Show terminal screen
+  setTimeout(()=>{
+    terminalScreen.classList.add('visible');
+    VisitorTracker.init();
+  },1000);
+
+  // Show menu toggle
+  setTimeout(()=>{
+    toggle.classList.add('visible');
+  },3000);
+}
+
+// ====== FALLBACK: Auto-arrive if no messages after 60s ======
+setTimeout(()=>{
+  if(state==='launching'){
+    state='terminal';
+    arriveAtTerminal();
+  }
+},65000);
+
+// ====== Also allow skip: double-tap during flight to arrive early ======
+let tapCount=0;let tapTimer=null;
+window.addEventListener('dblclick',()=>{
+  if(state==='launching'){state='terminal';arriveAtTerminal();}
+});
+
+// ====== DISMISS TERMINAL SCREEN ======
+function dismissTerminal(){
+  terminalScreen.classList.remove('visible');
+  terminalScreen.style.pointerEvents='none';
+  rocketFrame.style.transition='opacity 0.8s ease';
+  rocketFrame.style.opacity='1';
+  rocketFrame.style.pointerEvents='auto';
+  toggle.classList.add('visible');
+}
+
+// ====== CENTRAL TAP → OPEN EXPERIENCE MAP (after terminal arrival) ======
+// ユーザーがメイン画面の中央付近をタップした時にもExperience Mapを開く
+window.addEventListener('click',(e)=>{
+  if(state!=='terminal') return;
+  // パネルが既に開いている場合は別のハンドラに任せる
+  if(panel.classList.contains('open')) return;
+  // ターミナル画面が表示中なら無視（open-launcherボタンで処理）
+  if(terminalScreen.classList.contains('visible')) return;
+  // トグルボタン自体のクリックは別ハンドラ
+  if(toggle.contains(e.target)) return;
+  // パネル内クリックは無視
+  if(panel.contains(e.target)) return;
+  // iframeへのクリックは無視（ロケット操作用）
+  if(e.target===rocketFrame) return;
+  // 中央エリア判定（画面の上下左右の20%外側を除外）
+  const w=window.innerWidth, h=window.innerHeight;
+  const cx=e.clientX, cy=e.clientY;
+  const inCenter = cx>w*0.15 && cx<w*0.85 && cy>h*0.15 && cy<h*0.85;
+  if(inCenter){
+    dismissTerminal();
+    panel.classList.add('open');
+    rocketFrame.style.pointerEvents='none';
+    rocketFrame.style.transition='opacity 0.8s ease';
+    rocketFrame.style.opacity='0.85';
+  }
+},{capture:false});
+
+// ====== LAUNCHER PANEL CONTROLS ======
+// "EXPLORE EXPERIENCES" button — opens panel and dismisses terminal
+$('open-launcher').addEventListener('click',(e)=>{
+  e.stopPropagation();
+  dismissTerminal();
+  panel.classList.add('open');
+  rocketFrame.style.pointerEvents='none';
+});
+
+let _agentsInitialized = false;
+toggle.addEventListener('click',(e)=>{
+  e.stopPropagation();
+  const isOpen = panel.classList.toggle('open');
+  rocketFrame.style.pointerEvents = isOpen ? 'none' : 'auto';
+  rocketFrame.style.transition='opacity 0.8s ease';
+  rocketFrame.style.opacity = isOpen ? '0.85' : '1';
+  if (isOpen && !_agentsInitialized) { _agentsInitialized = true; setTimeout(() => AppAgents.init(), 300); }
+});
+
+window.addEventListener('click',(e)=>{
+  if(!panel.contains(e.target) && e.target!==toggle && !toggle.contains(e.target)){
+    if(panel.classList.contains('open')){
+      panel.classList.remove('open');
+      rocketFrame.style.pointerEvents='auto';
+      rocketFrame.style.transition='opacity 0.8s ease';
+      rocketFrame.style.opacity='1';
+    }
+  }
+});
+
+window.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape'){
+    if(panel.classList.contains('open')){
+      panel.classList.remove('open');
+      rocketFrame.style.pointerEvents='auto';
+      rocketFrame.style.opacity='1';
+    } else if(terminalScreen.classList.contains('visible')){
+      dismissTerminal();
+    }
+  }
+});
+
+// Hover on toggle disables iframe pointer events
+toggle.addEventListener('mouseenter',()=>{rocketFrame.style.pointerEvents='none';});
+toggle.addEventListener('mouseleave',()=>{
+  if(!panel.classList.contains('open'))rocketFrame.style.pointerEvents='auto';
+});
+
+// ====== COMING SOON HANDLER ======
+let toastTimer=null;
+document.querySelectorAll('.app-card[data-coming-soon]').forEach(card=>{
+  card.addEventListener('click',(e)=>{
+    e.preventDefault();e.stopPropagation();
+    const toast=$('coming-toast');
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(()=>{toast.classList.remove('show');},2000);
+  });
+});
+
+// ====== MEGA ROCKET CARD: close panel, show rocket fullscreen ======
+$('mega-rocket-card').addEventListener('click',(e)=>{
+  e.preventDefault();e.stopPropagation();
+  panel.classList.remove('open');
+  rocketFrame.style.pointerEvents='auto';
+  rocketFrame.style.transition='opacity 0.8s ease';
+  rocketFrame.style.opacity='1';
+});
+
+// ====== FIREBASE AUTH ======
+firebase.initializeApp({
+  apiKey: "AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",
+  authDomain: "grace-of-touch.firebaseapp.com",
+  projectId: "grace-of-touch",
+  storageBucket: "grace-of-touch.firebasestorage.app",
+  messagingSenderId: "505078300866",
+  appId: "1:505078300866:web:adad2a27b163c3b0f1bb5b"
+});
+const auth = firebase.auth();
+const db = firebase.firestore();
+const OWNER_EMAILS = ['graceoftouchco@gmail.com'];
+
+$('login-btn').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+$('logout-btn').onclick = () => auth.signOut();
+
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    $('auth-logged-out').style.display = 'none';
+    $('auth-logged-in').style.display = 'block';
+    $('auth-user-name').textContent = (user.displayName || user.email || 'USER').toUpperCase();
+
+    // Show client section for owner or registered clients
+    const email = (user.email || '').toLowerCase();
+    let isClient = false;
+    if (OWNER_EMAILS.includes(email)) {
+      $('client-section').style.display = 'block';
+      isClient = true;
+    } else {
+      try {
+        const clientDoc = await db.collection('clients').doc(user.uid).get();
+        if (clientDoc.exists) {
+          $('client-section').style.display = 'block';
+          isClient = true;
+        }
+      } catch(e) { /* not a client */ }
+    }
+
+    // InfraScan AI: show only for invited users (Firestore infrascan_invited collection)
+    if (OWNER_EMAILS.includes(email)) {
+      const isc = $('infrascan-card'); if(isc) isc.style.display = '';
+    } else {
+      try {
+        const invDoc = await db.collection('infrascan_invited').doc(email).get();
+        if (invDoc.exists) { const isc = $('infrascan-card'); if(isc) isc.style.display = ''; }
+      } catch(e) { /* not invited */ }
+    }
+
+    // Show contact form for non-client users
+    if (!isClient) {
+      $('contact-section').style.display = 'block';
+    }
+  } else {
+    $('auth-logged-out').style.display = 'block';
+    $('auth-logged-in').style.display = 'none';
+    $('client-section').style.display = 'none';
+    $('contact-section').style.display = 'none';
+    const isc = $('infrascan-card'); if(isc) isc.style.display = 'none';
+  }
+});
+
+// Contact form send
+$('contact-send').onclick = async () => {
+  const msg = $('contact-msg').value.trim();
+  if (!msg) { $('contact-status').textContent = 'メッセージを入力してください'; return; }
+
+  const user = auth.currentUser;
+  if (!user) return;
+
+  $('contact-send').disabled = true;
+  $('contact-status').textContent = 'Sending...';
+
+  try {
+    await db.collection('inquiries').add({
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName || '',
+      message: msg,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      status: 'new'
+    });
+    $('contact-msg').value = '';
+    $('contact-status').textContent = 'Sent! Thank you.';
+    $('contact-status').style.color = 'rgba(0,255,100,0.6)';
+  } catch(e) {
+    // Fallback: mailto link
+    const subject = encodeURIComponent('Grace of Touch — お問い合わせ');
+    const body = encodeURIComponent(msg + '\n\n--- From: ' + user.email);
+    window.open('mailto:graceoftouchco@gmail.com?subject=' + subject + '&body=' + body);
+    $('contact-status').textContent = 'メールアプリを開きました';
+  }
+  $('contact-send').disabled = false;
+};
+
+// ====== REAL-TIME EARTHQUAKE MONITOR ======
+async function initQuakeMonitor() {
+  const feed = $('quake-feed');
+  const monitor = $('quake-monitor');
+  if (!feed || !monitor) return;
+
+  async function fetchQuakes() {
+    try {
+      // Japan earthquakes (P2P)
+      const jpRes = await fetch('https://api.p2pquake.net/v2/history?codes=551&limit=5');
+      const jpData = await jpRes.json();
+
+      // World earthquakes (USGS)
+      const usRes = await fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson');
+      const usData = await usRes.json();
+
+      let items = [];
+
+      // Japan quakes
+      jpData.forEach(q => {
+        if (!q.earthquake || !q.earthquake.hypocenter) return;
+        const mag = q.earthquake.hypocenter.magnitude;
+        const place = q.earthquake.hypocenter.name || '不明';
+        const time = q.earthquake.time ? new Date(q.earthquake.time).toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'}) : '--:--';
+        const color = mag >= 5 ? '#ff3333' : mag >= 3 ? '#ffaa00' : '#00ffcc';
+        items.push({mag, place: '🇯🇵 ' + place, time, color, ts: new Date(q.earthquake.time || 0).getTime()});
+      });
+
+      // World quakes
+      usData.features.slice(0, 5).forEach(f => {
+        const mag = f.properties.mag;
+        const place = f.properties.place || 'Unknown';
+        const time = new Date(f.properties.time).toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'});
+        const color = mag >= 6 ? '#ff3333' : mag >= 5 ? '#ffaa00' : '#00ffcc';
+        items.push({mag, place: '🌍 ' + place, time, color, ts: f.properties.time});
+      });
+
+      // Sort by time, newest first
+      items.sort((a, b) => b.ts - a.ts);
+
+      feed.innerHTML = items.slice(0, 6).map(q =>
+        '<div style="display:flex;gap:8px;align-items:baseline;">' +
+        '<span style="color:' + q.color + ';font-weight:bold;min-width:36px;">M' + q.mag.toFixed(1) + '</span>' +
+        '<span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + q.place + '</span>' +
+        '<span style="color:rgba(0,255,255,0.3);font-size:9px;">' + q.time + '</span>' +
+        '</div>'
+      ).join('');
+
+    } catch(e) {
+      feed.innerHTML = '<div style="color:rgba(255,100,100,0.4);">SIGNAL LOST — RECONNECTING...</div>';
+    }
+  }
+
+  // Initial fetch + refresh every 60 seconds
+  await fetchQuakes();
+  monitor.style.opacity = '1';
+  setInterval(fetchQuakes, 60000);
+}
+
+// Start monitor when terminal screen becomes visible
+const terminalObserver = new MutationObserver((mutations) => {
+  mutations.forEach(m => {
+    if (m.target.classList && m.target.classList.contains('visible') && m.target.id === 'terminal-screen') {
+      initQuakeMonitor();
+      terminalObserver.disconnect();
+    }
+  });
+});
+terminalObserver.observe($('terminal-screen'), { attributes: true, attributeFilter: ['class'] });
+
+</script>
+</body>
+</html>

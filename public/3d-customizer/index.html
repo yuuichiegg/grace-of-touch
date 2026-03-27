@@ -1,0 +1,2601 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Box Customizer | Grace of Touch</title>
+  <!-- Auth Guard -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script>
+    firebase.initializeApp({
+      apiKey: "AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",
+      authDomain: "grace-of-touch.firebaseapp.com",
+      projectId: "grace-of-touch",
+      storageBucket: "grace-of-touch.firebasestorage.app",
+      messagingSenderId: "505078300866",
+      appId: "1:505078300866:web:adad2a27b163c3b0f1bb5b"
+    });
+    const OWNER_EMAILS = ['graceoftouchco@gmail.com'];
+    const _db = firebase.firestore();
+
+    // Export license state
+    window._exportLicensed = false;
+    window._currentUser = null;
+
+    firebase.auth().onAuthStateChanged(async function(user) {
+      if (!user) {
+        window.location.href = '/';
+        return;
+      }
+      window._currentUser = user;
+      const email = (user.email || '').toLowerCase();
+
+      // Owner always has full access
+      if (OWNER_EMAILS.includes(email)) {
+        window._exportLicensed = true;
+        document.documentElement.style.visibility = 'visible';
+        return;
+      }
+
+      // Public demo — no access check needed
+      document.documentElement.style.visibility = 'visible';
+      window._exportLicensed = true; // demo mode: allow export
+    });
+
+    // Export gate: check license before any export
+    window.requireExportLicense = function() {
+      if (window._exportLicensed) return true;
+
+      // Show purchase modal
+      const overlay = document.getElementById('export-paywall');
+      if (overlay) overlay.style.display = 'flex';
+      return false;
+    };
+
+
+    // ====== SOURCE CODE PROTECTION ======
+    // Disable right-click
+    document.addEventListener('contextmenu', e => e.preventDefault());
+
+    // Disable keyboard shortcuts for viewing source / DevTools
+    document.addEventListener('keydown', e => {
+      // F12
+      if (e.key === 'F12') { e.preventDefault(); return false; }
+      // Ctrl+Shift+I (DevTools), Ctrl+Shift+J (Console), Ctrl+Shift+C (Inspector)
+      if (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key.toUpperCase())) { e.preventDefault(); return false; }
+      // Ctrl+U (View Source), Ctrl+S (Save)
+      if (e.ctrlKey && ['u','U','s','S'].includes(e.key)) { e.preventDefault(); return false; }
+    });
+
+    // Disable text selection
+    document.addEventListener('selectstart', e => e.preventDefault());
+
+    // Disable drag
+    document.addEventListener('dragstart', e => e.preventDefault());
+    console.clear();
+  </script>
+  <style>html { visibility: hidden; }</style>
+  <!-- /Auth Guard -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #c9a96e;
+      --accent-dim: rgba(201,169,110,0.5);
+      --dark: #111;
+      --panel: rgba(16,16,18,0.96);
+      --panel-border: rgba(201,169,110,0.15);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0a0a0c;
+      font-family: 'Inter', sans-serif;
+      color: #d8d8d8;
+      overflow: hidden;
+      height: 100vh;
+    }
+    /* ──── HEADER ──── */
+    #header {
+      position: absolute; top: 0; left: 0; right: 0; height: 52px; z-index: 30;
+      background: rgba(8,8,10,0.97);
+      border-bottom: 1px solid var(--panel-border);
+      display: flex; align-items: center; padding: 0 20px; gap: 14px;
+      backdrop-filter: blur(16px);
+    }
+    .logo-mark {
+      width: 32px; height: 32px; border: 1.5px solid var(--accent);
+      border-radius: 5px; display: flex; align-items: center; justify-content: center;
+      font-family: 'Noto Serif JP', serif; font-size: 13px; color: var(--accent); font-weight: 700;
+    }
+    .logo-text { font-family: 'Noto Serif JP', serif; font-size: 0.92rem; color: #fff; letter-spacing: 2px; }
+    .logo-sub { font-size: 0.6rem; color: var(--accent-dim); letter-spacing: 1.5px; text-transform: uppercase; }
+    .header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+    .btn-header {
+      color: #fff; border: none; padding: 6px 14px; border-radius: 5px;
+      font-size: 0.72rem; font-weight: 600; cursor: pointer; letter-spacing: 0.5px;
+      transition: all 0.2s; display: flex; align-items: center; gap: 5px;
+    }
+    .btn-header:hover { opacity: 0.85; transform: translateY(-1px); }
+    .btn-export { background: linear-gradient(135deg, var(--accent), #8c6d3f); }
+    .btn-rec { background: linear-gradient(135deg, #b03030, #802020); }
+    .btn-rec.recording { background: linear-gradient(135deg, #7b241c, #512e5f); animation: rec-pulse 1.2s ease-in-out infinite; }
+    .btn-promo { background: linear-gradient(135deg, #2a5a7a, #1a3a55); }
+    @keyframes rec-pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+    /* 録画インジケーター */
+    #rec-indicator {
+      position: absolute; top: 62px; left: 16px; z-index: 25;
+      background: rgba(176,48,48,0.9); color: #fff;
+      padding: 4px 10px; border-radius: 16px; font-size: 0.7rem; font-weight: 700;
+      display: none; align-items: center; gap: 5px; backdrop-filter: blur(4px);
+      pointer-events: none;
+    }
+    #rec-indicator .dot { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: rec-pulse 1s ease-in-out infinite; }
+    /* プロモオーバーレイ */
+    #promo-overlay {
+      position: absolute; top: 52px; left: 0; right: 320px; bottom: 0;
+      pointer-events: none; z-index: 20; display: none;
+    }
+    #promo-overlay canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    /* ──── CANVAS ──── */
+    #viewport {
+      position: absolute; top: 52px; left: 0; right: 320px; bottom: 0;
+      background: radial-gradient(ellipse at 50% 40%, #1c1c2a 0%, #0a0a0c 70%);
+    }
+    #viewport canvas { display: block; width: 100% !important; height: 100% !important; }
+    /* プロモ シークバー */
+    #promo-seekbar {
+      position: absolute; top: 58px; left: 12px; right: 332px; z-index: 25;
+      display: none; align-items: center; gap: 10px;
+      background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius: 8px;
+      backdrop-filter: blur(6px);
+    }
+    #promo-seekbar input[type=range] { flex: 1; height: 4px; }
+    #promo-seekbar .promo-time { font-size: 0.65rem; color: #aaa; min-width: 70px; text-align: center; }
+    #promo-seekbar .promo-btn {
+      background: none; border: 1px solid rgba(201,169,110,0.4); color: var(--accent);
+      padding: 3px 10px; border-radius: 4px; font-size: 0.65rem; cursor: pointer;
+    }
+    #promo-seekbar .promo-btn:hover { background: rgba(201,169,110,0.15); }
+    /* ──── SIDE PANEL ──── */
+    #sidebar {
+      position: absolute; top: 52px; right: 0; width: 320px; bottom: 0;
+      background: var(--panel); border-left: 1px solid var(--panel-border);
+      overflow-y: auto; padding: 16px 14px 80px;
+      backdrop-filter: blur(12px);
+    }
+    .section-title {
+      font-size: 0.6rem; font-weight: 700; letter-spacing: 2.5px;
+      text-transform: uppercase; color: var(--accent);
+      margin: 18px 0 10px; border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 5px;
+    }
+    .section-title:first-child { margin-top: 0; }
+    /* ── Color Swatches ── */
+    .swatch-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 6px; }
+    .swatch {
+      border-radius: 8px; padding: 8px 4px; text-align: center; cursor: pointer;
+      border: 2px solid transparent; transition: all 0.2s;
+      font-size: 0.68rem; font-weight: 600; background: rgba(255,255,255,0.02);
+    }
+    .swatch:hover { transform: scale(1.03); background: rgba(255,255,255,0.04); }
+    .swatch.active { border-color: var(--accent); background: rgba(201,169,110,0.06); }
+    .swatch-dot { width: 26px; height: 26px; border-radius: 50%; margin: 0 auto 5px; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+    /* ── Texture / Mode Buttons ── */
+    .tex-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 6px; }
+    .tex-btn {
+      background: rgba(255,255,255,0.03); border: 1.5px solid rgba(255,255,255,0.08);
+      border-radius: 8px; padding: 8px 4px; text-align: center; cursor: pointer;
+      font-size: 0.65rem; font-weight: 600; transition: all 0.2s; color: #888;
+    }
+    .tex-btn:hover { border-color: var(--accent-dim); color: #ccc; }
+    .tex-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(201,169,110,0.06); }
+    .tex-preview { font-size: 1.2rem; margin-bottom: 3px; }
+    /* ── Sliders ── */
+    .slider-row { margin-bottom: 12px; }
+    .slider-label { display: flex; justify-content: space-between; font-size: 0.73rem; color: #777; margin-bottom: 4px; }
+    .slider-label span { color: var(--accent); font-weight: 700; font-size: 0.8rem; }
+    input[type=range] {
+      width: 100%; cursor: pointer;
+      appearance: none; height: 3px; border-radius: 2px;
+      background: rgba(255,255,255,0.08); outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      appearance: none; width: 13px; height: 13px; border-radius: 50%;
+      background: var(--accent); cursor: pointer;
+      box-shadow: 0 0 8px rgba(201,169,110,0.4);
+    }
+    /* ── Info ── */
+    .info-box {
+      background: rgba(201,169,110,0.04); border: 1px solid var(--panel-border);
+      border-radius: 8px; padding: 10px 12px; font-size: 0.72rem; color: #777; line-height: 1.7;
+    }
+    .info-box strong { color: var(--accent); font-weight: 600; }
+    /* ── Bottom Bar ── */
+    #bottom-bar {
+      position: absolute; bottom: 0; left: 0; right: 320px;
+      background: rgba(8,8,10,0.92); border-top: 1px solid var(--panel-border);
+      height: 36px; display: flex; align-items: center; justify-content: center; gap: 20px;
+      font-size: 0.65rem; color: #555; backdrop-filter: blur(8px);
+    }
+    .hint { display: flex; align-items: center; gap: 5px; }
+    .hint kbd {
+      background: rgba(255,255,255,0.06); border-radius: 3px;
+      padding: 1px 5px; font-size: 0.6rem; color: #888;
+    }
+    /* ── Divider ── */
+    .divider { border: none; border-top: 1px solid rgba(255,255,255,0.04); margin: 14px 0; }
+    /* Scrollbar */
+    #sidebar::-webkit-scrollbar { width: 3px; }
+    #sidebar::-webkit-scrollbar-track { background: transparent; }
+    #sidebar::-webkit-scrollbar-thumb { background: rgba(201,169,110,0.2); border-radius: 2px; }
+    /* Animation */
+    @keyframes rotate-bell { 0%,100%{transform:rotate(-12deg)} 50%{transform:rotate(12deg)} }
+    .bell-anim { animation: rotate-bell 0.8s ease-in-out infinite; display:inline-block; }
+    /* Promo ratio buttons */
+    .promo-ratio-btn {
+      padding:5px 10px; border-radius:5px; font-size:0.7rem; cursor:pointer;
+      background:rgba(255,255,255,0.03); border:1.5px solid rgba(255,255,255,0.1);
+      color:#888; transition:all 0.15s;
+    }
+    .promo-ratio-btn:hover { border-color:var(--accent-dim); color:#ccc; }
+    .promo-ratio-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(201,169,110,0.08); }
+
+    /* ──── MOBILE TOGGLE BUTTON ──── */
+    #sidebar-toggle {
+      display: none;
+      position: fixed; bottom: 16px; right: 16px; z-index: 100;
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--accent); border: none; cursor: pointer;
+      box-shadow: 0 4px 16px rgba(201,169,110,0.4);
+      align-items: center; justify-content: center;
+      font-size: 20px; color: #000;
+    }
+
+    /* ──── MOBILE RESPONSIVE ──── */
+    @media (max-width: 768px) {
+      #header { flex-wrap: wrap; padding: 6px 10px; gap: 4px; }
+      .header-actions { gap: 3px; }
+      .btn-header { font-size: 0.55rem; padding: 4px 6px; }
+      .logo-text { font-size: 0.85rem; }
+      .logo-sub { font-size: 0.55rem; }
+      .logo-mark { width: 28px; height: 28px; font-size: 13px; }
+
+      #viewport {
+        position: absolute; top: 52px; left: 0; right: 0; bottom: 0;
+      }
+      #promo-overlay { right: 0; }
+      #promo-seekbar { right: 12px; }
+
+      #sidebar {
+        position: fixed; top: 52px; right: 0; bottom: 0;
+        width: 85vw; max-width: 320px;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        z-index: 90;
+        box-shadow: -4px 0 24px rgba(0,0,0,0.5);
+      }
+      #sidebar.mobile-open {
+        transform: translateX(0);
+      }
+
+      #sidebar-toggle { display: flex; }
+
+      /* Back button smaller on mobile */
+      #gt-back { padding: 4px 10px; font-size: 9px; }
+    }
+
+    @media (max-width: 480px) {
+      .header-actions { flex-wrap: wrap; justify-content: flex-end; }
+      .btn-header { font-size: 0.5rem; padding: 3px 5px; }
+      #sidebar { width: 92vw; }
+    }
+  </style>
+</head>
+<body>
+  <a href="/client/" id="gt-back" style="position:fixed;top:12px;left:12px;z-index:99999;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);border:1px solid rgba(201,169,110,0.3);border-radius:8px;padding:6px 14px;text-decoration:none;color:rgba(201,169,110,0.8);font-family:Orbitron,monospace;font-size:10px;letter-spacing:0.1em;transition:all 0.3s;" onmouseover="this.style.background='rgba(201,169,110,0.12)';this.style.borderColor='rgba(201,169,110,0.5)'" onmouseout="this.style.background='rgba(0,0,0,0.6)';this.style.borderColor='rgba(201,169,110,0.3)'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>DASHBOARD</a>
+  <!-- HEADER -->
+  <div id="header">
+    <div class="logo-mark">筒</div>
+    <div>
+      <div class="logo-text">3D Box Customizer</div>
+      <div class="logo-sub">3D Box Customizer</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-header btn-export" onclick="exportSTL('body')">本体STL</button>
+      <button class="btn-header btn-export" onclick="exportSTL('lid')" style="background: linear-gradient(135deg,#5a7a5a,#2d6a4f)">蓋STL</button>
+      <button class="btn-header btn-export" onclick="exportSplitSTL()" style="background: linear-gradient(135deg,#5a3a7a,#4a2d6a)">分割STL</button>
+      <button class="btn-header btn-export" onclick="export3MF()" style="background: linear-gradient(135deg,#2a6a8a,#1a4a6a)">3MF</button>
+      <button class="btn-header btn-promo" id="btn-promo" onclick="showPromoSettings()">PROMO</button>
+      <button class="btn-header btn-rec" id="btn-rec" onclick="toggleRecording()">REC</button>
+    </div>
+  </div>
+
+  <!-- EXPORT PAYWALL OVERLAY -->
+  <div id="export-paywall" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;flex-direction:column;">
+    <div style="background:var(--panel);border:1px solid var(--accent);border-radius:16px;padding:32px;max-width:420px;width:90%;text-align:center;">
+      <div style="font-size:32px;margin-bottom:12px;">🔒</div>
+      <h2 style="color:var(--accent);font-family:'Noto Serif JP',serif;font-size:18px;margin:0 0 8px;">Export License Required</h2>
+      <p style="color:#aaa;font-size:13px;line-height:1.6;margin:0 0 20px;">STL / 3MF ファイルの出力にはライセンスが必要です。<br>3Dプレビュー・カスタマイズは引き続き無料でご利用いただけます。</p>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+        <a id="btn-buy-export" href="#" style="display:block;background:linear-gradient(135deg,var(--accent),#8c6d3f);color:#fff;padding:14px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">Export Pro — ¥19,800（買い切り）</a>
+        <a id="btn-buy-monthly" href="#" style="display:block;background:rgba(201,169,110,0.1);border:1px solid var(--accent);color:var(--accent);padding:12px;border-radius:8px;text-decoration:none;font-size:13px;">Monthly — ¥3,980/月</a>
+      </div>
+      <p style="color:#666;font-size:10px;margin:0 0 12px;">Stripe による安全な決済処理</p>
+      <button onclick="document.getElementById('export-paywall').style.display='none'" style="background:none;border:none;color:#666;font-size:12px;cursor:pointer;text-decoration:underline;">閉じる</button>
+    </div>
+  </div>
+
+  <!-- VIEWPORT -->
+  <div id="viewport"></div>
+  <!-- 録画インジケーター -->
+  <div id="rec-indicator"><div class="dot"></div> REC</div>
+  <!-- プロモオーバーレイ Canvas -->
+  <div id="promo-overlay"><canvas id="promo-canvas"></canvas></div>
+
+  <!-- SIDEBAR -->
+  <!-- Mobile sidebar toggle -->
+  <button id="sidebar-toggle" onclick="document.getElementById('sidebar').classList.toggle('mobile-open');this.textContent=document.getElementById('sidebar').classList.contains('mobile-open')?'✕':'⚙'">⚙</button>
+
+  <div id="sidebar">
+    <!-- カラーテーマ -->
+    <div class="section-title">Bambu Lab フィラメント</div>
+    <!-- 素材タイプ選択 -->
+    <select id="filament-type" onchange="onFilamentTypeChange()" style="
+      width:100%; padding:6px 10px; margin-bottom:8px; border-radius:6px;
+      background:rgba(255,255,255,0.06); border:1px solid rgba(201,169,110,0.3);
+      color:#ccc; font-size:0.75rem; outline:none; cursor:pointer;
+    ">
+    </select>
+    <!-- カラースウォッチ -->
+    <div id="filament-colors" style="
+      display:grid; grid-template-columns:repeat(auto-fill, minmax(36px, 1fr));
+      gap:4px; max-height:160px; overflow-y:auto; padding:2px;
+    "></div>
+    <div id="filament-color-name" style="font-size:0.68rem; color:#888; margin-top:4px; text-align:center; min-height:16px;"></div>
+
+    <hr class="divider">
+
+    <!-- サイズ調整 -->
+    <div class="section-title">サイズ調整 (mm)</div>
+    <div class="info-box" style="margin-bottom:10px;font-size:0.72rem;border-color:rgba(176,141,87,0.5)">
+      <strong style="color:#e8c97a">📐 クライアント指定寸法</strong><br>
+      長辺200 × 短辺150 × 高さ60mm
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">長辺 (W) <span id="lbl-w">200</span>mm</div>
+      <input type="range" id="sl-w" min="100" max="300" value="200" oninput="updateBox()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">短辺 (D) <span id="lbl-d">150</span>mm</div>
+      <input type="range" id="sl-d" min="80" max="250" value="150" oninput="updateBox()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">高さ (H) <span id="lbl-h">60</span>mm</div>
+      <input type="range" id="sl-h" min="20" max="150" value="60" oninput="updateBox()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">壁の厚み <span id="lbl-t">3</span>mm</div>
+      <input type="range" id="sl-t" min="2" max="8" value="3" oninput="updateBox()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">面取りR <span id="lbl-cf">3</span>mm</div>
+      <input type="range" id="sl-cf" min="0" max="15" value="3" step="0.5" oninput="updateBox()">
+    </div>
+    <hr class="divider">
+
+    <!-- 蓋の開閉 -->
+    <div class="section-title">蓋の開閉</div>
+    <div class="tex-grid" style="grid-template-columns: repeat(4, 1fr);">
+      <div class="tex-btn active" id="lid-closed" onclick="setLidMode('closed')">
+        <div class="tex-preview">📦</div>
+        閉じる
+      </div>
+      <div class="tex-btn" id="lid-slide" onclick="setLidMode('slide')">
+        <div class="tex-preview">↗</div>
+        スライド
+      </div>
+      <div class="tex-btn" id="lid-open" onclick="setLidMode('open')">
+        <div class="tex-preview">📂</div>
+        ヒンジ
+      </div>
+      <div class="tex-btn" id="lid-explode" onclick="setLidMode('explode')">
+        <div class="tex-preview">💥</div>
+        分解
+      </div>
+    </div>
+    <div class="slider-row" style="margin-top:10px">
+      <div class="slider-label">開き具合 <span id="lbl-lid">0</span>%</div>
+      <input type="range" id="sl-lid" min="0" max="100" value="0" oninput="updateLidManual()">
+    </div>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:4px; cursor:pointer; font-size:0.72rem; color:#888;">
+      <input type="checkbox" id="lid-lip-toggle" onchange="toggleLidLip()" style="accent-color:var(--accent); width:15px; height:15px;">
+      蓋の返し（リップ）あり
+    </label>
+    <hr class="divider">
+
+    <hr class="divider">
+
+    <!-- ライティング -->
+    <div class="section-title">ライティング</div>
+    <div class="slider-row">
+      <div class="slider-label">光源の水平角度 <span id="lbl-la">45</span>°</div>
+      <input type="range" id="sl-la" min="0" max="360" value="45" oninput="updateLighting()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">光源の高さ <span id="lbl-lh">65</span>°</div>
+      <input type="range" id="sl-lh" min="10" max="85" value="65" oninput="updateLighting()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">光の強さ <span id="lbl-li">180</span>%</div>
+      <input type="range" id="sl-li" min="50" max="300" value="180" oninput="updateLighting()">
+    </div>
+    <hr class="divider">
+
+    <!-- 背景 -->
+    <div class="section-title">背景シーン</div>
+    <div class="tex-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="tex-btn active" id="bg-studio" onclick="setBackground('studio')">
+        <div class="tex-preview" style="font-size:1rem;">⬛</div>
+        スタジオ
+      </div>
+      <div class="tex-btn" id="bg-tearoom" onclick="setBackground('tearoom')">
+        <div class="tex-preview" style="font-size:1rem;">🍵</div>
+        茶室
+      </div>
+      <div class="tex-btn" id="bg-garden" onclick="setBackground('garden')">
+        <div class="tex-preview" style="font-size:1rem;">🌿</div>
+        日本庭園
+      </div>
+    </div>
+    <div class="tex-grid" style="grid-template-columns: repeat(3, 1fr); margin-top:4px;">
+      <div class="tex-btn" id="bg-tower" onclick="setBackground('tower')">
+        <div class="tex-preview" style="font-size:1rem;">🏙</div>
+        タワマン夜景
+      </div>
+      <div class="tex-btn" id="bg-living" onclick="setBackground('living')">
+        <div class="tex-preview" style="font-size:1rem;">🛋</div>
+        リビング
+      </div>
+      <div class="tex-btn" id="bg-wood" onclick="setBackground('wood')">
+        <div class="tex-preview" style="font-size:1rem;">🪵</div>
+        木目テーブル
+      </div>
+    </div>
+    <!-- カスタム背景 -->
+    <div style="margin-top:6px;">
+      <button onclick="document.getElementById('bg-upload').click()" style="
+        width:100%; padding:6px; border:1px dashed rgba(201,169,110,0.4); background:none;
+        color:#888; border-radius:6px; cursor:pointer; font-size:0.7rem;
+      ">画像をアップロードして背景にする</button>
+      <input type="file" id="bg-upload" accept="image/*" style="display:none;" onchange="uploadBackground(event)">
+    </div>
+    <!-- グリッド表示 -->
+    <label style="display:flex; align-items:center; gap:8px; margin-top:8px; cursor:pointer; font-size:0.72rem; color:#888;">
+      <input type="checkbox" id="grid-toggle" checked onchange="toggleGrid()" style="accent-color:var(--accent); width:15px; height:15px;">
+      グリッド線を表示
+    </label>
+    <hr class="divider">
+
+    <!-- 情報 -->
+    <!-- 分割印刷 -->
+    <div class="section-title">分割印刷 (A1 mini: 180mm)</div>
+    <div id="split-warning" class="info-box" style="margin-bottom:8px; border-color:rgba(220,100,100,0.5); display:none;">
+      <strong style="color:#e88">長辺がA1 miniのビルドサイズ(180mm)を超えています</strong><br>
+      フィンガージョイントで分割印刷できます
+    </div>
+    <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer; font-size:0.72rem; color:#888;">
+      <input type="checkbox" id="split-toggle" onchange="toggleSplit()" style="accent-color:var(--accent); width:15px; height:15px;">
+      分割表示（フィンガージョイント）
+    </label>
+    <div id="split-options" style="display:none;">
+      <div class="slider-row">
+        <div class="slider-label">ジョイント数 <span id="lbl-jn">4</span></div>
+        <input type="range" id="sl-jn" min="2" max="8" value="4" oninput="updateBox()">
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">ジョイント深さ <span id="lbl-jd">10</span>mm</div>
+        <input type="range" id="sl-jd" min="5" max="20" value="10" oninput="updateBox()">
+      </div>
+      <div class="slider-row">
+        <div class="slider-label">クリアランス <span id="lbl-jc">0.3</span>mm</div>
+        <input type="range" id="sl-jc" min="0.1" max="0.5" value="0.3" step="0.05" oninput="updateBox()">
+      </div>
+    </div>
+    <hr class="divider">
+
+    <!-- 内部仕切り（サンプル） -->
+    <div class="section-title">内部仕切り（サンプル）</div>
+    <div class="tex-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="tex-btn active" id="div-none" onclick="setDivider('none')">
+        <div class="tex-preview" style="font-size:1rem;">━</div>
+        なし
+      </div>
+      <div class="tex-btn" id="div-cross" onclick="setDivider('cross')">
+        <div class="tex-preview" style="font-size:1rem;">╋</div>
+        十字
+      </div>
+      <div class="tex-btn" id="div-slots" onclick="setDivider('slots')">
+        <div class="tex-preview" style="font-size:1rem;">┃┃</div>
+        スロット
+      </div>
+    </div>
+    <hr class="divider">
+
+    <div class="section-title">印刷仕様参考</div>
+    <div class="info-box" id="info-box">
+      <strong>クライアント寸法:</strong> 200×150×60mm<br>
+      <strong>壁厚:</strong> 3mm<br>
+      <strong>蓋:</strong> フラット一枚板<br>
+      <strong>面取り:</strong> R角 (スライダー調整可)<br>
+      <strong>想定重量:</strong> <span id="info-weight">約 75g</span><br>
+      <strong>想定印刷時間:</strong> <span id="info-time">約 3.5時間</span>
+    </div>
+    <div style="height:16px"></div>
+    <div class="info-box" style="font-size:0.8rem; text-align:center; color: rgba(176,141,87,0.9)">
+      <span class="bell-anim">🔔</span>
+      プロパノータ自動打鍵ボックス
+    </div>
+  </div>
+
+  <!-- PROMO設定ダイアログ -->
+  <div id="promo-settings" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; z-index:50; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); align-items:center; justify-content:center;">
+    <div style="background:rgba(20,20,22,0.98); border:1px solid rgba(201,169,110,0.3); border-radius:12px; padding:24px 28px; max-width:420px; width:92%; max-height:90vh; overflow-y:auto;">
+      <div style="font-family:'Noto Serif JP',serif; font-size:1rem; color:#fff; margin-bottom:16px; text-align:center;">PROMO 設定</div>
+
+      <!-- SNS向けアスペクト比 -->
+      <div style="font-size:0.7rem; color:var(--accent); font-weight:700; letter-spacing:1px; margin-bottom:6px;">SNS / アスペクト比</div>
+      <div style="display:flex; gap:5px; margin-bottom:14px; flex-wrap:wrap;">
+        <label class="promo-ratio-btn active" id="ratio-16-9"><input type="radio" name="promo-ratio" value="16:9" checked style="display:none;"> 16:9 YouTube</label>
+        <label class="promo-ratio-btn" id="ratio-9-16"><input type="radio" name="promo-ratio" value="9:16" style="display:none;"> 9:16 TikTok</label>
+        <label class="promo-ratio-btn" id="ratio-1-1"><input type="radio" name="promo-ratio" value="1:1" style="display:none;"> 1:1 Instagram</label>
+        <label class="promo-ratio-btn" id="ratio-4-5"><input type="radio" name="promo-ratio" value="4:5" style="display:none;"> 4:5 X/Facebook</label>
+      </div>
+
+      <!-- 基本設定 -->
+      <div style="font-size:0.7rem; color:var(--accent); font-weight:700; letter-spacing:1px; margin-bottom:6px;">基本設定</div>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer; font-size:0.78rem; color:#ccc;">
+        <input type="checkbox" id="promo-opt-subtitle" checked style="accent-color:var(--accent); width:16px; height:16px;">
+        字幕を表示する
+      </label>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer; font-size:0.78rem; color:#ccc;">
+        <input type="checkbox" id="promo-opt-bgm" checked style="accent-color:var(--accent); width:16px; height:16px;">
+        BGM（金平糖の踊り）
+      </label>
+
+      <!-- ウォーターマーク -->
+      <div style="font-size:0.7rem; color:var(--accent); font-weight:700; letter-spacing:1px; margin:12px 0 6px;">ウォーターマーク / ロゴ</div>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer; font-size:0.78rem; color:#ccc;">
+        <input type="checkbox" id="promo-opt-watermark" style="accent-color:var(--accent); width:16px; height:16px;">
+        ウォーターマークを挿入
+      </label>
+      <div id="watermark-options" style="display:none; padding-left:24px; margin-bottom:8px;">
+        <div style="font-size:0.68rem; color:#888; margin-bottom:3px;">テキスト（ブランド名など）</div>
+        <input type="text" id="promo-opt-watermark-text" placeholder="Grace of Touch / Sugai Gakki" value="Grace of Touch" style="
+          width:100%; padding:5px 8px; border-radius:5px; margin-bottom:6px;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(201,169,110,0.2);
+          color:#ccc; font-size:0.72rem; outline:none;
+        ">
+        <div style="font-size:0.68rem; color:#888; margin-bottom:3px;">表示位置</div>
+        <select id="promo-opt-watermark-pos" style="
+          width:100%; padding:4px 8px; border-radius:5px;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(201,169,110,0.2);
+          color:#ccc; font-size:0.72rem; outline:none;
+        ">
+          <option value="top-right">右上</option>
+          <option value="top-left">左上</option>
+          <option value="bottom-right">右下</option>
+          <option value="bottom-left">左下</option>
+        </select>
+      </div>
+
+      <!-- エンドカード -->
+      <div style="font-size:0.7rem; color:var(--accent); font-weight:700; letter-spacing:1px; margin:12px 0 6px;">エンドカード（最後の画面）</div>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer; font-size:0.78rem; color:#ccc;">
+        <input type="checkbox" id="promo-opt-endcard" style="accent-color:var(--accent); width:16px; height:16px;">
+        エンドカードを挿入
+      </label>
+      <div id="endcard-options" style="display:none; padding-left:24px; margin-bottom:8px;">
+        <div style="font-size:0.68rem; color:#888; margin-bottom:3px;">ブランド名 / タイトル</div>
+        <input type="text" id="promo-opt-endcard-title" placeholder="Grace of Touch" value="Grace of Touch" style="
+          width:100%; padding:5px 8px; border-radius:5px; margin-bottom:6px;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(201,169,110,0.2);
+          color:#ccc; font-size:0.72rem; outline:none;
+        ">
+        <div style="font-size:0.68rem; color:#888; margin-bottom:3px;">サブテキスト（URL・連絡先など）</div>
+        <input type="text" id="promo-opt-endcard-sub" placeholder="sugai-gakki.com" style="
+          width:100%; padding:5px 8px; border-radius:5px; margin-bottom:6px;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(201,169,110,0.2);
+          color:#ccc; font-size:0.72rem; outline:none;
+        ">
+        <div style="font-size:0.68rem; color:#888; margin-bottom:3px;">表示秒数</div>
+        <input type="number" id="promo-opt-endcard-duration" value="3" min="1" max="10" style="
+          width:80px; padding:4px 8px; border-radius:5px;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(201,169,110,0.2);
+          color:#ccc; font-size:0.72rem; outline:none;
+        "> 秒
+      </div>
+
+      <!-- 録画設定 -->
+      <div style="font-size:0.7rem; color:var(--accent); font-weight:700; letter-spacing:1px; margin:12px 0 6px;">出力設定</div>
+      <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer; font-size:0.78rem; color:#ccc;">
+        <input type="checkbox" id="promo-opt-record" checked style="accent-color:var(--accent); width:16px; height:16px;">
+        録画する
+      </label>
+      <div id="promo-record-options">
+        <div style="display:flex; gap:5px; margin-bottom:8px;">
+          <label style="flex:1; display:flex; align-items:center; gap:5px; padding:5px 8px; border-radius:5px; background:rgba(201,169,110,0.08); border:1.5px solid var(--accent); cursor:pointer; font-size:0.72rem; color:#ccc;" id="fmt-mp4-label">
+            <input type="radio" name="promo-format" value="mp4" checked style="accent-color:var(--accent);"> MP4
+          </label>
+          <label style="flex:1; display:flex; align-items:center; gap:5px; padding:5px 8px; border-radius:5px; background:rgba(255,255,255,0.03); border:1.5px solid rgba(255,255,255,0.1); cursor:pointer; font-size:0.72rem; color:#888;" id="fmt-webm-label">
+            <input type="radio" name="promo-format" value="webm" style="accent-color:var(--accent);"> WebM
+          </label>
+        </div>
+        <div style="font-size:0.68rem; color:#888; margin-bottom:3px;">ファイル名</div>
+        <input type="text" id="promo-opt-filename" placeholder="custom_promo" style="
+          width:100%; padding:5px 8px; border-radius:5px;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(201,169,110,0.2);
+          color:#ccc; font-size:0.72rem; outline:none;
+        ">
+      </div>
+
+      <div style="display:flex; gap:8px; margin-top:16px;">
+        <button onclick="cancelPromoSettings()" style="flex:1; padding:8px; border:1px solid #555; background:none; color:#aaa; border-radius:6px; cursor:pointer; font-size:0.78rem;">キャンセル</button>
+        <button onclick="confirmPromoSettings()" style="flex:1; padding:8px; border:none; background:linear-gradient(135deg,var(--accent),#8c6d3f); color:#fff; border-radius:6px; cursor:pointer; font-size:0.78rem; font-weight:700;">開始</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROMO SEEKBAR -->
+  <div id="promo-seekbar">
+    <button class="promo-btn" id="promo-pause-btn" onclick="togglePromoPause()">⏸</button>
+    <input type="range" id="promo-seek" min="0" max="100" value="0" step="0.1" oninput="seekPromo()">
+    <span class="promo-time" id="promo-time-label">0:00 / 0:30</span>
+    <button class="promo-btn" id="promo-sub-btn" onclick="togglePromoSubtitles()">字幕 ON</button>
+    <button class="promo-btn" onclick="endPromoMode()">✕ 終了</button>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div id="bottom-bar">
+    <div class="hint"><kbd>ドラッグ</kbd> 回転</div>
+    <div class="hint"><kbd>スクロール</kbd> ズーム</div>
+    <div class="hint"><kbd>右ドラッグ</kbd> パン</div>
+  </div>
+
+<script>
+// ─────────────────────────────────────────────
+//  テーマ定義
+// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+//  Bambu Lab フィラメントカタログ
+// ─────────────────────────────────────────────
+const FILAMENT_CATALOG = [
+  { type:"PLA Basic", m:0.02, r:0.55, colors:[
+    {n:"Jade White",hex:"#FFFFFF"},{n:"Black",hex:"#000000"},{n:"Gray",hex:"#8E9089"},
+    {n:"Dark Gray",hex:"#545454"},{n:"Light Gray",hex:"#D1D3D5"},{n:"Blue Grey",hex:"#5B6579"},
+    {n:"Silver",hex:"#A6A9AA"},{n:"Red",hex:"#C12E1F"},{n:"Maroon Red",hex:"#9D2235"},
+    {n:"Hot Pink",hex:"#F5547C"},{n:"Magenta",hex:"#EC008C"},{n:"Pink",hex:"#F55A74"},
+    {n:"Orange",hex:"#FF6A13"},{n:"Pumpkin Orange",hex:"#FF9016"},{n:"Yellow",hex:"#F4EE2A"},
+    {n:"Sunflower Yellow",hex:"#FEC600"},{n:"Gold",hex:"#E4BD68"},{n:"Bronze",hex:"#847D48"},
+    {n:"Blue",hex:"#0A2989"},{n:"Cobalt Blue",hex:"#0056B8"},{n:"Cyan",hex:"#0086D6"},
+    {n:"Turquoise",hex:"#00B1B7"},{n:"Bambu Green",hex:"#00AE42"},{n:"Bright Green",hex:"#BECF00"},
+    {n:"Mistletoe Green",hex:"#3F8E43"},{n:"Purple",hex:"#5E43B7"},{n:"Indigo Purple",hex:"#482960"},
+    {n:"Brown",hex:"#9D432C"},{n:"Cocoa Brown",hex:"#6F5034"},
+  ]},
+  { type:"PLA Matte", m:0.0, r:0.75, colors:[
+    {n:"Ivory White",hex:"#FFFFFF"},{n:"Charcoal",hex:"#000000"},{n:"Bone White",hex:"#CBC6B8"},
+    {n:"Ash Gray",hex:"#9B9EA0"},{n:"Nardo Gray",hex:"#757575"},{n:"Desert Tan",hex:"#E8DBB7"},
+    {n:"Latte Brown",hex:"#D3B7A7"},{n:"Caramel",hex:"#AE835B"},{n:"Dark Brown",hex:"#7D6556"},
+    {n:"Dark Chocolate",hex:"#4D3324"},{n:"Terracotta",hex:"#B15533"},{n:"Scarlet Red",hex:"#DE4343"},
+    {n:"Dark Red",hex:"#BB3D43"},{n:"Mandarin Orange",hex:"#F99963"},{n:"Lemon Yellow",hex:"#F7D959"},
+    {n:"Apple Green",hex:"#C2E189"},{n:"Grass Green",hex:"#61C680"},{n:"Dark Green",hex:"#68724D"},
+    {n:"Ice Blue",hex:"#A3D8E1"},{n:"Sky Blue",hex:"#56B7E6"},{n:"Marine Blue",hex:"#0078BF"},
+    {n:"Dark Blue",hex:"#042F56"},{n:"Lilac Purple",hex:"#AE96D4"},{n:"Plum",hex:"#950051"},
+    {n:"Sakura Pink",hex:"#E8AFCF"},
+  ]},
+  { type:"PLA Silk+", m:0.50, r:0.18, colors:[
+    {n:"Gold",hex:"#F4A925"},{n:"Silver",hex:"#C8C8C8"},{n:"Blue",hex:"#008BDA"},
+    {n:"Purple",hex:"#8671CB"},{n:"Candy Red",hex:"#D02727"},{n:"Candy Green",hex:"#018814"},
+    {n:"Rose Gold",hex:"#BA9594"},{n:"Titan Gray",hex:"#5F6367"},{n:"Baby Blue",hex:"#A8C6EE"},
+    {n:"Pink",hex:"#F7ADA6"},{n:"Mint",hex:"#96DCB9"},{n:"Champagne",hex:"#F3CFB2"},
+    {n:"White",hex:"#FFFFFF"},
+  ]},
+  { type:"PLA Silk Dual Color", m:0.50, r:0.18, colors:[
+    {n:"Gilded Rose",hex:["#FCA2BF","#FF9425"]},{n:"Midnight Blaze",hex:["#0047BB","#7D1B49"]},
+    {n:"Mystic Magenta",hex:["#720062","#3A913F"]},{n:"Phantom Blue",hex:["#00629B","#000000"]},
+    {n:"Neon City",hex:["#0047BB","#BB22A3"]},{n:"Blue Hawaii",hex:["#60A4E8","#4CE4A0"]},
+    {n:"Velvet Eclipse",hex:["#000000","#A34342"]},
+  ]},
+  { type:"PLA Silk Gradient", m:0.50, r:0.18, colors:[
+    {n:"Dawn Radiance",hex:["#EC984C","#6CD4BC","#A66EB9","#D87694"]},
+    {n:"Aurora Purple",hex:["#7F3696","#006EC9"]},
+    {n:"South Beach",hex:["#F772A4","#00918B"]},
+  ]},
+  { type:"PLA Metal", m:0.60, r:0.25, colors:[
+    {n:"Iridium Gold",hex:"#B39B84"},{n:"Copper Brown",hex:"#AA6443"},
+    {n:"Oxide Green",hex:"#1D7C6A"},{n:"Cobalt Blue",hex:"#39699E"},
+    {n:"Iron Gray",hex:"#43403D"},
+  ]},
+  { type:"PLA Translucent", m:0.02, r:0.40, colors:[
+    {n:"Teal",hex:"#009FA1"},{n:"Light Jade",hex:"#96D8AF"},{n:"Blue",hex:"#0047BB"},
+    {n:"Red",hex:"#B50011"},{n:"Orange",hex:"#F74E02"},{n:"Purple",hex:"#8344B0"},
+    {n:"Cherry Pink",hex:"#F5B6CD"},{n:"Ice Blue",hex:"#B8CDE9"},
+    {n:"Mellow Yellow",hex:"#F5DBAB"},{n:"Lavender",hex:"#C5A3D9"},
+  ]},
+  { type:"PLA Glow", m:0.02, r:0.50, colors:[
+    {n:"Green",hex:"#A1FFAC"},{n:"Blue",hex:"#7AC0E9"},{n:"Pink",hex:"#F17B8F"},
+    {n:"Yellow",hex:"#F8FF80"},{n:"Orange",hex:"#FF9D5B"},
+  ]},
+  { type:"PLA-CF", m:0.05, r:0.65, colors:[
+    {n:"Black",hex:"#000000"},{n:"Burgundy Red",hex:"#951E23"},{n:"Iris Purple",hex:"#69398E"},
+    {n:"Matcha Green",hex:"#5C9748"},{n:"Jeans Blue",hex:"#6E88BC"},
+    {n:"Royal Blue",hex:"#2842AD"},{n:"Lava Gray",hex:"#4D5054"},
+  ]},
+  { type:"PETG Basic", m:0.06, r:0.50, colors:[
+    {n:"Black",hex:"#000000"},{n:"White",hex:"#FFFFFF"},{n:"Grey",hex:"#8E9089"},
+    {n:"Blue",hex:"#0A2989"},{n:"Red",hex:"#C12E1F"},{n:"Green",hex:"#00AE42"},
+    {n:"Orange",hex:"#FF6A13"},{n:"Yellow",hex:"#F4EE2A"},{n:"Blue Grey",hex:"#5B6579"},
+    {n:"Lake Blue",hex:"#0086D6"},{n:"Purple",hex:"#5E43B7"},{n:"Gold",hex:"#E4BD68"},
+    {n:"Lime Green",hex:"#BECF00"},{n:"Natural",hex:"#F5F2E8"},
+  ]},
+  { type:"PETG HF", m:0.06, r:0.50, colors:[
+    {n:"Black",hex:"#000000"},{n:"White",hex:"#FFFFFF"},{n:"Grey",hex:"#8E9089"},
+    {n:"Blue",hex:"#0A2989"},{n:"Red",hex:"#C12E1F"},
+  ]},
+  { type:"PETG-CF", m:0.08, r:0.60, colors:[
+    {n:"Black",hex:"#000000"},{n:"Brick Red",hex:"#9F332A"},{n:"Violet Purple",hex:"#583061"},
+    {n:"Indigo Blue",hex:"#324585"},{n:"Malachite Green",hex:"#16B08E"},{n:"Titan Gray",hex:"#565656"},
+  ]},
+  { type:"ABS", m:0.02, r:0.55, colors:[
+    {n:"White",hex:"#FFFFFF"},{n:"Black",hex:"#000000"},{n:"Desert Tan",hex:"#E8DBB7"},
+    {n:"Olive",hex:"#789D4A"},{n:"Azure",hex:"#489FDF"},{n:"Navy Blue",hex:"#0C2340"},
+    {n:"Blue",hex:"#0A2CA5"},{n:"Tangerine Yellow",hex:"#FFC72C"},{n:"Orange",hex:"#FF6A13"},
+    {n:"Red",hex:"#D32941"},{n:"Purple",hex:"#AF1685"},
+  ]},
+  { type:"ASA", m:0.02, r:0.55, colors:[
+    {n:"White",hex:"#FFFAF2"},{n:"Black",hex:"#000000"},{n:"Gray",hex:"#8A949E"},
+    {n:"Red",hex:"#E02928"},{n:"Green",hex:"#00A6A0"},{n:"Blue",hex:"#2140B4"},
+  ]},
+  { type:"TPU 95A HF", m:0.02, r:0.60, colors:[
+    {n:"Black",hex:"#101820"},{n:"Grey",hex:"#898D8D"},{n:"White",hex:"#FFFFFF"},
+    {n:"Yellow",hex:"#F3E600"},{n:"Blue",hex:"#0A2989"},{n:"Red",hex:"#C12E1F"},
+  ]},
+];
+
+// 素材タイプ別の3D表示プロパティ
+const FILAMENT_PROPS = {};
+FILAMENT_CATALOG.forEach(f => { FILAMENT_PROPS[f.type] = { m: f.m, r: f.r }; });
+
+// 現在の選択状態
+let currentFilamentType = 'PLA Basic';
+let currentFilamentColor = 'Black';
+let currentFilamentHex = '#000000';
+let lidLipEnabled = false; // クライアント要望: 返しなしがデフォルト
+
+// ─────────────────────────────────────────────
+//  Three.js セットアップ
+// ─────────────────────────────────────────────
+const viewport = document.getElementById('viewport');
+const scene    = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0a0c);
+scene.fog = new THREE.Fog(0x0a0a0c, 350, 900);
+
+const camera = new THREE.PerspectiveCamera(40, viewport.clientWidth / viewport.clientHeight, 0.1, 2000);
+camera.position.set(0, 150, 350); // 正面から
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+viewport.appendChild(renderer.domElement);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance = 80;
+controls.maxDistance = 600;
+controls.target.set(0, 40, 0);
+
+// ライト（スタジオライティング）
+const ambient = new THREE.AmbientLight(0xffffff, 0.25);
+scene.add(ambient);
+
+// 環境光（半球ライト: 上=暖色, 下=寒色）
+const hemi = new THREE.HemisphereLight(0xfff0d0, 0x202040, 0.4);
+scene.add(hemi);
+
+// キーライト（メイン照明）
+const keyLight = new THREE.DirectionalLight(0xfff3e0, 1.8);
+keyLight.position.set(120, 220, 160);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.near = 1;
+keyLight.shadow.camera.far = 600;
+keyLight.shadow.camera.left = -180;
+keyLight.shadow.camera.right = 180;
+keyLight.shadow.camera.top = 180;
+keyLight.shadow.camera.bottom = -180;
+keyLight.shadow.bias = -0.001;
+scene.add(keyLight);
+
+// フィルライト（影を柔らかく）
+const fillLight = new THREE.DirectionalLight(0xc8d8f0, 0.6);
+fillLight.position.set(-140, 100, -80);
+scene.add(fillLight);
+
+// リムライト（輪郭を強調）
+const rimLight = new THREE.DirectionalLight(0xd4aa60, 0.35);
+rimLight.position.set(-50, 60, -180);
+scene.add(rimLight);
+
+// 正面からの弱い補助光
+const frontLight = new THREE.DirectionalLight(0xffffff, 0.15);
+frontLight.position.set(0, 30, 250);
+scene.add(frontLight);
+
+// 床面（リフレクション風）
+const floorGeo = new THREE.PlaneGeometry(800, 800);
+const floorMat = new THREE.MeshStandardMaterial({
+  color: 0x080808, metalness: 0.3, roughness: 0.7
+});
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -0.5;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// 影受け用の透明床（影をfloorの上に落とす）
+const shadowFloor = new THREE.Mesh(
+  new THREE.PlaneGeometry(800, 800),
+  new THREE.ShadowMaterial({ opacity: 0.35 })
+);
+shadowFloor.rotation.x = -Math.PI / 2;
+shadowFloor.receiveShadow = true;
+scene.add(shadowFloor);
+
+// グリッド（控えめ）
+const grid = new THREE.GridHelper(300, 30, 0x222228, 0x18181e);
+grid.material.opacity = 0.3;
+grid.material.transparent = true;
+scene.add(grid);
+
+// ─────────────────────────────────────────────
+//  ボックスグループ
+// ─────────────────────────────────────────────
+let boxGroup = null;
+let bodyMeshes = [];
+let lidMesh = null;
+
+// ─────────── 面取りShape生成 (R面/フィレット対応) ───────────
+function makeChamferShape(w, d, c) {
+  const s = new THREE.Shape();
+  const r = Math.min(c || 0, w / 2 - 0.1, d / 2 - 0.1);
+  if (r <= 0.05) {
+    s.moveTo(-w / 2, -d / 2);
+    s.lineTo(w / 2, -d / 2);
+    s.lineTo(w / 2, d / 2);
+    s.lineTo(-w / 2, d / 2);
+  } else {
+    // absarc(x, y, radius, startAngle, endAngle, clockwise)
+    s.absarc(-w / 2 + r, -d / 2 + r, r, Math.PI, Math.PI * 1.5);
+    s.absarc(w / 2 - r, -d / 2 + r, r, Math.PI * 1.5, Math.PI * 2);
+    s.absarc(w / 2 - r, d / 2 - r, r, 0, Math.PI * 0.5);
+    s.absarc(-w / 2 + r, d / 2 - r, r, Math.PI * 0.5, Math.PI);
+  }
+  s.closePath();
+  return s;
+}
+
+// ─────────── メインビルド ───────────
+function buildBox() {
+  if (boxGroup) {
+    scene.remove(boxGroup);
+    boxGroup.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) {
+        if (Array.isArray(o.material)) o.material.forEach(m => m.dispose());
+        else o.material.dispose();
+      }
+    });
+  }
+  boxGroup = new THREE.Group();
+  bodyMeshes = [];
+  lidMesh = null;
+
+  const W  = parseFloat(document.getElementById('sl-w').value);
+  const D  = parseFloat(document.getElementById('sl-d').value);
+  const H  = parseFloat(document.getElementById('sl-h').value);
+  const T  = parseFloat(document.getElementById('sl-t').value);
+  const CF = parseFloat(document.getElementById('sl-cf').value);  // 面取りR
+
+  // スライダー値表示更新
+  document.getElementById('lbl-w').textContent = W;
+  document.getElementById('lbl-d').textContent = D;
+  document.getElementById('lbl-h').textContent = H;
+  document.getElementById('lbl-t').textContent = T;
+  document.getElementById('lbl-cf').textContent = CF;
+
+  // フィラメントカタログから素材プロパティを取得
+  const props = FILAMENT_PROPS[currentFilamentType] || { m: 0.02, r: 0.55 };
+  const bodyColor = new THREE.Color(currentFilamentHex);
+  const lidColor = bodyColor.clone().multiplyScalar(0.9);
+
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: bodyColor,
+    metalness: props.m,
+    roughness: props.r,
+  });
+  const lidMat = new THREE.MeshStandardMaterial({
+    color: lidColor,
+    metalness: props.m,
+    roughness: props.r,
+  });
+  // 内部底面は本体より少し暗い同系色
+  const innerColor = bodyColor.clone().multiplyScalar(0.6);
+  const innerMat = new THREE.MeshStandardMaterial({ color: innerColor, roughness: 0.85, metalness: 0.02 });
+
+  const wallH = H - T;
+  const lidMargin = 1;       // 蓋の外側マージン（片側）
+  const lipH = T * 2.5;      // インナーリップの深さ（箱の内側にはまる部分）
+  const lipT = T * 0.6;      // リップの厚み
+  const lipClearance = 0.4;  // 壁とリップの隙間（3Dプリント用クリアランス）
+  // リップ外寸: 箱の内寸 - クリアランス
+  const innerW = W - T * 2 - lipClearance * 2;
+  const innerD = D - T * 2 - lipClearance * 2;
+
+  // ── 底面 + 壁面 ──
+  if (CF > 0) {
+    // 面取りあり: ExtrudeGeometryで一体成型
+    // 底面（ソリッド面取りプレート）
+    const bottomShape = makeChamferShape(W, D, CF);
+    const bottomGeo = new THREE.ExtrudeGeometry(bottomShape, { depth: T, bevelEnabled: false });
+    const bottomMesh = new THREE.Mesh(bottomGeo, bodyMat);
+    bottomMesh.rotation.x = -Math.PI / 2;
+    bottomMesh.position.set(0, 0, 0);
+    bottomMesh.castShadow = true; bottomMesh.receiveShadow = true;
+    boxGroup.add(bottomMesh); bodyMeshes.push(bottomMesh);
+
+    // 壁面（面取り中空シェル）
+    const wallShape = makeChamferShape(W, D, CF);
+    const innerCF = Math.max(0, CF - T);
+    const holePts = makeChamferShape(W - T * 2, D - T * 2, innerCF).getPoints();
+    holePts.reverse();
+    const wallHole = new THREE.Path();
+    wallHole.setFromPoints(holePts);
+    wallShape.holes.push(wallHole);
+    const wallGeo = new THREE.ExtrudeGeometry(wallShape, { depth: wallH, bevelEnabled: false });
+    const wallMesh = new THREE.Mesh(wallGeo, bodyMat);
+    wallMesh.rotation.x = -Math.PI / 2;
+    wallMesh.position.set(0, T, 0);
+    wallMesh.castShadow = true; wallMesh.receiveShadow = true;
+    boxGroup.add(wallMesh); bodyMeshes.push(wallMesh);
+  } else {
+    // 面取りなし: BoxGeometryで4壁+底面
+    const bottomGeo = new THREE.BoxGeometry(W, T, D);
+    const bottomMesh = new THREE.Mesh(bottomGeo, bodyMat);
+    bottomMesh.position.set(0, T / 2, 0);
+    bottomMesh.castShadow = true; bottomMesh.receiveShadow = true;
+    boxGroup.add(bottomMesh); bodyMeshes.push(bottomMesh);
+
+    const fwGeo = new THREE.BoxGeometry(W, wallH, T);
+    const fw = new THREE.Mesh(fwGeo, bodyMat);
+    fw.position.set(0, T + wallH / 2, D / 2 - T / 2);
+    fw.castShadow = true; fw.receiveShadow = true;
+    boxGroup.add(fw); bodyMeshes.push(fw);
+
+    const bw = new THREE.Mesh(fwGeo.clone(), bodyMat);
+    bw.position.set(0, T + wallH / 2, -(D / 2 - T / 2));
+    bw.castShadow = true; bw.receiveShadow = true;
+    boxGroup.add(bw); bodyMeshes.push(bw);
+
+    const swGeo = new THREE.BoxGeometry(T, wallH, D - T * 2);
+    const lw = new THREE.Mesh(swGeo, bodyMat);
+    lw.position.set(-(W / 2 - T / 2), T + wallH / 2, 0);
+    lw.castShadow = true; lw.receiveShadow = true;
+    boxGroup.add(lw); bodyMeshes.push(lw);
+
+    const rw = new THREE.Mesh(swGeo.clone(), bodyMat);
+    rw.position.set(W / 2 - T / 2, T + wallH / 2, 0);
+    rw.castShadow = true; rw.receiveShadow = true;
+    boxGroup.add(rw); bodyMeshes.push(rw);
+  }
+
+  // ── 蓋（天板 + インナーリップ）をグループ化 ──
+  lidMesh = new THREE.Group();
+
+  // ── 天板（面取り対応 ExtrudeGeometry）──
+  const lidW = W + lidMargin * 2;
+  const lidD = D + lidMargin * 2;
+  const lidCF = CF > 0 ? CF + lidMargin : 0;
+  const lidTopShape = makeChamferShape(lidW, lidD, lidCF);
+  const lidTopGeo = new THREE.ExtrudeGeometry(lidTopShape, { depth: T, bevelEnabled: false });
+  const lidTop = new THREE.Mesh(lidTopGeo, lidMat);
+  lidTop.rotation.x = -Math.PI / 2;
+  lidTop.position.set(0, 0, 0);
+  lidTop.castShadow = true;
+  lidMesh.add(lidTop);
+
+  // ── インナーリップ（返し）── ON/OFF切替可能
+  if (lidLipEnabled) {
+    const lipOuterCF = Math.max(0, CF - T - lipClearance);
+    const lipInnerCF = Math.max(0, lipOuterCF - lipT);
+    const lipOuterShape = makeChamferShape(innerW, innerD, lipOuterCF);
+    const lipInnerW = innerW - lipT * 2;
+    const lipInnerD = innerD - lipT * 2;
+    if (lipInnerW > 0 && lipInnerD > 0) {
+      const lipInnerPts = makeChamferShape(lipInnerW, lipInnerD, lipInnerCF).getPoints();
+      lipInnerPts.reverse();
+      const lipHolePath = new THREE.Path();
+      lipHolePath.setFromPoints(lipInnerPts);
+      lipOuterShape.holes.push(lipHolePath);
+    }
+    const lipGeo = new THREE.ExtrudeGeometry(lipOuterShape, { depth: lipH, bevelEnabled: false });
+    const lipMesh = new THREE.Mesh(lipGeo, lidMat);
+    lipMesh.rotation.x = Math.PI / 2;
+    lipMesh.position.set(0, 0, 0);
+    lidMesh.add(lipMesh);
+  }
+
+  // 蓋をピボットグループで包む（奥端をヒンジにする）
+  // ピボット位置 = 蓋の奥端(Z-)
+  const lidPivot = new THREE.Group();
+  const lidHalfD = (D + lidMargin * 2) / 2;
+  lidPivot.position.set(0, H, -lidHalfD); // ピボットを奥端に配置
+  lidMesh.position.set(0, 0, lidHalfD);   // 蓋をピボットからオフセット
+  lidPivot.add(lidMesh);
+  boxGroup.add(lidPivot);
+  // lidMeshの代わりにlidPivotを回転制御に使う
+  window._lidPivot = lidPivot;
+  window._lidHalfD = lidHalfD;
+
+  // ── 内部底面（暗い色で内部を表現）──
+  if (CF > 0) {
+    const innerCF2 = Math.max(0, CF - T);
+    const innerBotShape = makeChamferShape(W - T * 2, D - T * 2, innerCF2);
+    const innerBotGeo = new THREE.ExtrudeGeometry(innerBotShape, { depth: 0.5, bevelEnabled: false });
+    const innerBottom = new THREE.Mesh(innerBotGeo, innerMat);
+    innerBottom.rotation.x = -Math.PI / 2;
+    innerBottom.position.set(0, T, 0);
+    boxGroup.add(innerBottom);
+  } else {
+    const innerGeo = new THREE.BoxGeometry(W - T * 2, 0.5, D - T * 2);
+    const innerBottom = new THREE.Mesh(innerGeo, innerMat);
+    innerBottom.position.set(0, T + 0.25, 0);
+    boxGroup.add(innerBottom);
+  }
+
+  // 内部仕切り（サンプル）
+  if (currentDivider !== 'none') {
+    const divGroup = buildDividers(W, D, H, T, currentDivider, bodyMat);
+    boxGroup.add(divGroup);
+  }
+
+  // 分割表示（フィンガージョイント）
+  if (splitEnabled && W > 180) {
+    const jn = parseInt(document.getElementById('sl-jn').value);
+    const jd = parseFloat(document.getElementById('sl-jd').value);
+    const jc = parseFloat(document.getElementById('sl-jc').value);
+    document.getElementById('lbl-jn').textContent = jn;
+    document.getElementById('lbl-jd').textContent = jd;
+    document.getElementById('lbl-jc').textContent = jc;
+
+    // 分割ラインを表示（X=0で分割）
+    const splitLineMat = new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.6 });
+    const splitLine = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, H + T + 5, D + 10),
+      splitLineMat
+    );
+    splitLine.position.set(0, (H + T) / 2, 0);
+    boxGroup.add(splitLine);
+
+    // フィンガージョイントのプレビュー
+    const jointMat = new THREE.MeshStandardMaterial({ color: 0x44aa44, transparent: true, opacity: 0.5 });
+    const wallH = H - T;
+    const jointH = wallH / (jn * 2);
+    for (let i = 0; i < jn * 2; i++) {
+      const isLeft = i % 2 === 0;
+      const y = T + i * jointH;
+      // 前壁ジョイント
+      const g1 = new THREE.Mesh(new THREE.BoxGeometry(jd, jointH - jc, T), jointMat);
+      g1.position.set(isLeft ? jd/2 : -jd/2, y + jointH/2, D/2 - T/2);
+      boxGroup.add(g1);
+      // 後壁ジョイント
+      const g2 = new THREE.Mesh(new THREE.BoxGeometry(jd, jointH - jc, T), jointMat);
+      g2.position.set(isLeft ? jd/2 : -jd/2, y + jointH/2, -(D/2 - T/2));
+      boxGroup.add(g2);
+    }
+  }
+
+  // サイズ警告チェック
+  checkSplitWarning();
+
+  boxGroup.position.y = 0;
+  scene.add(boxGroup);
+
+  // スタジオモードのみ背景色をフィラメント色に連動
+  if (currentBg === 'studio') {
+    const bgMid = bodyColor.clone().multiplyScalar(0.15);
+    const bgDark = bodyColor.clone().multiplyScalar(0.05);
+    scene.background = makeGradientTexture(
+      '#' + bgMid.clone().multiplyScalar(1.2).getHexString(),
+      '#' + bgMid.getHexString(),
+      '#' + bgDark.getHexString()
+    );
+    scene.fog.color = bgDark;
+  }
+
+  // 情報更新
+  updateInfo(W, D, H, T, CF);
+
+  // 蓋の開閉状態を復元
+  applyLidTransform(lidAnimCurrent);
+}
+
+function updateInfo(W, D, H, T, CF) {
+  // 側面積 + 底面積 − 内容積 ≅ 素材体積 (cm³)
+  const vol = (W * D * H - (W - T*2) * (D - T*2) * (H - T)) * 0.001;
+  const density = 1.24; // PLA 比重
+  const weight = Math.round(vol * density);
+  document.getElementById('info-weight').textContent = `約 ${weight}g`;
+  const time = (vol / 18).toFixed(1);
+  document.getElementById('info-time').textContent = `約 ${time}時間`;
+}
+
+// ─────────────────────────────────────────────
+//  UI 操作
+// ─────────────────────────────────────────────
+// フィラメントUI初期化
+function initFilamentUI() {
+  const sel = document.getElementById('filament-type');
+  FILAMENT_CATALOG.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f.type;
+    opt.textContent = f.type;
+    sel.appendChild(opt);
+  });
+  sel.value = currentFilamentType;
+  renderFilamentColors();
+}
+
+function onFilamentTypeChange() {
+  currentFilamentType = document.getElementById('filament-type').value;
+  renderFilamentColors();
+  // デフォルトで最初の色を選択
+  const cat = FILAMENT_CATALOG.find(f => f.type === currentFilamentType);
+  if (cat && cat.colors.length > 0) {
+    selectFilamentColor(0);
+  }
+}
+
+function renderFilamentColors() {
+  const container = document.getElementById('filament-colors');
+  container.innerHTML = '';
+  const cat = FILAMENT_CATALOG.find(f => f.type === currentFilamentType);
+  if (!cat) return;
+
+  cat.colors.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.style.cssText = 'width:32px;height:32px;border-radius:6px;cursor:pointer;border:2px solid transparent;transition:all 0.15s;';
+
+    if (Array.isArray(c.hex)) {
+      // グラデーション/デュアルカラー
+      div.style.background = `linear-gradient(135deg, ${c.hex.join(', ')})`;
+    } else {
+      div.style.background = c.hex;
+      // 白や明るい色は枠線で区別
+      if (c.hex === '#FFFFFF' || c.hex === '#F5F2E8' || c.hex === '#FFFAF2') {
+        div.style.boxShadow = 'inset 0 0 0 1px rgba(0,0,0,0.15)';
+      }
+    }
+
+    if (c.n === currentFilamentColor) {
+      div.style.borderColor = 'var(--accent)';
+      div.style.transform = 'scale(1.1)';
+    }
+
+    div.title = c.n;
+    div.onclick = () => selectFilamentColor(i);
+    div.onmouseenter = () => {
+      document.getElementById('filament-color-name').textContent = c.n;
+    };
+    div.onmouseleave = () => {
+      document.getElementById('filament-color-name').textContent = currentFilamentColor;
+    };
+    container.appendChild(div);
+  });
+
+  document.getElementById('filament-color-name').textContent = currentFilamentColor;
+}
+
+function selectFilamentColor(idx) {
+  const cat = FILAMENT_CATALOG.find(f => f.type === currentFilamentType);
+  if (!cat || !cat.colors[idx]) return;
+  const c = cat.colors[idx];
+  currentFilamentColor = c.n;
+  currentFilamentHex = Array.isArray(c.hex) ? c.hex[0] : c.hex;
+  renderFilamentColors();
+  buildBox();
+}
+
+// プロモ用テーマ切替（互換性のため）
+function setTheme(filamentType, colorName) {
+  if (typeof colorName === 'undefined') {
+    // 旧API: setTheme('pla_black') → フィラメントタイプ名として解釈
+    const mapping = {
+      'pla_black': ['PLA Basic', 'Black'],
+      'pla_charcoal': ['PLA Matte', 'Charcoal'],
+      'silk_gold': ['PLA Silk+', 'Gold'],
+      'silk_copper': ['PLA Metal', 'Copper Brown'],
+      'petg_black': ['PETG HF', 'Black'],
+    };
+    const m = mapping[filamentType];
+    if (m) { filamentType = m[0]; colorName = m[1]; }
+    else return;
+  }
+  currentFilamentType = filamentType;
+  document.getElementById('filament-type').value = filamentType;
+  const cat = FILAMENT_CATALOG.find(f => f.type === filamentType);
+  if (cat) {
+    const idx = cat.colors.findIndex(c => c.n === colorName);
+    if (idx >= 0) selectFilamentColor(idx);
+  }
+}
+
+function updateBox() {
+  buildBox();
+}
+
+function toggleLidLip() {
+  lidLipEnabled = document.getElementById('lid-lip-toggle').checked;
+  buildBox();
+}
+
+// ─────────────────────────────────────────────
+//  分割印刷（フィンガージョイント）
+// ─────────────────────────────────────────────
+let splitEnabled = false;
+let currentDivider = 'none';
+
+function toggleSplit() {
+  splitEnabled = document.getElementById('split-toggle').checked;
+  document.getElementById('split-options').style.display = splitEnabled ? 'block' : 'none';
+  buildBox();
+}
+
+function checkSplitWarning() {
+  const W = parseFloat(document.getElementById('sl-w').value);
+  const warning = document.getElementById('split-warning');
+  if (W > 180) {
+    warning.style.display = 'block';
+  } else {
+    warning.style.display = 'none';
+  }
+}
+
+function setDivider(type) {
+  currentDivider = type;
+  ['none', 'cross', 'slots'].forEach(id => {
+    const el = document.getElementById('div-' + id);
+    if (el) el.classList.toggle('active', id === type);
+  });
+  buildBox();
+}
+
+function buildFingerJoints(W, D, H, T, jointCount, jointDepth, clearance) {
+  // フィンガージョイントのジオメトリを生成
+  // 箱を長辺の中央(X=0)で分割し、互い違いの突起を作る
+  const group = new THREE.Group();
+  const wallH = H - T;
+  const jointH = wallH / (jointCount * 2); // 各ジョイントの高さ
+
+  for (let i = 0; i < jointCount * 2; i++) {
+    const isEven = i % 2 === 0;
+    const y = T + i * jointH;
+
+    // 左側のジョイント突起（偶数番目）
+    if (isEven) {
+      const geo = new THREE.BoxGeometry(jointDepth, jointH - clearance, T);
+      // 前壁のジョイント
+      const m1 = new THREE.Mesh(geo);
+      m1.position.set(jointDepth / 2, y + jointH / 2, D / 2 - T / 2);
+      group.add(m1);
+      // 後壁のジョイント
+      const m2 = new THREE.Mesh(geo);
+      m2.position.set(jointDepth / 2, y + jointH / 2, -(D / 2 - T / 2));
+      group.add(m2);
+    }
+  }
+  return group;
+}
+
+function buildDividers(W, D, H, T, type, bodyMat) {
+  const group = new THREE.Group();
+  const innerW = W - T * 2;
+  const innerD = D - T * 2;
+  const wallH = H - T;
+  const divT = T * 0.6; // 仕切りの厚み
+
+  if (type === 'cross') {
+    // 十字仕切り
+    const hDiv = new THREE.Mesh(
+      new THREE.BoxGeometry(innerW, wallH * 0.8, divT),
+      bodyMat.clone()
+    );
+    hDiv.position.set(0, T + wallH * 0.4, 0);
+    group.add(hDiv);
+
+    const vDiv = new THREE.Mesh(
+      new THREE.BoxGeometry(divT, wallH * 0.8, innerD),
+      bodyMat.clone()
+    );
+    vDiv.position.set(0, T + wallH * 0.4, 0);
+    group.add(vDiv);
+  } else if (type === 'slots') {
+    // 3スロット仕切り（2枚の仕切り）
+    for (let i = 1; i <= 2; i++) {
+      const x = -innerW / 2 + (innerW / 3) * i;
+      const div = new THREE.Mesh(
+        new THREE.BoxGeometry(divT, wallH * 0.8, innerD),
+        bodyMat.clone()
+      );
+      div.position.set(x, T + wallH * 0.4, 0);
+      group.add(div);
+    }
+  }
+  return group;
+}
+
+// ─────────────────────────────────────────────
+//  3MF出力（Bambu Studio対応）
+// ─────────────────────────────────────────────
+async function export3MF() {
+  if (!window.requireExportLicense()) return;
+  if (typeof JSZip === 'undefined') {
+    alert('JSZipが読み込めませんでした。');
+    return;
+  }
+
+  const W = parseFloat(document.getElementById('sl-w').value);
+  const D = parseFloat(document.getElementById('sl-d').value);
+  const H = parseFloat(document.getElementById('sl-h').value);
+  const T = parseFloat(document.getElementById('sl-t').value);
+  const CF = parseFloat(document.getElementById('sl-cf').value);
+
+  // Three.jsのメッシュから頂点・三角形を抽出
+  function extractMesh(meshGroup) {
+    const vertices = [];
+    const triangles = [];
+    let vertexOffset = 0;
+
+    meshGroup.traverse(obj => {
+      if (!obj.isMesh) return;
+      const geo = obj.geometry;
+      const pos = geo.attributes.position;
+      const idx = geo.index;
+
+      // ワールド座標に変換
+      obj.updateMatrixWorld(true);
+      const matrix = obj.matrixWorld;
+
+      const startIdx = vertexOffset;
+      for (let i = 0; i < pos.count; i++) {
+        const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+        v.applyMatrix4(matrix);
+        vertices.push([v.x, v.y, v.z]);
+        vertexOffset++;
+      }
+
+      if (idx) {
+        for (let i = 0; i < idx.count; i += 3) {
+          triangles.push([startIdx + idx.getX(i), startIdx + idx.getX(i+1), startIdx + idx.getX(i+2)]);
+        }
+      } else {
+        for (let i = 0; i < pos.count; i += 3) {
+          triangles.push([startIdx + i, startIdx + i+1, startIdx + i+2]);
+        }
+      }
+    });
+
+    return { vertices, triangles };
+  }
+
+  // 本体メッシュ
+  const bodyGroup = new THREE.Group();
+  bodyMeshes.forEach(m => {
+    const clone = m.clone();
+    clone.position.copy(m.getWorldPosition(new THREE.Vector3()));
+    clone.quaternion.copy(m.getWorldQuaternion(new THREE.Quaternion()));
+    bodyGroup.add(clone);
+  });
+  const bodyData = extractMesh(bodyGroup);
+
+  // 蓋メッシュ
+  const lidGroup = new THREE.Group();
+  if (lidMesh) {
+    lidMesh.traverse(child => {
+      if (child.isMesh) {
+        const clone = child.clone();
+        clone.position.copy(child.getWorldPosition(new THREE.Vector3()));
+        clone.quaternion.copy(child.getWorldQuaternion(new THREE.Quaternion()));
+        lidGroup.add(clone);
+      }
+    });
+  }
+  const lidData = extractMesh(lidGroup);
+
+  // XML構築
+  function buildVerticesXml(verts) {
+    return verts.map(v => `          <vertex x="${v[0].toFixed(4)}" y="${v[1].toFixed(4)}" z="${v[2].toFixed(4)}" />`).join('\n');
+  }
+  function buildTrianglesXml(tris) {
+    return tris.map(t => `          <triangle v1="${t[0]}" v2="${t[1]}" v3="${t[2]}" />`).join('\n');
+  }
+
+  const zip = new JSZip();
+
+  // [Content_Types].xml
+  zip.file('[Content_Types].xml',
+`<?xml version="1.0" encoding="UTF-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/>
+</Types>`);
+
+  // _rels/.rels
+  zip.file('_rels/.rels',
+`<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/>
+</Relationships>`);
+
+  // 本体と蓋を1つのモデルに結合（オブジェクトIDを分ける）
+  zip.file('3D/3dmodel.model',
+`<?xml version="1.0" encoding="UTF-8"?>
+<model unit="millimeter" xml:lang="en-US"
+  xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
+  <metadata name="Application">3D Box Customizer</metadata>
+  <metadata name="BambuStudio:3mfVersion">1</metadata>
+  <resources>
+    <object id="1" type="model" name="Box Body">
+      <mesh>
+        <vertices>
+${buildVerticesXml(bodyData.vertices)}
+        </vertices>
+        <triangles>
+${buildTrianglesXml(bodyData.triangles)}
+        </triangles>
+      </mesh>
+    </object>
+    <object id="2" type="model" name="Box Lid">
+      <mesh>
+        <vertices>
+${buildVerticesXml(lidData.vertices)}
+        </vertices>
+        <triangles>
+${buildTrianglesXml(lidData.triangles)}
+        </triangles>
+      </mesh>
+    </object>
+  </resources>
+  <build>
+    <item objectid="1" />
+    <item objectid="2" transform="1 0 0 0 1 0 0 0 1 ${W + 20} 0 0" />
+  </build>
+</model>`);
+
+  // Bambu Studio メタデータ
+  zip.file('Metadata/model_settings.config',
+`<?xml version="1.0" encoding="UTF-8"?>
+<config>
+  <object id="1">
+    <metadata key="name" value="Box Body ${W}x${D}x${H}" />
+    <metadata key="extruder" value="1" />
+  </object>
+  <object id="2">
+    <metadata key="name" value="Box Lid ${W}x${D}" />
+    <metadata key="extruder" value="1" />
+  </object>
+</config>`);
+
+  // A1 mini用プリント設定
+  zip.file('Metadata/project_settings.config',
+`<?xml version="1.0" encoding="UTF-8"?>
+<config>
+  <metadata key="printer_model" value="Bambu Lab A1 mini" />
+  <metadata key="nozzle_diameter" value="0.4" />
+  <metadata key="printable_area" value="0x0,180x0,180x180,0x180" />
+  <metadata key="printable_height" value="180" />
+  <metadata key="layer_height" value="0.2" />
+  <metadata key="initial_layer_print_height" value="0.2" />
+  <metadata key="wall_loops" value="3" />
+  <metadata key="top_shell_layers" value="4" />
+  <metadata key="bottom_shell_layers" value="3" />
+  <metadata key="sparse_infill_density" value="20%" />
+  <metadata key="sparse_infill_pattern" value="grid" />
+  <metadata key="outer_wall_speed" value="200" />
+  <metadata key="inner_wall_speed" value="300" />
+  <metadata key="sparse_infill_speed" value="300" />
+  <metadata key="travel_speed" value="500" />
+  <metadata key="enable_support" value="0" />
+  <metadata key="brim_type" value="auto_brim" />
+  <metadata key="filament_type" value="${currentFilamentType}" />
+  <metadata key="nozzle_temperature" value="220" />
+  <metadata key="bed_temperature" value="55" />
+  <metadata key="fan_max_speed" value="100" />
+  <metadata key="filament_retraction_length" value="0.8" />
+</config>`);
+
+  // ZIPを生成してダウンロード
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `custom_box_${W}x${D}x${H}_${currentFilamentType}.3mf`;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(a.href);
+    document.body.removeChild(a);
+  }, 1000);
+}
+
+function exportSplitSTL() {
+  if (!window.requireExportLicense()) return;
+  const W = parseFloat(document.getElementById('sl-w').value);
+  if (W <= 180) {
+    alert('現在のサイズ(' + W + 'mm)はA1 miniに収まります。分割は不要です。');
+    return;
+  }
+
+  const exporter = new THREE.STLExporter();
+  const D = document.getElementById('sl-d').value;
+  const H = document.getElementById('sl-h').value;
+
+  // 左半分と右半分を個別にSTL出力
+  alert('分割STLを2ファイル出力します。\n\n' +
+    '1. 左半分 (' + Math.ceil(W/2) + 'x' + D + 'x' + H + 'mm)\n' +
+    '2. 右半分 (' + Math.ceil(W/2) + 'x' + D + 'x' + H + 'mm)\n\n' +
+    'フィンガージョイントで接合してください。');
+
+  // 左半分
+  exportSTL('body');
+  // TODO: 実際の分割ジオメトリ生成は3MF調査完了後に実装
+}
+
+// ─────────────────────────────────────────────
+//  背景シーン
+// ─────────────────────────────────────────────
+// Canvas でグラデーション背景テクスチャを生成
+function makeGradientTexture(topColor, midColor, bottomColor) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 2; canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 512);
+  grad.addColorStop(0, topColor);
+  grad.addColorStop(0.5, midColor);
+  grad.addColorStop(1, bottomColor);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 2, 512);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  return tex;
+}
+
+const BACKGROUNDS = {
+  studio: {
+    sky: null, // フィラメント色に連動（単色）
+    floor: { color: 0x080808, metalness: 0.3, roughness: 0.7 },
+    ambient: 0.25, keyIntensity: 1.8, hemiTop: '#fff0d0', hemiBottom: '#202040',
+    fogNear: 350, fogFar: 900,
+  },
+  tearoom: {
+    sky: ['#8B7355', '#6B5B3A', '#3a2a18'], // 天井=木、壁=土壁、床方向=暗
+    floor: { color: 0x9B8B65, metalness: 0.0, roughness: 0.9 },
+    ambient: 0.45, keyIntensity: 1.0, hemiTop: '#ffe8c0', hemiBottom: '#4a3a20',
+    fogNear: 500, fogFar: 1200,
+  },
+  garden: {
+    sky: ['#87CEEB', '#a0c8a0', '#2a4a1a'], // 空=青、中=緑、地面=暗緑
+    floor: { color: 0x5a7a4a, metalness: 0.0, roughness: 0.95 },
+    ambient: 0.50, keyIntensity: 1.6, hemiTop: '#e0f0ff', hemiBottom: '#2a4a1a',
+    fogNear: 400, fogFar: 1000,
+  },
+  tower: {
+    sky: ['#0a0a20', '#141430', '#1a1a3a'], // 夜空
+    floor: { color: 0x2a2a3a, metalness: 0.6, roughness: 0.2 },
+    ambient: 0.12, keyIntensity: 2.2, hemiTop: '#2a2a4a', hemiBottom: '#0a0a1a',
+    fogNear: 500, fogFar: 1500,
+  },
+  living: {
+    sky: ['#d4c4a8', '#b09878', '#5a4030'], // クリーム壁、暖色
+    floor: { color: 0x8B6B40, metalness: 0.05, roughness: 0.75 },
+    ambient: 0.45, keyIntensity: 1.3, hemiTop: '#fff5e0', hemiBottom: '#3a2a18',
+    fogNear: 400, fogFar: 1000,
+  },
+  wood: {
+    sky: ['#c8b090', '#9a8060', '#4a3820'], // 木目の暖色環境
+    floor: { color: 0xA07830, metalness: 0.1, roughness: 0.65 },
+    ambient: 0.40, keyIntensity: 1.4, hemiTop: '#ffe8c0', hemiBottom: '#3a2a10',
+    fogNear: 400, fogFar: 1000,
+  },
+};
+
+let currentBg = 'studio';
+
+function setBackground(bgName) {
+  currentBg = bgName;
+  const bg = BACKGROUNDS[bgName];
+  if (!bg) return;
+
+  Object.keys(BACKGROUNDS).forEach(id => {
+    const el = document.getElementById('bg-' + id);
+    if (el) el.classList.toggle('active', id === bgName);
+  });
+
+  // 全体背景（スカイドーム）
+  if (bg.sky) {
+    scene.background = makeGradientTexture(bg.sky[0], bg.sky[1], bg.sky[2]);
+  }
+
+  // フォグ
+  scene.fog.near = bg.fogNear || 350;
+  scene.fog.far = bg.fogFar || 900;
+  if (bg.sky) scene.fog.color = new THREE.Color(bg.sky[2]);
+
+  // 床面
+  floor.material.color.set(bg.floor.color);
+  floor.material.metalness = bg.floor.metalness;
+  floor.material.roughness = bg.floor.roughness;
+  floor.material.needsUpdate = true;
+
+  // ライティング
+  ambient.intensity = bg.ambient;
+  keyLight.intensity = bg.keyIntensity;
+  hemi.color.set(bg.hemiTop || '#fff0d0');
+  hemi.groundColor.set(bg.hemiBottom || '#202040');
+
+  // studioの場合はbuildBoxで背景色を再設定
+  if (bgName === 'studio') buildBox();
+}
+
+function toggleGrid() {
+  grid.visible = document.getElementById('grid-toggle').checked;
+}
+
+function uploadBackground(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const loader = new THREE.TextureLoader();
+    loader.load(e.target.result, (tex) => {
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      scene.background = tex;
+      currentBg = 'custom';
+
+      // UIアクティブ状態をリセット
+      Object.keys(BACKGROUNDS).forEach(id => {
+        const el = document.getElementById('bg-' + id);
+        if (el) el.classList.remove('active');
+      });
+
+      // ライティングを明るめに
+      ambient.intensity = 0.4;
+      keyLight.intensity = 1.5;
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+// ─────────────────────────────────────────────
+//  STL エクスポート
+// ─────────────────────────────────────────────
+function exportSTL(part) {
+  if (!window.requireExportLicense()) return;
+  const exporter = new THREE.STLExporter();
+  const exportGroup = new THREE.Group();
+  if (part === 'body') {
+    bodyMeshes.forEach(m => {
+      const clone = m.clone();
+      clone.position.copy(m.getWorldPosition(new THREE.Vector3()));
+      clone.rotation.copy(m.rotation);
+      exportGroup.add(clone);
+    });
+  } else {
+    if (lidMesh) exportGroup.add(lidMesh.clone());
+  }
+  try {
+    const result = exporter.parse(exportGroup, { binary: true });
+    const blob = new Blob([result], { type: 'application/octet-stream' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const W = document.getElementById('sl-w').value;
+    const D = document.getElementById('sl-d').value;
+    const H = document.getElementById('sl-h').value;
+    a.download = `custom_box_${part}_${W}x${D}x${H}_${currentFilamentType}_${currentFilamentColor}.stl`;
+    a.click();
+  } catch(e) {
+    alert('STL出力エラー: ' + e.message);
+  }
+}
+
+// ─────────────────────────────────────────────
+//  蓋の開閉アニメーション
+// ─────────────────────────────────────────────
+let lidMode = 'closed';       // 'closed' | 'open' | 'explode'
+let lidAnimTarget = 0;         // 目標値 0〜1
+let lidAnimCurrent = 0;        // 現在値 0〜1
+let lidManualControl = false;  // スライダー手動操作中
+
+function setLidMode(mode) {
+  lidMode = mode;
+  lidManualControl = false;
+  ['closed', 'slide', 'open', 'explode'].forEach(id => {
+    const el = document.getElementById('lid-' + id);
+    if (el) el.classList.toggle('active', id === mode);
+  });
+  // 一連の流れ: 閉→スライド→ヒンジ開→分解
+  if (mode === 'closed') lidAnimTarget = 0;
+  else if (mode === 'slide') lidAnimTarget = 0.25;
+  else if (mode === 'open') lidAnimTarget = 0.6;
+  else lidAnimTarget = 1;
+}
+
+function updateLidManual() {
+  const v = parseFloat(document.getElementById('sl-lid').value);
+  document.getElementById('lbl-lid').textContent = v;
+  lidManualControl = true;
+  lidAnimCurrent = v / 100;
+  lidAnimTarget = v / 100;
+  applyLidTransform(lidAnimCurrent);
+}
+
+function applyLidTransform(t) {
+  const pivot = window._lidPivot;
+  if (!pivot) return;
+  const H  = parseFloat(document.getElementById('sl-h').value);
+  const T  = parseFloat(document.getElementById('sl-t').value);
+  const lipH = lidLipEnabled ? T * 2.5 : 0;
+  const halfD = window._lidHalfD || 76;
+
+  // 一連の滑らかな流れ:
+  // 0.00〜0.25: スライド（蓋を横にずらす）
+  // 0.25〜0.35: スライド戻し + 少し持ち上げ（遷移）
+  // 0.35〜0.65: ヒンジ回転（ピボットグループで回転）
+  // 0.65〜1.00: 分解表示（上に浮き上がり水平に戻る）
+
+  const W = parseFloat(document.getElementById('sl-w').value);
+  const maxAngle = -Math.PI * 0.55;
+  const liftForLip = lipH + T;
+
+  // 常にリセット
+  pivot.rotation.x = 0;
+  pivot.position.y = H;
+  lidMesh.rotation.set(0, 0, 0);
+
+  if (t <= 0) {
+    lidMesh.position.set(0, 0, halfD);
+
+  } else if (t <= 0.25) {
+    // Phase 1: スライド（イージングでゆったり）
+    const p = t / 0.25;
+    const ep = p < 0.5 ? 2*p*p : -1+(4-2*p)*p; // easeInOut
+    lidMesh.position.set(ep * W * 0.55, 0, halfD);
+
+  } else if (t <= 0.35) {
+    // Phase 2: スライド戻し + 持ち上げ（滑らかな遷移）
+    const p = (t - 0.25) / 0.1;
+    const slideX = W * 0.55 * (1 - p);
+    pivot.position.y = H + liftForLip * p;
+    lidMesh.position.set(slideX, 0, halfD);
+
+  } else if (t <= 0.65) {
+    // Phase 3: ヒンジ回転（ピボットグループを回転）
+    const p = (t - 0.35) / 0.3;
+    pivot.position.y = H + liftForLip;
+    pivot.rotation.x = p * maxAngle;
+    lidMesh.position.set(0, 0, halfD);
+
+  } else {
+    // Phase 4: 分解表示
+    const p = (t - 0.65) / 0.35;
+
+    // 開いた状態の蓋のワールド位置を求める
+    const openPivotY = H + liftForLip;
+    const cosA = Math.cos(maxAngle);
+    const sinA = Math.sin(maxAngle);
+    const openCenterY = openPivotY + halfD * (-sinA);
+    const openCenterZ = -halfD + halfD * cosA;
+
+    const finalY = H + H * 1.8;
+    const finalZ = 0;
+
+    pivot.position.y = H;
+    lidMesh.position.set(
+      0,
+      openCenterY + (finalY - openCenterY) * p - H,
+      openCenterZ + (finalZ - openCenterZ) * p + halfD
+    );
+    lidMesh.rotation.set(maxAngle * (1 - p), 0, 0);
+  }
+}
+
+// ─────────────────────────────────────────────
+//  ライティング制御
+// ─────────────────────────────────────────────
+function updateLighting() {
+  const angleDeg = parseFloat(document.getElementById('sl-la').value);
+  const heightDeg = parseFloat(document.getElementById('sl-lh').value);
+  const intensity = parseFloat(document.getElementById('sl-li').value) / 100;
+
+  document.getElementById('lbl-la').textContent = angleDeg;
+  document.getElementById('lbl-lh').textContent = heightDeg;
+  document.getElementById('lbl-li').textContent = Math.round(intensity * 100);
+
+  const angleRad = angleDeg * Math.PI / 180;
+  const heightRad = heightDeg * Math.PI / 180;
+  const dist = 250;
+
+  keyLight.position.set(
+    Math.cos(angleRad) * Math.cos(heightRad) * dist,
+    Math.sin(heightRad) * dist,
+    Math.sin(angleRad) * Math.cos(heightRad) * dist
+  );
+  keyLight.intensity = intensity;
+}
+
+// ─────────────────────────────────────────────
+//  アニメーションループ
+// ─────────────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+
+  // 蓋アニメーション（スムーズ補間）
+  if (!lidManualControl && Math.abs(lidAnimCurrent - lidAnimTarget) > 0.001) {
+    lidAnimCurrent += (lidAnimTarget - lidAnimCurrent) * 0.08;
+    applyLidTransform(lidAnimCurrent);
+    // スライダーも同期
+    const pct = Math.round(lidAnimCurrent * 100);
+    document.getElementById('sl-lid').value = pct;
+    document.getElementById('lbl-lid').textContent = pct;
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ─────────────────────────────────────────────
+//  リサイズ対応
+// ─────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  const w = viewport.clientWidth;
+  const h = viewport.clientHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+});
+
+// ─────────────────────────────────────────────
+//  録画機能 (MediaRecorder API)
+// ─────────────────────────────────────────────
+let mediaRecorder = null;
+let recordedChunks = [];
+let isRecording = false;
+let _recInterval = null;
+let _recCanvas = null;
+
+function toggleRecording() {
+  if (!isRecording) startRecording();
+  else stopRecording();
+}
+
+function startRecording() {
+  recordedChunks = [];
+
+  // 合成Canvas（Three.js + オーバーレイ字幕を重ねる）
+  _recCanvas = document.createElement('canvas');
+  _recCanvas.width = Math.ceil(renderer.domElement.width / 2) * 2;
+  _recCanvas.height = Math.ceil(renderer.domElement.height / 2) * 2;
+  const rCtx = _recCanvas.getContext('2d');
+
+  // setIntervalで30fpsで合成（requestAnimationFrameよりcaptureStreamと相性が良い）
+  _recInterval = setInterval(() => {
+    rCtx.drawImage(renderer.domElement, 0, 0, _recCanvas.width, _recCanvas.height);
+    if (promoCanvas && promoCanvas.width > 0) {
+      rCtx.drawImage(promoCanvas, 0, 0, _recCanvas.width, _recCanvas.height);
+    }
+  }, 1000 / 30);
+
+  const videoStream = _recCanvas.captureStream(30);
+
+  // BGM音声ストリームがあれば映像と合成
+  let stream = videoStream;
+  if (promoBGMStreamDest) {
+    try {
+      const audioTrack = promoBGMStreamDest.stream.getAudioTracks()[0];
+      if (audioTrack) {
+        stream = new MediaStream([...videoStream.getVideoTracks(), audioTrack]);
+      }
+    } catch(e) { /* 音声合成失敗時は映像のみ */ }
+  }
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+    ? 'video/webm;codecs=vp9'
+    : MediaRecorder.isTypeSupported('video/webm')
+    ? 'video/webm'
+    : 'video/mp4';
+  try {
+    mediaRecorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8000000 });
+  } catch(e) {
+    mediaRecorder = new MediaRecorder(stream);
+  }
+  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+  mediaRecorder.onstop = downloadRecording;
+  mediaRecorder.start(100);
+  isRecording = true;
+  document.getElementById('btn-rec').textContent = '⏹ 停止';
+  document.getElementById('btn-rec').classList.add('recording');
+  document.getElementById('rec-indicator').style.display = 'flex';
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  isRecording = false;
+  if (_recInterval) { clearInterval(_recInterval); _recInterval = null; }
+  _recCanvas = null;
+  document.getElementById('btn-rec').textContent = '⏺ REC';
+  document.getElementById('btn-rec').classList.remove('recording');
+  document.getElementById('rec-indicator').style.display = 'none';
+}
+
+let promoFileName = '';
+
+function downloadRecording() {
+  if (recordedChunks.length === 0) {
+    console.error('No recorded data');
+    alert('録画データがありません。');
+    return;
+  }
+  const blob = new Blob(recordedChunks, { type: recordedChunks[0]?.type || 'video/webm' });
+  console.log('Blob created:', (blob.size / 1024 / 1024).toFixed(1) + 'MB');
+
+  const d = new Date();
+  const ts = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
+  const baseName = promoFileName || `custom_promo_${ts}`;
+
+  if (promoOutputFormat === 'mp4') {
+    // MP4選択: サーバーでffmpeg変換
+    convertToMP4(blob, baseName);
+  } else {
+    // WebM選択: そのままダウンロード
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${baseName}.webm`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+}
+
+async function convertToMP4(webmBlob, filename) {
+  const btn = document.getElementById('btn-promo');
+  btn.textContent = 'MP4変換中...';
+  btn.style.opacity = '0.6';
+
+  try {
+    const bgmFlag = promoBGMEnabled ? '1' : '0';
+    const serverBase = location.protocol === 'file:' ? 'http://localhost:8090' : '';
+
+    // 字幕・エンドカードは合成Canvasに含まれているため、
+    // サーバーでは映像コピー + BGM合成のみ行う
+    const res = await fetch(`${serverBase}/convert?filename=${encodeURIComponent(filename)}&bgm=${bgmFlag}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: webmBlob,
+    });
+
+    if (!res.ok) throw new Error('Server error: ' + res.status);
+
+    const mp4Blob = await res.blob();
+    console.log('MP4 received:', (mp4Blob.size/1024/1024).toFixed(1) + 'MB');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(mp4Blob);
+    a.download = `${filename}.mp4`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(a.href);
+      document.body.removeChild(a);
+    }, 1000);
+
+    btn.textContent = 'PROMO';
+    btn.style.opacity = '1';
+    btn.disabled = false;
+  } catch (e) {
+    console.error('MP4変換エラー:', e);
+    btn.textContent = 'PROMO';
+    btn.style.opacity = '1';
+
+    // フォールバック: WebMをダウンロード
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(webmBlob);
+    a.download = `${filename}.webm`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+
+    alert(
+      'MP4変換エラー: ' + e.message + '\n\n' +
+      'WebMファイルをダウンロードしました。\n' +
+      'URL: ' + location.href + '\n\n' +
+      'http://localhost:8090 からアクセスしているか確認してください。'
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+//  自動プロモカメラ (シネマティックシーケンス)
+// ─────────────────────────────────────────────
+let promoActive = false;
+let promoStartTime = 0;
+let promoCanvas = null;  // モジュールスコープに移動（バグ修正）
+
+// シネマティック プロモシーケンス（30秒、蓋開閉・色変化・カメラワーク）
+// lid: 蓋の開き具合 0〜1
+const PROMO_SHOTS = [
+  // === イントロ: 遠くからドリーイン (0-3s) ===
+  { t: 0,    cam: [0, 100, 700],     tgt: [0, 30, 0],  theme: 'pla_black', lid: 0,    title: '' },
+  { t: 3,    cam: [0, 120, 350],     tgt: [0, 30, 0],  theme: null,    lid: 0,    title: '' },
+
+  // === 右から左へ180度周回 (3-8s) ===
+  { t: 5,    cam: [300, 130, 200],   tgt: [0, 30, 0],  theme: null,    lid: 0,    title: '' },
+  { t: 8,    cam: [-300, 130, 200],  tgt: [0, 30, 0],  theme: null,    lid: 0,    title: '' },
+
+  // === 正面からスライドで蓋をずらす (8-11s) ===
+  { t: 10,   cam: [60, 90, 220],     tgt: [0, 40, 10], theme: null,    lid: 0.22, title: '' },
+
+  // === スライド戻し→ヒンジで開ける (11-16s) ===
+  { t: 12,   cam: [-40, 130, 280],   tgt: [0, 30, 0],  theme: null,    lid: 0.35, title: '' },
+  { t: 14,   cam: [-100, 180, 250],  tgt: [0, 20, 0],  theme: null,    lid: 0.55, title: '' },
+  { t: 16,   cam: [30, 220, 200],    tgt: [0, 15, 0],  theme: null,    lid: 0.6,  title: '精密な内部構造' },
+
+  // === 俯瞰で内部を見せる (16-18s) ===
+  { t: 18,   cam: [0, 300, 40],      tgt: [0, 15, 0],  theme: null,    lid: 0.6,  title: '' },
+
+  // === 蓋を閉じながらSilk Copperに変更、背面から正面へ360度 (18-22s) ===
+  { t: 20,   cam: [0, 130, -300],    tgt: [0, 30, 0],  theme: 'silk_copper', lid: 0, title: 'Silk Copper' },
+  { t: 22,   cam: [300, 100, 150],   tgt: [0, 30, 0],  theme: null,    lid: 0,    title: '' },
+
+  // === Silk Gold、ローアングルから見上げる (22-26s) ===
+  { t: 24,   cam: [-200, 50, 280],   tgt: [0, 40, 0],  theme: 'silk_gold', lid: 0, title: 'Silk Gold' },
+  { t: 26,   cam: [200, 180, 300],   tgt: [0, 25, 0],  theme: null,    lid: 0,    title: '' },
+
+  // === エンディング: 黒に戻し正面から引き (26-30s) ===
+  { t: 27,   cam: [0, 130, 350],     tgt: [0, 30, 0],  theme: 'pla_black', lid: 0, title: 'Grace of Touch' },
+  { t: 30,   cam: [0, 180, 550],     tgt: [0, 30, 0],  theme: null,    lid: 0,    title: '' },
+];
+
+const PROMO_DURATION = 30;
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+function lerpV3(a, b, t) { return [lerp(a[0],b[0],t), lerp(a[1],b[1],t), lerp(a[2],b[2],t)]; }
+function easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+let promoOverlayCtx = null;
+let promoRafId = null;
+let lastPromoTheme = null;
+let lastPromoTitle = null;
+let promoSubtitlesOn = true;
+
+// ─────────── BGM（金平糖の踊り MP3）───────────
+let promoBGMAudio = null;
+let promoBGMAudioCtx = null;
+let promoBGMStreamDest = null;
+let promoBGMEnabled = true;
+
+function startPromoBGM() {
+  if (!promoBGMEnabled) return;
+  try {
+    promoBGMAudio = new Audio('sugar_plum_fairy.mp3');
+    promoBGMAudio.volume = 0.35;
+    promoBGMAudio.loop = true;
+
+    // Web Audio APIで録画用音声ストリームも取得
+    promoBGMAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (promoBGMAudioCtx.state === 'suspended') promoBGMAudioCtx.resume();
+    const source = promoBGMAudioCtx.createMediaElementSource(promoBGMAudio);
+    promoBGMStreamDest = promoBGMAudioCtx.createMediaStreamDestination();
+    source.connect(promoBGMStreamDest);
+    source.connect(promoBGMAudioCtx.destination);
+
+    promoBGMAudio.play().catch(e => console.warn('BGM再生失敗:', e));
+  } catch(e) {
+    console.warn('BGM読込失敗:', e);
+  }
+}
+
+function stopPromoBGM() {
+  if (promoBGMAudio) {
+    promoBGMAudio.pause();
+    promoBGMAudio.currentTime = 0;
+    promoBGMAudio = null;
+  }
+  if (promoBGMAudioCtx) {
+    promoBGMAudioCtx.close().catch(() => {});
+    promoBGMAudioCtx = null;
+    promoBGMStreamDest = null;
+  }
+}
+
+let promoPaused = false;
+let promoPausedAt = 0;
+let promoElapsedOffset = 0; // シーク時のオフセット
+
+function togglePromoPause() {
+  if (!promoActive) return;
+  promoPaused = !promoPaused;
+  document.getElementById('promo-pause-btn').textContent = promoPaused ? '▶' : '⏸';
+  if (promoPaused) {
+    promoPausedAt = performance.now() / 1000;
+    if (promoBGMAudio) promoBGMAudio.pause();
+  } else {
+    // 一時停止していた時間分だけ開始時刻をずらす
+    const pauseDuration = performance.now() / 1000 - promoPausedAt;
+    promoStartTime += pauseDuration;
+    if (promoBGMAudio) promoBGMAudio.play();
+    updatePromo();
+  }
+}
+
+function togglePromoSubtitles() {
+  promoSubtitlesOn = !promoSubtitlesOn;
+  document.getElementById('promo-sub-btn').textContent = promoSubtitlesOn ? '字幕 ON' : '字幕 OFF';
+}
+
+function seekPromo() {
+  const seekVal = parseFloat(document.getElementById('promo-seek').value);
+  const targetTime = (seekVal / 100) * PROMO_DURATION;
+  promoStartTime = performance.now() / 1000 - targetTime;
+
+  // BGMも同期
+  if (promoBGMAudio && promoBGMAudio.duration) {
+    promoBGMAudio.currentTime = targetTime % promoBGMAudio.duration;
+  }
+
+  // フレームを即座に更新
+  renderPromoFrame(targetTime);
+
+  // 一時停止中ならタイムスタンプも更新
+  if (promoPaused) {
+    promoPausedAt = performance.now() / 1000;
+  }
+}
+
+// シークバーのドラッグ中は再生を一時的に止めて操作しやすく
+document.addEventListener('DOMContentLoaded', () => {
+  const seekEl = document.getElementById('promo-seek');
+  if (seekEl) {
+    seekEl.addEventListener('mousedown', () => {
+      if (promoActive && !promoPaused) {
+        seekEl._wasPlaying = true;
+        promoPaused = true;
+        if (promoBGMAudio) promoBGMAudio.pause();
+      }
+    });
+    seekEl.addEventListener('mouseup', () => {
+      if (seekEl._wasPlaying) {
+        seekEl._wasPlaying = false;
+        promoPaused = false;
+        if (promoBGMAudio) promoBGMAudio.play();
+        document.getElementById('promo-pause-btn').textContent = '⏸';
+        updatePromo();
+      }
+    });
+  }
+});
+
+function renderPromoFrame(elapsed) {
+  let shotA = PROMO_SHOTS[0], shotB = PROMO_SHOTS[1];
+  for (let i = 0; i < PROMO_SHOTS.length - 1; i++) {
+    if (elapsed >= PROMO_SHOTS[i].t && elapsed < PROMO_SHOTS[i+1].t) {
+      shotA = PROMO_SHOTS[i]; shotB = PROMO_SHOTS[i+1]; break;
+    }
+  }
+  const segDur = Math.max(0.001, shotB.t - shotA.t);
+  const segT = Math.min((elapsed - shotA.t) / segDur, 1);
+  const et = easeInOut(segT);
+
+  const cam = lerpV3(shotA.cam, shotB.cam, et);
+  const tgt = lerpV3(shotA.tgt, shotB.tgt, et);
+  camera.position.set(cam[0], cam[1], cam[2]);
+  controls.target.set(tgt[0], tgt[1], tgt[2]);
+  camera.lookAt(tgt[0], tgt[1], tgt[2]);
+
+  const theme = shotA.theme;
+  if (theme && theme !== lastPromoTheme) { setTheme(theme); lastPromoTheme = theme; }
+
+  const lidTarget = lerp(shotA.lid, shotB.lid, et);
+  lidAnimCurrent = lidTarget;
+  applyLidTransform(lidTarget);
+
+  renderer.render(scene, camera);
+
+  // 字幕・フェードエフェクトをrendererのCanvas上に直接描画（録画にも含まれる）
+  const title = shotA.title || '';
+  const rc = renderer.domElement;
+  const ctx2d = rc.getContext('2d', { willReadFrequently: false });
+  if (!ctx2d) {
+    // WebGLCanvasは2dコンテキストを直接取れないので、オーバーレイCanvasに描画
+    if (promoCanvas) drawPromoOverlay(promoOverlayCtx, promoCanvas.width, promoCanvas.height, elapsed, title);
+  }
+
+  // オーバーレイCanvas（画面表示用）にも描画
+  if (promoCanvas) drawPromoOverlay(promoOverlayCtx, promoCanvas.width, promoCanvas.height, elapsed, title);
+
+  // BGMフェードイン/アウト
+  if (promoBGMAudio && !promoBGMAudio.paused) {
+    const fadeInEnd = 2;
+    const fadeOutStart = PROMO_DURATION - 4;
+    if (elapsed < fadeInEnd) {
+      promoBGMAudio.volume = 0.35 * (elapsed / fadeInEnd);
+    } else if (elapsed > fadeOutStart) {
+      promoBGMAudio.volume = 0.35 * Math.max(0, (PROMO_DURATION - elapsed) / 4);
+    } else {
+      promoBGMAudio.volume = 0.35;
+    }
+  }
+
+  // 時間表示更新
+  const m = Math.floor(elapsed / 60);
+  const s = Math.floor(elapsed % 60);
+  document.getElementById('promo-time-label').textContent =
+    `${m}:${String(s).padStart(2,'0')} / 0:${PROMO_DURATION}`;
+  document.getElementById('promo-seek').value = (elapsed / PROMO_DURATION) * 100;
+}
+
+let promoRecordEnabled = true;
+
+function showPromoSettings() {
+  document.getElementById('promo-settings').style.display = 'flex';
+}
+
+function cancelPromoSettings() {
+  document.getElementById('promo-settings').style.display = 'none';
+}
+
+let promoOutputFormat = 'mp4';
+let promoWatermark = { enabled: false, text: '', position: 'top-right' };
+let promoEndcard = { enabled: false, title: '', sub: '', duration: 3 };
+let promoAspectRatio = '16:9';
+
+function confirmPromoSettings() {
+  promoSubtitlesOn = document.getElementById('promo-opt-subtitle').checked;
+  promoBGMEnabled = document.getElementById('promo-opt-bgm').checked;
+  promoRecordEnabled = document.getElementById('promo-opt-record').checked;
+  promoFileName = document.getElementById('promo-opt-filename').value.trim();
+  const fmtRadio = document.querySelector('input[name="promo-format"]:checked');
+  promoOutputFormat = fmtRadio ? fmtRadio.value : 'mp4';
+
+  // アスペクト比
+  const ratioRadio = document.querySelector('input[name="promo-ratio"]:checked');
+  promoAspectRatio = ratioRadio ? ratioRadio.value : '16:9';
+
+  // ウォーターマーク
+  promoWatermark = {
+    enabled: document.getElementById('promo-opt-watermark').checked,
+    text: document.getElementById('promo-opt-watermark-text').value.trim(),
+    position: document.getElementById('promo-opt-watermark-pos').value,
+  };
+
+  // エンドカード
+  promoEndcard = {
+    enabled: document.getElementById('promo-opt-endcard').checked,
+    title: document.getElementById('promo-opt-endcard-title').value.trim(),
+    sub: document.getElementById('promo-opt-endcard-sub').value.trim(),
+    duration: parseInt(document.getElementById('promo-opt-endcard-duration').value) || 3,
+  };
+
+  document.getElementById('promo-sub-btn').textContent = promoSubtitlesOn ? '字幕 ON' : '字幕 OFF';
+  document.getElementById('promo-settings').style.display = 'none';
+  startPromoMode();
+}
+
+function startPromoMode() {
+  if (promoActive) return;
+  promoActive = true;
+  promoPaused = false;
+  promoStartTime = performance.now() / 1000;
+  lastPromoTheme = currentFilamentType + ':' + currentFilamentColor;
+  lastPromoTitle = '';
+
+  const overlay = document.getElementById('promo-overlay');
+  promoCanvas = document.getElementById('promo-canvas');
+  overlay.style.display = 'block';
+  const rect = overlay.getBoundingClientRect();
+  promoCanvas.width  = rect.width;
+  promoCanvas.height = rect.height;
+  promoOverlayCtx = promoCanvas.getContext('2d');
+
+  // 蓋を閉じた状態にリセット
+  lidAnimCurrent = 0;
+  lidAnimTarget = 0;
+  lidManualControl = false;
+  applyLidTransform(0);
+
+  // BGM（設定に応じて）
+  if (promoBGMEnabled) startPromoBGM();
+
+  // 録画（設定に応じて）
+  if (promoRecordEnabled) startRecording();
+
+  document.getElementById('btn-promo').textContent = 'PROMO...';
+  document.getElementById('btn-promo').style.opacity = '0.6';
+  document.getElementById('btn-promo').disabled = true;
+  document.getElementById('btn-rec').disabled = true;
+
+  controls.enabled = false;
+
+  // シークバー表示
+  document.getElementById('promo-seekbar').style.display = 'flex';
+  document.getElementById('promo-seek').value = 0;
+  document.getElementById('promo-pause-btn').textContent = '⏸';
+
+  updatePromo();
+}
+
+function updatePromo() {
+  if (!promoActive || promoPaused) return;
+  try {
+    const elapsed = performance.now() / 1000 - promoStartTime;
+
+    if (elapsed >= PROMO_DURATION) {
+      endPromoMode();
+      return;
+    }
+
+    renderPromoFrame(elapsed);
+    promoRafId = requestAnimationFrame(updatePromo);
+  } catch(err) {
+    console.error('Promo error:', err);
+    endPromoMode();
+  }
+}
+
+function drawPromoOverlay(ctx, w, h, elapsed, title) {
+  ctx.clearRect(0, 0, w, h);
+
+  // 暗転エフェクト（冒頭3秒）
+  if (elapsed < 3) {
+    ctx.fillStyle = `rgba(0,0,0,${Math.max(0, 1 - elapsed / 2.5)})`;
+    ctx.fillRect(0, 0, w, h);
+  }
+  // フェードアウト（最後2秒）
+  const fadeStart = PROMO_DURATION - 2;
+  if (elapsed > fadeStart) {
+    ctx.fillStyle = `rgba(0,0,0,${Math.min(1, (elapsed - fadeStart) / 2)})`;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // タイトルテキスト（字幕ON時のみ）
+  // エンドカード表示中は字幕を非表示
+  const endcardStart = PROMO_DURATION - 3;
+  const isEndcardTime = promoEndcard.enabled && elapsed >= endcardStart;
+  if (title && promoSubtitlesOn && !isEndcardTime) {
+    // セグメント内でのフェードイン/アウト
+    let shotStartT = 0;
+    let shotEndT = PROMO_DURATION;
+    for (let i = 0; i < PROMO_SHOTS.length - 1; i++) {
+      if (elapsed >= PROMO_SHOTS[i].t && elapsed < PROMO_SHOTS[i+1].t) {
+        shotStartT = PROMO_SHOTS[i].t;
+        shotEndT = PROMO_SHOTS[i+1].t;
+        break;
+      }
+    }
+    const segElapsed = elapsed - shotStartT;
+    const segDuration = shotEndT - shotStartT;
+    const fadeIn = Math.min(1, segElapsed / 0.8);
+    const fadeOut = Math.min(1, (segDuration - segElapsed) / 0.8);
+    const alpha = Math.min(fadeIn, fadeOut);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    const fontSize = Math.round(w * 0.035);
+    const textY = h * 0.92;
+
+    // 背景帯（画面幅いっぱいのグラデーション）
+    const bandH = fontSize * 2.8;
+    const bandGrad = ctx.createLinearGradient(0, textY - bandH/2, 0, textY + bandH/2);
+    bandGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    bandGrad.addColorStop(0.3, 'rgba(0,0,0,0.6)');
+    bandGrad.addColorStop(0.7, 'rgba(0,0,0,0.6)');
+    bandGrad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = bandGrad;
+    ctx.fillRect(0, textY - bandH/2, w, bandH);
+
+    // 装飾ライン（字幕の上下に金色の細いライン）
+    ctx.strokeStyle = 'rgba(201,169,110,0.4)';
+    ctx.lineWidth = 1;
+    const tw = ctx.measureText(title).width;
+    // 上のライン
+    ctx.beginPath();
+    ctx.moveTo(w/2 - tw/2 - 40, textY - fontSize * 0.8);
+    ctx.lineTo(w/2 + tw/2 + 40, textY - fontSize * 0.8);
+    ctx.stroke();
+
+    // テキスト
+    ctx.font = `300 ${fontSize}px 'Meiryo', 'Noto Serif JP', serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.letterSpacing = '3px';
+
+    // テキスト影
+    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+    ctx.fillText(title, w/2 + 1, textY + 1);
+    // テキスト本文（白+金のグラデーション風）
+    const textGrad = ctx.createLinearGradient(w/2 - tw/2, 0, w/2 + tw/2, 0);
+    textGrad.addColorStop(0, '#ffffff');
+    textGrad.addColorStop(0.3, '#e8c97a');
+    textGrad.addColorStop(0.7, '#e8c97a');
+    textGrad.addColorStop(1, '#ffffff');
+    ctx.fillStyle = textGrad;
+    ctx.fillText(title, w/2, textY);
+
+    // 下のライン
+    ctx.beginPath();
+    ctx.moveTo(w/2 - tw/2 - 40, textY + fontSize * 0.8);
+    ctx.lineTo(w/2 + tw/2 + 40, textY + fontSize * 0.8);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // エンドカード（最後の3秒間）
+  if (promoEndcard.enabled && elapsed >= endcardStart) {
+    // フェードイン（最初0.8秒）+ フェードアウト（最後0.8秒）
+    const ecFadeIn = Math.min(1, (elapsed - endcardStart) / 0.8);
+    const ecFadeOut = Math.min(1, (PROMO_DURATION - elapsed) / 0.8);
+    const ecAlpha = Math.min(ecFadeIn, ecFadeOut);
+    ctx.save();
+    ctx.globalAlpha = ecAlpha;
+
+    // 完全に黒い背景
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
+    ctx.fillRect(0, 0, w, h);
+
+    // ブランド名（画面中央にドーンと大きく）
+    const ecTitle = promoEndcard.title || 'Grace of Touch';
+    const ecTitleSize = Math.round(w * 0.09);
+    ctx.font = `700 ${ecTitleSize}px 'Noto Serif JP', serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // テキスト影
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillText(ecTitle, w/2 + 2, h/2 + 2);
+    // テキスト本文（金色）
+    ctx.fillStyle = '#e8c97a';
+    ctx.fillText(ecTitle, w/2, h/2);
+
+    // 装飾ライン（上下）
+    const ecTw = ctx.measureText(ecTitle).width;
+    ctx.strokeStyle = 'rgba(201,169,110,0.4)';
+    ctx.lineWidth = 1;
+    // 上のライン
+    ctx.beginPath();
+    ctx.moveTo(w/2 - ecTw/2 - 40, h/2 - ecTitleSize * 0.8);
+    ctx.lineTo(w/2 + ecTw/2 + 40, h/2 - ecTitleSize * 0.8);
+    ctx.stroke();
+    // 下のライン
+    ctx.beginPath();
+    ctx.moveTo(w/2 - ecTw/2 - 40, h/2 + ecTitleSize * 0.8);
+    ctx.lineTo(w/2 + ecTw/2 + 40, h/2 + ecTitleSize * 0.8);
+    ctx.stroke();
+
+    // サブテキスト（ライン下に小さく）
+    const ecSub = promoEndcard.sub || '';
+    if (ecSub) {
+      const ecSubSize = Math.round(w * 0.022);
+      ctx.font = `300 ${ecSubSize}px 'Inter', sans-serif`;
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.fillText(ecSub, w/2, h/2 + ecTitleSize * 1.2);
+    }
+
+    ctx.restore();
+  }
+
+  // 経過タイムバー
+  ctx.fillStyle = 'rgba(176,141,87,0.4)';
+  ctx.fillRect(0, h - 3, w * (elapsed / PROMO_DURATION), 3);
+}
+
+function endPromoMode() {
+  promoActive = false;
+  cancelAnimationFrame(promoRafId);
+  controls.enabled = true;
+
+  document.getElementById('promo-overlay').style.display = 'none';
+  const ctx = promoOverlayCtx;
+  if (ctx) ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+  // BGM停止
+  if (promoBGMEnabled) stopPromoBGM();
+
+  // 録画停止
+  if (promoRecordEnabled) stopRecording();
+
+  // フィラメント復元＆蓋を閉じる
+  // lastPromoTheme から復元（'Type:Color' 形式）
+  if (lastPromoTheme && lastPromoTheme.includes(':')) {
+    const [t, c] = lastPromoTheme.split(':');
+    setTheme(t, c);
+  } else {
+    buildBox();
+  }
+  lidAnimCurrent = 0;
+  lidAnimTarget = 0;
+  lidManualControl = false;
+  applyLidTransform(0);
+  document.getElementById('sl-lid').value = 0;
+  document.getElementById('lbl-lid').textContent = 0;
+  setLidMode('closed');
+
+  // シークバー非表示
+  document.getElementById('promo-seekbar').style.display = 'none';
+  promoPaused = false;
+
+  const btn = document.getElementById('btn-promo');
+  btn.textContent = 'PROMO';
+  btn.style.opacity = '1';
+  btn.disabled = false;
+  document.getElementById('btn-rec').disabled = false;
+}
+
+// ─────────────────────────────────────────────
+//  初期化
+// ─────────────────────────────────────────────
+initFilamentUI();
+buildBox();
+animate();
+
+// 出力形式ラジオボタンのスタイル連動
+document.querySelectorAll('input[name="promo-format"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    document.getElementById('fmt-mp4-label').style.borderColor = radio.value === 'mp4' ? 'var(--accent)' : 'rgba(255,255,255,0.1)';
+    document.getElementById('fmt-mp4-label').style.background = radio.value === 'mp4' ? 'rgba(201,169,110,0.08)' : 'rgba(255,255,255,0.03)';
+    document.getElementById('fmt-mp4-label').style.color = radio.value === 'mp4' ? '#ccc' : '#888';
+    document.getElementById('fmt-webm-label').style.borderColor = radio.value === 'webm' ? 'var(--accent)' : 'rgba(255,255,255,0.1)';
+    document.getElementById('fmt-webm-label').style.background = radio.value === 'webm' ? 'rgba(201,169,110,0.08)' : 'rgba(255,255,255,0.03)';
+    document.getElementById('fmt-webm-label').style.color = radio.value === 'webm' ? '#ccc' : '#888';
+  });
+});
+
+// 録画チェックボックスで録画オプション表示/非表示
+document.getElementById('promo-opt-record').addEventListener('change', (e) => {
+  document.getElementById('promo-record-options').style.display = e.target.checked ? 'block' : 'none';
+});
+// ウォーターマークのオプション表示/非表示
+document.getElementById('promo-opt-watermark').addEventListener('change', (e) => {
+  document.getElementById('watermark-options').style.display = e.target.checked ? 'block' : 'none';
+});
+// エンドカードのオプション表示/非表示
+document.getElementById('promo-opt-endcard').addEventListener('change', (e) => {
+  document.getElementById('endcard-options').style.display = e.target.checked ? 'block' : 'none';
+});
+// アスペクト比ボタン
+document.querySelectorAll('input[name="promo-ratio"]').forEach(radio => {
+  radio.closest('.promo-ratio-btn').addEventListener('click', () => {
+    radio.checked = true;
+    document.querySelectorAll('.promo-ratio-btn').forEach(b => b.classList.remove('active'));
+    radio.closest('.promo-ratio-btn').classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

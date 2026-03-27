@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DroneGuard - 飛行日誌</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --surface: #141926;
+    --surface2: #1c2236;
+    --border: #262e45;
+    --text: #e2e6f0;
+    --text2: #7a839e;
+    --accent: #4a8aff;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app { max-width: 480px; margin: 0 auto; min-height: 100vh; }
+
+  .header {
+    padding: 16px 20px; display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--border); position: sticky; top: 0;
+    background: var(--bg); z-index: 50;
+  }
+  .back-btn { background: none; border: none; color: var(--accent); font-size: 20px; cursor: pointer; }
+  .header h1 { font-size: 17px; font-weight: 700; color: var(--accent); flex: 1; }
+  .header-action {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+
+  .content { padding: 16px 20px 100px; }
+
+  /* Tab switcher */
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+  .tab {
+    flex: 1; padding: 10px; text-align: center; border: none;
+    background: var(--surface); color: var(--text2); font-size: 13px;
+    font-weight: 600; cursor: pointer; border-radius: 8px; transition: all 0.15s;
+  }
+  .tab.active { background: var(--accent); color: #fff; }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Form */
+  .form-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; margin-bottom: 12px;
+  }
+  .form-title {
+    font-size: 12px; font-weight: 700; color: var(--text2);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;
+  }
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px;
+  }
+  .field .hint { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 10px 12px; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-size: 14px; outline: none;
+    font-family: inherit;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    border-color: var(--accent);
+  }
+  .field textarea { min-height: 60px; resize: vertical; }
+
+  .field-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+
+  /* Auto-calc fields */
+  .calc-field {
+    padding: 10px 12px; background: rgba(52,211,153,0.06);
+    border: 1px solid rgba(52,211,153,0.2); border-radius: 8px;
+    font-size: 15px; font-weight: 700; color: var(--green);
+  }
+
+  /* Save button */
+  .save-btn {
+    width: 100%; padding: 16px; margin-top: 16px;
+    background: var(--green); color: #fff; border: none;
+    border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer;
+  }
+  .save-btn:active { transform: scale(0.97); }
+
+  /* Log list */
+  .log-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; margin-bottom: 10px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .log-card:active { transform: scale(0.98); }
+  .log-top { display: flex; justify-content: space-between; align-items: center; }
+  .log-date { font-size: 15px; font-weight: 700; }
+  .log-duration {
+    font-size: 13px; padding: 2px 8px; border-radius: 6px;
+    background: rgba(74,138,255,0.15); color: var(--accent);
+  }
+  .log-details {
+    margin-top: 8px; font-size: 13px; color: var(--text2); line-height: 1.8;
+  }
+  .log-details span { display: block; }
+  .log-tag {
+    display: inline-block; margin-top: 6px; padding: 2px 8px;
+    border-radius: 4px; font-size: 11px; font-weight: 600;
+  }
+  .log-tag-normal { background: rgba(52,211,153,0.15); color: var(--green); }
+  .log-tag-incident { background: rgba(248,113,113,0.15); color: var(--red); }
+
+  .empty-state {
+    text-align: center; padding: 40px 0; color: var(--text2); font-size: 14px;
+  }
+
+  /* Stats */
+  .stats-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; text-align: center;
+  }
+  .stat-value { font-size: 22px; font-weight: 700; color: var(--accent); }
+  .stat-label { font-size: 11px; color: var(--text2); margin-top: 4px; }
+
+  /* Delete */
+  .delete-btn {
+    background: none; border: 1px solid var(--border); color: var(--red);
+    padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer;
+    margin-top: 10px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <button class="back-btn" onclick="location.href='index.html'">&#8249;</button>
+    <h1>飛行日誌</h1>
+    <button class="header-action" onclick="showTab('new')">+ 新規記録</button>
+  </div>
+
+  <div class="content">
+    <div class="tabs">
+      <button class="tab active" id="tabNew" onclick="showTab('new')">記録する</button>
+      <button class="tab" id="tabHistory" onclick="showTab('history')">履歴</button>
+      <button class="tab" id="tabStats" onclick="showTab('stats')">統計</button>
+    </div>
+
+    <!-- === 新規記録 === -->
+    <div class="tab-content active" id="contentNew">
+
+      <div class="form-section">
+        <div class="form-title">飛行情報</div>
+        <div class="field">
+          <label>飛行年月日</label>
+          <input type="date" id="fDate">
+        </div>
+        <div class="field">
+          <label>飛行させた者の氏名</label>
+          <input type="text" id="fPilot" placeholder="操縦者名">
+        </div>
+        <div class="field">
+          <label>機体番号</label>
+          <div class="hint">JUから始まる登録記号</div>
+          <input type="text" id="fRegId" placeholder="JU00000000">
+        </div>
+        <div class="field">
+          <label>飛行概要</label>
+          <select id="fNature">
+            <option value="空撮">空撮</option>
+            <option value="インフラ点検">インフラ点検</option>
+            <option value="農薬散布">農薬散布</option>
+            <option value="測量">測量</option>
+            <option value="物流">物流・配送</option>
+            <option value="訓練">訓練・練習</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-title">飛行場所・時刻</div>
+        <div class="field-row">
+          <div class="field">
+            <label>離陸場所</label>
+            <input type="text" id="fFrom" placeholder="場所名">
+          </div>
+          <div class="field">
+            <label>着陸場所</label>
+            <input type="text" id="fTo" placeholder="場所名">
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>離陸時刻</label>
+            <input type="time" id="fOffTime" onchange="calcFlightTime()">
+          </div>
+          <div class="field">
+            <label>着陸時刻</label>
+            <input type="time" id="fOnTime" onchange="calcFlightTime()">
+          </div>
+        </div>
+        <div class="field">
+          <label>飛行時間</label>
+          <div class="calc-field" id="fFlightTime">--:--</div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-title">飛行条件</div>
+        <div class="field-row">
+          <div class="field">
+            <label>最大高度</label>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <input type="number" id="fMaxAlt" placeholder="0" min="0" max="500">
+              <span style="font-size:12px; color:var(--text2);">m</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>最大距離</label>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <input type="number" id="fMaxDist" placeholder="0" min="0" max="10000">
+              <span style="font-size:12px; color:var(--text2);">m</span>
+            </div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>天候</label>
+            <select id="fWeather">
+              <option value="晴れ">晴れ</option>
+              <option value="曇り">曇り</option>
+              <option value="雨">雨</option>
+              <option value="雪">雪</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>風速（目安）</label>
+            <select id="fWind">
+              <option value="微風(0-3m/s)">微風（0-3m/s）</option>
+              <option value="軽風(3-5m/s)">軽風（3-5m/s）</option>
+              <option value="中風(5-8m/s)">中風（5-8m/s）</option>
+              <option value="強風(8m/s以上)">強風（8m/s以上）</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-title">安全に影響のあった事項</div>
+        <div class="field">
+          <label>特記事項</label>
+          <div class="hint">異常なし、または発生した事象を記録</div>
+          <textarea id="fRemarks" placeholder="異常なし"></textarea>
+        </div>
+        <div class="field">
+          <label>不具合事項</label>
+          <div class="hint">機体・通信・バッテリー等の不具合があれば記載</div>
+          <textarea id="fSquawk" placeholder="なし"></textarea>
+        </div>
+        <div class="field">
+          <label>処置・対応</label>
+          <div class="hint">不具合への対応、または今後の対策</div>
+          <textarea id="fAction" placeholder=""></textarea>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-title">確認</div>
+        <div class="field">
+          <label>確認者</label>
+          <input type="text" id="fConfirmer" placeholder="確認者名">
+        </div>
+      </div>
+
+      <button class="save-btn" onclick="saveLog()">飛行記録を保存</button>
+    </div>
+
+    <!-- === 履歴 === -->
+    <div class="tab-content" id="contentHistory">
+      <div id="historyList"></div>
+    </div>
+
+    <!-- === 統計 === -->
+    <div class="tab-content" id="contentStats">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="statFlights">0</div>
+          <div class="stat-label">総飛行回数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statHours">0:00</div>
+          <div class="stat-label">総飛行時間</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statMaxAlt">0m</div>
+          <div class="stat-label">最大高度</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statIncidents">0</div>
+          <div class="stat-label">不具合報告数</div>
+        </div>
+      </div>
+      <div id="statsDetail"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// === Storage ===
+function getLogs() {
+  return JSON.parse(localStorage.getItem('dg_flightlogs') || '[]');
+}
+function saveLogs(logs) {
+  localStorage.setItem('dg_flightlogs', JSON.stringify(logs));
+}
+
+// === Tabs ===
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+  document.getElementById('content' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+  if (name === 'history') renderHistory();
+  if (name === 'stats') renderStats();
+}
+
+// === Flight time calc ===
+function calcFlightTime() {
+  const off = document.getElementById('fOffTime').value;
+  const on = document.getElementById('fOnTime').value;
+  if (!off || !on) { document.getElementById('fFlightTime').textContent = '--:--'; return; }
+
+  const [oh, om] = off.split(':').map(Number);
+  const [nh, nm] = on.split(':').map(Number);
+  let mins = (nh * 60 + nm) - (oh * 60 + om);
+  if (mins < 0) mins += 24 * 60;
+
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  document.getElementById('fFlightTime').textContent =
+    `${h}時間${m.toString().padStart(2,'0')}分`;
+}
+
+// === Save ===
+function saveLog() {
+  const off = document.getElementById('fOffTime').value;
+  const on = document.getElementById('fOnTime').value;
+
+  if (!document.getElementById('fDate').value) {
+    alert('飛行年月日を入力してください');
+    return;
+  }
+
+  let flightMins = 0;
+  if (off && on) {
+    const [oh, om] = off.split(':').map(Number);
+    const [nh, nm] = on.split(':').map(Number);
+    flightMins = (nh * 60 + nm) - (oh * 60 + om);
+    if (flightMins < 0) flightMins += 24 * 60;
+  }
+
+  const log = {
+    id: Date.now(),
+    date: document.getElementById('fDate').value,
+    pilot: document.getElementById('fPilot').value,
+    regId: document.getElementById('fRegId').value,
+    nature: document.getElementById('fNature').value,
+    from: document.getElementById('fFrom').value,
+    to: document.getElementById('fTo').value,
+    offTime: off,
+    onTime: on,
+    flightMins: flightMins,
+    maxAlt: parseInt(document.getElementById('fMaxAlt').value) || 0,
+    maxDist: parseInt(document.getElementById('fMaxDist').value) || 0,
+    weather: document.getElementById('fWeather').value,
+    wind: document.getElementById('fWind').value,
+    remarks: document.getElementById('fRemarks').value,
+    squawk: document.getElementById('fSquawk').value,
+    action: document.getElementById('fAction').value,
+    confirmer: document.getElementById('fConfirmer').value,
+  };
+
+  const logs = getLogs();
+  logs.unshift(log);
+  saveLogs(logs);
+
+  alert('飛行記録を保存しました');
+  showTab('history');
+}
+
+// === History ===
+function renderHistory() {
+  const logs = getLogs();
+  const container = document.getElementById('historyList');
+
+  if (logs.length === 0) {
+    container.innerHTML = '<div class="empty-state">飛行記録がありません</div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  logs.forEach(log => {
+    const h = Math.floor(log.flightMins / 60);
+    const m = log.flightMins % 60;
+    const duration = log.flightMins > 0 ? `${h}:${m.toString().padStart(2,'0')}` : '--';
+    const hasIssue = log.squawk && log.squawk !== 'なし' && log.squawk.trim() !== '';
+
+    const card = document.createElement('div');
+    card.className = 'log-card';
+    card.innerHTML = `
+      <div class="log-top">
+        <div class="log-date">${log.date}</div>
+        <div class="log-duration">${duration}</div>
+      </div>
+      <div class="log-details">
+        <span><strong>${log.nature}</strong> | ${log.pilot || '未記入'}</span>
+        <span>${log.from || '?'} → ${log.to || '?'} | 高度${log.maxAlt}m / 距離${log.maxDist}m</span>
+        <span>${log.weather} / ${log.wind}</span>
+        ${log.remarks && log.remarks !== '異常なし' ? `<span style="color:var(--yellow);">備考: ${log.remarks}</span>` : ''}
+        ${hasIssue
+          ? `<span class="log-tag log-tag-incident">不具合あり: ${log.squawk}</span>`
+          : `<span class="log-tag log-tag-normal">異常なし</span>`}
+      </div>
+      <button class="delete-btn" onclick="event.stopPropagation(); deleteLog(${log.id})">削除</button>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function deleteLog(id) {
+  if (!confirm('この記録を削除しますか？')) return;
+  const logs = getLogs().filter(l => l.id !== id);
+  saveLogs(logs);
+  renderHistory();
+}
+
+// === Stats ===
+function renderStats() {
+  const logs = getLogs();
+
+  const totalFlights = logs.length;
+  const totalMins = logs.reduce((s, l) => s + (l.flightMins || 0), 0);
+  const totalH = Math.floor(totalMins / 60);
+  const totalM = totalMins % 60;
+  const maxAlt = logs.reduce((m, l) => Math.max(m, l.maxAlt || 0), 0);
+  const incidents = logs.filter(l => l.squawk && l.squawk !== 'なし' && l.squawk.trim() !== '').length;
+
+  document.getElementById('statFlights').textContent = totalFlights;
+  document.getElementById('statHours').textContent = `${totalH}:${totalM.toString().padStart(2,'0')}`;
+  document.getElementById('statMaxAlt').textContent = maxAlt + 'm';
+  document.getElementById('statIncidents').textContent = incidents;
+
+  // Nature breakdown
+  const byNature = {};
+  logs.forEach(l => { byNature[l.nature] = (byNature[l.nature] || 0) + 1; });
+
+  let detailHtml = '<div class="form-section"><div class="form-title">用途別の飛行回数</div>';
+  Object.entries(byNature).sort((a,b) => b[1]-a[1]).forEach(([nature, count]) => {
+    detailHtml += `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;">
+      <span>${nature}</span><span style="color:var(--accent);font-weight:700;">${count}回</span></div>`;
+  });
+  detailHtml += '</div>';
+
+  document.getElementById('statsDetail').innerHTML = detailHtml;
+}
+
+// === Init ===
+const today = new Date();
+document.getElementById('fDate').value = today.toISOString().slice(0, 10);
+
+// Load saved pilot/regId from last entry
+const lastLogs = getLogs();
+if (lastLogs.length > 0) {
+  document.getElementById('fPilot').value = lastLogs[0].pilot || '';
+  document.getElementById('fRegId').value = lastLogs[0].regId || '';
+}
+
+// === Firebase Auth + Cloud Sync ===
+firebase.initializeApp({
+  apiKey: "AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",
+  authDomain: "grace-of-touch.firebaseapp.com",
+  projectId: "grace-of-touch",
+  storageBucket: "grace-of-touch.firebasestorage.app",
+  messagingSenderId: "505078300866",
+  appId: "1:505078300866:web:adad2a27b163c3b0f1bb5b"
+});
+const dgAuth = firebase.auth();
+const dgDb = firebase.firestore();
+
+// Override saveLog to also sync to Firestore
+const _origSaveLog = saveLog;
+saveLog = function(entry) {
+  _origSaveLog(entry);
+  const user = dgAuth.currentUser;
+  if (user) {
+    dgDb.collection('droneguard_users').doc(user.uid)
+      .collection('flight_logs').add({
+        ...entry,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(e => console.warn('Cloud sync failed:', e));
+  }
+};
+</script>
+</body>
+</html>

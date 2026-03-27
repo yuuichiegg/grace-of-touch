@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WanCraft 3D | GRACE OF TOUCH</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow-x: hidden; background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; touch-action: none; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        .hero-section { background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%); padding: 80px 20px 60px; text-align: center; }
+        .brand-title { font-family: 'Times New Roman', serif; font-size: 2.5rem; color: #1e293b; letter-spacing: 2px; margin-bottom: 10px; font-weight: bold; }
+        .brand-subtitle { font-family: 'Arial', sans-serif; font-size: 1rem; color: #64748b; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 40px; }
+        .category-badge { display: inline-block; padding: 5px 15px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; margin-bottom: 10px; }
+        .tool-card { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,.1); transition: all .3s; cursor: pointer; border: 1px solid #e2e8f0; text-align: left; }
+        .tool-card:hover { transform: translateY(-5px); box-shadow: 0 20px 25px -5px rgba(0,0,0,.1); border-color: #3b82f6; }
+        .tool-thumb { height: 180px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 4rem; }
+        .tool-info { padding: 20px; }
+        #background-layer { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; background-size: cover; background-position: center; background-repeat: no-repeat; transition: background-image .3s; background-color: #f0f2f5; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 0; }
+        #canvas-container canvas { display: block; }
+        #ui-container { position: absolute; top: 80px; left: 20px; z-index: 10; background: rgba(255,255,255,.95); border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,.1); width: 340px; max-height: calc(100vh - 100px); overflow: hidden; backdrop-filter: blur(4px); transition: opacity .3s; display: flex; flex-direction: column; }
+        #ui-container.minimized { max-height: 50px; }
+        #ui-container.hidden-ui { opacity: 0; pointer-events: none; }
+        .panel-header { padding: 15px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: rgba(248,250,252,.8); user-select: none; }
+        .panel-content { padding: 20px; overflow-y: auto; flex: 1; -webkit-overflow-scrolling: touch; }
+        #app-header { position: absolute; top: 0; left: 0; width: 100%; height: 70px; z-index: 15; background: rgba(255,255,255,.95); backdrop-filter: blur(10px); border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; box-shadow: 0 4px 6px -1px rgba(0,0,0,.05); transition: transform .3s; }
+        #app-header.hidden-ui { transform: translateY(-100%); }
+        .brand-container { display: flex; flex-direction: column; justify-content: center; }
+        .main-brand { font-family: 'Times New Roman', serif; font-size: 1.2rem; color: #1e293b; letter-spacing: 1px; font-weight: bold; }
+        .sub-brand-tag { font-family: Arial, sans-serif; font-size: .75rem; color: #3b82f6; font-weight: bold; display: flex; align-items: center; gap: 5px; margin-top: -2px; }
+        #toolbar-container { position: absolute; top: 80px; right: 20px; z-index: 10; display: flex; gap: 8px; transition: opacity .3s; }
+        #toolbar-container.hidden-ui { opacity: 0; pointer-events: none; }
+        .tool-btn { width: 44px; height: 44px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; background: white; font-size: 1.4rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,.1); transition: all .2s; border: 2px solid transparent; }
+        .tool-btn:hover { transform: translateY(-2px); }
+        .tool-btn.active { background-color: #3b82f6; color: white; border-color: #2563eb; }
+        .tool-btn.request { background-color: #facc15; color: white; }
+        .tool-btn.share { background-color: #10b981; color: white; }
+        .tool-btn.gallery { background-color: #8b5cf6; color: white; }
+        .tool-btn.game-mode { background-color: #ec4899; color: white; }
+        .tool-btn.print-mode { background-color: #f59e0b; color: white; }
+        .model-selector { display: flex; align-items: center; gap: 10px; padding: 8px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 50px; font-size: .85rem; font-weight: 600; color: #475569; cursor: pointer; transition: all .2s; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,.5); z-index: 50; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(4px); }
+        .modal-content { background: white; width: 90%; max-width: 500px; max-height: 80vh; border-radius: 16px; padding: 20px; box-shadow: 0 20px 25px -5px rgba(0,0,0,.1); display: flex; flex-direction: column; overflow-y: auto; }
+        #photo-controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; flex-direction: column; gap: 15px; align-items: center; opacity: 0; pointer-events: none; transition: opacity .3s; width: 90%; max-width: 500px; }
+        #photo-controls.visible { opacity: 1; pointer-events: auto; }
+        .photo-actions { display: flex; gap: 20px; justify-content: center; width: 100%; flex-wrap: wrap; }
+        .photo-btn { background: white; padding: 10px 20px; border-radius: 50px; box-shadow: 0 10px 25px -5px rgba(0,0,0,.3); font-weight: bold; color: #333; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform .2s; white-space: nowrap; border: 1px solid #eee; }
+        .photo-btn.shutter { background: #ef4444; color: white; border: none; }
+        .text-panel { background: rgba(255,255,255,.9); padding: 10px 15px; border-radius: 12px; width: 100%; display: flex; gap: 10px; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,.1); }
+        .text-panel input { flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #ccc; }
+        .lighting-panel { background: rgba(0,0,0,.6); padding: 15px; border-radius: 12px; width: 100%; color: white; backdrop-filter: blur(4px); }
+        .lighting-panel input { width: 100%; accent-color: #fbbf24; }
+        #promo-text-container { position: absolute; transform: translate(-50%,-50%); z-index: 30; cursor: grab; user-select: none; touch-action: none; opacity: 0; pointer-events: none; transition: opacity .3s; }
+        #promo-text-container.visible { opacity: 1; pointer-events: auto; }
+        #promo-text-content { font-family: sans-serif; font-weight: 900; color: #fff; text-shadow: 2px 2px 0 #000; font-size: 2rem; background: rgba(0,0,0,.2); padding: 5px 20px; border-radius: 50px; white-space: nowrap; }
+        #game-overlay { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); z-index: 20; pointer-events: none; text-align: center; display: none; }
+        #game-overlay.active { display: block; }
+        .score-board { font-size: 3rem; font-weight: 800; color: #ec4899; text-shadow: 2px 2px 0 #fff; }
+        .score-popup { position: absolute; font-size: 2rem; font-weight: bold; color: #fbbf24; text-shadow: 1px 1px 0 #000; animation: floatUp 1s ease-out forwards; pointer-events: none; }
+        @keyframes floatUp { 0% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-50px) scale(1.5); } }
+        .step-guide { display: flex; justify-content: space-between; margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .step-item { text-align: center; font-size: .7rem; color: #64748b; font-weight: bold; width: 20%; cursor: pointer; }
+        .step-item.active { color: #3b82f6; }
+        .home-gallery-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: 20px; padding: 20px; max-width: 1000px; margin: 0 auto; }
+        .home-gallery-item { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,.1); border: 1px solid #e2e8f0; }
+        .home-gallery-thumb { width: 100%; height: 150px; object-fit: cover; background: #f8fafc; }
+        .home-gallery-info { padding: 12px; }
+        .home-gallery-title { font-weight: bold; color: #334155; }
+        .home-gallery-user { font-size: .8rem; color: #94a3b8; }
+        .mw-link { display: inline-block; margin-top: 5px; font-size: .7rem; color: #10b981; font-weight: bold; text-decoration: none; border: 1px solid #10b981; padding: 2px 6px; border-radius: 4px; }
+        .request-list { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex: 1; }
+        .request-item { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; }
+        .like-btn { color: #ef4444; cursor: pointer; font-size: .8rem; display: flex; flex-direction: column; align-items: center; }
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(140px,1fr)); gap: 15px; overflow-y: auto; padding: 5px; flex: 1; }
+        .gallery-item { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; cursor: pointer; transition: transform .2s; background: #fff; }
+        .gallery-thumb { width: 100%; height: 100px; object-fit: cover; background: #f1f5f9; }
+        .gallery-info { padding: 8px; }
+        .gallery-title { font-weight: bold; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .back-btn { font-size: .9rem; color: #64748b; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        .back-btn:hover { color: #3b82f6; }
+        .version-info { text-align: center; font-size: .65rem; color: #94a3b8; margin-top: 15px; }
+        .slider-group { margin-bottom: 15px; }
+        label { display: block; font-size: .85rem; font-weight: 600; color: #333; margin-bottom: 4px; }
+        input[type=range] { width: 100%; cursor: pointer; accent-color: #3b82f6; }
+        .preset-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+        button.preset-btn { padding: 8px; background-color: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; border-radius: 6px; font-size: .8rem; cursor: pointer; transition: all .2s; font-weight: 600; }
+        button.preset-btn.active { background-color: #3b82f6; color: white; border-color: #2563eb; }
+        button.action-btn { width: 100%; padding: 12px; background-color: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background .2s; margin-top: 10px; }
+        button.action-btn:hover { background-color: #2563eb; }
+        .error-boundary { padding: 20px; background: #fee2e2; color: #b91c1c; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; z-index: 9999; position: relative; }
+        #edit-toolbar { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); background: white; padding: 8px; border-radius: 12px; display: flex; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,.15); z-index: 45; transition: all .2s; }
+        #edit-toolbar.hidden-ui { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(20px); }
+        .edit-btn { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.1rem; color: #475569; }
+        .edit-btn:hover { background-color: #f1f5f9; }
+        .edit-btn.active { background: #3b82f6; color: white; }
+        .edit-btn.special { width: auto; padding: 0 12px; font-size: .8rem; font-weight: bold; color: #7c3aed; }
+        .autosave-toast { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.7); color: white; padding: 6px 12px; border-radius: 20px; font-size: .7rem; font-weight: bold; pointer-events: none; opacity: 0; transition: opacity .5s; z-index: 60; display: flex; align-items: center; gap: 6px; }
+        .autosave-toast.visible { opacity: 1; }
+        .hinge-slider-section { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+        .hinge-slider-section h4 { font-size: .8rem; color: #0369a1; font-weight: bold; margin-bottom: 8px; }
+        .hinge-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .hinge-row label { width: 24px; font-size: .75rem; color: #64748b; margin-bottom: 0; min-width: 24px; }
+        .hinge-row input[type=range] { flex: 1; }
+        .hinge-row span { font-size: .7rem; color: #94a3b8; min-width: 36px; text-align: right; }
+    </style>
+</head>
+<body><a href="/" id="gt-back" style="position:fixed;top:12px;left:12px;z-index:99999;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);border:1px solid rgba(0,255,255,0.2);border-radius:8px;padding:6px 14px;text-decoration:none;color:rgba(0,255,255,0.8);font-family:Orbitron,monospace;font-size:10px;letter-spacing:0.1em;transition:all 0.3s;" onmouseover="this.style.background='rgba(0,255,255,0.12)';this.style.borderColor='rgba(0,255,255,0.5)'" onmouseout="this.style.background='rgba(0,0,0,0.6)';this.style.borderColor='rgba(0,255,255,0.2)'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>PORTAL</a>
+    <div id="background-layer"></div>
+    <div id="root"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Three.js r128 + addons (UMD, adds to THREE namespace) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/TransformControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
+
+    <!-- Firebase compat v10 -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="/__/firebase/init.compat.js" onerror="window.__fbInitFailed=true"></script>
+
+    <script type="text/babel">
+    const { useState, useRef, useEffect, useCallback } = React;
+    const APP_VERSION = "3.0.0";
+
+    // --- Firebase compat init ---
+    let db = null, auth = null;
+    try {
+        if (window.firebase && !window.__fbInitFailed) {
+            db = firebase.firestore();
+            auth = firebase.auth();
+        }
+    } catch(e) { console.warn("Firebase init failed:", e); }
+
+    // --- Undo/Redo Hook ---
+    function useHistoryState(initialState) {
+        const [history, setHistory] = useState([initialState]);
+        const [idx, setIdx] = useState(0);
+        const current = history[idx];
+        const setState = useCallback((newState) => {
+            setHistory(h => { const next = [...h.slice(0, idx + 1), newState]; return next; });
+            setIdx(i => i + 1);
+        }, [idx]);
+        const undo = useCallback(() => { if (idx > 0) setIdx(i => i - 1); }, [idx]);
+        const redo = useCallback(() => { if (idx < history.length - 1) setIdx(i => i + 1); }, [idx, history.length]);
+        return [current, setState, undo, redo, idx > 0, idx < history.length - 1];
+    }
+
+    // --- Error Boundary ---
+    class ErrorBoundary extends React.Component {
+        constructor(props) { super(props); this.state = { hasError: false }; }
+        static getDerivedStateFromError() { return { hasError: true }; }
+        render() {
+            if (this.state.hasError) return (
+                <div className="error-boundary">
+                    <h2 className="text-xl font-bold mb-2">エラーが発生しました</h2>
+                    <button className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-full" onClick={() => window.location.reload()}>再読み込み</button>
+                </div>
+            );
+            return this.props.children;
+        }
+    }
+
+    // --- 3D Constants ---
+    const JW = 10, PR = 1.0, HOR = 4.0, PLF = 2.2;
+
+    // --- 3D Builder Functions ---
+    function disposeGroup(group) {
+        group.traverse(obj => {
+            if (obj.geometry) obj.geometry.dispose();
+            if (obj.material) {
+                if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+                else obj.material.dispose();
+            }
+        });
+    }
+
+    function knuckleMesh(radius, length, pinR, color) {
+        const shape = new THREE.Shape();
+        shape.absarc(0, 0, radius, 0, Math.PI * 2, false);
+        const hole = new THREE.Path();
+        hole.absarc(0, 0, pinR, 0, Math.PI * 2, true);
+        shape.holes.push(hole);
+        const geo = new THREE.ExtrudeGeometry(shape, { steps: 1, depth: length, bevelEnabled: false });
+        const mat = new THREE.MeshStandardMaterial({ color });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.castShadow = true;
+        return mesh;
+    }
+
+    function buildPaddleBody(config, pos, rot, color) {
+        const g = new THREE.Group();
+        g.position.set(pos[0], pos[1], pos[2]);
+        g.rotation.set(rot[0], rot[1], rot[2]);
+        g.name = 'PaddleBody';
+        const k1 = knuckleMesh(HOR, 6, PR, color);
+        k1.position.set(-JW, 0, 0); k1.rotation.set(0, Math.PI / 2, 0);
+        g.add(k1);
+        const k2 = knuckleMesh(HOR, 6, PR, color);
+        k2.position.set(JW, 0, 0); k2.rotation.set(0, -Math.PI / 2, 0);
+        g.add(k2);
+        const bg = new THREE.Group();
+        bg.position.set(0, 0, HOR);
+        const plane = new THREE.Mesh(
+            new THREE.PlaneGeometry(config.width, config.length),
+            new THREE.MeshStandardMaterial({ color: '#4ade80', side: THREE.DoubleSide, roughness: 0.5 })
+        );
+        plane.position.set(0, 0, config.length / 2);
+        plane.rotation.x = -Math.PI / 2;
+        plane.castShadow = true; plane.receiveShadow = true;
+        bg.add(plane);
+        const wt = config.wallThickness, wh = config.wallHeight, cw = config.width, cl = config.length;
+        const wallMat = () => new THREE.MeshStandardMaterial({ color });
+        const lw = new THREE.Mesh(new THREE.BoxGeometry(wt, wh, cl), wallMat());
+        lw.position.set(-cw / 2 + wt / 2, wh / 2, cl / 2); lw.castShadow = true;
+        bg.add(lw);
+        const rw = new THREE.Mesh(new THREE.BoxGeometry(wt, wh, cl), wallMat());
+        rw.position.set(cw / 2 - wt / 2, wh / 2, cl / 2); rw.castShadow = true;
+        bg.add(rw);
+        const bw = new THREE.Mesh(new THREE.BoxGeometry(cw - wt * 2, wh, wt), wallMat());
+        bw.position.set(0, wh / 2, wt / 2); bw.castShadow = true;
+        bg.add(bw);
+        g.add(bg);
+        return g;
+    }
+
+    function buildPaddleHandle(config, tol, pos, rot, color) {
+        const g = new THREE.Group();
+        g.position.set(pos[0], pos[1], pos[2]);
+        g.rotation.set(rot[0], rot[1], rot[2]);
+        g.name = 'PaddleHandle';
+        const kw = (JW * 2) - 12 - (tol || 0.4);   // center knuckle fits in gap between body's two 6mm knuckles
+        const neckLen = 15;
+        const k = knuckleMesh(HOR, kw, PR, color);
+        k.position.set(-kw / 2, 0, 0);              // center the knuckle at x=0
+        k.rotation.set(0, Math.PI / 2, 0);
+        g.add(k);
+        const neckGrp = new THREE.Group();
+        neckGrp.position.set(0, HOR + neckLen / 2, 0);
+        neckGrp.rotation.x = THREE.MathUtils.degToRad(25);
+        const neck = new THREE.Mesh(new THREE.BoxGeometry(12, neckLen, 12), new THREE.MeshStandardMaterial({ color }));
+        neckGrp.add(neck);
+        const handleGrp = new THREE.Group();
+        handleGrp.position.set(0, neckLen / 2 + config.handleLength / 2, 0);
+        const cyl = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, config.handleLength, 16), new THREE.MeshStandardMaterial({ color }));
+        cyl.castShadow = true;
+        handleGrp.add(cyl);
+        const capGeo = new THREE.SphereGeometry(7, 16, 8);
+        const capMat = new THREE.MeshStandardMaterial({ color });
+        const tc = new THREE.Mesh(capGeo, capMat); tc.position.y = config.handleLength / 2;
+        const bc = new THREE.Mesh(capGeo, capMat); bc.position.y = -config.handleLength / 2;
+        handleGrp.add(tc); handleGrp.add(bc);
+        neckGrp.add(handleGrp);
+        g.add(neckGrp);
+        return g;
+    }
+
+    function buildHingePin(color) {
+        const geo = new THREE.CylinderGeometry(PR, PR, JW * PLF, 16);
+        const mat = new THREE.MeshStandardMaterial({ color: color || '#333333', metalness: 0.8, roughness: 0.2 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.rotation.z = Math.PI / 2;
+        mesh.name = 'Pin';
+        return mesh;
+    }
+
+    function buildPaddleAssembly(config, mode, hingeAngle, tol, hPos, hRot) {
+        const root = new THREE.Group();
+        if (mode === 'print') {
+            const bg = new THREE.Group(); bg.position.x = -70;
+            bg.add(buildPaddleBody(config, [0,0,0], [0,0,0], '#15803d'));
+            root.add(bg);
+            const hg = new THREE.Group(); hg.position.x = 70;
+            hg.add(buildPaddleHandle(config, tol, [0,0,0], [0,0,0], '#16a34a'));
+            root.add(hg);
+            const pg = new THREE.Group(); pg.position.y = -80;
+            pg.add(buildHingePin());
+            root.add(pg);
+            return root;
+        }
+        const asm = new THREE.Group();
+        asm.position.y = 20;
+        asm.add(buildPaddleBody(config, hPos, hRot, '#15803d'));
+        const hingeGrp = new THREE.Group();
+        hingeGrp.position.set(hPos[0], hPos[1], hPos[2]);
+        hingeGrp.rotation.set(hRot[0], hRot[1], hRot[2]);
+        hingeGrp.add(buildHingePin());
+        const handleRot = new THREE.Group();
+        handleRot.rotation.x = THREE.MathUtils.degToRad(180 - hingeAngle);
+        handleRot.add(buildPaddleHandle(config, tol, [0,0,0], [0,0,0], '#16a34a'));
+        hingeGrp.add(handleRot);
+        asm.add(hingeGrp);
+        root.add(asm);
+        return root;
+    }
+
+    function createTargetMesh(isGold) {
+        const geo = new THREE.TorusKnotGeometry(2.5, 1, 64, 8, 2, 3);
+        const mat = new THREE.MeshStandardMaterial({ color: isGold ? '#FFD700' : '#8B4513', metalness: isGold ? 0.8 : 0, roughness: isGold ? 0.2 : 0.8 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.userData.isGold = isGold;
+        mesh.userData.speed = isGold ? 250 : 180;
+        return mesh;
+    }
+
+    // --- Home Page ---
+    const Home = ({ onLaunchTool, user }) => {
+        const [gallery, setGallery] = useState([]);
+        useEffect(() => {
+            if (!user || !db) return;
+            const unsub = db.collection('shared_designs').orderBy('createdAt', 'desc').limit(6)
+                .onSnapshot(sn => { const i = []; sn.forEach(d => i.push({ ...d.data(), id: d.id })); setGallery(i); });
+            return unsub;
+        }, [user]);
+        return (
+            <div className="w-full h-full overflow-y-auto animate-fade-in pb-20">
+                <div className="hero-section">
+                    <h1 className="brand-title">WanCraft 3D</h1>
+                    <p className="brand-subtitle">3D Printable Gear Generator</p>
+                    <div className="max-w-4xl mx-auto px-4">
+                        <span className="category-badge bg-blue-100 text-blue-600">Dog Tools</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="tool-card" onClick={() => onLaunchTool('paddle')}>
+                                <div className="tool-thumb">🐶</div>
+                                <div className="tool-info">
+                                    <h3 className="font-bold text-lg text-gray-800">エチケットパドル</h3>
+                                    <p className="text-sm text-gray-500 mt-1">散歩中の必需品。愛犬のサイズに合わせてカスタム可能な折りたたみ式パドル。</p>
+                                    <div className="mt-3 flex gap-2"><span className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">#PrintInPlace</span></div>
+                                </div>
+                            </div>
+                            <div className="tool-card opacity-60"><div className="tool-thumb text-gray-300">🦴</div><div className="tool-info"><h3 className="font-bold text-lg text-gray-400">フードボウル (近日公開)</h3></div></div>
+                        </div>
+                    </div>
+                </div>
+                {gallery.length > 0 && (
+                    <div className="max-w-5xl mx-auto px-6 mt-8">
+                        <h3 className="text-xl font-bold text-gray-700 mb-4 border-l-4 border-blue-500 pl-3">みんなの新着デザイン</h3>
+                        <div className="home-gallery-grid">
+                            {gallery.map(item => (
+                                <div key={item.id} className="home-gallery-item">
+                                    <img src={item.thumbnail} className="home-gallery-thumb" alt={item.name} />
+                                    <div className="home-gallery-info">
+                                        <div className="home-gallery-title">{item.name}</div>
+                                        <div className="home-gallery-user">by {item.creator}</div>
+                                        {item.makerWorldUrl && <a href={item.makerWorldUrl} target="_blank" rel="noopener noreferrer" className="mw-link" onClick={e => e.stopPropagation()}>MakerWorld</a>}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                <div className="text-center text-gray-400 text-xs mt-12 pb-4">&copy; 2025 GRACE OF TOUCH &nbsp;|&nbsp; WanCraft 3D v{APP_VERSION}</div>
+            </div>
+        );
+    };
+
+    // --- PaddleMaker ---
+    const PRESETS = {
+        chihuahua: { name: "チワワ (小型)", width: 100, length: 110, wallHeight: 20, thickness: 2, wallThickness: 2, handleLength: 80, cornerRadius: 10 },
+        dachshund:  { name: "ダックス (短足)", width: 120, length: 130, wallHeight: 15, thickness: 2, wallThickness: 2, handleLength: 90, cornerRadius: 15 },
+        labrador:   { name: "ラブ (大型)", width: 150, length: 160, wallHeight: 35, thickness: 3, wallThickness: 3, handleLength: 110, cornerRadius: 20 }
+    };
+
+    const PaddleMaker = ({ onBack, user }) => {
+        const [designState, setDesignState, undo, redo, canUndo, canRedo] = useHistoryState({
+            config: PRESETS.dachshund, activePreset: 'dachshund',
+            hingeAngle: 180, hingeTolerance: 0.2,
+            hingePos: [0, 0, 0], hingeRot: [0, 0, 0],
+        });
+        const { config, activePreset, hingeAngle, hingeTolerance, hingePos, hingeRot } = designState;
+
+        const [activeMode, setActiveMode] = useState('design');
+        const [transformMode, setTransformMode] = useState('translate');
+        const [bgImage, setBgImage] = useState(null);
+        const [lightDir, setLightDir] = useState(1.5);
+        const [promoText, setPromoText] = useState("ビニール袋で回収も楽々♪");
+        const [textPos, setTextPos] = useState({ x: 50, y: 15 });
+        const [score, setScore] = useState(0);
+        const [scorePopups, setScorePopups] = useState([]);
+        const [isUiCollapsed, setIsUiCollapsed] = useState(false);
+        const [showAutoSaveToast, setShowAutoSaveToast] = useState(false);
+        const [showRequestModal, setShowRequestModal] = useState(false);
+        const [showIdeaBoard, setShowIdeaBoard] = useState(false);
+        const [showShareModal, setShowShareModal] = useState(false);
+        const [showGalleryModal, setShowGalleryModal] = useState(false);
+        const [designName, setDesignName] = useState('');
+        const [creatorName, setCreatorName] = useState('');
+        const [makerWorldUrl, setMakerWorldUrl] = useState('');
+        const [galleryItems, setGalleryItems] = useState([]);
+        const [requestText, setRequestText] = useState('');
+        const [contactInfo, setContactInfo] = useState('');
+        const [ideaItems, setIdeaItems] = useState([]);
+
+        const isPhotoMode = activeMode === 'photo';
+        const isGameMode = activeMode === 'game';
+
+        // Three.js refs
+        const mountRef = useRef();
+        const threeRef = useRef({});       // { scene, camera, renderer, orbit, transform }
+        const paddleRef = useRef();
+        const hingeTargetRef = useRef();   // persistent hinge wireframe
+        const rafRef = useRef();
+        // Refs for animation loop (avoids stale closures)
+        const isGameRef = useRef(false);
+        const mousePosRef = useRef(0);
+        const gameTargetsRef = useRef([]);
+        const pendingScoreRef = useRef(0);
+        const configRef = useRef(config);
+        const activeModeRef = useRef('design');
+        const bgImageRef = useRef(null);
+        const promoTextRef = useRef(promoText);
+        const textPosRef = useRef(textPos);
+        const hingeUpdateRef = useRef(null);
+        const draggingRef = useRef(false);
+        const fileInputRef = useRef();
+
+        // Keep refs in sync
+        useEffect(() => { isGameRef.current = isGameMode; activeModeRef.current = activeMode; }, [isGameMode, activeMode]);
+        useEffect(() => { configRef.current = config; }, [config]);
+        useEffect(() => { bgImageRef.current = bgImage; }, [bgImage]);
+        useEffect(() => { promoTextRef.current = promoText; }, [promoText]);
+        useEffect(() => { textPosRef.current = textPos; }, [textPos]);
+        hingeUpdateRef.current = (pos, rot) => {
+            setDesignState(prev => ({ ...prev, hingePos: pos, hingeRot: rot }));
+        };
+
+        // --- Init Three.js ---
+        useEffect(() => {
+            const mount = mountRef.current;
+            const w = mount.clientWidth || window.innerWidth;
+            const h = mount.clientHeight || window.innerHeight;
+
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color('#f0f0f0');
+            scene.fog = new THREE.Fog('#f0f2f0', 200, 600);
+
+            const camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 2000);
+            camera.position.set(0, 150, 100);
+            camera.lookAt(0, 0, 0);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            mount.appendChild(renderer.domElement);
+
+            // Lights
+            scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+            dirLight.position.set(75, 100, 50);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.set(1024, 1024);
+            scene.add(dirLight);
+
+            // Shadow plane
+            const shadowPlane = new THREE.Mesh(
+                new THREE.PlaneGeometry(500, 500),
+                new THREE.ShadowMaterial({ opacity: 0.25 })
+            );
+            shadowPlane.rotation.x = -Math.PI / 2;
+            shadowPlane.receiveShadow = true;
+            scene.add(shadowPlane);
+
+            // OrbitControls
+            const orbit = new THREE.OrbitControls(camera, renderer.domElement);
+            orbit.enableDamping = true;
+
+            // TransformControls
+            const transform = new THREE.TransformControls(camera, renderer.domElement);
+            transform.addEventListener('dragging-changed', e => {
+                orbit.enabled = !e.value;
+                if (!e.value && hingeTargetRef.current) {
+                    const p = hingeTargetRef.current.position;
+                    const r = hingeTargetRef.current.rotation;
+                    hingeUpdateRef.current([p.x, p.y, p.z], [r.x, r.y, r.z]);
+                }
+            });
+            scene.add(transform);
+
+            threeRef.current = { scene, camera, renderer, orbit, transform, dirLight };
+
+            // Capture functions
+            window.captureThumbnail = () => {
+                renderer.render(scene, camera);
+                const c = document.createElement('canvas');
+                c.width = 256; c.height = 256;
+                c.getContext('2d').drawImage(renderer.domElement, 0, 0, 256, 256);
+                return c.toDataURL('image/jpeg', 0.7);
+            };
+            window.takeCompositePhoto = () => {
+                renderer.render(scene, camera);
+                const cvs = document.createElement('canvas');
+                cvs.width = renderer.domElement.width; cvs.height = renderer.domElement.height;
+                const ctx = cvs.getContext('2d');
+                const finish = () => {
+                    ctx.drawImage(renderer.domElement, 0, 0);
+                    const pt = promoTextRef.current;
+                    if (pt) {
+                        ctx.save();
+                        const fs = cvs.width * 0.05;
+                        ctx.font = `900 ${fs}px sans-serif`;
+                        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                        ctx.fillStyle = 'white'; ctx.strokeStyle = 'black'; ctx.lineWidth = fs * 0.1;
+                        const tp = textPosRef.current;
+                        ctx.strokeText(pt, cvs.width * (tp.x / 100), cvs.height * (tp.y / 100));
+                        ctx.fillText(pt, cvs.width * (tp.x / 100), cvs.height * (tp.y / 100));
+                        ctx.restore();
+                    }
+                    const a = document.createElement('a'); if(!window.requireExportLicense())return; a.download = 'wancraft_promo.png'; a.href = cvs.toDataURL(); a.click();
+                };
+                const bi = bgImageRef.current;
+                if (bi) {
+                    const img = new Image(); img.crossOrigin = 'Anonymous';
+                    img.onload = () => {
+                        const sc = Math.max(cvs.width / img.width, cvs.height / img.height);
+                        ctx.drawImage(img, (cvs.width - img.width * sc) / 2, (cvs.height - img.height * sc) / 2, img.width * sc, img.height * sc);
+                        finish();
+                    }; img.src = bi;
+                } else { finish(); }
+            };
+
+            // Mouse tracking for game
+            const onMouseMove = e => {
+                const rect = renderer.domElement.getBoundingClientRect();
+                mousePosRef.current = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            };
+            const onTouchMove = e => {
+                if (e.touches[0]) {
+                    const rect = renderer.domElement.getBoundingClientRect();
+                    mousePosRef.current = ((e.touches[0].clientX - rect.left) / rect.width) * 2 - 1;
+                }
+            };
+            renderer.domElement.addEventListener('mousemove', onMouseMove);
+            renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: true });
+
+            // Click-to-select: attach TransformControls to paddle in design mode
+            const clickRaycaster = new THREE.Raycaster();
+            const clickMouse = new THREE.Vector2();
+            let clickStartX = 0, clickStartY = 0;
+            const onPointerDownForClick = e => { clickStartX = e.clientX; clickStartY = e.clientY; };
+            const onClickSelect = e => {
+                if (activeModeRef.current !== 'design') return;
+                const dx = e.clientX - clickStartX, dy = e.clientY - clickStartY;
+                if (dx * dx + dy * dy > 36) return; // ignore drag (> 6px movement)
+                const rect = renderer.domElement.getBoundingClientRect();
+                clickMouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                clickMouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+                clickRaycaster.setFromCamera(clickMouse, camera);
+                const { transform } = threeRef.current;
+                if (!transform || !paddleRef.current) return;
+                const hits = clickRaycaster.intersectObjects([paddleRef.current], true);
+                if (hits.length > 0) {
+                    transform.attach(paddleRef.current);
+                    transform.setMode('translate');
+                } else {
+                    transform.detach();
+                }
+            };
+            renderer.domElement.addEventListener('pointerdown', onPointerDownForClick);
+            renderer.domElement.addEventListener('click', onClickSelect);
+
+            // Resize
+            const onResize = () => {
+                const w = mount.clientWidth || window.innerWidth;
+                const h = mount.clientHeight || window.innerHeight;
+                renderer.setSize(w, h);
+                camera.aspect = w / h;
+                camera.updateProjectionMatrix();
+            };
+            window.addEventListener('resize', onResize);
+
+            // Animation loop
+            const clock = new THREE.Clock();
+            const animate = () => {
+                rafRef.current = requestAnimationFrame(animate);
+                const delta = clock.getDelta();
+                orbit.update();
+
+                if (isGameRef.current && paddleRef.current) {
+                    paddleRef.current.position.x = mousePosRef.current * 120;
+                    // Spawn
+                    if (gameTargetsRef.current.length === 0) {
+                        const isGold = Math.random() < 0.3;
+                        const mesh = createTargetMesh(isGold);
+                        mesh.position.set((Math.random() - 0.5) * 150, 150, -50);
+                        scene.add(mesh);
+                        gameTargetsRef.current.push(mesh);
+                    }
+                    // Move & hit test
+                    gameTargetsRef.current = gameTargetsRef.current.filter(t => {
+                        t.position.y -= t.userData.speed * delta;
+                        t.rotation.x += delta * (t.userData.isGold ? 3 : 1);
+                        const p = paddleRef.current;
+                        if (p && t.position.y < 30 && t.position.y > 0 &&
+                            Math.abs(t.position.x - p.position.x) < configRef.current.width * 0.45) {
+                            pendingScoreRef.current += t.userData.isGold ? 5 : 1;
+                            scene.remove(t); t.geometry.dispose(); t.material.dispose();
+                            return false;
+                        }
+                        if (t.position.y < -50) {
+                            scene.remove(t); t.geometry.dispose(); t.material.dispose();
+                            return false;
+                        }
+                        return true;
+                    });
+                } else if (!isGameRef.current && gameTargetsRef.current.length > 0) {
+                    gameTargetsRef.current.forEach(t => { scene.remove(t); t.geometry.dispose(); t.material.dispose(); });
+                    gameTargetsRef.current = [];
+                }
+
+                renderer.render(scene, camera);
+            };
+            animate();
+
+            return () => {
+                cancelAnimationFrame(rafRef.current);
+                window.removeEventListener('resize', onResize);
+                renderer.domElement.removeEventListener('mousemove', onMouseMove);
+                renderer.domElement.removeEventListener('touchmove', onTouchMove);
+                renderer.domElement.removeEventListener('pointerdown', onPointerDownForClick);
+                renderer.domElement.removeEventListener('click', onClickSelect);
+                renderer.dispose();
+                if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement);
+            };
+        }, []);
+
+        // --- Rebuild paddle when design changes (skip hinge mode, it's managed separately) ---
+        useEffect(() => {
+            const { scene } = threeRef.current;
+            if (!scene) return;
+            if (activeMode === 'hinge') return;
+            if (paddleRef.current) {
+                if (threeRef.current.transform) threeRef.current.transform.detach();
+                disposeGroup(paddleRef.current); scene.remove(paddleRef.current);
+            }
+            const paddle = buildPaddleAssembly(config, activeMode, hingeAngle, hingeTolerance, hingePos, hingeRot);
+            const box = new THREE.Box3().setFromObject(paddle);
+            if (isFinite(box.min.y)) paddle.position.y = -box.min.y;
+            scene.add(paddle);
+            paddleRef.current = paddle;
+        }, [designState, activeMode]);
+
+        // --- Hinge mode: manage persistent hinge target + TransformControls ---
+        useEffect(() => {
+            const { scene, transform } = threeRef.current;
+            if (!scene || !transform) return;
+            if (activeMode === 'hinge') {
+                if (!hingeTargetRef.current) {
+                    const geo = new THREE.BoxGeometry(JW * 2.2, HOR * 2.2, HOR * 2.2);
+                    const mat = new THREE.MeshBasicMaterial({ wireframe: true, color: 'red' });
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.name = 'HingeTarget';
+                    hingeTargetRef.current = mesh;
+                    scene.add(mesh);
+                }
+                hingeTargetRef.current.position.set(hingePos[0], hingePos[1], hingePos[2]);
+                hingeTargetRef.current.rotation.set(hingeRot[0], hingeRot[1], hingeRot[2]);
+                transform.attach(hingeTargetRef.current);
+                transform.setMode(transformMode);
+                // Hide main paddle in hinge mode
+                if (paddleRef.current) paddleRef.current.visible = false;
+            } else {
+                transform.detach();
+                if (hingeTargetRef.current) { scene.remove(hingeTargetRef.current); hingeTargetRef.current = null; }
+                if (paddleRef.current) paddleRef.current.visible = true;
+            }
+        }, [activeMode]);
+
+        // Sync transform mode
+        useEffect(() => {
+            if (threeRef.current.transform) threeRef.current.transform.setMode(transformMode);
+        }, [transformMode]);
+
+        // Update directional light direction
+        useEffect(() => {
+            if (threeRef.current.dirLight) threeRef.current.dirLight.position.set(lightDir * 50, 100, 50);
+        }, [lightDir]);
+
+        // Photo mode background
+        useEffect(() => {
+            const { scene } = threeRef.current;
+            if (!scene) return;
+            scene.background = isPhotoMode ? new THREE.Color('#e0f2fe') : (bgImage ? null : new THREE.Color('#f0f0f0'));
+            scene.fog = isPhotoMode ? new THREE.Fog('#e0f2fe', 200, 600) : new THREE.Fog('#f0f2f0', 200, 600);
+        }, [isPhotoMode, bgImage]);
+
+        // Game mode: reset score, set hingeAngle to 180
+        useEffect(() => {
+            if (isGameMode) { setScore(0); setDesignState(prev => ({ ...prev, hingeAngle: 180 })); setScorePopups([]); }
+        }, [isGameMode]);
+
+        // Score update from animation loop
+        useEffect(() => {
+            const interval = setInterval(() => {
+                if (pendingScoreRef.current > 0) {
+                    const pts = pendingScoreRef.current;
+                    pendingScoreRef.current = 0;
+                    setScore(s => s + pts);
+                    const id = Date.now();
+                    setScorePopups(p => [...p, { id, points: pts, x: 50 + (Math.random() - 0.5) * 20, y: 40 }]);
+                    setTimeout(() => setScorePopups(p => p.filter(i => i.id !== id)), 1000);
+                }
+            }, 100);
+            return () => clearInterval(interval);
+        }, []);
+
+        // Auto-save
+        useEffect(() => {
+            const saved = localStorage.getItem('wancraft_autosave');
+            if (saved) { try { const p = JSON.parse(saved); setDesignState(prev => ({ ...prev, ...p })); } catch(e) {} }
+        }, []);
+        useEffect(() => {
+            const t = setTimeout(() => {
+                localStorage.setItem('wancraft_autosave', JSON.stringify(designState));
+                setShowAutoSaveToast(true);
+                setTimeout(() => setShowAutoSaveToast(false), 2000);
+            }, 1000);
+            return () => clearTimeout(t);
+        }, [designState]);
+
+        // Firebase listeners
+        useEffect(() => {
+            if (!user || !db) return;
+            const unsub = db.collection('design_requests').orderBy('createdAt', 'desc').limit(30)
+                .onSnapshot(sn => { const i = []; sn.forEach(d => i.push({ ...d.data(), id: d.id })); setIdeaItems(i); });
+            return unsub;
+        }, [user]);
+        useEffect(() => {
+            if (!user || !db) return;
+            const unsub = db.collection('shared_designs').orderBy('createdAt', 'desc').limit(20)
+                .onSnapshot(sn => { const i = []; sn.forEach(d => i.push({ ...d.data(), id: d.id })); setGalleryItems(i); });
+            return unsub;
+        }, [user]);
+
+        // --- Handlers ---
+        const updateConfig = (k, v) => setDesignState({ ...designState, config: { ...config, [k]: parseFloat(v) }, activePreset: 'custom' });
+        const updateParam = (k, v) => setDesignState({ ...designState, [k]: v });
+        const applyPreset = k => setDesignState({ ...designState, config: PRESETS[k], activePreset: k });
+
+        const handleExport = () => {
+            if (!paddleRef.current) return;
+            try {
+                const exporter = new THREE.STLExporter();
+                const result = exporter.parse(paddleRef.current, { binary: true });
+                const blob = new Blob([result], { type: 'application/octet-stream' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `dog_paddle_${activePreset}_${activeMode}.stl`;
+                a.click();
+            } catch(e) { alert('エクスポートエラー: ' + e.message); }
+        };
+
+        const handleShare = async () => {
+            if (!db) return alert('Firebase未設定。デモモードでは共有できません。');
+            if (!designName) return alert('デザイン名を入力してください');
+            try {
+                const thumbnail = window.captureThumbnail ? window.captureThumbnail() : '';
+                await db.collection('shared_designs').add({
+                    name: designName, creator: creatorName || '名無し', makerWorldUrl: makerWorldUrl || '',
+                    config, hingeTolerance, thumbnail, userId: user.uid,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                setShowShareModal(false); setDesignName(''); alert('共有しました！');
+            } catch(e) { alert('共有に失敗しました。'); }
+        };
+
+        const loadDesign = item => {
+            setDesignState({ config: item.config, hingeTolerance: item.hingeTolerance || 0.2, hingeAngle: 180, hingePos: [0,0,0], hingeRot: [0,0,0], activePreset: 'custom' });
+            setShowGalleryModal(false);
+            alert(`「${item.name}」をロードしました！`);
+        };
+
+        const handleRequest = async () => {
+            if (!requestText) return alert('内容を入力してください');
+            if (!db) return alert('Firebase未設定。');
+            await db.collection('design_requests').add({
+                content: requestText, contact: contactInfo, likes: 0, userId: user?.uid,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            setShowRequestModal(false); setRequestText(''); alert('送信完了！');
+        };
+
+        const handleLike = async id => {
+            if (!db) return;
+            await db.collection('design_requests').doc(id).update({ likes: firebase.firestore.FieldValue.increment(1) });
+        };
+
+        const handleBg = e => {
+            const f = e.target.files[0];
+            if (f) { const u = URL.createObjectURL(f); setBgImage(u); document.getElementById('background-layer').style.backgroundImage = `url(${u})`; }
+        };
+
+        const handleTextPointerDown = e => { draggingRef.current = true; e.preventDefault(); e.target.setPointerCapture(e.pointerId); };
+        const handleTextPointerMove = e => {
+            if (!draggingRef.current) return; e.preventDefault();
+            setTextPos({ x: (e.clientX / document.body.clientWidth) * 100, y: (e.clientY / document.body.clientHeight) * 100 });
+        };
+        const handleTextPointerUp = e => { draggingRef.current = false; e.target.releasePointerCapture(e.pointerId); };
+
+        const hp = hingePos, hr = hingeRot;
+
+        return (
+            <>
+                <div id="app-header" className={(isGameMode || isPhotoMode) ? 'hidden-ui' : ''}>
+                    <div className="brand-container cursor-pointer" onClick={onBack}>
+                        <div className="back-btn"><span className="text-lg">←</span> Home</div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <div className="model-selector"><span>エチケットパドル</span></div>
+                        <div className="flex items-center gap-2">
+                            <div className="tool-btn request" onClick={() => setShowRequestModal(true)} title="リクエスト">💡</div>
+                            <div className="tool-btn share" onClick={() => setShowShareModal(true)} title="共有">📤</div>
+                            <div className="tool-btn gallery" onClick={() => setShowGalleryModal(true)} title="アルバム">🖼️</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="toolbar-container" className={isPhotoMode ? 'hidden-ui' : ''}>
+                    <div className={`tool-btn ${!canUndo ? 'opacity-30 pointer-events-none' : ''}`} onClick={undo} title="元に戻す">↩</div>
+                    <div className={`tool-btn ${!canRedo ? 'opacity-30 pointer-events-none' : ''}`} onClick={redo} title="やり直し">↪</div>
+                    <div className="w-px h-[30px] bg-gray-300 mx-1"></div>
+                    <div className={`tool-btn ${isPhotoMode ? 'active' : ''}`} onClick={() => setActiveMode(m => m === 'photo' ? 'design' : 'photo')}>📷</div>
+                    <div className={`tool-btn game-mode ${isGameMode ? 'active' : ''}`} onClick={() => setActiveMode(m => m === 'game' ? 'design' : 'game')}>🎮</div>
+                    <div className={`tool-btn print-mode ${activeMode === 'print' ? 'active' : ''}`} onClick={() => setActiveMode('print')}>🖨️</div>
+                </div>
+
+                <div id="ui-container" className={`${(isGameMode || isPhotoMode) ? 'hidden-ui' : ''} ${isUiCollapsed ? 'minimized' : ''}`}>
+                    <div className="panel-header" onClick={() => setIsUiCollapsed(v => !v)}>
+                        <h2 className="text-sm font-bold text-gray-700">設定</h2>
+                        <span className="text-gray-500">{isUiCollapsed ? '▲' : '▼'}</span>
+                    </div>
+                    <div className="panel-content">
+                        <div className="step-guide">
+                            {['design','hinge','photo','game','print'].map((m, i) => (
+                                <div key={m} className={`step-item ${activeMode === m ? 'active' : ''}`} onClick={() => setActiveMode(m)}>
+                                    {['🔧Design','📏Hinge','📷Photo','🎮Test','🖨️Assemble'][i]}
+                                </div>
+                            ))}
+                        </div>
+
+                        {activeMode === 'hinge' && (
+                            <div className="mb-4">
+                                <div className="text-center p-3 bg-blue-100 rounded-lg mb-3">
+                                    <h3 className="font-bold text-blue-800">ヒンジ位置調整</h3>
+                                    <p className="text-xs text-blue-700 mt-1">赤いボックスをドラッグして位置・角度を調整</p>
+                                    <div className="flex gap-2 mt-3">
+                                        {['translate','rotate'].map(m => (
+                                            <button key={m} className={`w-full py-2 rounded text-sm ${transformMode === m ? 'bg-blue-500 text-white' : 'bg-white'}`} onClick={() => setTransformMode(m)}>
+                                                {m === 'translate' ? '移動' : '回転'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="hinge-slider-section">
+                                    <h4>位置 (X / Y / Z)</h4>
+                                    {['x','y','z'].map((axis, i) => (
+                                        <div key={axis} className="hinge-row">
+                                            <label>{axis.toUpperCase()}</label>
+                                            <input type="range" min="-50" max="50" step="1" value={hp[i]}
+                                                onChange={e => { const v = [...hp]; v[i] = parseFloat(e.target.value); updateParam('hingePos', v); }} />
+                                            <span>{hp[i].toFixed(0)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="hinge-slider-section">
+                                    <h4>回転 (X / Y / Z) °</h4>
+                                    {['x','y','z'].map((axis, i) => (
+                                        <div key={axis} className="hinge-row">
+                                            <label>{axis.toUpperCase()}</label>
+                                            <input type="range" min="-180" max="180" step="5" value={Math.round(THREE.MathUtils.radToDeg(hr[i]))}
+                                                onChange={e => { const v = [...hr]; v[i] = THREE.MathUtils.degToRad(parseFloat(e.target.value)); updateParam('hingeRot', v); }} />
+                                            <span>{Math.round(THREE.MathUtils.radToDeg(hr[i]))}°</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeMode === 'design' && (<>
+                            <p className="text-xs font-bold text-gray-500 mb-2">プリセット</p>
+                            <div className="preset-grid">
+                                {Object.keys(PRESETS).map(k => (
+                                    <button key={k} className={`preset-btn ${activePreset === k ? 'active' : ''}`} onClick={() => applyPreset(k)}>{PRESETS[k].name}</button>
+                                ))}
+                            </div>
+                            <hr className="mb-4 border-gray-300" />
+                            <div className="bg-green-50 p-3 rounded-lg mb-4 border border-green-200">
+                                <label className="text-green-800 text-sm mb-1">ヒンジ開閉 ({hingeAngle}°)</label>
+                                <input type="range" min="0" max="180" value={hingeAngle} onChange={e => updateParam('hingeAngle', parseFloat(e.target.value))} />
+                            </div>
+                            <div className="bg-gray-100 p-3 rounded-lg mb-4 border border-gray-300">
+                                <label className="text-gray-700 text-xs font-bold mb-1 flex justify-between"><span>ヒンジ固さ</span><span>{hingeTolerance}mm</span></label>
+                                <input type="range" min="0.1" max="0.6" step="0.1" value={hingeTolerance} onChange={e => updateParam('hingeTolerance', parseFloat(e.target.value))} />
+                            </div>
+                            <div className="slider-group"><label>幅 ({config.width}mm)</label><input type="range" min="80" max="180" value={config.width} onChange={e => updateConfig('width', e.target.value)} /></div>
+                            <div className="slider-group"><label>長さ ({config.length}mm)</label><input type="range" min="80" max="180" value={config.length} onChange={e => updateConfig('length', e.target.value)} /></div>
+                            <div className="slider-group"><label>持ち手 ({config.handleLength}mm)</label><input type="range" min="50" max="150" value={config.handleLength} onChange={e => updateConfig('handleLength', e.target.value)} /></div>
+                        </>)}
+
+                        <button className="action-btn" onClick={handleExport}>⬇ STLダウンロード</button>
+                        <p className="version-info">WanCraft 3D v{APP_VERSION}</p>
+                    </div>
+                </div>
+
+                <div className={`autosave-toast ${showAutoSaveToast ? 'visible' : ''}`}><span>💾</span> 自動保存しました</div>
+
+                {/* Photo controls */}
+                <div id="photo-controls" className={isPhotoMode ? 'visible' : ''}>
+                    <div className="lighting-panel">
+                        <label style={{color:'white',marginBottom:'4px'}}>光の方向</label>
+                        <input type="range" min="-3" max="3" step="0.1" value={lightDir} onChange={e => setLightDir(parseFloat(e.target.value))} />
+                    </div>
+                    <div className="text-panel">
+                        <input type="text" placeholder="プロモテキスト..." value={promoText} onChange={e => setPromoText(e.target.value)} />
+                    </div>
+                    <div className="photo-actions">
+                        <label className="photo-btn cursor-pointer"><input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleBg} />🖼 背景を設定</label>
+                        <div className="photo-btn shutter" onClick={() => window.takeCompositePhoto && window.takeCompositePhoto()}>📸 撮影</div>
+                    </div>
+                </div>
+
+                {/* Promo text overlay */}
+                <div id="promo-text-container" className={isPhotoMode ? 'visible' : ''}
+                    style={{ left: `${textPos.x}%`, top: `${textPos.y}%` }}
+                    onPointerDown={handleTextPointerDown}
+                    onPointerMove={handleTextPointerMove}
+                    onPointerUp={handleTextPointerUp}>
+                    <div id="promo-text-content">{promoText}</div>
+                </div>
+
+                {/* Game overlay */}
+                <div id="game-overlay" className={isGameMode ? 'active' : ''}>
+                    <div className="score-board">{score}</div>
+                    {scorePopups.map(p => (
+                        <div key={p.id} className="score-popup" style={{ left: `${p.x}%`, top: `${p.y}%` }}>+{p.points}</div>
+                    ))}
+                </div>
+
+                {/* Modals */}
+                {showRequestModal && (
+                    <div className="modal-overlay" onClick={() => setShowRequestModal(false)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()}>
+                            <h3 className="text-xl font-bold mb-4 text-yellow-600">💡 リクエスト</h3>
+                            <div className="mb-4"><label className="block text-sm font-bold mb-2">内容</label><textarea className="w-full border p-2 rounded h-24" value={requestText} onChange={e => setRequestText(e.target.value)} /></div>
+                            <div className="mb-6"><label className="block text-sm font-bold mb-2">連絡先 (任意)</label><input className="w-full border p-2 rounded" value={contactInfo} onChange={e => setContactInfo(e.target.value)} /><p className="text-xs text-red-500 mt-1">🔒 管理者のみ公開</p></div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-blue-500 cursor-pointer text-sm underline" onClick={() => { setShowRequestModal(false); setShowIdeaBoard(true); }}>アイデア一覧</span>
+                                <div className="flex gap-2">
+                                    <button className="px-4 py-2 bg-gray-200 rounded" onClick={() => setShowRequestModal(false)}>閉じる</button>
+                                    <button className="px-4 py-2 bg-yellow-500 text-white rounded" onClick={handleRequest}>送信</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showIdeaBoard && (
+                    <div className="modal-overlay" onClick={() => setShowIdeaBoard(false)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ height: '70vh' }}>
+                            <h3 className="text-xl font-bold mb-4 text-gray-700">みんなのアイデア</h3>
+                            <div className="request-list">
+                                {ideaItems.map(i => (
+                                    <div key={i.id} className="request-item">
+                                        <div><div>{i.content}</div><div className="text-xs text-gray-400">{i.createdAt?.seconds ? new Date(i.createdAt.seconds * 1000).toLocaleDateString() : ''}</div></div>
+                                        <div className="like-btn" onClick={() => handleLike(i.id)}><span>♥</span>{i.likes || 0}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            <button className="mt-4 px-4 py-2 bg-gray-200 rounded w-full" onClick={() => setShowIdeaBoard(false)}>閉じる</button>
+                        </div>
+                    </div>
+                )}
+
+                {showShareModal && (
+                    <div className="modal-overlay" onClick={() => setShowShareModal(false)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()}>
+                            <h3 className="text-xl font-bold mb-4 text-green-600">デザインを共有</h3>
+                            <div className="mb-4"><label className="block text-sm font-bold mb-2">デザイン名</label><input className="w-full border p-2 rounded" value={designName} onChange={e => setDesignName(e.target.value)} /></div>
+                            <div className="mb-4"><label className="block text-sm font-bold mb-2">作者名（任意）</label><input className="w-full border p-2 rounded" value={creatorName} onChange={e => setCreatorName(e.target.value)} /></div>
+                            <div className="mb-6"><label className="block text-sm font-bold mb-2">MakerWorld URL（任意）</label><input className="w-full border p-2 rounded" value={makerWorldUrl} onChange={e => setMakerWorldUrl(e.target.value)} /></div>
+                            <div className="flex justify-end gap-4">
+                                <button className="px-4 py-2 bg-gray-200 rounded" onClick={() => setShowShareModal(false)}>キャンセル</button>
+                                <button className="px-4 py-2 bg-green-600 text-white rounded" onClick={handleShare}>共有する</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {showGalleryModal && (
+                    <div className="modal-overlay" onClick={() => setShowGalleryModal(false)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', height: '80vh' }}>
+                            <h3 className="text-xl font-bold mb-4 text-purple-600">みんなのアルバム</h3>
+                            <div className="gallery-grid">
+                                {galleryItems.map(item => (
+                                    <div key={item.id} className="gallery-item" onClick={() => loadDesign(item)}>
+                                        <img src={item.thumbnail} className="gallery-thumb" alt={item.name} />
+                                        <div className="gallery-info">
+                                            <div className="gallery-title">{item.name}</div>
+                                            <div className="text-xs text-gray-400">by {item.creator}</div>
+                                            {item.makerWorldUrl && <a href={item.makerWorldUrl} target="_blank" rel="noopener noreferrer" className="mw-link" onClick={e => e.stopPropagation()}>MakerWorld</a>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <button className="mt-4 px-4 py-2 bg-gray-200 rounded w-full" onClick={() => setShowGalleryModal(false)}>閉じる</button>
+                        </div>
+                    </div>
+                )}
+
+                <div id="canvas-container" ref={mountRef}></div>
+            </>
+        );
+    };
+
+    // --- App ---
+    const App = () => {
+        const [view, setView] = useState('home');
+        const [user, setUser] = useState(null);
+
+        useEffect(() => {
+            if (auth) {
+                const init = async () => {
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await auth.signInWithCustomToken(__initial_auth_token);
+                        } else {
+                            await auth.signInAnonymously();
+                        }
+                    } catch(e) { setUser({ uid: 'offline' }); }
+                };
+                init();
+                return auth.onAuthStateChanged(setUser);
+            } else {
+                setUser({ uid: 'offline' });
+            }
+        }, []);
+
+        if (!user) return <div className="flex h-screen items-center justify-center text-gray-400">Loading...</div>;
+
+        return (
+            <ErrorBoundary>
+                <div className="w-full h-screen overflow-hidden relative">
+                    {view === 'home' && <Home onLaunchTool={tool => { if (tool === 'paddle') setView('paddle'); }} user={user} />}
+                    {view === 'paddle' && <PaddleMaker onBack={() => setView('home')} user={user} />}
+                </div>
+            </ErrorBoundary>
+        );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+
+<div id="export-paywall" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);align-items:center;justify-content:center;flex-direction:column;">
+<div style="background:rgba(16,16,18,0.96);border:1px solid #00ffff;border-radius:16px;padding:32px;max-width:420px;width:90%;text-align:center;">
+<div style="font-size:32px;margin-bottom:12px;">🔒</div>
+<h2 style="color:#00ffff;font-family:monospace;font-size:16px;">Export License Required</h2>
+<p style="color:#aaa;font-size:12px;line-height:1.6;margin:12px 0 20px;">ファイルの出力にはライセンスが必要です。<br>プレビュー・操作は引き続き無料です。</p>
+<p style="color:#666;font-size:10px;">Stripe による安全な決済処理</p>
+<button onclick="document.getElementById('export-paywall').style.display='none'" style="background:none;border:none;color:#666;font-size:12px;cursor:pointer;text-decoration:underline;margin-top:12px;">閉じる</button>
+</div>
+</div>
+<script>
+window._exportLicensed = false;
+window.requireExportLicense = function() {
+  if (window._exportLicensed) return true;
+  var overlay = document.getElementById('export-paywall');
+  if (overlay) overlay.style.display = 'flex';
+  return false;
+};
+</script></body>
+</html>

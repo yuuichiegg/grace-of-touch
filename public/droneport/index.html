@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drone Port Designer | GRACE OF TOUCH</title>
+  <!-- Auth Guard -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script>
+    firebase.initializeApp({
+      apiKey: "AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",
+      authDomain: "grace-of-touch.firebaseapp.com",
+      projectId: "grace-of-touch",
+      storageBucket: "grace-of-touch.firebasestorage.app",
+      messagingSenderId: "505078300866",
+      appId: "1:505078300866:web:adad2a27b163c3b0f1bb5b"
+    });
+    const OWNER_EMAILS = ['graceoftouchco@gmail.com'];
+    const _db = firebase.firestore();
+
+    window._exportLicensed = false;
+    window._currentUser = null;
+
+    // Preview is free for everyone, export requires license
+    document.documentElement.style.visibility = 'visible';
+
+    firebase.auth().onAuthStateChanged(async function(user) {
+      if (!user) { window._currentUser = null; return; }
+      window._currentUser = user;
+      const email = (user.email || '').toLowerCase();
+
+      if (OWNER_EMAILS.includes(email)) {
+        window._exportLicensed = true;
+        return;
+      }
+
+      try {
+        const licDoc = await _db.collection('licenses').doc(user.uid + '_droneport_export').get();
+        if (licDoc.exists && licDoc.data().status === 'active') {
+          window._exportLicensed = true;
+        }
+      } catch (e) { /* no license */ }
+    });
+
+    window.requireExportLicense = function() {
+      if (window._exportLicensed) return true;
+      const overlay = document.getElementById('export-paywall');
+      if (overlay) overlay.style.display = 'flex';
+      return false;
+    };
+
+    // ====== SOURCE CODE PROTECTION ======
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+      if (e.key === 'F12') { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key.toUpperCase())) { e.preventDefault(); return false; }
+      if (e.ctrlKey && ['u','U','s','S'].includes(e.key)) { e.preventDefault(); return false; }
+    });
+    document.addEventListener('selectstart', e => e.preventDefault());
+    document.addEventListener('dragstart', e => e.preventDefault());
+    console.clear();
+  </script>
+  <style>/* auth guard removed - preview free */</style>
+  <!-- /Auth Guard -->
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
+
+  <style>
+    :root {
+      --accent: #00d4ff;
+      --accent-dim: rgba(0,212,255,0.15);
+      --bg: #0a0a12;
+      --panel: #12121e;
+      --panel-border: #1e1e30;
+      --text: #e0e0e8;
+      --text-dim: #8888a0;
+      --danger: #ff4466;
+      --success: #00ff88;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    /* HEADER */
+    #header {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 52px;
+      background: linear-gradient(180deg, rgba(18,18,30,0.98), rgba(10,10,18,0.95));
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 1000;
+      backdrop-filter: blur(12px);
+    }
+
+    #header .left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-back {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .btn-back:hover {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    .header-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--text);
+    }
+    .header-title span {
+      color: var(--accent);
+    }
+
+    #header .right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-header {
+      padding: 6px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+    }
+    .btn-export {
+      background: linear-gradient(135deg, #00a8cc, #006880);
+      color: #fff;
+    }
+    .btn-export:hover {
+      filter: brightness(1.2);
+      transform: translateY(-1px);
+    }
+
+    /* VIEWPORT */
+    #viewport {
+      position: fixed;
+      top: 52px;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
+
+    /* SIDEBAR */
+    #sidebar {
+      position: fixed;
+      top: 52px;
+      right: 0;
+      width: 300px;
+      bottom: 0;
+      background: rgba(18,18,30,0.92);
+      border-left: 1px solid var(--panel-border);
+      backdrop-filter: blur(12px);
+      overflow-y: auto;
+      z-index: 500;
+      padding: 16px;
+      transition: transform 0.3s ease;
+    }
+
+    #sidebar::-webkit-scrollbar { width: 4px; }
+    #sidebar::-webkit-scrollbar-thumb { background: var(--panel-border); border-radius: 2px; }
+
+    .section-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 16px 0 10px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--panel-border);
+    }
+    .section-title:first-child { margin-top: 0; }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .control-row label {
+      font-size: 12px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+    .control-row .value {
+      font-size: 11px;
+      color: var(--accent);
+      min-width: 48px;
+      text-align: right;
+      font-weight: 600;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: var(--panel-border);
+      border-radius: 2px;
+      outline: none;
+      margin: 4px 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      border: 2px solid var(--bg);
+    }
+
+    select {
+      width: 100%;
+      padding: 8px 10px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      font-size: 12px;
+      outline: none;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    select:focus { border-color: var(--accent); }
+
+    .radio-group {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .radio-btn {
+      flex: 1;
+      padding: 8px 0;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-dim);
+      background: var(--bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .radio-btn.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .toggle-row label {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    .toggle-switch {
+      position: relative;
+      width: 40px;
+      height: 20px;
+      background: var(--panel-border);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .toggle-switch.active {
+      background: var(--accent);
+    }
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.3s;
+    }
+    .toggle-switch.active::after {
+      transform: translateX(20px);
+    }
+
+    /* COLOR SWATCHES */
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .color-swatch {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .color-swatch:hover { transform: scale(1.1); }
+    .color-swatch.active { border-color: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+    /* MOBILE TOGGLE */
+    #sidebar-toggle {
+      display: none;
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 48px;
+      height: 48px;
+      background: var(--accent);
+      color: var(--bg);
+      border: none;
+      border-radius: 50%;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 1001;
+      box-shadow: 0 4px 16px rgba(0,212,255,0.4);
+    }
+
+    @media (max-width: 768px) {
+      #sidebar {
+        width: 280px;
+        transform: translateX(100%);
+      }
+      #sidebar.open {
+        transform: translateX(0);
+      }
+      #sidebar-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .header-title { font-size: 11px; }
+      .btn-header { padding: 5px 10px; font-size: 11px; }
+      .btn-back { font-size: 11px; padding: 4px 10px; }
+    }
+
+    /* EXPORT PAYWALL */
+    #export-paywall {
+      position: fixed;
+      inset: 0;
+      z-index: 99998;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(8px);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+
+    /* GRID FLOOR HINT */
+    .dim-info {
+      position: fixed;
+      bottom: 12px;
+      left: 12px;
+      font-size: 11px;
+      color: var(--text-dim);
+      z-index: 100;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div id="header">
+    <div class="left">
+      <a href="/" class="btn-back">&larr; PORTAL</a>
+      <div class="header-title">GRACE OF TOUCH <span>|</span> Drone Port Designer</div>
+    </div>
+    <div class="right">
+      <button class="btn-header btn-export" onclick="exportSTL('ascii')">STL (ASCII)</button>
+      <button class="btn-header btn-export" onclick="exportSTL('binary')">STL (Binary)</button>
+    </div>
+  </div>
+
+  <!-- EXPORT PAYWALL OVERLAY -->
+  <div id="export-paywall" style="display:none;">
+    <div style="background:var(--panel);border:1px solid var(--accent);border-radius:16px;padding:32px;max-width:420px;width:90%;text-align:center;">
+      <div style="font-size:32px;margin-bottom:12px;">&#128274;</div>
+      <h2 style="color:var(--accent);font-size:18px;margin:0 0 8px;">Export License Required</h2>
+      <p style="color:#aaa;font-size:13px;line-height:1.6;margin:0 0 20px;">STL export requires a license.<br>3D preview and customization remain free.</p>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+        <a href="#" style="display:block;background:linear-gradient(135deg,var(--accent),#0088aa);color:#fff;padding:14px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;">Export Pro — ¥19,800</a>
+        <a href="#" style="display:block;background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);padding:12px;border-radius:8px;text-decoration:none;font-size:13px;">Monthly — ¥3,980/mo</a>
+      </div>
+      <p style="color:#666;font-size:10px;margin:0 0 12px;">Secure payment via Stripe</p>
+      <button onclick="document.getElementById('export-paywall').style.display='none'" style="background:none;border:none;color:#666;font-size:12px;cursor:pointer;text-decoration:underline;">Close</button>
+    </div>
+  </div>
+
+  <!-- VIEWPORT -->
+  <div id="viewport"></div>
+  <div class="dim-info" id="dim-info"></div>
+
+  <!-- MOBILE SIDEBAR TOGGLE -->
+  <button id="sidebar-toggle" onclick="toggleSidebar()">&#9881;</button>
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+
+    <div class="section-title">Drone Model</div>
+    <select id="drone-model" onchange="onDroneModelChange()">
+      <option value="custom">Custom</option>
+      <option value="mini">DJI Mini (250mm)</option>
+      <option value="air" selected>DJI Air (300mm)</option>
+      <option value="mavic">DJI Mavic (350mm)</option>
+    </select>
+
+    <div class="section-title">Platform</div>
+    <div class="control-row">
+      <label>Diameter</label>
+      <span class="value" id="val-diameter">300mm</span>
+    </div>
+    <input type="range" id="sl-diameter" min="200" max="600" value="300" step="10" oninput="onSlider()">
+
+    <div class="control-row">
+      <label>Thickness</label>
+      <span class="value" id="val-thickness">10mm</span>
+    </div>
+    <input type="range" id="sl-thickness" min="5" max="20" value="10" step="1" oninput="onSlider()">
+
+    <div class="section-title">Legs</div>
+    <div class="control-row">
+      <label>Height</label>
+      <span class="value" id="val-legHeight">30mm</span>
+    </div>
+    <input type="range" id="sl-legHeight" min="0" max="100" value="30" step="5" oninput="onSlider()">
+
+    <label style="font-size:11px;color:var(--text-dim);margin-bottom:6px;display:block;">Number of Legs</label>
+    <div class="radio-group" id="leg-count-group">
+      <div class="radio-btn" data-val="3" onclick="setLegCount(3)">3</div>
+      <div class="radio-btn active" data-val="4" onclick="setLegCount(4)">4</div>
+      <div class="radio-btn" data-val="6" onclick="setLegCount(6)">6</div>
+    </div>
+
+    <div class="section-title">Guide Rail</div>
+    <div class="control-row">
+      <label>Height</label>
+      <span class="value" id="val-railHeight">15mm</span>
+    </div>
+    <input type="range" id="sl-railHeight" min="0" max="50" value="15" step="1" oninput="onSlider()">
+
+    <div class="section-title">Center Marker</div>
+    <div class="control-row">
+      <label>Size</label>
+      <span class="value" id="val-markerSize">60%</span>
+    </div>
+    <input type="range" id="sl-markerSize" min="20" max="90" value="60" step="5" oninput="onSlider()">
+
+    <div class="section-title">Options</div>
+    <div class="toggle-row">
+      <label>Cable Channel</label>
+      <div class="toggle-switch" id="toggle-cable" onclick="toggleCable()"></div>
+    </div>
+
+    <div class="section-title">Color</div>
+    <div class="color-grid" id="color-grid"></div>
+
+    <div class="section-title">Lighting</div>
+
+    <div class="control-row">
+      <label>Brightness</label>
+      <span class="value" id="val-brightness">100%</span>
+    </div>
+    <input type="range" id="sl-brightness" min="20" max="200" value="100" step="5" oninput="onLightChange()">
+
+    <div class="control-row">
+      <label>Key Light Angle</label>
+      <span class="value" id="val-lightAngle">45°</span>
+    </div>
+    <input type="range" id="sl-lightAngle" min="0" max="360" value="45" step="5" oninput="onLightChange()">
+
+    <div class="control-row">
+      <label>Key Light Height</label>
+      <span class="value" id="val-lightHeight">60°</span>
+    </div>
+    <input type="range" id="sl-lightHeight" min="10" max="90" value="60" step="5" oninput="onLightChange()">
+
+    <div class="control-row">
+      <label>Light Color</label>
+    </div>
+    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;">
+      <div class="color-swatch active" data-light="#ffffff" onclick="setLightColor('#ffffff')" style="background:#ffffff;width:28px;height:28px;border-radius:6px;cursor:pointer;border:2px solid transparent;"></div>
+      <div class="color-swatch" data-light="#ffe0b2" onclick="setLightColor('#ffe0b2')" style="background:#ffe0b2;width:28px;height:28px;border-radius:6px;cursor:pointer;border:2px solid transparent;" title="Warm"></div>
+      <div class="color-swatch" data-light="#b3e5fc" onclick="setLightColor('#b3e5fc')" style="background:#b3e5fc;width:28px;height:28px;border-radius:6px;cursor:pointer;border:2px solid transparent;" title="Cool"></div>
+      <div class="color-swatch" data-light="#00d4ff" onclick="setLightColor('#00d4ff')" style="background:#00d4ff;width:28px;height:28px;border-radius:6px;cursor:pointer;border:2px solid transparent;" title="Cyan"></div>
+      <div class="color-swatch" data-light="#ff6600" onclick="setLightColor('#ff6600')" style="background:#ff6600;width:28px;height:28px;border-radius:6px;cursor:pointer;border:2px solid transparent;" title="Orange"></div>
+      <div class="color-swatch" data-light="#ff3366" onclick="setLightColor('#ff3366')" style="background:#ff3366;width:28px;height:28px;border-radius:6px;cursor:pointer;border:2px solid transparent;" title="Red"></div>
+    </div>
+
+    <div class="control-row">
+      <label>Exposure</label>
+      <span class="value" id="val-exposure">110%</span>
+    </div>
+    <input type="range" id="sl-exposure" min="50" max="250" value="110" step="5" oninput="onLightChange()">
+
+  </div>
+
+  <script>
+    // ====== CONFIG ======
+    const COLORS = [
+      { name: 'Gunmetal',       hex: '#2a2d32' },
+      { name: 'Carbon',         hex: '#1a1a1a' },
+      { name: 'Slate',          hex: '#4a5568' },
+      { name: 'Titanium',       hex: '#878e99' },
+      { name: 'Silver',         hex: '#c0c0c0' },
+      { name: 'White',          hex: '#e8e8e8' },
+      { name: 'Safety Orange',  hex: '#ff6600' },
+      { name: 'Signal Red',     hex: '#cc2222' },
+      { name: 'Hi-Vis Yellow',  hex: '#dde000' },
+      { name: 'Tactical Green', hex: '#2d6a30' },
+      { name: 'Cyan Tech',      hex: '#00d4ff' },
+      { name: 'Deep Navy',      hex: '#1a2744' },
+    ];
+
+    const DRONE_PRESETS = {
+      mini:  { diameter: 250 },
+      air:   { diameter: 300 },
+      mavic: { diameter: 350 },
+    };
+
+    // ====== STATE ======
+    let params = {
+      diameter: 300,
+      thickness: 10,
+      legHeight: 30,
+      legCount: 4,
+      railHeight: 15,
+      markerSize: 60,
+      cableChannel: false,
+      colorHex: '#2a2d32',
+    };
+
+    // ====== THREE.JS SETUP ======
+    const vp = document.getElementById('viewport');
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 2000);
+    camera.position.set(200, 250, 350);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x0a0a12);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    vp.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 100;
+    controls.maxDistance = 800;
+    controls.target.set(0, 20, 0);
+
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0x8899bb, 1.2);
+    scene.add(ambientLight);
+
+    const hemiLight = new THREE.HemisphereLight(0x88ccff, 0x444422, 0.8);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+    dirLight.position.set(200, 400, 200);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(1024, 1024);
+    dirLight.shadow.camera.near = 10;
+    dirLight.shadow.camera.far = 1000;
+    dirLight.shadow.camera.left = -300;
+    dirLight.shadow.camera.right = 300;
+    dirLight.shadow.camera.top = 300;
+    dirLight.shadow.camera.bottom = -300;
+    scene.add(dirLight);
+
+    const fillLight = new THREE.DirectionalLight(0x00d4ff, 0.6);
+    fillLight.position.set(-150, 200, -100);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xff6600, 0.4);
+    rimLight.position.set(0, 100, -200);
+    scene.add(rimLight);
+
+    const bottomLight = new THREE.PointLight(0x00d4ff, 0.5, 500);
+    bottomLight.position.set(0, -50, 0);
+    scene.add(bottomLight);
+
+    // Ground grid
+    const gridHelper = new THREE.GridHelper(600, 30, 0x1e1e30, 0x14141f);
+    scene.add(gridHelper);
+
+    // ====== MODEL GROUP ======
+    let modelGroup = new THREE.Group();
+    scene.add(modelGroup);
+
+    // ====== BUILD FUNCTIONS ======
+    function createMarkerTexture(size) {
+      const res = 512;
+      const canvas = document.createElement('canvas');
+      canvas.width = res;
+      canvas.height = res;
+      const ctx = canvas.getContext('2d');
+
+      // Base - transparent
+      ctx.clearRect(0, 0, res, res);
+
+      // Draw "H" marker
+      const hSize = (size / 100) * res * 0.4;
+      const cx = res / 2;
+      const cy = res / 2;
+      const barW = hSize * 0.18;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = 0.9;
+
+      // Left vertical
+      ctx.fillRect(cx - hSize / 2, cy - hSize / 2, barW, hSize);
+      // Right vertical
+      ctx.fillRect(cx + hSize / 2 - barW, cy - hSize / 2, barW, hSize);
+      // Horizontal bar
+      ctx.fillRect(cx - hSize / 2, cy - barW / 2, hSize, barW);
+
+      // Circle around H
+      ctx.globalAlpha = 0.6;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(cx, cy, hSize * 0.7, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Outer ring
+      ctx.globalAlpha = 0.25;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, res * 0.44, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Corner marks
+      ctx.globalAlpha = 0.4;
+      ctx.lineWidth = 3;
+      const cm = res * 0.42;
+      const cl = 20;
+      [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(([dx, dy]) => {
+        const x = cx + dx * cm;
+        const y = cy + dy * cm;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - dx * cl, y);
+        ctx.moveTo(x, y);
+        ctx.lineTo(x, y - dy * cl);
+        ctx.stroke();
+      });
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.needsUpdate = true;
+      return tex;
+    }
+
+    function buildModel() {
+      // Clear old
+      while (modelGroup.children.length) {
+        const c = modelGroup.children[0];
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) {
+          const mats = Array.isArray(c.material) ? c.material : [c.material];
+          mats.forEach(m => {
+            if (m.map) m.map.dispose();
+            m.dispose();
+          });
+        }
+        modelGroup.remove(c);
+      }
+
+      const { diameter, thickness, legHeight, legCount, railHeight, markerSize, cableChannel, colorHex } = params;
+      const r = diameter / 2;
+      const color = new THREE.Color(colorHex);
+      const yBase = legHeight;
+
+      // ---- Platform disc ----
+      const platGeo = new THREE.CylinderGeometry(r, r, thickness, 64);
+      const markerTex = createMarkerTexture(markerSize);
+      const platMats = [
+        new THREE.MeshStandardMaterial({ color, metalness: 0.6, roughness: 0.35 }), // side
+        new THREE.MeshStandardMaterial({ color, metalness: 0.5, roughness: 0.3, map: markerTex }), // top
+        new THREE.MeshStandardMaterial({ color, metalness: 0.6, roughness: 0.35 }), // bottom
+      ];
+      const platform = new THREE.Mesh(platGeo, platMats);
+      platform.position.y = yBase + thickness / 2;
+      platform.castShadow = true;
+      platform.receiveShadow = true;
+      modelGroup.add(platform);
+
+      // ---- Legs ----
+      if (legHeight > 0) {
+        const legRadius = Math.max(6, diameter * 0.025);
+        const legOffset = r * 0.78;
+        for (let i = 0; i < legCount; i++) {
+          const angle = (i / legCount) * Math.PI * 2;
+          const legGeo = new THREE.CylinderGeometry(legRadius, legRadius * 1.3, legHeight, 16);
+          const legMat = new THREE.MeshStandardMaterial({ color, metalness: 0.7, roughness: 0.3 });
+          const leg = new THREE.Mesh(legGeo, legMat);
+          leg.position.set(
+            Math.cos(angle) * legOffset,
+            legHeight / 2,
+            Math.sin(angle) * legOffset
+          );
+          leg.castShadow = true;
+          modelGroup.add(leg);
+
+          // Foot pad
+          const footGeo = new THREE.CylinderGeometry(legRadius * 2, legRadius * 2, 2, 16);
+          const footMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.3, roughness: 0.8 });
+          const foot = new THREE.Mesh(footGeo, footMat);
+          foot.position.set(
+            Math.cos(angle) * legOffset,
+            1,
+            Math.sin(angle) * legOffset
+          );
+          modelGroup.add(foot);
+        }
+      }
+
+      // ---- Guide rail ring ----
+      if (railHeight > 0) {
+        const torusR = r - 4;
+        const tubeR = 3;
+        const railGeo = new THREE.TorusGeometry(torusR, tubeR, 12, 64);
+        const railMat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color(colorHex).multiplyScalar(0.7),
+          metalness: 0.8,
+          roughness: 0.25
+        });
+        const rail = new THREE.Mesh(railGeo, railMat);
+        rail.rotation.x = Math.PI / 2;
+        rail.position.y = yBase + thickness + railHeight;
+        rail.castShadow = true;
+        modelGroup.add(rail);
+
+        // Vertical posts for rail
+        const postCount = Math.max(legCount, 4);
+        for (let i = 0; i < postCount; i++) {
+          const angle = (i / postCount) * Math.PI * 2;
+          const postGeo = new THREE.CylinderGeometry(2, 2, railHeight, 8);
+          const postMat = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(colorHex).multiplyScalar(0.7),
+            metalness: 0.8,
+            roughness: 0.25
+          });
+          const post = new THREE.Mesh(postGeo, postMat);
+          post.position.set(
+            Math.cos(angle) * (torusR),
+            yBase + thickness + railHeight / 2,
+            Math.sin(angle) * (torusR)
+          );
+          modelGroup.add(post);
+        }
+      }
+
+      // ---- Cable channel ----
+      if (cableChannel) {
+        const channelW = 12;
+        const channelD = 8;
+        const channelLen = r * 0.9;
+        const channelGeo = new THREE.BoxGeometry(channelW, channelD, channelLen);
+        const channelMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, metalness: 0.3, roughness: 0.7 });
+        const channel = new THREE.Mesh(channelGeo, channelMat);
+        channel.position.set(0, yBase - channelD / 2 + thickness * 0.1, -channelLen / 2 + r * 0.05);
+        modelGroup.add(channel);
+
+        // Second channel perpendicular
+        const channel2 = channel.clone();
+        channel2.rotation.y = Math.PI / 2;
+        channel2.position.set(-channelLen / 2 + r * 0.05, yBase - channelD / 2 + thickness * 0.1, 0);
+        modelGroup.add(channel2);
+      }
+
+      // Update info
+      const totalH = legHeight + thickness + railHeight;
+      document.getElementById('dim-info').textContent =
+        `\u00D8${diameter}mm \u00D7 H${totalH}mm | ${legCount} legs`;
+    }
+
+    // ====== UI BINDINGS ======
+    // ====== LIGHTING CONTROLS ======
+    let lightColor = '#ffffff';
+
+    function onLightChange() {
+      const brightness = +document.getElementById('sl-brightness').value / 100;
+      const angle = +document.getElementById('sl-lightAngle').value;
+      const height = +document.getElementById('sl-lightHeight').value;
+      const exposure = +document.getElementById('sl-exposure').value / 100;
+
+      document.getElementById('val-brightness').textContent = Math.round(brightness * 100) + '%';
+      document.getElementById('val-lightAngle').textContent = angle + '°';
+      document.getElementById('val-lightHeight').textContent = height + '°';
+      document.getElementById('val-exposure').textContent = Math.round(exposure * 100) + '%';
+
+      // Update key light position (orbit around model)
+      const rad = angle * Math.PI / 180;
+      const hRad = height * Math.PI / 180;
+      const dist = 400;
+      dirLight.position.set(
+        Math.cos(rad) * Math.cos(hRad) * dist,
+        Math.sin(hRad) * dist,
+        Math.sin(rad) * Math.cos(hRad) * dist
+      );
+
+      // Update brightness
+      dirLight.intensity = 1.5 * brightness;
+      ambientLight.intensity = 1.2 * brightness;
+      hemiLight.intensity = 0.8 * brightness;
+      fillLight.intensity = 0.6 * brightness;
+
+      // Update color
+      dirLight.color.set(lightColor);
+
+      // Update exposure
+      renderer.toneMappingExposure = exposure;
+    }
+
+    function setLightColor(hex) {
+      lightColor = hex;
+      document.querySelectorAll('[data-light]').forEach(s => {
+        s.style.borderColor = s.dataset.light === hex ? 'var(--accent)' : 'transparent';
+      });
+      onLightChange();
+    }
+
+    function onSlider() {
+      params.diameter = +document.getElementById('sl-diameter').value;
+      params.thickness = +document.getElementById('sl-thickness').value;
+      params.legHeight = +document.getElementById('sl-legHeight').value;
+      params.railHeight = +document.getElementById('sl-railHeight').value;
+      params.markerSize = +document.getElementById('sl-markerSize').value;
+
+      document.getElementById('val-diameter').textContent = params.diameter + 'mm';
+      document.getElementById('val-thickness').textContent = params.thickness + 'mm';
+      document.getElementById('val-legHeight').textContent = params.legHeight + 'mm';
+      document.getElementById('val-railHeight').textContent = params.railHeight + 'mm';
+      document.getElementById('val-markerSize').textContent = params.markerSize + '%';
+
+      buildModel();
+    }
+
+    function setLegCount(n) {
+      params.legCount = n;
+      document.querySelectorAll('#leg-count-group .radio-btn').forEach(el => {
+        el.classList.toggle('active', +el.dataset.val === n);
+      });
+      buildModel();
+    }
+
+    function toggleCable() {
+      params.cableChannel = !params.cableChannel;
+      document.getElementById('toggle-cable').classList.toggle('active', params.cableChannel);
+      buildModel();
+    }
+
+    function onDroneModelChange() {
+      const sel = document.getElementById('drone-model').value;
+      if (DRONE_PRESETS[sel]) {
+        const preset = DRONE_PRESETS[sel];
+        params.diameter = preset.diameter;
+        document.getElementById('sl-diameter').value = preset.diameter;
+        document.getElementById('val-diameter').textContent = preset.diameter + 'mm';
+        buildModel();
+      }
+    }
+
+    // ====== COLOR GRID ======
+    function initColors() {
+      const grid = document.getElementById('color-grid');
+      COLORS.forEach((c, i) => {
+        const div = document.createElement('div');
+        div.className = 'color-swatch' + (i === 0 ? ' active' : '');
+        div.style.background = c.hex;
+        div.title = c.name;
+        div.onclick = () => {
+          document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+          div.classList.add('active');
+          params.colorHex = c.hex;
+          buildModel();
+        };
+        grid.appendChild(div);
+      });
+    }
+
+    // ====== EXPORT ======
+    function exportSTL(mode) {
+      if (!window.requireExportLicense()) return;
+
+      const exporter = new THREE.STLExporter();
+      let result;
+      if (mode === 'binary') {
+        result = exporter.parse(modelGroup, { binary: true });
+        const blob = new Blob([result], { type: 'application/octet-stream' });
+        downloadBlob(blob, 'droneport_' + params.diameter + 'mm.stl');
+      } else {
+        result = exporter.parse(modelGroup, { binary: false });
+        const blob = new Blob([result], { type: 'text/plain' });
+        downloadBlob(blob, 'droneport_' + params.diameter + 'mm.stl');
+      }
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ====== MOBILE SIDEBAR ======
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+    }
+
+    // ====== RESIZE ======
+    function onResize() {
+      const w = vp.clientWidth;
+      const h = vp.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    }
+    window.addEventListener('resize', onResize);
+
+    // ====== ANIMATION LOOP ======
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // ====== INIT ======
+    initColors();
+    onResize();
+    buildModel();
+    animate();
+  </script>
+
+</body>
+</html>

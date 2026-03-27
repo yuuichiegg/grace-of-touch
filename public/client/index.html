@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | Grace of Touch</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@400;700&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --accent: #c9a96e;
+      --accent-dim: rgba(201,169,110,0.5);
+      --dark: #0a0a0c;
+      --panel: rgba(16,16,18,0.96);
+      --panel-border: rgba(201,169,110,0.15);
+      --text: #d8d8d8;
+      --text-muted: #888;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--dark);
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* Background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -50%; left: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(ellipse at 20% 10%, rgba(201,169,110,0.04) 0%, transparent 50%),
+                  radial-gradient(ellipse at 80% 90%, rgba(201,169,110,0.03) 0%, transparent 50%);
+      z-index: 0;
+    }
+
+    /* Loading */
+    .auth-loading {
+      position: fixed; inset: 0;
+      background: var(--dark);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      z-index: 200;
+      transition: opacity 0.4s;
+    }
+    .auth-loading.hidden { opacity: 0; pointer-events: none; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 2px solid var(--panel-border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Header */
+    header {
+      position: relative; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 20px 40px;
+      border-bottom: 1px solid var(--panel-border);
+      background: var(--panel);
+      backdrop-filter: blur(20px);
+    }
+    .header-brand {
+      display: flex; align-items: center; gap: 14px;
+    }
+    .header-logo {
+      width: 36px; height: 36px;
+      border: 1.5px solid var(--accent);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 16px;
+      color: var(--accent);
+    }
+    .header-title {
+      font-family: 'Noto Serif JP', serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 2px;
+    }
+    .header-right {
+      display: flex; align-items: center; gap: 20px;
+    }
+    .user-name {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .btn-logout {
+      padding: 8px 20px;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: all 0.3s;
+      letter-spacing: 1px;
+    }
+    .btn-logout:hover {
+      border-color: #e57373;
+      color: #e57373;
+    }
+
+    /* Main */
+    main {
+      position: relative; z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 48px 40px;
+    }
+
+    .welcome {
+      margin-bottom: 48px;
+      animation: fadeIn 0.6s ease-out;
+    }
+    .welcome h1 {
+      font-family: 'Noto Serif JP', serif;
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    .welcome p {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+    }
+
+    /* Project Cards */
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 24px;
+    }
+
+    .project-card {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.4s ease;
+      animation: fadeInUp 0.6s ease-out backwards;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+    }
+    .project-card:nth-child(1) { animation-delay: 0.1s; }
+    .project-card:nth-child(2) { animation-delay: 0.2s; }
+    .project-card:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .project-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(201,169,110,0.08);
+    }
+    .project-card.disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .project-card.disabled:hover {
+      border-color: var(--panel-border);
+      transform: none;
+      box-shadow: none;
+    }
+
+    .card-thumb {
+      height: 180px;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-thumb-propanota {
+      background: linear-gradient(135deg, #1a1410 0%, #0d0b09 100%);
+    }
+    .card-thumb-propanota .cube-icon {
+      width: 80px; height: 80px;
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      transform: perspective(500px) rotateX(10deg) rotateY(-20deg);
+      position: relative;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 28px;
+      color: var(--accent);
+    }
+    .card-thumb-propanota .cube-icon::after {
+      content: '';
+      position: absolute;
+      inset: -8px;
+      border: 1px solid rgba(201,169,110,0.15);
+      border-radius: 12px;
+      transform: translateZ(-10px);
+    }
+
+    .card-thumb-tunnel {
+      background: linear-gradient(135deg, #0f1520 0%, #080c14 100%);
+    }
+    .card-thumb-tunnel .tunnel-icon {
+      width: 100px; height: 100px;
+      border-radius: 50%;
+      border: 2px solid rgba(100,160,255,0.3);
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+    }
+    .card-thumb-tunnel .tunnel-icon::before {
+      content: '';
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(100,160,255,0.2);
+      position: absolute;
+    }
+    .card-thumb-tunnel .tunnel-icon::after {
+      content: '';
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: rgba(100,160,255,0.1);
+      border: 1px solid rgba(100,160,255,0.15);
+    }
+
+    .card-thumb-infra {
+      background: linear-gradient(135deg, #141a0f 0%, #0a0f08 100%);
+    }
+    .card-thumb-infra .infra-icon {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+    }
+    .card-thumb-infra .infra-bar {
+      height: 3px;
+      border-radius: 2px;
+      background: rgba(110,201,130,0.3);
+    }
+    .card-thumb-infra .infra-bar:nth-child(1) { width: 80px; }
+    .card-thumb-infra .infra-bar:nth-child(2) { width: 60px; }
+    .card-thumb-infra .infra-bar:nth-child(3) { width: 90px; }
+    .card-thumb-infra .infra-bar:nth-child(4) { width: 50px; }
+    .card-thumb-infra .infra-bar:nth-child(5) { width: 70px; }
+
+    .card-badge {
+      position: absolute;
+      top: 12px; right: 12px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .badge-live {
+      background: rgba(201,169,110,0.15);
+      color: var(--accent);
+      border: 1px solid rgba(201,169,110,0.3);
+    }
+    .badge-soon {
+      background: rgba(255,255,255,0.05);
+      color: #666;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .card-body {
+      padding: 20px 24px 24px;
+    }
+    .card-body h3 {
+      font-family: 'Noto Serif JP', serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 6px;
+    }
+    .card-body p {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 40px;
+      font-size: 11px;
+      color: #333;
+      letter-spacing: 1px;
+      position: relative;
+      z-index: 1;
+    }
+
+    @media (max-width: 640px) {
+      header { padding: 16px 20px; }
+      .header-title { font-size: 14px; }
+      main { padding: 32px 20px; }
+      .welcome h1 { font-size: 20px; }
+      .projects-grid { grid-template-columns: 1fr; }
+      .user-name { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <a href="/" style="position:fixed;top:12px;left:12px;z-index:99999;display:flex;align-items:center;gap:6px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);border:1px solid rgba(201,169,110,0.3);border-radius:8px;padding:6px 14px;text-decoration:none;color:rgba(201,169,110,0.8);font-family:Orbitron,monospace;font-size:10px;letter-spacing:0.1em;transition:all 0.3s;" onmouseover="this.style.background='rgba(201,169,110,0.12)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>PORTAL</a>
+
+  <div class="auth-loading" id="authLoading">
+    <div class="spinner"></div>
+    <span style="color: var(--text-muted); font-size: 13px;">Loading...</span>
+  </div>
+
+  <header>
+    <div class="header-brand">
+      <div class="header-logo">G</div>
+      <div class="header-title">Grace of Touch</div>
+    </div>
+    <div class="header-right">
+      <span class="user-name" id="userName"></span>
+      <button class="btn-logout" onclick="signOut()">SIGN OUT</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="welcome">
+      <h1 id="welcomeMsg">Welcome back</h1>
+      <p>Your project dashboard</p>
+    </div>
+
+    <div class="section-label" id="sectionLabel">Your Projects</div>
+
+    <div class="projects-grid" id="projectsGrid">
+      <!-- Projects are dynamically loaded based on client permissions -->
+    </div>
+
+    <!-- Admin Notes (Owner only) -->
+    <div id="adminNotes" style="display:none;margin-top:32px;">
+      <div class="section-label" style="color:rgba(255,100,100,0.6);">ADMIN — CLIENT NOTES</div>
+      <div style="background:var(--panel);border:1px solid rgba(255,100,100,0.15);border-radius:12px;padding:16px;">
+        <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
+          <span id="notesClientName" style="color:var(--accent);font-family:'Noto Serif JP',serif;font-size:14px;font-weight:700;"></span>
+          <span id="notesClientEmail" style="color:var(--text-muted);font-size:11px;"></span>
+          <span id="notesSaveStatus" style="margin-left:auto;font-size:10px;color:rgba(0,255,100,0.5);"></span>
+        </div>
+        <textarea id="notesArea" placeholder="商談メモ・価格設定・方向性など..." style="width:100%;min-height:200px;background:rgba(255,255,255,0.03);border:1px solid rgba(201,169,110,0.1);border-radius:8px;color:var(--text);font-family:'Noto Sans JP','Inter',sans-serif;font-size:13px;line-height:1.7;padding:12px;resize:vertical;outline:none;" oninput="onNotesInput()"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <select id="notesCategory" style="background:rgba(255,255,255,0.05);border:1px solid rgba(201,169,110,0.15);border-radius:6px;color:var(--text);font-size:11px;padding:6px 10px;">
+            <option value="general">一般メモ</option>
+            <option value="pricing">価格設定</option>
+            <option value="prototype">試作・デモ</option>
+            <option value="production">量産計画</option>
+            <option value="meeting">商談記録</option>
+          </select>
+          <button onclick="saveNotes()" style="margin-left:auto;background:rgba(201,169,110,0.15);border:1px solid rgba(201,169,110,0.3);border-radius:6px;color:var(--accent);font-size:11px;padding:6px 16px;cursor:pointer;font-family:'Inter',sans-serif;">SAVE</button>
+        </div>
+        <div id="notesHistory" style="margin-top:16px;"></div>
+      </div>
+    </div>
+  </main>
+
+  <div class="footer">&copy; 2026 Grace of Touch Inc. All rights reserved.</div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",
+      authDomain: "grace-of-touch.firebaseapp.com",
+      projectId: "grace-of-touch",
+      storageBucket: "grace-of-touch.firebasestorage.app",
+      messagingSenderId: "505078300866",
+      appId: "1:505078300866:web:adad2a27b163c3b0f1bb5b"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    const db = firebase.firestore();
+
+    // Project catalog — visual definitions only
+    const PROJECT_CATALOG = {
+      propanota: {
+        href: '/propanota/',
+        thumbClass: 'card-thumb-propanota',
+        thumbHTML: '<div class="cube-icon">P</div>',
+        badge: 'live',
+        title: 'Propanota Box Customizer',
+        desc: '3D customizable storage box for Propanota instruments. Real-time preview, material selection, and export support.'
+      },
+      'propanota-shooting': {
+        href: '/propanota/shooting.html',
+        thumbClass: 'card-thumb-propanota',
+        thumbHTML: '<div class="cube-icon" style="font-size:20px;">🎯</div>',
+        badge: 'live',
+        title: 'Propanota Shooting',
+        desc: 'Airgun × Propanota interaction prototype. Shoot targets to play tongue drum notes.'
+      },
+      bowlstand: {
+        href: '/bowlstand/',
+        thumbClass: 'card-thumb-propanota',
+        thumbHTML: '<div class="cube-icon" style="font-size:20px;">🐕</div>',
+        badge: 'live',
+        title: 'Bowl Stand Customizer',
+        desc: 'Dog food bowl stand designer. Auto-optimized for breed size, tilt angle, and grip ring.'
+      },
+      droneport: {
+        href: '/droneport/',
+        thumbClass: 'card-thumb-propanota',
+        thumbHTML: '<div class="cube-icon" style="font-size:20px;background:linear-gradient(135deg,rgba(0,212,255,0.2),rgba(0,212,255,0.05));border-color:rgba(0,212,255,0.3);">🛸</div>',
+        badge: 'live',
+        title: 'Drone Port Designer',
+        desc: 'Landing pad & dock designer for DJI drones. Platform size, legs, guide rails, cable channels.'
+      },
+      tunnelscan: {
+        href: '#',
+        thumbClass: 'card-thumb-tunnel',
+        thumbHTML: '<div class="tunnel-icon"></div>',
+        badge: 'soon',
+        title: 'TunnelScan AI',
+        desc: 'AI-powered tunnel inspection system with drone-captured 360-degree imagery analysis.'
+      },
+      infrascan: {
+        href: '#',
+        thumbClass: 'card-thumb-infra',
+        thumbHTML: '<div class="infra-icon"><div class="infra-bar"></div><div class="infra-bar"></div><div class="infra-bar"></div><div class="infra-bar"></div><div class="infra-bar"></div></div>',
+        badge: 'soon',
+        title: 'InfraScan Engine',
+        desc: 'Infrastructure monitoring and predictive maintenance platform for civil engineering assets.'
+      }
+    };
+
+    function renderProjects(projectIds) {
+      const grid = document.getElementById('projectsGrid');
+      grid.innerHTML = '';
+      if (!projectIds || projectIds.length === 0) {
+        grid.innerHTML = '<div style="color:rgba(201,169,110,0.6);text-align:center;padding:40px;font-family:Orbitron,monospace;font-size:12px;letter-spacing:0.2em;">NO PROJECTS ASSIGNED<br><span style="font-size:10px;opacity:0.6;">Contact your account manager for access.</span></div>';
+        return;
+      }
+      projectIds.forEach((id, i) => {
+        const p = PROJECT_CATALOG[id];
+        if (!p) return;
+        const isLive = p.badge === 'live';
+        const card = document.createElement(isLive ? 'a' : 'div');
+        if (isLive) card.href = p.href;
+        card.className = 'project-card' + (isLive ? '' : ' disabled');
+        card.style.animationDelay = (i * 0.1 + 0.1) + 's';
+        card.innerHTML = `
+          <div class="card-thumb ${p.thumbClass}">
+            ${p.thumbHTML}
+            <span class="card-badge badge-${p.badge}">${isLive ? 'Live' : 'Coming Soon'}</span>
+          </div>
+          <div class="card-body">
+            <h3>${p.title}</h3>
+            <p>${p.desc}</p>
+          </div>`;
+        grid.appendChild(card);
+      });
+    }
+
+    // Owner emails — full access to all projects
+    const OWNER_EMAILS = ['graceoftouchco@gmail.com'];
+    // Owner sees only actively deployed projects (not coming-soon placeholders)
+    const ALL_PROJECTS = ['propanota', 'propanota-shooting', 'bowlstand', 'droneport'];
+
+    // Valid invite codes → project IDs
+    const INVITE_CODES = {
+      'propanota': ['propanota', 'propanota-shooting'],
+      'tunnelscan': ['tunnelscan', 'infrascan'],
+    };
+
+    // Fetch or create client permissions from Firestore
+    async function getClientProjects(user) {
+      const email = (user.email || '').toLowerCase();
+
+      // Owner gets all projects
+      if (OWNER_EMAILS.includes(email)) {
+        return ALL_PROJECTS;
+      }
+
+      const docRef = db.collection('clients').doc(user.uid);
+
+      try {
+        const docSnap = await docRef.get();
+
+        if (docSnap.exists) {
+          return docSnap.data().projects || [];
+        }
+
+        // Check for invite code in URL
+        const params = new URLSearchParams(window.location.search);
+        const inviteCode = params.get('invite');
+
+        if (inviteCode && INVITE_CODES[inviteCode]) {
+          // Register this client with the invited projects
+          await docRef.set({
+            email: user.email,
+            displayName: user.displayName || '',
+            projects: INVITE_CODES[inviteCode],
+            inviteCode: inviteCode,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          // Clean URL
+          window.history.replaceState({}, '', '/client/');
+          return INVITE_CODES[inviteCode];
+        }
+
+        // No client record and no invite = no access
+        return [];
+      } catch (e) {
+        console.error('Client lookup error:', e);
+        return [];
+      }
+    }
+
+    auth.onAuthStateChanged(async (user) => {
+      const loader = document.getElementById('authLoading');
+      if (!user) {
+        // If there's an invite code, save it and redirect to login
+        const params = new URLSearchParams(window.location.search);
+        const invite = params.get('invite');
+        if (invite) {
+          sessionStorage.setItem('pendingInvite', invite);
+        }
+        window.location.href = '/';
+        return;
+      }
+
+      // Restore invite code from session if redirected from login
+      const pendingInvite = sessionStorage.getItem('pendingInvite');
+      if (pendingInvite && !window.location.search.includes('invite=')) {
+        sessionStorage.removeItem('pendingInvite');
+        window.location.href = '/client/?invite=' + pendingInvite;
+        return;
+      }
+
+      const displayName = user.displayName || user.email || 'User';
+      document.getElementById('userName').textContent = displayName;
+      document.getElementById('welcomeMsg').textContent = 'Welcome back, ' + displayName.split(' ')[0];
+
+      // Render only projects assigned to this client in Firestore
+      const projects = await getClientProjects(user);
+
+      // If no projects and no invite code → not a registered client, kick out
+      const email = (user.email || '').toLowerCase();
+      if (projects.length === 0 && !OWNER_EMAILS.includes(email)) {
+        window.location.href = '/';
+        return;
+      }
+
+      renderProjects(projects);
+
+      // Admin notes panel (owner only)
+      const email = (user.email || '').toLowerCase();
+      if (OWNER_EMAILS.includes(email)) {
+        initAdminNotes(user);
+      }
+
+      loader.classList.add('hidden');
+    });
+
+    // ====== ADMIN NOTES SYSTEM ======
+    let currentViewingClient = null;
+    let saveTimer = null;
+
+    async function initAdminNotes(ownerUser) {
+      const notesPanel = document.getElementById('adminNotes');
+      notesPanel.style.display = 'block';
+
+      // Load all clients for the dropdown
+      const clientsSnap = await db.collection('clients').get();
+      if (clientsSnap.empty) {
+        document.getElementById('notesClientName').textContent = 'No clients registered yet';
+        return;
+      }
+
+      // Build client selector
+      const selectorHTML = '<select id="clientSelector" onchange="loadClientNotes(this.value)" style="background:rgba(255,255,255,0.05);border:1px solid rgba(201,169,110,0.2);border-radius:6px;color:var(--accent);font-size:12px;padding:6px 12px;font-family:Inter,sans-serif;">' +
+        '<option value="">— Select Client —</option>' +
+        clientsSnap.docs.map(d => {
+          const data = d.data();
+          return '<option value="' + d.id + '">' + (data.displayName || data.email || d.id) + '</option>';
+        }).join('') +
+        '</select>';
+      document.getElementById('notesClientName').innerHTML = selectorHTML;
+
+      // Auto-select first client
+      if (clientsSnap.docs.length > 0) {
+        document.getElementById('clientSelector').value = clientsSnap.docs[0].id;
+        loadClientNotes(clientsSnap.docs[0].id);
+      }
+    }
+
+    async function loadClientNotes(clientId) {
+      if (!clientId) return;
+      currentViewingClient = clientId;
+
+      // Load client info
+      const clientDoc = await db.collection('clients').doc(clientId).get();
+      if (clientDoc.exists) {
+        const data = clientDoc.data();
+        document.getElementById('notesClientEmail').textContent = data.email || '';
+      }
+
+      // Load notes
+      const notesSnap = await db.collection('client_notes').doc(clientId).get();
+      if (notesSnap.exists) {
+        const data = notesSnap.data();
+        document.getElementById('notesArea').value = data.content || '';
+        document.getElementById('notesCategory').value = data.category || 'general';
+      } else {
+        document.getElementById('notesArea').value = '';
+        document.getElementById('notesCategory').value = 'general';
+      }
+
+      // Load notes history
+      loadNotesHistory(clientId);
+      document.getElementById('notesSaveStatus').textContent = '';
+    }
+
+    function onNotesInput() {
+      document.getElementById('notesSaveStatus').textContent = 'unsaved...';
+      document.getElementById('notesSaveStatus').style.color = 'rgba(255,200,0,0.5)';
+      // Auto-save after 3 seconds of no typing
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => saveNotes(), 3000);
+    }
+
+    async function saveNotes() {
+      if (!currentViewingClient) return;
+      const content = document.getElementById('notesArea').value;
+      const category = document.getElementById('notesCategory').value;
+
+      try {
+        await db.collection('client_notes').doc(currentViewingClient).set({
+          content: content,
+          category: category,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedBy: firebase.auth().currentUser.email
+        }, { merge: true });
+
+        // Save to history
+        await db.collection('client_notes').doc(currentViewingClient)
+          .collection('history').add({
+            content: content,
+            category: category,
+            savedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            savedBy: firebase.auth().currentUser.email
+          });
+
+        document.getElementById('notesSaveStatus').textContent = 'saved ✓';
+        document.getElementById('notesSaveStatus').style.color = 'rgba(0,255,100,0.5)';
+        loadNotesHistory(currentViewingClient);
+      } catch(e) {
+        document.getElementById('notesSaveStatus').textContent = 'save error';
+        document.getElementById('notesSaveStatus').style.color = 'rgba(255,50,50,0.7)';
+        console.error('Notes save error:', e);
+      }
+    }
+
+    async function loadNotesHistory(clientId) {
+      const histDiv = document.getElementById('notesHistory');
+      try {
+        const histSnap = await db.collection('client_notes').doc(clientId)
+          .collection('history').orderBy('savedAt', 'desc').limit(5).get();
+        if (histSnap.empty) {
+          histDiv.innerHTML = '<div style="font-size:10px;color:var(--text-muted);opacity:0.5;">No history yet</div>';
+          return;
+        }
+        histDiv.innerHTML = '<div style="font-size:10px;color:var(--text-muted);margin-bottom:6px;letter-spacing:0.1em;">RECENT SAVES</div>' +
+          histSnap.docs.map(d => {
+            const data = d.data();
+            const time = data.savedAt ? new Date(data.savedAt.toDate()).toLocaleString('ja-JP') : '...';
+            const cat = data.category || 'general';
+            const preview = (data.content || '').substring(0, 60) + ((data.content || '').length > 60 ? '...' : '');
+            return '<div style="font-size:10px;color:var(--text-muted);padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.03);cursor:pointer;" onclick="document.getElementById(\'notesArea\').value=\'' + (data.content || '').replace(/'/g, "\\'").replace(/\n/g, "\\n") + '\'">' +
+              '<span style="color:rgba(201,169,110,0.5);">[' + cat + ']</span> ' +
+              '<span style="opacity:0.6;">' + time + '</span> ' + preview + '</div>';
+          }).join('');
+      } catch(e) {
+        histDiv.innerHTML = '';
+      }
+    }
+
+    function signOut() {
+      auth.signOut().then(() => {
+        window.location.href = '/';
+      });
+    }
+  </script>
+</body>
+</html>

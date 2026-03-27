@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Panda World x Drone | v4.0.0</title>
+
+<style>
+/* --- Base Theme --- */
+html, body, #root {
+  margin: 0; width: 100%; height: 100%;
+  background: #87ceeb;
+  overflow: hidden;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+  user-select: none; -webkit-user-select: none; touch-action: none;
+}
+
+#ui {
+  position: absolute; inset: 0; pointer-events: none;
+  display: flex; flex-direction: column; justify-content: space-between;
+  z-index: 100;
+  opacity: 0; transition: opacity 1.0s ease-in;
+}
+#ui.ready { opacity: 1; }
+
+/* --- HUD Components --- */
+.top-hud {
+  padding: 15px; display: flex; justify-content: space-between; align-items: flex-start;
+  pointer-events: auto; background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+}
+.hud-info {
+  background: rgba(10, 20, 30, 0.85); border-left: 3px solid #00f0ff;
+  padding: 8px 16px; color: #fff; backdrop-filter: blur(8px);
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.5); border-radius: 0 4px 4px 0;
+}
+.hud-title { color: #fff; font-weight: 800; font-size: 16px; letter-spacing: 1px; }
+.hud-sub { font-size: 10px; color: #aaa; margin-top: 2px; font-family: monospace; }
+.warning-box {
+  margin-top: 5px; color: #ff3333; font-weight: bold; font-size: 12px; display: none;
+  animation: blink 1s infinite;
+}
+.warning-box.active { display: block; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.btn-group { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: 60%; }
+.btn {
+  padding: 8px 14px; border-radius: 4px;
+  border: 1px solid rgba(100, 200, 255, 0.3);
+  background: rgba(10, 20, 30, 0.7); color: #00f0ff;
+  font-weight: bold; font-size: 11px; cursor: pointer;
+  text-transform: uppercase; transition: all 0.2s;
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; gap: 5px;
+}
+.btn:active { transform: scale(0.95); background: #00f0ff; color: #000; }
+.btn.active { background: rgba(0, 240, 255, 0.2); border-color: #00f0ff; color: #fff; box-shadow: 0 0 10px rgba(0, 240, 255, 0.4); }
+.action-btn { border-color: #ffaa00; color: #ffaa00; }
+.action-btn.active { background: rgba(255, 170, 0, 0.2); border-color: #ffaa00; color: #fff; box-shadow: 0 0 10px rgba(255, 170, 0, 0.4); }
+.light-btn { border-color: #ffff00; color: #ffff00; }
+.light-btn.active { background: rgba(255, 255, 0, 0.2); color: #fff; box-shadow: 0 0 15px rgba(255, 255, 0, 0.5); }
+.info-btn { border-color: #aaa; color: #fff; background: rgba(50,50,50,0.5); }
+.reset-btn { width: 100%; margin-top: 8px; background: #ff4444; border-color: #fff; }
+
+/* Modal */
+.modal-overlay {
+  position: absolute; inset: 0; background: rgba(0,0,0,0.85);
+  display: flex; justify-content: center; align-items: center;
+  z-index: 2000; pointer-events: auto; backdrop-filter: blur(10px);
+}
+.modal-content {
+  background: rgba(20, 25, 35, 0.95); border: 1px solid #00f0ff;
+  padding: 30px; border-radius: 8px; max-width: 85%; width: 500px;
+  max-height: 80vh; overflow-y: auto; color: #eee; line-height: 1.6;
+}
+.modal-title { color: #00f0ff; font-weight: 800; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 15px; }
+.close-btn { width: 100%; margin-top: 10px; padding: 12px; background: #00f0ff; color: #000; border: none; font-weight: bold; cursor: pointer; border-radius: 4px; }
+
+/* Sticks */
+.controls-area { padding: 0 40px 50px; display: flex; justify-content: space-between; align-items: flex-end; pointer-events: auto; }
+.stick-zone { width: 130px; height: 130px; display: flex; justify-content: center; align-items: center; background: radial-gradient(circle, rgba(255,255,255,0.05), transparent 70%); border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(2px); }
+.stick-base { width: 60px; height: 60px; border-radius: 50%; background: rgba(255,255,255,0.1); position: relative; border: 1px solid rgba(255,255,255,0.2); }
+.stick-knob { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #fff, #88b3ff); position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+
+/* Telemetry */
+.telemetry { position: absolute; bottom: 30px; left: 30px; pointer-events: auto; }
+.telemetry-panel {
+  background: rgba(10, 15, 20, 0.85); border-left: 2px solid #00f0ff;
+  padding: 12px; color: #ccc; min-width: 160px; font-size: 12px; font-family: monospace;
+  border-radius: 4px;
+}
+.telemetry-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.val { color: #00f0ff; font-weight: bold; }
+.signature {
+  margin-top: 10px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,0.1);
+  text-align: center; color: #555; letter-spacing: 2px; font-size: 9px; font-weight: 800;
+  text-transform: uppercase;
+}
+
+/* IR Night Vision Mode */
+.ir-mode canvas { filter: hue-rotate(90deg) saturate(0.3) brightness(1.5) contrast(1.3); }
+
+/* Loader */
+#loader-ui {
+  position: absolute; inset: 0; background: #000;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  z-index: 500; transition: opacity 0.8s ease-out;
+}
+.loader-text { color: #00f0ff; font-family: monospace; font-size: 24px; letter-spacing: 6px; margin-bottom: 30px; font-weight: bold; text-shadow: 0 0 10px #00f0ff; }
+.loader-bar { width: 240px; height: 4px; background: #222; position: relative; overflow: hidden; border-radius: 2px; }
+.loader-fill {
+  position: absolute; top:0; left:0; height:100%; width: 50%; background: #00f0ff;
+  animation: loadSlide 1.5s infinite ease-in-out;
+}
+@keyframes loadSlide { from { left: -40%; } to { left: 100%; } }
+#force-start-btn {
+  margin-top: 30px; padding: 12px 24px; border: 2px solid #ff5555; background: transparent; color: #ff5555;
+  font-weight: bold; cursor: pointer; display: none; border-radius: 4px; letter-spacing: 1px;
+}
+#force-start-btn:hover { background: #ff5555; color: #000; }
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "three": "https://esm.sh/three@0.160.0",
+    "@react-three/fiber": "https://esm.sh/@react-three/fiber@8.15.16?deps=three@0.160.0,react@18.2.0,react-dom@18.2.0",
+    "@react-three/drei": "https://esm.sh/@react-three/drei@9.99.0?deps=three@0.160.0,react@18.2.0,react-dom@18.2.0,@react-three/fiber@8.15.16"
+  }
+}
+</script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+
+<body>
+  <div id="loader-ui">
+    <div class="loader-text">EXPANDING WORLD...</div>
+    <div class="loader-bar"><div class="loader-fill"></div></div>
+    <button id="force-start-btn" onclick="forceStart()">FORCE START</button>
+  </div>
+  <div id="root"></div>
+
+<script>
+  function forceStart() {
+    const l = document.getElementById('loader-ui');
+    if(l) {
+      l.style.opacity = '0';
+      setTimeout(() => l.style.display = 'none', 800);
+    }
+    const ui = document.getElementById('ui');
+    if(ui) ui.classList.add('ready');
+  }
+
+  function showError(title, msg) {
+    console.error(title, msg);
+    forceStart();
+  }
+
+  window.addEventListener('error', e => showError('System Error', e.message));
+
+  // 3秒後に強制起動 (描画準備待ち)
+  setTimeout(forceStart, 3000);
+</script>
+
+<script type="text/babel" data-type="module" data-presets="react">
+import React, { useRef, useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
+import { createRoot } from "react-dom/client";
+import * as THREE from "three";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { OrbitControls, ContactShadows, PerspectiveCamera } from "@react-three/drei";
+
+/* --- Assets --- */
+const TREE_DATA = [...Array(100)].map((_, i) => {
+  const angle = Math.random() * Math.PI * 2;
+  const r = 40 + Math.random() * 300;
+  return { key: i, pos: [Math.sin(angle) * r, 0, Math.cos(angle) * r], scale: 0.8 + Math.random() * 1.5 };
+});
+const HOUSE_DATA = [...Array(10)].map((_, i) => {
+  const x = (Math.random() - 0.5) * 200;
+  const z = 80 + Math.random() * 150;
+  return { key: i, pos: [x, 0, z], rot: [0, Math.random() * Math.PI * 0.5, 0], scale: 1 + Math.random() * 0.5 };
+});
+const RABBIT_DATA = [...Array(15)].map((_, i) => ({
+  key: i, pos: [(Math.random()-0.5)*200, 0, (Math.random()-0.5)*200], color: Math.random() > 0.9 ? "#ffd700" : "#fff"
+}));
+const BIRD_DATA = [...Array(20)].map((_, i) => ({
+  key: i, pos: [(Math.random()-0.5)*300, 20 + Math.random()*20, (Math.random()-0.5)*300], speed: 0.5 + Math.random() * 0.5
+}));
+
+const input = { lx: 0, ly: 0, rx: 0, ry: 0 };
+
+/* --- Keyboard Controls (WASD + Space/Shift + QE) --- */
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.code] = true; e.preventDefault(); });
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+function updateKeyboardInput() {
+  // Mode 2: Left=Yaw+Throttle, Right=Roll+Pitch
+  // Throttle (up/down)
+  if (keys['Space'] || keys['KeyW']) input.ly = Math.min(1, input.ly + 0.05);
+  else if (keys['ShiftLeft'] || keys['ShiftRight'] || keys['KeyS']) input.ly = Math.max(-1, input.ly - 0.05);
+  else input.ly *= 0.85;
+  // Yaw (rotate left/right)
+  if (keys['KeyQ'] || keys['KeyA']) input.lx = Math.max(-1, input.lx - 0.05);
+  else if (keys['KeyE'] || keys['KeyD']) input.lx = Math.min(1, input.lx + 0.05);
+  else input.lx *= 0.85;
+  // Pitch (forward/backward)
+  if (keys['ArrowUp']) input.ry = Math.min(1, input.ry + 0.05);
+  else if (keys['ArrowDown']) input.ry = Math.max(-1, input.ry - 0.05);
+  else input.ry *= 0.85;
+  // Roll (strafe left/right)
+  if (keys['ArrowLeft']) input.rx = Math.max(-1, input.rx - 0.05);
+  else if (keys['ArrowRight']) input.rx = Math.min(1, input.rx + 0.05);
+  else input.rx *= 0.85;
+  // Clamp small values to 0
+  if (Math.abs(input.ly) < 0.01) input.ly = 0;
+  if (Math.abs(input.lx) < 0.01) input.lx = 0;
+  if (Math.abs(input.ry) < 0.01) input.ry = 0;
+  if (Math.abs(input.rx) < 0.01) input.rx = 0;
+}
+
+/* --- Audio Engine --- */
+let audioCtx = null;
+const droneSound = {
+  osc: null, gain: null, isPlaying: false,
+  start: () => {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (droneSound.isPlaying) return;
+      droneSound.osc = audioCtx.createOscillator();
+      droneSound.osc.type = 'sawtooth';
+      const filter = audioCtx.createBiquadFilter();
+      filter.type = 'lowpass'; filter.frequency.value = 400;
+      droneSound.gain = audioCtx.createGain();
+      droneSound.gain.gain.value = 0;
+      droneSound.osc.connect(filter); filter.connect(droneSound.gain);
+      droneSound.gain.connect(audioCtx.destination);
+      droneSound.osc.start(); droneSound.isPlaying = true;
+    } catch(e) {}
+  },
+  stop: () => {
+    if (!droneSound.isPlaying) return;
+    try { droneSound.gain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1); setTimeout(() => { if(droneSound.osc) { droneSound.osc.stop(); droneSound.osc=null; } droneSound.isPlaying=false; }, 200); } catch(e){}
+  },
+  update: (throttle) => {
+    if (!droneSound.isPlaying || !audioCtx) return;
+    try { droneSound.osc.frequency.setTargetAtTime(90+(throttle*120), audioCtx.currentTime, 0.1); droneSound.gain.gain.setTargetAtTime(0.05+(throttle*0.1), audioCtx.currentTime, 0.1); } catch(e){}
+  },
+  beep: () => {
+    if (!audioCtx) return;
+    try {
+      const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+      osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+    } catch(e) {}
+  }
+};
+
+/* --- Joystick --- */
+function Stick({ side }) {
+  const knob = useRef();
+  const state = useRef({ active: false, x: 0, y: 0, touchId: null });
+  const reset = () => {
+    state.current.active = false; state.current.touchId = null;
+    if (knob.current) knob.current.style.transform = `translate(-50%, -50%)`;
+    if (side === "L") { input.lx = 0; input.ly = 0; } else { input.rx = 0; input.ry = 0; }
+  };
+  const updateInput = (cx, cy) => {
+    const dx = cx - state.current.x; const dy = cy - state.current.y;
+    const max = 50; const dist = Math.min(max, Math.hypot(dx, dy));
+    const angle = Math.atan2(dy, dx);
+    const kx = Math.cos(angle) * dist; const ky = Math.sin(angle) * dist;
+    if (knob.current) knob.current.style.transform = `translate(-50%, -50%) translate(${kx}px, ${ky}px)`;
+    let nx = kx / max; let ny = -ky / max;
+    const expo = 1.3; nx = Math.sign(nx) * Math.pow(Math.abs(nx), expo); ny = Math.sign(ny) * Math.pow(Math.abs(ny), expo);
+    if (side === "L") { input.lx = nx; input.ly = ny; } else { input.rx = nx; input.ry = ny; }
+  };
+  return (
+    <div className="stick-zone"
+      onTouchStart={e => { e.preventDefault(); const t = e.changedTouches[0]; state.current = { active: true, x: t.clientX, y: t.clientY, touchId: t.identifier }; }}
+      onTouchMove={e => { e.preventDefault(); if (!state.current.active) return; for (let t of e.changedTouches) if (t.identifier === state.current.touchId) updateInput(t.clientX, t.clientY); }}
+      onTouchEnd={e => { for (let t of e.changedTouches) if (t.identifier === state.current.touchId) reset(); }}
+      onMouseDown={e => { e.preventDefault(); state.current = { active: true, x: e.clientX, y: e.clientY, touchId: 'mouse' }; }}
+      onMouseMove={e => { if (state.current.active) updateInput(e.clientX, e.clientY); }}
+      onMouseUp={reset} onMouseLeave={reset}
+    >
+      <div className="stick-base"><div ref={knob} className="stick-knob"/></div>
+    </div>
+  );
+}
+
+/* --- Animals --- */
+function Rabbit({ position, color }) {
+  const group = useRef();
+  useFrame((st) => { if(group.current) group.current.position.y = Math.abs(Math.sin(st.clock.elapsedTime * 15 + position[0])) * 0.3; });
+  return (
+    <group ref={group} position={position} scale={0.4}>
+      <mesh castShadow><sphereGeometry args={[0.5]}/><meshStandardMaterial color={color}/></mesh>
+      <mesh position={[0, 0.6, 0.2]}><sphereGeometry args={[0.3]}/><meshStandardMaterial color={color}/></mesh>
+      <mesh position={[0.1, 0.9, 0.2]} scale={[0.1, 0.4, 0.1]}><sphereGeometry/><meshStandardMaterial color={color}/></mesh>
+      <mesh position={[-0.1, 0.9, 0.2]} scale={[0.1, 0.4, 0.1]}><sphereGeometry/><meshStandardMaterial color={color}/></mesh>
+    </group>
+  );
+}
+
+function Bird({ position, speed }) {
+  const group = useRef();
+  useFrame((st) => {
+    if(group.current) {
+      const t = st.clock.elapsedTime * speed;
+      group.current.position.x = position[0] + Math.cos(t) * 20;
+      group.current.position.z = position[2] + Math.sin(t) * 20;
+      group.current.rotation.y = -t;
+      group.current.position.y = position[1] + Math.sin(t*10)*0.5;
+    }
+  });
+  return (
+    <group ref={group} position={position} scale={0.3}>
+      <mesh><coneGeometry args={[0.5, 1.5, 4]} /><meshStandardMaterial color="#ddd" /></mesh>
+      <mesh position={[0.5, 0, 0]} rotation={[0,0,-0.2]}><boxGeometry args={[1.2, 0.1, 0.5]} /><meshStandardMaterial color="#fff" /></mesh>
+      <mesh position={[-0.5, 0, 0]} rotation={[0,0,0.2]}><boxGeometry args={[1.2, 0.1, 0.5]} /><meshStandardMaterial color="#fff" /></mesh>
+    </group>
+  );
+}
+
+/* --- FIX: Food Component (was missing in v3.1.4) --- */
+function Food({ position, onEaten }) {
+  const group = useRef();
+  const vel = useRef(0);
+  const landed = useRef(false);
+
+  useFrame((_, dt) => {
+    if (!group.current) return;
+    // Gravity: fall until ground
+    if (!landed.current) {
+      vel.current += 9.8 * dt;
+      group.current.position.y -= vel.current * dt;
+      if (group.current.position.y <= 0.3) {
+        group.current.position.y = 0.3;
+        landed.current = true;
+      }
+    }
+    // Spin while falling
+    group.current.rotation.y += dt * 3;
+  });
+
+  return (
+    <group ref={group} position={position}>
+      {/* Bamboo bundle */}
+      <mesh castShadow>
+        <cylinderGeometry args={[0.08, 0.1, 1.2, 6]} />
+        <meshStandardMaterial color="#5c8a45" roughness={0.6} />
+      </mesh>
+      <mesh position={[0, 0.5, 0]} rotation={[0, 0, 0.3]}>
+        <coneGeometry args={[0.15, 0.5, 4]} />
+        <meshStandardMaterial color="#86efac" roughness={0.5} />
+      </mesh>
+      <mesh position={[0.1, 0.3, 0]} rotation={[0, 0, -0.4]}>
+        <coneGeometry args={[0.12, 0.4, 4]} />
+        <meshStandardMaterial color="#6dca7a" roughness={0.5} />
+      </mesh>
+      {/* Glow indicator so you can see it */}
+      <pointLight position={[0, 0.5, 0]} intensity={1} distance={5} color="#88ff88" />
+    </group>
+  );
+}
+
+/* --- Panda Component (Ver 1.4.2 Model) --- */
+const Panda = forwardRef(({ position: initPos, droneRef, foods, speakerActive }, ref) => {
+  const group = useRef(); const body = useRef(); const limbs = useRef([]);
+  const targetPos = useRef(new THREE.Vector3());
+  const [state, setState] = useState('WALK');
+  const timer = useRef(0);
+  const inCity = useRef(false);
+  const bambooRef = useRef();
+
+  useImperativeHandle(ref, () => ({ position: group.current?.position || new THREE.Vector3(), object: group.current, isInCity: () => inCity.current }));
+  useEffect(() => { if (group.current) { group.current.position.set(...initPos); targetPos.current.copy(group.current.position); } }, [initPos]);
+
+  useFrame((st, dt) => {
+    if (!group.current) return;
+    const t = st.clock.getElapsedTime(); const g = group.current;
+    inCity.current = g.position.z > 60;
+
+    // AI
+    let overrideTarget = false;
+    if (foods && foods.length > 0) {
+      let nearestDist = 20; let nearestFood = null;
+      foods.forEach(f => {
+        const fPos = new THREE.Vector3(...f.position);
+        const d = g.position.distanceTo(fPos);
+        if (d < nearestDist) { nearestDist = d; nearestFood = f; }
+      });
+      if (nearestFood) {
+        targetPos.current.set(...nearestFood.position);
+        targetPos.current.y = 0;
+        overrideTarget = true;
+        if (nearestDist < 1.5) setState('EAT'); else setState('WALK');
+      }
+    }
+    if (!overrideTarget && speakerActive && droneRef?.current?.object) {
+      const dronePos = droneRef.current.position;
+      if (dronePos) {
+        const dist = g.position.distanceTo(dronePos);
+        if (dist < 40) { targetPos.current.copy(dronePos); targetPos.current.y = 0; overrideTarget = true; setState('WALK'); }
+      }
+    }
+
+    if (!overrideTarget) {
+      timer.current -= dt;
+      if (timer.current <= 0) {
+        const r = Math.random();
+        if (r < 0.5) { setState('WALK'); const angle = Math.random() * Math.PI * 2; const dist = 10 + Math.random() * 30; targetPos.current.set(THREE.MathUtils.clamp(g.position.x + Math.cos(angle)*dist, -450, 450), 0, THREE.MathUtils.clamp(g.position.z + Math.sin(angle)*dist, -450, 450)); timer.current = 10; }
+        else if (r < 0.7) { setState('SIT'); timer.current = 6; }
+        else if (r < 0.85) { setState('STAND'); timer.current = 4; }
+        else { setState('SLEEP'); timer.current = 8; }
+      }
+    }
+
+    const walkSpeed = 9.5; const walkFactor = state === 'WALK' ? 1 : 0; const cycle = t * walkSpeed;
+    if (body.current) {
+      let targetH = 0.8; if (state === 'WALK') targetH = 0.75; else if (state === 'SLEEP') targetH = 0.6; else if (state === 'EAT') targetH = 0.5;
+      body.current.position.y = THREE.MathUtils.lerp(body.current.position.y, targetH + Math.abs(Math.sin(cycle)) * 0.08 * walkFactor, dt * 5);
+      body.current.rotation.z = THREE.MathUtils.lerp(body.current.rotation.z, Math.sin(cycle) * 0.05 * walkFactor, dt * 5);
+      let rotX = 0; if (state === 'WALK') rotX = 0.2; else if (state === 'SIT' || state === 'EAT') rotX = -0.3; else if (state === 'SLEEP') rotX = -Math.PI/2; else if (state === 'STAND') rotX = -0.1;
+      body.current.rotation.x = THREE.MathUtils.lerp(body.current.rotation.x, rotX, dt * 3);
+    }
+    const swing = 0.8;
+    if(limbs.current[0]) limbs.current[0].rotation.x = Math.sin(cycle) * swing * walkFactor + 0.2;
+    if(limbs.current[1]) limbs.current[1].rotation.x = Math.sin(cycle + Math.PI) * swing * walkFactor + 0.2;
+    if(limbs.current[2]) limbs.current[2].rotation.x = Math.sin(cycle + Math.PI) * swing * walkFactor;
+    if(limbs.current[3]) limbs.current[3].rotation.x = Math.sin(cycle) * swing * walkFactor;
+
+    if (state === 'EAT') {
+      if(bambooRef.current) bambooRef.current.visible = true;
+      if(limbs.current[1]) limbs.current[1].rotation.x = -0.6 + Math.sin(t*5)*0.2;
+      if(limbs.current[0]) limbs.current[0].rotation.x = -0.6 + Math.cos(t*5)*0.2;
+      if(limbs.current[2]) limbs.current[2].rotation.x = -1.2;
+      if(limbs.current[3]) limbs.current[3].rotation.x = -1.2;
+    } else {
+      if(bambooRef.current) bambooRef.current.visible = false;
+    }
+
+    if (state === 'WALK') {
+      const dir = targetPos.current.clone().sub(g.position); dir.y = 0;
+      if (dir.length() > 0.5) {
+        dir.normalize();
+        g.rotation.y = THREE.MathUtils.lerp(g.rotation.y, Math.atan2(dir.x, dir.z), dt * 2.0);
+        g.position.add(dir.multiplyScalar(dt * 1.5));
+      } else setState('SIT');
+    }
+  });
+
+  const matFur = useMemo(() => new THREE.MeshStandardMaterial({ color: "#fefefe", roughness: 0.8 }), []);
+  const matBlack = useMemo(() => new THREE.MeshStandardMaterial({ color: "#121212", roughness: 0.8 }), []);
+  const matPupil = useMemo(() => new THREE.MeshStandardMaterial({ color: "#000000", roughness: 0.1 }), []);
+  const matWhite = useMemo(() => new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.2 }), []);
+  const matHighlight = useMemo(() => new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.1, emissive: "#ffffff", emissiveIntensity: 0.8 }), []);
+  const matGreen = useMemo(() => new THREE.MeshStandardMaterial({ color: "#5c8a45", roughness: 0.6 }), []);
+
+  return (
+    <group ref={group}>
+      <group ref={body}>
+        <group position={[0, 0.4, 0]}>
+          <mesh castShadow position={[0, 0, 0]} scale={[1.25, 1.05, 1.35]} material={matFur}><sphereGeometry args={[0.55, 24, 24]}/></mesh>
+          <mesh castShadow position={[0, 0.45, 0.05]} scale={[1.15, 0.42, 1.1]} material={matBlack}><cylinderGeometry args={[0.48, 0.53, 1, 24]}/></mesh>
+          <mesh castShadow position={[0, 0.6, 0.1]} scale={[1.1, 0.6, 1.0]} material={matFur}><sphereGeometry args={[0.45, 24, 24]}/></mesh>
+          <group position={[0, 1.1, 0.25]}>
+            <mesh castShadow scale={[1.15, 1, 1.05]} material={matFur}><sphereGeometry args={[0.45, 24, 24]}/></mesh>
+            <mesh position={[-0.35, 0.38, -0.1]} rotation={[0, 0, 0.4]} scale={[1, 1, 0.7]} material={matBlack}><sphereGeometry args={[0.18]}/></mesh>
+            <mesh position={[0.35, 0.38, -0.1]} rotation={[0, 0, -0.4]} scale={[1, 1, 0.7]} material={matBlack}><sphereGeometry args={[0.18]}/></mesh>
+            <mesh position={[0, -0.1, 0.3]} scale={[0.8, 0.7, 0.6]} material={matFur}><sphereGeometry args={[0.22]}/></mesh>
+            <mesh position={[0, -0.05, 0.48]} scale={[0.12, 0.08, 0.1]} material={matBlack}><sphereGeometry args={[1, 8, 8]}/></mesh>
+            {[[-0.2, 0.08, 0.38], [0.2, 0.08, 0.38]].map((pos, i) => (
+              <group key={i} position={pos} rotation={[0.05, i === 0 ? -0.2 : 0.2, -0.15 * (i===0?1:-1)]}>
+                <mesh scale={[0.2, 0.26, 0.08]} material={matBlack}><sphereGeometry/></mesh>
+                <mesh position={[0, 0.02, 0.06]} scale={[0.07, 0.07, 0.02]} material={matWhite}><sphereGeometry/></mesh>
+                <mesh position={[0, 0.02, 0.075]} scale={[0.045, 0.045, 0.02]} material={matPupil}><sphereGeometry/></mesh>
+                <mesh position={[0.02, 0.04, 0.08]} scale={[0.015, 0.015, 0.01]} material={matHighlight}><sphereGeometry/></mesh>
+              </group>
+            ))}
+          </group>
+          <group ref={el=>limbs.current[0]=el} position={[-0.45, 0.5, 0.3]}><mesh position={[0, -0.4, 0]} castShadow material={matBlack}><capsuleGeometry args={[0.17, 0.7]}/></mesh></group>
+          <group ref={el=>limbs.current[1]=el} position={[0.45, 0.5, 0.3]}>
+             <mesh position={[0, -0.4, 0]} castShadow material={matBlack}><capsuleGeometry args={[0.17, 0.7]}/></mesh>
+             <group ref={bambooRef} position={[0, -0.7, 0.1]} rotation={[0,0,-0.5]} visible={false}>
+               <mesh position={[0,0.4,0]} material={matGreen}><cylinderGeometry args={[0.03,0.04,0.8]} /></mesh>
+               <mesh position={[0,0.7,0]} rotation={[0,0,0.5]} material={matGreen}><coneGeometry args={[0.08,0.3,3]} /></mesh>
+             </group>
+          </group>
+          <group ref={el=>limbs.current[2]=el} position={[-0.4, 0.0, -0.2]}><mesh position={[0, -0.35, 0]} castShadow material={matBlack}><capsuleGeometry args={[0.2, 0.6]}/></mesh></group>
+          <group ref={el=>limbs.current[3]=el} position={[0.4, 0.0, -0.2]}><mesh position={[0, -0.35, 0]} castShadow material={matBlack}><capsuleGeometry args={[0.2, 0.6]}/></mesh></group>
+        </group>
+      </group>
+    </group>
+  );
+});
+
+/* --- Environment --- */
+function WorldEnv({ time }) {
+  const groundTex = useMemo(() => {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 128; const ctx = c.getContext('2d'); ctx.fillStyle = '#2d4c1e'; ctx.fillRect(0,0,128,128);
+    for(let i=0; i<300; i++) { ctx.fillStyle = Math.random()>0.5 ? '#3a5c2e' : '#1e3c10'; const x=Math.random()*128, y=Math.random()*128, r=Math.random()*3; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); }
+    const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(100, 100); return t;
+  }, []);
+
+  const hours = time.getHours();
+  const minutes = time.getMinutes();
+  const floatTime = hours + minutes / 60;
+  const isNight = floatTime < 5 || floatTime > 18;
+  const sunIntensity = isNight ? 0.1 : 1.2;
+  const sunPos = [Math.sin(floatTime/24 * Math.PI * 2) * 100, Math.cos(floatTime/24 * Math.PI * 2) * 100 + 20, 50];
+  const skyColor = isNight ? '#050510' : '#87ceeb';
+
+  return (
+    <>
+      <ambientLight intensity={isNight ? 0.3 : 0.8} />
+      <directionalLight position={sunPos} intensity={sunIntensity} castShadow shadow-mapSize={[2048, 2048]} />
+
+      <fog attach="fog" args={[skyColor, 10, 1000]} />
+      <mesh position={[0, 50, 0]}><sphereGeometry args={[1000, 32, 32]} /><meshBasicMaterial color={skyColor} side={THREE.BackSide} /></mesh>
+      <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, -0.05, 0]} receiveShadow><planeGeometry args={[4000, 4000]} /><meshStandardMaterial map={groundTex} color={isNight ? "#444" : "#fff"} roughness={0.9}/></mesh>
+
+      {TREE_DATA.map(t => (
+        <group key={t.key} position={t.pos} scale={t.scale}>
+          <mesh position={[0, 1.5, 0]} castShadow><cylinderGeometry args={[0.2, 0.4, 3]}/><meshStandardMaterial color="#4a3c2e"/></mesh>
+          <mesh position={[0, 3.5, 0]} castShadow><coneGeometry args={[2, 4.5, 8]}/><meshStandardMaterial color="#1d3c1e"/></mesh>
+        </group>
+      ))}
+
+      {HOUSE_DATA.map(h => (
+        <group key={h.key} position={h.pos} rotation={h.rot} scale={h.scale}>
+          <mesh position={[0, 2, 0]} castShadow><boxGeometry args={[4, 4, 4]} /><meshStandardMaterial color="#ddd" /></mesh>
+          <mesh position={[0, 5, 0]} rotation={[0, Math.PI/4, 0]} castShadow><coneGeometry args={[3.5, 3, 4]} /><meshStandardMaterial color="#8b4513" /></mesh>
+          {isNight && <pointLight position={[0, 3, 2]} intensity={2} color="#ffaa00" distance={10} />}
+        </group>
+      ))}
+
+      {RABBIT_DATA.map(r => <Rabbit key={`rab-${r.key}`} position={r.pos} color={r.color} />)}
+      {BIRD_DATA.map(b => <Bird key={`bir-${b.key}`} position={b.pos} speed={b.speed} />)}
+      <ContactShadows scale={200} blur={2} far={50} opacity={0.5} />
+    </>
+  );
+}
+
+/* --- Drone Controller --- */
+const Drone = forwardRef(({ active, auto, targetRef, camMode, controlMode, resetSignal, time, speakerActive, lightOn, lightTilt }, ref) => {
+  const droneRef = useRef(); const tiltRef = useRef(); const propsRef = useRef([]);
+  const velocity = useRef(new THREE.Vector3(0, 0, 0)); const camRot = useRef({ y: 0, p: 0 });
+  const lightTargetRef = useRef(new THREE.Object3D());
+  const { camera, scene } = useThree();
+
+  useImperativeHandle(ref, () => ({ position: droneRef.current?.position || new THREE.Vector3(), object: droneRef.current }));
+
+  useEffect(() => { if (droneRef.current) { droneRef.current.position.set(0, 0.1, 10); droneRef.current.rotation.set(0, 0, 0); velocity.current.set(0, 0, 0); camRot.current = { y: 0, p: 0 }; } }, [active, resetSignal]);
+
+  // Add light target to scene
+  useEffect(() => {
+    const target = lightTargetRef.current;
+    if (target) scene.add(target);
+    return () => { if (target) scene.remove(target); };
+  }, [scene]);
+
+  useFrame((state, dt) => {
+    if (!droneRef.current || !active) return;
+    updateKeyboardInput(); // Keyboard fallback for PC
+    const d = droneRef.current;
+    let load = 0; let th = 0, ya = 0, pi = 0, ro = 0;
+    if (controlMode === 1) { ya = input.lx; pi = input.ly; ro = input.rx; th = input.ry; }
+    else { ya = input.lx; th = input.ly; ro = input.rx; pi = input.ry; }
+
+    if (auto && targetRef?.current?.position) {
+      const tPos = targetRef.current.position; const angle = state.clock.getElapsedTime() * 0.25; const targetPos = new THREE.Vector3(tPos.x + Math.sin(angle) * 15, 7, tPos.z + Math.cos(angle) * 15);
+      velocity.current.lerp(targetPos.sub(d.position), dt * 1.5); d.position.add(velocity.current.clone().multiplyScalar(dt)); d.lookAt(tPos); load = 0.5;
+      camRot.current.y -= ya * dt * 2.5; camRot.current.p = THREE.MathUtils.clamp(camRot.current.p + pi * dt * 1.5, -0.8, 0.8);
+    } else {
+      d.rotation.y -= ya * dt * 2.5; const yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), d.rotation.y);
+      const accel = new THREE.Vector3(0, 0, -1).applyQuaternion(yawQ).multiplyScalar(pi * 35.0 * dt);
+      accel.add(new THREE.Vector3(1, 0, 0).applyQuaternion(yawQ).multiplyScalar(ro * 35.0 * dt)); accel.y = th * 35.0 * dt;
+      velocity.current.add(accel).multiplyScalar(0.975);
+      d.position.add(velocity.current.clone().multiplyScalar(dt)); if (d.position.y < 0.1) { d.position.y = 0.1; velocity.current.y = 0; }
+      d.rotation.x = THREE.MathUtils.lerp(d.rotation.x, -pi * 0.4, dt * 8); d.rotation.z = THREE.MathUtils.lerp(d.rotation.z, -ro * 0.4, dt * 8);
+      load = d.position.y > 0.15 ? (Math.abs(th) > 0.1 ? 0.8 : 0.45) : 0;
+      camRot.current.y = THREE.MathUtils.lerp(camRot.current.y, 0, dt * 2); camRot.current.p = THREE.MathUtils.lerp(camRot.current.p, 0, dt * 2);
+    }
+    droneSound.update(load); propsRef.current.forEach((p, i) => { if (p) p.rotation.y += dt * (load > 0 ? 30 + load * 40 : 0) * (i % 2 === 0 ? 1 : -1); });
+
+    // Light target
+    if (lightTargetRef.current) {
+        const angle = THREE.MathUtils.degToRad(10 + (lightTilt||0.5) * 80);
+        const offset = new THREE.Vector3(0, -Math.sin(angle) * 20, -Math.cos(angle) * 20).applyEuler(d.rotation);
+        lightTargetRef.current.position.copy(d.position).add(offset);
+    }
+
+    // Camera modes
+    if (camMode === "FPS" || camMode === "IR") {
+      const q = d.quaternion.clone().multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(camRot.current.p, camRot.current.y, 0)));
+      camera.position.copy(d.position).add(new THREE.Vector3(0, 0, -0.4).applyQuaternion(q)); camera.quaternion.copy(q);
+    } else if (camMode === "FOLLOW") {
+      const tPos = targetRef?.current?.position || new THREE.Vector3(0,0,0);
+      camera.position.lerp(tPos.clone().add(new THREE.Vector3(0, 6, 12).applyAxisAngle(new THREE.Vector3(0,1,0), camRot.current.y)), dt * 3); camera.lookAt(tPos);
+    } else {
+      const offset = new THREE.Vector3(0, 3, 5).applyEuler(new THREE.Euler(camRot.current.p, d.rotation.y + camRot.current.y, 0));
+      camera.position.lerp(d.position.clone().add(offset), dt * 6);
+      camera.lookAt(d.position.clone().add(new THREE.Vector3(0, -0.5, -10).applyEuler(new THREE.Euler(camRot.current.p, d.rotation.y + camRot.current.y, 0))));
+    }
+  });
+
+  const isDark = time.getHours() < 6 || time.getHours() > 18;
+
+  return (
+    <group ref={droneRef}>
+      <mesh castShadow><boxGeometry args={[0.5, 0.12, 0.5]}/><meshStandardMaterial color="#222"/></mesh>
+      {[[-0.7,-0.7],[0.7,-0.7],[-0.7,0.7],[0.7,0.7]].map((p,i)=>(
+        <group key={i} position={[p[0],0.1,p[1]]}>
+          <mesh><cylinderGeometry args={[0.05,0.05,0.1]} /><meshStandardMaterial color="#333" /></mesh>
+          <mesh ref={el => propsRef.current[i] = el}><boxGeometry args={[1.2, 0.01, 0.08]}/><meshStandardMaterial color="#0ff" transparent opacity={0.6} /></mesh>
+        </group>
+      ))}
+      <group position={[0, -0.2, -0.3]}>
+         <mesh><sphereGeometry args={[0.12]} /><meshStandardMaterial color="#111" /></mesh>
+         <mesh position={[0.15, 0, 0]} rotation={[1.57,0,0]}><cylinderGeometry args={[0.04, 0.04, 0.1]} /><meshStandardMaterial color="#000" emissive="#f00" emissiveIntensity={2} /></mesh>
+         <spotLight position={[0, 0, -0.1]} angle={0.5} penumbra={0.4} intensity={lightOn ? 10 : 0} color="#fff" castShadow target={lightTargetRef.current} />
+         {speakerActive && <pointLight position={[0,0,0]} intensity={2} distance={2} color="#00ff00" />}
+      </group>
+      <mesh position={[0.3, -0.1, 0]} rotation={[0,0,1.57]}><coneGeometry args={[0.1, 0.2, 8]} /><meshStandardMaterial color="#222" /></mesh>
+      <mesh position={[-0.3, -0.1, 0]} rotation={[0,0,-1.57]}><coneGeometry args={[0.1, 0.2, 8]} /><meshStandardMaterial color="#222" /></mesh>
+      <mesh position={[0, -0.1, 0.3]}><boxGeometry args={[0.2, 0.05, 0.05]} /><meshStandardMaterial color="red" emissive="red" emissiveIntensity={3} /></mesh>
+    </group>
+  );
+});
+
+/* --- FIX: PandaWarningChecker — useFrame inside Canvas (was in App before, causing crash) --- */
+function PandaWarningChecker({ pandaRef, onWarningChange }) {
+  useFrame(() => {
+    if (pandaRef.current && pandaRef.current.isInCity) {
+      onWarningChange(pandaRef.current.isInCity());
+    } else {
+      onWarningChange(false);
+    }
+  });
+  return null;
+}
+
+/* --- FIX: PandaWrapper — handles all Canvas-internal logic --- */
+function PandaWrapper({ appMode, auto, cam, ctrl, resetSig, time, foods, speaker, lightOn, lightTilt, onPandaWarning, dronePositionRef }) {
+  const mainPanda = useRef();
+  const droneRef = useRef();
+  const { camera } = useThree();
+
+  useEffect(() => {
+    if (appMode === "PANDA") { camera.position.set(0, 15, 30); camera.lookAt(0, 0, 0); }
+  }, [appMode, camera]);
+
+  // Expose drone position to parent for food dropping
+  useFrame(() => {
+    if (droneRef.current?.position && dronePositionRef) {
+      dronePositionRef.current = droneRef.current.position.clone();
+    }
+  });
+
+  return (
+    <>
+      <OrbitControls enabled={appMode === "PANDA"} maxPolarAngle={Math.PI/2 - 0.1} minDistance={10} maxDistance={500} />
+      <Panda ref={mainPanda} position={[0, 0, 0]} droneRef={droneRef} foods={foods} speakerActive={speaker} />
+      <Panda position={[50, 0, -60]} droneRef={droneRef} foods={foods} speakerActive={speaker} />
+      <Panda position={[-70, 0, 55]} droneRef={droneRef} foods={foods} speakerActive={speaker} />
+      {foods.map(f => <Food key={f.id} position={f.position} />)}
+      <Drone ref={droneRef} active={appMode === "DRONE"} auto={auto} targetRef={mainPanda} camMode={cam} controlMode={ctrl} resetSignal={resetSig} time={time} speakerActive={speaker} lightOn={lightOn} lightTilt={lightTilt} />
+      <PandaWarningChecker pandaRef={mainPanda} onWarningChange={onPandaWarning} />
+    </>
+  );
+}
+
+/* --- FIX: App Root — no useFrame (was causing crash), no nested #root div --- */
+function App() {
+  const [ready, setReady] = useState(false);
+  const [appMode, setAppMode] = useState("PANDA");
+  const [auto, setAuto] = useState(false);
+  const [cam, setCam] = useState("DRONE");
+  const [ctrl, setCtrl] = useState(2);
+  const [bat, setBat] = useState(100);
+  const [resetSig, setResetSig] = useState(0);
+  const [showInfo, setShowInfo] = useState(false);
+
+  const [time, setTime] = useState(new Date());
+  useEffect(() => { const t = setInterval(() => setTime(new Date()), 1000 * 60); return () => clearInterval(t); }, []);
+
+  const [foods, setFoods] = useState([]);
+  const [speaker, setSpeaker] = useState(false);
+  const [lightOn, setLightOn] = useState(false);
+  const [lightTilt, setLightTilt] = useState(0.5);
+  const [pandaWarning, setPandaWarning] = useState(false);
+
+  // FIX: Track drone position via ref (shared between Canvas and DOM)
+  const dronePositionRef = useRef(new THREE.Vector3(0, 5, 10));
+
+  useEffect(() => { if(appMode==="DRONE"){ const i=setInterval(()=>setBat(b=>Math.max(0, b-0.05)), 1000); return ()=>clearInterval(i);} }, [appMode]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const l = document.getElementById('loader-ui');
+      if (l) l.style.opacity = '0';
+      setTimeout(() => { if (l) l.style.display = 'none'; setReady(true); }, 500);
+    }, 2000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const toggleDrone = () => { if (appMode === "PANDA") { setAppMode("DRONE"); droneSound.start(); } else { setAppMode("PANDA"); setAuto(false); droneSound.stop(); } };
+
+  // FIX: Drop food near drone position, not at origin
+  const handleDropFood = useCallback(() => {
+    const dp = dronePositionRef.current;
+    const spread = 3;
+    setFoods(prev => [...prev, {
+      id: Date.now(),
+      position: [dp.x + (Math.random()-0.5)*spread, dp.y + 2, dp.z + (Math.random()-0.5)*spread]
+    }]);
+  }, []);
+
+  // Auto-remove old food after 30s
+  useEffect(() => {
+    if (foods.length === 0) return;
+    const timer = setTimeout(() => {
+      setFoods(prev => prev.length > 0 ? prev.slice(1) : prev);
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [foods]);
+
+  const toggleSpeaker = () => { setSpeaker(s => !s); if (!speaker) droneSound.beep(); };
+
+  const handlePandaWarning = useCallback((isWarning) => {
+    setPandaWarning(isWarning);
+  }, []);
+
+  return (
+    <>
+      {/* Canvas wrapper: absolute position to fill viewport */}
+      <div className={cam === 'IR' ? 'ir-mode' : ''} style={{position:'absolute',inset:0}}>
+        <Canvas shadows camera={{ fov: 75, position: [0, 15, 25] }} onCreated={({gl})=>{gl.setClearColor("#87ceeb")}}>
+            <PerspectiveCamera makeDefault position={[0, 15, 25]} fov={75} />
+            <WorldEnv time={time} />
+            <PandaWrapper
+              appMode={appMode} auto={auto} cam={cam} ctrl={ctrl}
+              resetSig={resetSig} time={time} foods={foods} speaker={speaker}
+              lightOn={lightOn} lightTilt={lightTilt}
+              onPandaWarning={handlePandaWarning}
+              dronePositionRef={dronePositionRef}
+            />
+        </Canvas>
+      </div>
+      <div id="ui" className={ready ? 'ready' : ''}>
+        <div className="top-hud">
+          <div className="hud-info">
+            <div className="hud-title">PANDA WORLD</div>
+            <div className="hud-sub">v4.0.0 | TIME: {time.getHours().toString().padStart(2,'0')}:{time.getMinutes().toString().padStart(2,'0')}</div>
+            <div className={`warning-box ${pandaWarning?'active':''}`}>WARNING: PANDA IN CITY</div>
+          </div>
+          <div className="btn-group">
+            <button className="btn info-btn" onClick={()=>setShowInfo(true)}>INFO</button>
+            <button className={`btn ${appMode==="DRONE"?"active":""}`} onClick={toggleDrone}>{appMode==="PANDA" ? "START" : "EXIT"}</button>
+            {appMode==="DRONE" && (
+              <>
+                <button className={`btn light-btn ${lightOn?'active':''}`} onClick={()=>setLightOn(!lightOn)}>LIGHT</button>
+                <button className={`btn action-btn ${speaker?'active':''}`} onClick={toggleSpeaker}>CALL</button>
+                <button className="btn action-btn" onClick={handleDropFood}>FEED</button>
+                <button className={`btn ${auto?"active":""}`} onClick={()=>setAuto(!auto)}>{auto?"AUTO":"MAN"}</button>
+                <button className="btn" onClick={()=>setCam(c=>c==="DRONE"?"FPS":c==="FPS"?"IR":c==="IR"?"FOLLOW":"DRONE")}>CAM: {cam}</button>
+                <button className="btn" onClick={()=>setCtrl(c=>c===1?2:1)}>MODE {ctrl}</button>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="telemetry"><div className="telemetry-panel">
+          <div className="telemetry-row"><span>BATTERY</span><span className="val">{bat.toFixed(0)}%</span></div>
+          <div className="telemetry-row"><span>CONTROL</span><span className="val">{ctrl===1?"MODE 1":"MODE 2"}</span></div>
+          {lightOn && <div className="telemetry-row"><span>LIGHT</span><span className="val">{Math.round(lightTilt*100)}%</span></div>}
+          <div className="signature">grace of touch</div>
+          {appMode==="DRONE" && <button className="btn reset-btn" onClick={()=>{setResetSig(s=>s+1);setBat(100)}}>RE-SPAWN</button>}
+        </div></div>
+        {appMode==="DRONE" && <div className="controls-area"><Stick side="L"/><Stick side="R"/></div>}
+        {lightOn && appMode==="DRONE" && (
+           <div style={{position:'absolute', right:'20px', bottom:'180px', transform:'rotate(-90deg)', pointerEvents:'auto'}}>
+              <input type="range" min="0" max="1" step="0.1" value={lightTilt} onChange={(e) => setLightTilt(parseFloat(e.target.value))} style={{width:'100px'}} />
+           </div>
+        )}
+      </div>
+      {showInfo && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2 className="modal-title">PANDA WORLD x DRONE</h2>
+            <p><strong>Version:</strong> 4.0.0</p>
+            <p><strong>Developer:</strong> grace of touch</p>
+            <hr style={{borderColor:'#333',margin:'15px 0'}}/>
+            <p><strong>Joystick:</strong></p>
+            <p>Left Stick: Yaw + Throttle (Mode 2) or Yaw + Pitch (Mode 1)</p>
+            <p>Right Stick: Roll + Pitch (Mode 2) or Roll + Throttle (Mode 1)</p>
+            <hr style={{borderColor:'#333',margin:'15px 0'}}/>
+            <p><strong>Keyboard (PC):</strong></p>
+            <p>Space / W: Ascend &nbsp; | &nbsp; Shift / S: Descend</p>
+            <p>Q / A: Yaw Left &nbsp; | &nbsp; E / D: Yaw Right</p>
+            <p>Arrow Up/Down: Pitch &nbsp; | &nbsp; Arrow Left/Right: Roll</p>
+            <hr style={{borderColor:'#333',margin:'15px 0'}}/>
+            <p><strong>Features:</strong></p>
+            <ul style={{paddingLeft:'20px'}}>
+              <li>3 AI pandas with autonomous behavior</li>
+              <li>Drone flight with Mode 1/2 controls</li>
+              <li>Camera modes: Drone / FPS / IR / Follow</li>
+              <li>Food drop, speaker call, spotlight</li>
+              <li>Day/night cycle with real-time clock</li>
+            </ul>
+            <button className="close-btn" onClick={()=>setShowInfo(false)}>CLOSE</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+const root = createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>

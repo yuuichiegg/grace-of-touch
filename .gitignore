@@ -1,0 +1,34 @@
+# Build artifacts (generated from dev source)
+build/
+*.output
+
+# Old backup folders (replaced by git history)
+backup-*/
+nul
+
+# Dev backups (replaced by git history)
+*_backup.html
+*_dev.html
+
+# Dependencies (npm install to restore)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Firebase local
+.firebase/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Sensitive (API keys are in Firebase config, not files)
+.env
+.env.local
+credentials*.json
