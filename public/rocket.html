@@ -855,6 +855,9 @@ const LaunchSequence = {
       case 'MAX-Q':
         this.rocketVelY+=dt*12;
         this.rocketY+=this.rocketVelY*dt;
+        // Max-Q camera shake
+        App.camera.position.x+=Math.sin(now*40)*0.15*(1-progress);
+        App.camera.position.z+=Math.cos(now*35)*0.12*(1-progress);
         break;
       case 'MECO':
         Rocket3D.flameUniforms.thrust.value=Math.max(0,1.0-progress*2);
@@ -1762,7 +1765,7 @@ const PandaZones={
 
         // Panda body (simple white+black spheres) — scaled up for visibility from orbit
         const panda=new THREE.Group();
-        const S=1; // original size
+        const S=0.15; // realistic scale relative to Earth
 
         // Body (white)
         const bodyGeo=new THREE.SphereGeometry(6*S,8,8);
@@ -1855,7 +1858,7 @@ const PandaZones={
       const breathe=1.0+Math.sin(d._phase)*0.03;
       p.children[0].scale.setScalar(breathe);
       // Head bob
-      if(p.children[1])p.children[1].position.y=7+Math.sin(d._phase*1.3)*0.3;
+      if(p.children[1])p.children[1].position.y=7*0.15+Math.sin(d._phase*1.3)*0.05;
       // Arm sway
       if(p.children[4])p.children[4].rotation.z=0.5+Math.sin(d._phase*0.7)*0.15;
       if(p.children[5])p.children[5].rotation.z=-0.5-Math.sin(d._phase*0.7)*0.15;
@@ -2436,7 +2439,13 @@ const App={
     this._bgColor.lerp(this._targetBgColor,0.01);this._ptColor.lerp(this._targetPtColor,0.02);this.renderer.setClearColor(this._bgColor,1.0);
     if(!this._realisticMode){const moodBloom=mood.bloom||1.8;this.bloomPass.strength=moodBloom+bass*2.0+energy*0.8;}
     if(MusicEngine.beat)this._beatPulse=1.0;this._beatPulse*=0.92;
-    if(this.particles)this.particles.material.size=1.2+bass*2.5+this._beatPulse*1.5;
+    // Particles: fade near surface, visible in space only
+    if(this.particles){
+      const _alt=this.camera.position.distanceTo(new THREE.Vector3(0,-3030,0))-3000;
+      const spaceFactor=Math.max(0,Math.min(1,(_alt-20)/80)); // 0 at surface, 1 at alt>100
+      this.particles.material.size=(0.4+bass*1.0+this._beatPulse*0.5)*spaceFactor;
+      this.particles.material.opacity=0.6*spaceFactor;
+    }
     if(this._starField){this._starField.material.size=2.0+treble*3.0;this._starField.rotation.y+=0.0001+energy*0.0003;}
     // Earth opacity kept stable (no music-driven transparency)
   },
