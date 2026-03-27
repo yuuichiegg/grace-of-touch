@@ -326,10 +326,49 @@ const GLOW_FS=`uniform float thrust;uniform vec3 glowColor;varying vec2 vUv;
 void main(){float d=length(vUv-vec2(0.5))*2.0;float a=smoothstep(1.0,0.0,d);a=pow(a,1.8)*0.7*thrust;gl_FragColor=vec4(glowColor,a);}`;
 
 // Atmosphere shader (Fresnel rim glow)
-const ATMO_VS=`varying vec3 vNormal;varying vec3 vViewPos;
-void main(){vNormal=normalize(normalMatrix*normal);vViewPos=(modelViewMatrix*vec4(position,1.0)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
-const ATMO_FS=`varying vec3 vNormal;varying vec3 vViewPos;
-void main(){vec3 vd=normalize(-vViewPos);float rim=1.0-max(0.0,dot(vd,vNormal));float glow=pow(rim,2.5)*0.7;vec3 col=mix(vec3(0.15,0.4,0.9),vec3(0.5,0.8,1.0),rim);gl_FragColor=vec4(col,glow);}`;
+const ATMO_VS=`varying vec3 vNormal;varying vec3 vViewPos;varying vec3 vWorldPos;
+void main(){vNormal=normalize(normalMatrix*normal);vViewPos=(modelViewMatrix*vec4(position,1.0)).xyz;vWorldPos=(modelMatrix*vec4(position,1.0)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
+const ATMO_FS=`varying vec3 vNormal;varying vec3 vViewPos;varying vec3 vWorldPos;
+void main(){
+  vec3 vd=normalize(-vViewPos);
+  float rim=1.0-max(0.0,dot(vd,vNormal));
+  // Rayleigh-like scattering: blue at edges, white-blue at limb
+  float scatter=pow(rim,2.0);
+  float limb=pow(rim,5.0);
+  vec3 skyBlue=vec3(0.2,0.5,1.0);
+  vec3 horizonWhite=vec3(0.6,0.8,1.0);
+  vec3 sunsetOrange=vec3(1.0,0.4,0.15);
+  vec3 col=mix(skyBlue,horizonWhite,scatter);
+  col+=sunsetOrange*limb*0.3; // subtle orange at the very edge
+  float alpha=scatter*0.6+limb*0.4;
+  gl_FragColor=vec4(col,alpha);
+}`;
+
+// Sky dome shader — altitude-based sky color (blue on ground → black in space)
+const SKY_VS=`varying vec3 vWorldPos;
+void main(){vWorldPos=(modelMatrix*vec4(position,1.0)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
+const SKY_FS=`uniform vec3 uEarthCenter;uniform float uEarthR;uniform vec3 uCamPos;
+varying vec3 vWorldPos;
+void main(){
+  float camAlt=length(uCamPos-uEarthCenter)-uEarthR;
+  // Sky transitions: 0=surface(blue), 50=upper atmo(dark blue), 200+=space(transparent)
+  float altFactor=clamp(camAlt/200.0,0.0,1.0);
+  // Direction from center to fragment
+  vec3 dir=normalize(vWorldPos-uEarthCenter);
+  vec3 camDir=normalize(uCamPos-uEarthCenter);
+  float up=dot(dir,camDir); // 1=overhead, 0=horizon, -1=below
+  // Ground-level sky gradient
+  vec3 zenith=vec3(0.1,0.2,0.6);   // deep blue overhead
+  vec3 horizon=vec3(0.5,0.7,1.0);   // light blue at horizon
+  vec3 ground=vec3(0.02,0.04,0.08); // dark below
+  vec3 col;
+  if(up>0.0){col=mix(horizon,zenith,pow(up,0.6));}
+  else{col=mix(horizon,ground,pow(-up,0.4));}
+  float alpha=(1.0-altFactor)*0.85;
+  // Fade sky near ground for better surface visibility
+  if(camAlt<5.0)alpha*=clamp(camAlt/5.0,0.0,1.0);
+  gl_FragColor=vec4(col,alpha);
+}`;
 
 // ══════════════════════════════════════════════
 // Logger
@@ -2218,18 +2257,31 @@ const App={
     loader.load('https://unpkg.com/three-globe@2.31.0/example/img/earth-blue-marble.jpg',
       tex=>{earthMat.map=tex;earthMat.color.set(0xffffff);earthMat.needsUpdate=true;Logger.log("EARTH: BLUE MARBLE LOADED");},
       undefined,()=>Logger.log("EARTH: TEXTURE UNAVAILABLE"));
-    // Atmosphere glow shell (Fresnel rim)
+    // Atmosphere glow shell (Fresnel rim — visible from space)
     const atmoGeo=new THREE.SphereGeometry(R+50,96,96);
     const atmoMat=new THREE.ShaderMaterial({vertexShader:ATMO_VS,fragmentShader:ATMO_FS,transparent:true,blending:THREE.AdditiveBlending,side:THREE.FrontSide,depthWrite:false});
     this._atmosphere=new THREE.Mesh(atmoGeo,atmoMat);
     this._atmosphere.position.set(0,cY,0);
     this.scene.add(this._atmosphere);
-    // Troposphere haze
+    // Troposphere haze (thin blue layer near surface)
     const hazeGeo=new THREE.SphereGeometry(R+15,48,48);
-    const hazeMat=new THREE.MeshBasicMaterial({color:0x88bbff,transparent:true,opacity:0.08,blending:THREE.AdditiveBlending,depthWrite:false});
-    this._haze=new THREE.Mesh(hazeGeo,hazeMat);
+    const hazeMat2=new THREE.MeshBasicMaterial({color:0x88bbff,transparent:true,opacity:0.08,blending:THREE.AdditiveBlending,depthWrite:false});
+    this._haze=new THREE.Mesh(hazeGeo,hazeMat2);
     this._haze.position.set(0,cY,0);
     this.scene.add(this._haze);
+    // Sky dome — altitude-reactive blue sky (inside-visible sphere)
+    const skyGeo=new THREE.SphereGeometry(R+180,64,64);
+    this._skyUniforms={uEarthCenter:{value:new THREE.Vector3(0,cY,0)},uEarthR:{value:R},uCamPos:{value:new THREE.Vector3()}};
+    const skyMat=new THREE.ShaderMaterial({vertexShader:SKY_VS,fragmentShader:SKY_FS,uniforms:this._skyUniforms,transparent:true,side:THREE.BackSide,depthWrite:false});
+    this._skyDome=new THREE.Mesh(skyGeo,skyMat);
+    this._skyDome.position.set(0,cY,0);
+    this.scene.add(this._skyDome);
+    // Cloud layer (subtle white semi-transparent sphere)
+    const cloudGeo=new THREE.SphereGeometry(R+8,64,64);
+    const cloudMat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.12,side:THREE.DoubleSide,depthWrite:false});
+    this._clouds=new THREE.Mesh(cloudGeo,cloudMat);
+    this._clouds.position.set(0,cY,0);
+    this.scene.add(this._clouds);
   },
   _createParticles(){const N=5000;const geo=new THREE.BufferGeometry();const pos=new Float32Array(N*3),col=new Float32Array(N*3),vel=new Float32Array(N*3),life=new Float32Array(N);for(let i=0;i<N;i++){const r=Math.random()*800+60,theta=Math.random()*Math.PI*2,phi=Math.acos(2*Math.random()-1);pos[i*3]=r*Math.sin(phi)*Math.cos(theta);pos[i*3+1]=r*Math.sin(phi)*Math.sin(theta);pos[i*3+2]=r*Math.cos(phi);vel[i*3]=(Math.random()-0.5)*0.015;vel[i*3+1]=(Math.random()-0.5)*0.015;vel[i*3+2]=(Math.random()-0.5)*0.015;life[i]=Math.random();}geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.setAttribute('velocity',new THREE.BufferAttribute(vel,3));geo.setAttribute('life',new THREE.BufferAttribute(life,1));const mat=new THREE.PointsMaterial({vertexColors:true,size:1.2,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true});this.particles=new THREE.Points(geo,mat);this.scene.add(this.particles);},
   _createStarField(){const N=8000;const geo=new THREE.BufferGeometry();const pos=new Float32Array(N*3),col=new Float32Array(N*3);for(let i=0;i<N;i++){const r=Math.random()*20000+4000,u=Math.random()*2-1,th=Math.random()*Math.PI*2,s=Math.sqrt(1-u*u);pos[i*3]=r*s*Math.cos(th);pos[i*3+1]=r*u;pos[i*3+2]=r*s*Math.sin(th);const b=0.5+Math.random()*0.5,rnd=Math.random();if(rnd<0.3){col[i*3]=b*0.7;col[i*3+1]=b*0.85;col[i*3+2]=b;}else if(rnd<0.7){col[i*3]=b;col[i*3+1]=b;col[i*3+2]=b;}else{col[i*3]=b;col[i*3+1]=b*0.88;col[i*3+2]=b*0.65;}}geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('color',new THREE.BufferAttribute(col,3));const mat=new THREE.PointsMaterial({vertexColors:true,size:2.0,transparent:true,opacity:1.0,blending:THREE.AdditiveBlending,depthWrite:false});this._starField=new THREE.Points(geo,mat);this.scene.add(this._starField);},
@@ -2333,7 +2385,10 @@ const App={
     SolarSystem.update(now);
     EarthquakeLayer.update(now);
     PandaZones.update(now);
-    // Earth rotation removed — launch pad must stay fixed on surface
+    // Sky dome: update camera position for altitude-based sky color
+    if(this._skyUniforms)this._skyUniforms.uCamPos.value.copy(this.camera.position);
+    // Slow cloud rotation
+    if(this._clouds)this._clouds.rotation.y+=0.00005;
 
     const speed=this.velocity.length();
     SFXSystem.setSpeed(speed);
