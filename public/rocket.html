@@ -1793,13 +1793,13 @@ const PandaZones={
         panda.add(nose);
 
         // Arms (black)
-        const armGeo=new THREE.CapsuleGeometry(2*S,4*S,4,4);
+        const armGeo=new THREE.CylinderGeometry(2*S,4*S,4,4);
         const armL=new THREE.Mesh(armGeo,earMat);armL.position.set(-6*S,2*S,0);armL.rotation.z=0.5;
         const armR=new THREE.Mesh(armGeo,earMat);armR.position.set(6*S,2*S,0);armR.rotation.z=-0.5;
         panda.add(armL,armR);
 
         // Legs (black)
-        const legGeo=new THREE.CapsuleGeometry(2.5*S,3*S,4,4);
+        const legGeo=new THREE.CylinderGeometry(2.5*S,3*S,4,4);
         const legL=new THREE.Mesh(legGeo,earMat);legL.position.set(-3*S,-5*S,0);
         const legR=new THREE.Mesh(legGeo,earMat);legR.position.set(3*S,-5*S,0);
         panda.add(legL,legR);
@@ -1871,7 +1871,7 @@ const PlayerShip={
 
     // Fuselage — sleek elongated capsule
     const bodyMat=new THREE.MeshPhongMaterial({color:0x334455,shininess:80,transparent:true,opacity:0.95});
-    const bodyGeo=new THREE.CapsuleGeometry(2,12,8,16);
+    const bodyGeo=new THREE.CylinderGeometry(2,12,8,16);
     const body=new THREE.Mesh(bodyGeo,bodyMat);
     body.rotation.x=Math.PI/2; // horizontal
     this.group.add(body);
@@ -2044,7 +2044,7 @@ const SpaceElevator={
 
     // Elevator car — small capsule that travels the cable
     const carMat=new THREE.MeshPhongMaterial({color:0xccddee,emissive:0x224455,shininess:90});
-    const carGeo=new THREE.CapsuleGeometry(3,6,6,8);
+    const carGeo=new THREE.CylinderGeometry(3,6,6,8);
     this._car=new THREE.Mesh(carGeo,carMat);
     // Car light
     const carLight=new THREE.PointLight(0xffffff,1,50);
