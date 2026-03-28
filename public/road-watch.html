@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>Road Watch — Grace of Touch</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: { orbitron: ['Orbitron','monospace'], noto: ['Noto Sans JP','sans-serif'] },
+      colors: { cyan: { grace: '#00ffff' }, dark: { bg: '#020510', panel: '#0a0e1a' } }
+    }
+  }
+}
+</script>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #020510; overflow-x: hidden; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0a0e1a; }
+::-webkit-scrollbar-thumb { background: rgba(0,255,255,0.2); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+/* ======== CONSTANTS ======== */
+const ANOMALY_TYPES = [
+  { id:'debris', label:'破片/ゴミ', color:'#a0522d', risk:'中', icon:'🪨' },
+  { id:'pothole', label:'ポットホール', color:'#333', risk:'高', icon:'🕳️' },
+  { id:'cone', label:'転倒コーン', color:'#ff6600', risk:'中', icon:'🔶' },
+  { id:'box', label:'落下物(箱)', color:'#8b6914', risk:'高', icon:'📦' },
+  { id:'branch', label:'倒木/枝', color:'#228b22', risk:'中', icon:'🌿' },
+  { id:'animal', label:'動物横断', color:'#daa520', risk:'高', icon:'🐾' },
+];
+
+const SPEED_OPTIONS = [30, 50, 80];
+
+/* ======== AUDIO ======== */
+function createBeep(freq=880, dur=0.12) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + dur);
+  } catch(e) {}
+}
+
+/* ======== SIMULATED GPS ======== */
+function randomGPS() {
+  const baseLat = 35.6762 + (Math.random()-0.5)*0.02;
+  const baseLng = 139.6503 + (Math.random()-0.5)*0.02;
+  return { lat: baseLat.toFixed(6), lng: baseLng.toFixed(6) };
+}
+
+/* ======== MAIN CAMERA CANVAS ======== */
+function CameraCanvas({ mode, speed, nightMode, onDetection, running }) {
+  const canvasRef = useRef(null);
+  const stateRef = useRef({
+    roadOffset: 0,
+    objects: [],
+    lastSpawn: 0,
+    detections: [],
+  });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let animId;
+    let lastTime = 0;
+
+    function resize() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width * window.devicePixelRatio;
+      canvas.height = rect.height * window.devicePixelRatio;
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    const W = () => canvas.width / window.devicePixelRatio;
+    const H = () => canvas.height / window.devicePixelRatio;
+
+    function drawSky(w, h) {
+      const skyH = mode === 'drone' ? h * 0.1 : h * 0.35;
+      const grad = ctx.createLinearGradient(0, 0, 0, skyH);
+      if (nightMode) {
+        grad.addColorStop(0, '#000820');
+        grad.addColorStop(1, '#0a1535');
+      } else {
+        grad.addColorStop(0, '#4a90d9');
+        grad.addColorStop(1, '#87ceeb');
+      }
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, skyH);
+
+      if (nightMode) {
+        for (let i = 0; i < 30; i++) {
+          ctx.fillStyle = `rgba(255,255,255,${0.3+Math.random()*0.7})`;
+          ctx.fillRect(Math.random()*w, Math.random()*skyH*0.8, 1.5, 1.5);
+        }
+      }
+    }
+
+    function drawRoadTaxi(w, h, dt) {
+      const st = stateRef.current;
+      st.roadOffset += speed * 0.8 * dt;
+      const horizonY = h * 0.35;
+      const vanishX = w * 0.5;
+
+      // Road surface
+      const roadGrad = ctx.createLinearGradient(0, horizonY, 0, h);
+      roadGrad.addColorStop(0, nightMode ? '#1a1a2e' : '#555');
+      roadGrad.addColorStop(1, nightMode ? '#111' : '#333');
+      ctx.fillStyle = roadGrad;
+      ctx.beginPath();
+      ctx.moveTo(vanishX - 10, horizonY);
+      ctx.lineTo(-w*0.3, h);
+      ctx.lineTo(w*1.3, h);
+      ctx.lineTo(vanishX + 10, horizonY);
+      ctx.closePath();
+      ctx.fill();
+
+      // Road edges
+      ctx.strokeStyle = nightMode ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(vanishX - 8, horizonY);
+      ctx.lineTo(-w*0.2, h);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(vanishX + 8, horizonY);
+      ctx.lineTo(w*1.2, h);
+      ctx.stroke();
+
+      // Center dashes
+      const dashLen = 40;
+      const gapLen = 30;
+      const totalDash = dashLen + gapLen;
+      const numDashes = 20;
+      ctx.strokeStyle = nightMode ? 'rgba(255,200,0,0.5)' : 'rgba(255,200,0,0.8)';
+      ctx.lineWidth = 3;
+      for (let i = 0; i < numDashes; i++) {
+        const t0 = ((i * totalDash - (st.roadOffset % totalDash)) / (numDashes * totalDash));
+        const t1 = t0 + dashLen / (numDashes * totalDash);
+        if (t0 < 0 || t0 > 1) continue;
+        const perspective0 = Math.pow(Math.max(0, t0), 1.5);
+        const perspective1 = Math.pow(Math.min(1, t1), 1.5);
+        const y0 = horizonY + perspective0 * (h - horizonY);
+        const y1 = horizonY + perspective1 * (h - horizonY);
+        ctx.beginPath();
+        ctx.moveTo(vanishX, y0);
+        ctx.lineTo(vanishX, y1);
+        ctx.stroke();
+      }
+
+      // Headlights at night
+      if (nightMode) {
+        const hlGrad = ctx.createRadialGradient(w*0.5, h, 10, w*0.5, h*0.5, h*0.6);
+        hlGrad.addColorStop(0, 'rgba(255,255,200,0.15)');
+        hlGrad.addColorStop(1, 'rgba(255,255,200,0)');
+        ctx.fillStyle = hlGrad;
+        ctx.fillRect(0, horizonY, w, h - horizonY);
+      }
+
+      return { horizonY, vanishX };
+    }
+
+    function drawRoadDrone(w, h, dt) {
+      const st = stateRef.current;
+      st.roadOffset += speed * 0.5 * dt;
+
+      // Top-down road
+      const roadLeft = w * 0.2;
+      const roadRight = w * 0.8;
+      const roadW = roadRight - roadLeft;
+
+      ctx.fillStyle = nightMode ? '#1a1a28' : '#444';
+      ctx.fillRect(roadLeft, 0, roadW, h);
+
+      // Side lines
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(roadLeft, 0); ctx.lineTo(roadLeft, h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(roadRight, 0); ctx.lineTo(roadRight, h); ctx.stroke();
+
+      // Center dashes scrolling
+      ctx.strokeStyle = 'rgba(255,200,0,0.7)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([20, 15]);
+      ctx.lineDashOffset = -st.roadOffset * 2;
+      ctx.beginPath();
+      ctx.moveTo(w*0.5, 0);
+      ctx.lineTo(w*0.5, h);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Scanning line
+      const scanY = (st.roadOffset * 40) % h;
+      ctx.strokeStyle = 'rgba(0,255,255,0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(roadLeft, scanY); ctx.lineTo(roadRight, scanY); ctx.stroke();
+
+      // Grass
+      ctx.fillStyle = nightMode ? '#0a1a0a' : '#3a7a3a';
+      ctx.fillRect(0, 0, roadLeft, h);
+      ctx.fillRect(roadRight, 0, w - roadRight, h);
+
+      return { roadLeft, roadRight, roadW };
+    }
+
+    function spawnObject(w, h, roadInfo, now) {
+      const st = stateRef.current;
+      const interval = Math.max(800, 3000 - speed * 20);
+      if (now - st.lastSpawn < interval) return;
+      if (Math.random() > 0.6) return;
+      st.lastSpawn = now;
+
+      const type = ANOMALY_TYPES[Math.floor(Math.random() * ANOMALY_TYPES.length)];
+      const size = 15 + Math.random() * 25;
+
+      let x, y;
+      if (mode === 'drone') {
+        x = roadInfo.roadLeft + Math.random() * roadInfo.roadW;
+        y = -size;
+      } else {
+        const horizonY = roadInfo.horizonY;
+        x = roadInfo.vanishX + (Math.random() - 0.5) * 40;
+        y = horizonY + 10;
+      }
+
+      st.objects.push({
+        id: Date.now() + Math.random(),
+        type,
+        x, y,
+        size: mode === 'drone' ? size : 4,
+        origSize: size,
+        detected: false,
+        confidence: (70 + Math.random() * 28).toFixed(1),
+        gps: randomGPS(),
+        spawnTime: now,
+        alpha: 1,
+      });
+    }
+
+    function updateObjects(w, h, roadInfo, dt) {
+      const st = stateRef.current;
+      st.objects = st.objects.filter(obj => {
+        if (mode === 'drone') {
+          obj.y += speed * 0.5 * dt * 80;
+          if (obj.y > h + 50) return false;
+        } else {
+          const horizonY = roadInfo.horizonY;
+          const progress = (obj.y - horizonY) / (h - horizonY);
+          const accel = 1 + progress * 4;
+          obj.y += speed * 0.8 * dt * 60 * accel;
+          obj.size = 4 + obj.origSize * progress;
+          obj.x = roadInfo.vanishX + (obj.x - roadInfo.vanishX) * (1 + dt * speed * 0.02);
+          if (obj.y > h + 50) return false;
+        }
+
+        // Detection trigger
+        if (!obj.detected) {
+          const detectionThreshold = mode === 'drone' ? h * 0.3 : h * 0.5;
+          if (obj.y > detectionThreshold) {
+            obj.detected = true;
+            createBeep(1200, 0.08);
+            setTimeout(() => createBeep(800, 0.1), 100);
+            onDetection({
+              id: obj.id,
+              type: obj.type,
+              confidence: obj.confidence,
+              gps: obj.gps,
+              timestamp: new Date().toLocaleTimeString('ja-JP'),
+            });
+          }
+        }
+        return true;
+      });
+    }
+
+    function drawObjects(w, h) {
+      const st = stateRef.current;
+      st.objects.forEach(obj => {
+        const sz = obj.size;
+        ctx.save();
+        ctx.globalAlpha = obj.alpha;
+
+        // Draw object shape
+        switch(obj.type.id) {
+          case 'debris':
+            ctx.fillStyle = obj.type.color;
+            ctx.fillRect(obj.x - sz/2, obj.y - sz/4, sz, sz/2);
+            ctx.fillStyle = '#8b4513';
+            ctx.fillRect(obj.x - sz/3, obj.y - sz/3, sz/3, sz/3);
+            break;
+          case 'pothole':
+            ctx.fillStyle = '#1a1a1a';
+            ctx.beginPath();
+            ctx.ellipse(obj.x, obj.y, sz/2, sz/3, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 8; i++) {
+              const a = (i/8)*Math.PI*2;
+              const r = sz/2 + Math.random()*4;
+              ctx.beginPath();
+              ctx.moveTo(obj.x + Math.cos(a)*sz/3, obj.y + Math.sin(a)*sz/4);
+              ctx.lineTo(obj.x + Math.cos(a)*r, obj.y + Math.sin(a)*(r*0.6));
+              ctx.stroke();
+            }
+            break;
+          case 'cone':
+            ctx.fillStyle = '#ff6600';
+            ctx.beginPath();
+            ctx.moveTo(obj.x, obj.y - sz/2);
+            ctx.lineTo(obj.x - sz/3, obj.y + sz/3);
+            ctx.lineTo(obj.x + sz/3, obj.y + sz/3);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(obj.x - sz/4, obj.y - sz/6, sz/2, sz/8);
+            break;
+          case 'box':
+            ctx.fillStyle = '#8b6914';
+            ctx.fillRect(obj.x - sz/2, obj.y - sz/2, sz, sz);
+            ctx.strokeStyle = '#654321';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(obj.x - sz/2, obj.y - sz/2, sz, sz);
+            ctx.beginPath();
+            ctx.moveTo(obj.x, obj.y - sz/2);
+            ctx.lineTo(obj.x, obj.y + sz/2);
+            ctx.moveTo(obj.x - sz/2, obj.y);
+            ctx.lineTo(obj.x + sz/2, obj.y);
+            ctx.stroke();
+            break;
+          case 'branch':
+            ctx.strokeStyle = '#654321';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(obj.x - sz/2, obj.y);
+            ctx.lineTo(obj.x + sz/2, obj.y - sz/6);
+            ctx.stroke();
+            ctx.fillStyle = '#228b22';
+            for (let i = 0; i < 4; i++) {
+              ctx.beginPath();
+              ctx.ellipse(obj.x - sz/3 + i*sz/4, obj.y - sz/4 - Math.random()*sz/4, sz/6, sz/5, 0, 0, Math.PI*2);
+              ctx.fill();
+            }
+            break;
+          case 'animal':
+            ctx.fillStyle = '#daa520';
+            ctx.beginPath();
+            ctx.ellipse(obj.x, obj.y, sz/2, sz/3, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = '#222';
+            ctx.beginPath();
+            ctx.arc(obj.x + sz/4, obj.y - sz/6, 2, 0, Math.PI*2);
+            ctx.fill();
+            break;
+        }
+
+        // Bounding box if detected
+        if (obj.detected) {
+          const risk = obj.type.risk;
+          const boxColor = risk === '高' ? '#ff3333' : risk === '中' ? '#ffaa00' : '#00ff88';
+          ctx.strokeStyle = boxColor;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 3]);
+          ctx.strokeRect(obj.x - sz/2 - 6, obj.y - sz/2 - 6, sz + 12, sz + 12);
+          ctx.setLineDash([]);
+
+          // Label
+          const label = `異物検知: ${obj.type.label} ${obj.confidence}%`;
+          ctx.font = `bold ${Math.max(9, Math.min(12, sz/3))}px "Noto Sans JP", sans-serif`;
+          const tm = ctx.measureText(label);
+          const lx = obj.x - sz/2 - 6;
+          const ly = obj.y - sz/2 - 20;
+          ctx.fillStyle = 'rgba(0,0,0,0.7)';
+          ctx.fillRect(lx, ly - 12, tm.width + 8, 16);
+          ctx.fillStyle = boxColor;
+          ctx.fillText(label, lx + 4, ly);
+
+          // Corner brackets
+          const bsz = 6;
+          ctx.strokeStyle = boxColor;
+          ctx.lineWidth = 2;
+          ctx.setLineDash([]);
+          const bx = obj.x - sz/2 - 6, by = obj.y - sz/2 - 6, bw = sz+12, bh = sz+12;
+          // top-left
+          ctx.beginPath(); ctx.moveTo(bx, by+bsz); ctx.lineTo(bx, by); ctx.lineTo(bx+bsz, by); ctx.stroke();
+          // top-right
+          ctx.beginPath(); ctx.moveTo(bx+bw-bsz, by); ctx.lineTo(bx+bw, by); ctx.lineTo(bx+bw, by+bsz); ctx.stroke();
+          // bottom-left
+          ctx.beginPath(); ctx.moveTo(bx, bh+by-bsz); ctx.lineTo(bx, by+bh); ctx.lineTo(bx+bsz, by+bh); ctx.stroke();
+          // bottom-right
+          ctx.beginPath(); ctx.moveTo(bx+bw-bsz, by+bh); ctx.lineTo(bx+bw, by+bh); ctx.lineTo(bx+bw, by+bh-bsz); ctx.stroke();
+        }
+
+        ctx.restore();
+      });
+    }
+
+    function drawHUD(w, h) {
+      // Mode indicator
+      ctx.font = '700 14px Orbitron, monospace';
+      ctx.fillStyle = 'rgba(0,255,255,0.7)';
+      ctx.fillText(mode === 'drone' ? '[ DRONE MODE ]' : '[ TAXI CAM ]', 12, 24);
+
+      // Speed
+      ctx.font = '400 11px Orbitron, monospace';
+      ctx.fillStyle = 'rgba(0,255,255,0.5)';
+      ctx.fillText(`${speed} km/h`, 12, 42);
+
+      // REC indicator
+      const blink = Math.sin(Date.now()/300) > 0;
+      if (blink) {
+        ctx.fillStyle = '#ff3333';
+        ctx.beginPath();
+        ctx.arc(w - 20, 20, 5, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.font = '700 11px Orbitron, monospace';
+      ctx.fillStyle = 'rgba(255,50,50,0.8)';
+      ctx.fillText('REC', w - 50, 24);
+
+      // Time
+      ctx.font = '400 10px Orbitron, monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillText(new Date().toLocaleTimeString('ja-JP'), w - 80, 42);
+
+      // Crosshair for drone
+      if (mode === 'drone') {
+        ctx.strokeStyle = 'rgba(0,255,255,0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(w/2, 0); ctx.lineTo(w/2, h); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, h/2); ctx.lineTo(w, h/2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(w/2, h/2, 40, 0, Math.PI*2); ctx.stroke();
+      }
+
+      // Night overlay tint
+      if (nightMode) {
+        ctx.fillStyle = 'rgba(0,0,30,0.15)';
+        ctx.fillRect(0, 0, w, h);
+      }
+    }
+
+    function frame(timestamp) {
+      if (!running) { animId = requestAnimationFrame(frame); return; }
+      const dt = lastTime ? Math.min((timestamp - lastTime)/1000, 0.1) : 0.016;
+      lastTime = timestamp;
+      const w = W(), h = H();
+      ctx.save();
+      ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+
+      let roadInfo;
+      if (mode === 'drone') {
+        ctx.fillStyle = nightMode ? '#0a1a0a' : '#3a7a3a';
+        ctx.fillRect(0, 0, w, h);
+        roadInfo = drawRoadDrone(w, h, dt);
+      } else {
+        drawSky(w, h);
+        roadInfo = drawRoadTaxi(w, h, dt);
+      }
+
+      spawnObject(w, h, roadInfo, timestamp);
+      updateObjects(w, h, roadInfo, dt);
+      drawObjects(w, h);
+      drawHUD(w, h);
+
+      ctx.restore();
+      animId = requestAnimationFrame(frame);
+    }
+    animId = requestAnimationFrame(frame);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', resize);
+    };
+  }, [mode, speed, nightMode, running, onDetection]);
+
+  return <canvas ref={canvasRef} className="w-full h-full block" />;
+}
+
+/* ======== MINI MAP ======== */
+function MiniMap({ detections }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width = 200;
+    const h = canvas.height = 180;
+
+    ctx.fillStyle = '#0a0e1a';
+    ctx.fillRect(0, 0, w, h);
+
+    // Grid
+    ctx.strokeStyle = 'rgba(0,255,255,0.08)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < w; i += 20) {
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, h); ctx.stroke();
+    }
+    for (let i = 0; i < h; i += 20) {
+      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(w, i); ctx.stroke();
+    }
+
+    // Roads
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(w/2, 0); ctx.lineTo(w/2, h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, h/2); ctx.lineTo(w, h/2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(w*0.2, 0); ctx.lineTo(w*0.8, h); ctx.stroke();
+
+    // Heatmap-like overlay
+    const recent = detections.slice(-30);
+    recent.forEach((d, i) => {
+      const px = 20 + (parseFloat(d.gps.lng) - 139.64) * 8000;
+      const py = 20 + (35.69 - parseFloat(d.gps.lat)) * 8000;
+      const x = Math.max(4, Math.min(w-4, px));
+      const y = Math.max(4, Math.min(h-4, py));
+      const riskColor = d.type.risk === '高' ? '#ff3333' : d.type.risk === '中' ? '#ffaa00' : '#00ff88';
+
+      // Heatmap glow
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, 15);
+      grad.addColorStop(0, riskColor + '40');
+      grad.addColorStop(1, riskColor + '00');
+      ctx.fillStyle = grad;
+      ctx.fillRect(x-15, y-15, 30, 30);
+
+      // Dot
+      ctx.fillStyle = riskColor;
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI*2);
+      ctx.fill();
+    });
+
+    // Labels
+    ctx.font = '8px Orbitron, monospace';
+    ctx.fillStyle = 'rgba(0,255,255,0.4)';
+    ctx.fillText('MAP VIEW', 4, 12);
+    ctx.fillText(`${recent.length} points`, 4, h-4);
+  }, [detections]);
+
+  return <canvas ref={canvasRef} className="w-full rounded border border-cyan-grace/10" style={{height:'180px'}} />;
+}
+
+/* ======== REPORT GENERATOR ======== */
+function generateReport(detections, distance) {
+  const counts = {};
+  ANOMALY_TYPES.forEach(t => counts[t.label] = 0);
+  detections.forEach(d => counts[d.type.label]++);
+
+  const highRisk = detections.filter(d => d.type.risk === '高');
+  const now = new Date().toLocaleString('ja-JP');
+
+  const html = `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<title>Road Watch Report - ${now}</title>
+<style>
+body{font-family:'Noto Sans JP',sans-serif;max-width:800px;margin:0 auto;padding:20px;color:#222;}
+h1{color:#0066cc;border-bottom:3px solid #0066cc;padding-bottom:10px;}
+h2{color:#333;margin-top:24px;}
+table{width:100%;border-collapse:collapse;margin:12px 0;}
+th,td{border:1px solid #ddd;padding:8px;text-align:left;}
+th{background:#f5f5f5;}
+.risk-high{color:#cc0000;font-weight:bold;}
+.risk-mid{color:#cc8800;}
+.risk-low{color:#00aa44;}
+.summary{background:#f0f8ff;padding:16px;border-radius:8px;margin:16px 0;}
+.footer{margin-top:30px;color:#888;font-size:12px;border-top:1px solid #ddd;padding-top:10px;}
+</style></head><body>
+<h1>Road Watch 道路異物検知レポート</h1>
+<div class="summary">
+<p><strong>レポート生成日時:</strong> ${now}</p>
+<p><strong>総検知数:</strong> ${detections.length} 件</p>
+<p><strong>監視距離:</strong> ${distance.toFixed(1)} km</p>
+<p><strong>検知率:</strong> ${distance > 0 ? (detections.length / distance).toFixed(1) : 0} 件/km</p>
+</div>
+<h2>検知内訳</h2>
+<table><tr><th>種別</th><th>件数</th><th>リスクレベル</th></tr>
+${ANOMALY_TYPES.map(t => `<tr><td>${t.icon} ${t.label}</td><td>${counts[t.label]}</td>
+<td class="${t.risk==='高'?'risk-high':t.risk==='中'?'risk-mid':'risk-low'}">${t.risk}</td></tr>`).join('')}
+</table>
+<h2>高リスク検知 (${highRisk.length}件)</h2>
+${highRisk.length > 0 ? `<table><tr><th>時刻</th><th>種別</th><th>信頼度</th><th>GPS</th></tr>
+${highRisk.map(d=>`<tr><td>${d.timestamp}</td><td>${d.type.label}</td><td>${d.confidence}%</td><td>${d.gps.lat}, ${d.gps.lng}</td></tr>`).join('')}
+</table>` : '<p>高リスク検知はありません。</p>'}
+<h2>推奨アクション</h2>
+<ul>
+${highRisk.length > 0 ? '<li class="risk-high">高リスクエリアの緊急パトロールを推奨</li>' : ''}
+${detections.length > 10 ? '<li>検知密度が高いエリアの重点巡回を検討</li>' : ''}
+<li>検知データを道路管理システムへ連携</li>
+<li>次回巡回時の重点監視エリアとしてマーク</li>
+</ul>
+<div class="footer">
+<p>Generated by Road Watch / Grace of Touch Engine</p>
+<p>&copy; 2024-2026 Grace of Touch Co. All rights reserved.</p>
+</div></body></html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `roadwatch_report_${Date.now()}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ======== MAIN APP ======== */
+function App() {
+  const [mode, setMode] = useState('taxi');
+  const [speed, setSpeed] = useState(50);
+  const [nightMode, setNightMode] = useState(false);
+  const [running, setRunning] = useState(true);
+  const [detections, setDetections] = useState([]);
+  const [distance, setDistance] = useState(0);
+  const [showInfo, setShowInfo] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const logRef = useRef(null);
+
+  // Distance counter
+  useEffect(() => {
+    if (!running) return;
+    const iv = setInterval(() => {
+      setDistance(d => d + (speed / 3600) * 0.5);
+    }, 500);
+    return () => clearInterval(iv);
+  }, [running, speed]);
+
+  const handleDetection = useCallback((det) => {
+    setDetections(prev => [det, ...prev].slice(0, 200));
+  }, []);
+
+  const todayCount = detections.length;
+  const roadScore = Math.max(0, Math.round(100 - todayCount * 2.5));
+  const alertRate = distance > 0 ? (todayCount / distance).toFixed(1) : '0.0';
+
+  const riskColor = (risk) => risk === '高' ? 'text-red-400' : risk === '中' ? 'text-yellow-400' : 'text-green-400';
+  const riskBg = (risk) => risk === '高' ? 'bg-red-500/10 border-red-500/20' : risk === '中' ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-green-500/10 border-green-500/20';
+
+  return (
+    <div className="min-h-screen bg-dark-bg text-white font-noto flex flex-col">
+      {/* Header */}
+      <header className="flex items-center justify-between px-4 py-2 border-b border-cyan-grace/10 bg-dark-panel/80 backdrop-blur z-10 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <a href="index.html" className="text-cyan-grace/50 hover:text-cyan-grace text-xs font-orbitron tracking-widest transition">
+            &larr; PORTAL
+          </a>
+          <div className="w-px h-4 bg-cyan-grace/20" />
+          <h1 className="font-orbitron font-bold text-sm tracking-wider text-cyan-grace flex items-center gap-2">
+            <span className="text-lg">&#x1F6E3;&#xFE0F;</span> ROAD WATCH
+          </h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-orbitron ${running ? 'text-green-400' : 'text-red-400'}`}>
+            {running ? '● LIVE' : '■ PAUSED'}
+          </span>
+          <button onClick={() => setShowInfo(!showInfo)}
+            className="text-xs text-cyan-grace/40 hover:text-cyan-grace transition px-2 py-1 border border-cyan-grace/10 rounded font-orbitron">
+            INFO
+          </button>
+        </div>
+      </header>
+
+      {/* Info Panel */}
+      {showInfo && (
+        <div className="bg-dark-panel border-b border-cyan-grace/10 px-4 py-3 text-xs text-white/60 leading-relaxed">
+          <p className="text-cyan-grace/80 font-bold mb-1">Grace of Touch Engine / Road Watch Module</p>
+          <p>このシステムは Grace of Touch Engine の道路監視モジュールです。</p>
+          <p>タクシーのダッシュカムやドローンカメラと連携して、</p>
+          <p>道路上の異物や損傷をリアルタイムで検知・報告します。</p>
+          <p className="mt-1 text-cyan-grace/40">Concept Demo v1.0 - Simulated Detection</p>
+        </div>
+      )}
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* Main View */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Controls */}
+          <div className="flex items-center gap-2 px-3 py-2 bg-dark-panel/50 border-b border-cyan-grace/5 flex-wrap">
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-white/30 font-orbitron">MODE</span>
+              <button onClick={() => setMode('taxi')}
+                className={`text-[10px] px-2 py-1 rounded font-orbitron tracking-wide transition ${mode==='taxi' ? 'bg-cyan-grace/20 text-cyan-grace border border-cyan-grace/30' : 'text-white/30 border border-white/5 hover:text-white/50'}`}>
+                TAXI
+              </button>
+              <button onClick={() => setMode('drone')}
+                className={`text-[10px] px-2 py-1 rounded font-orbitron tracking-wide transition ${mode==='drone' ? 'bg-cyan-grace/20 text-cyan-grace border border-cyan-grace/30' : 'text-white/30 border border-white/5 hover:text-white/50'}`}>
+                DRONE
+              </button>
+            </div>
+            <div className="w-px h-4 bg-white/10" />
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-white/30 font-orbitron">SPEED</span>
+              {SPEED_OPTIONS.map(s => (
+                <button key={s} onClick={() => setSpeed(s)}
+                  className={`text-[10px] px-2 py-1 rounded font-orbitron transition ${speed===s ? 'bg-cyan-grace/20 text-cyan-grace border border-cyan-grace/30' : 'text-white/30 border border-white/5 hover:text-white/50'}`}>
+                  {s}
+                </button>
+              ))}
+            </div>
+            <div className="w-px h-4 bg-white/10" />
+            <button onClick={() => setNightMode(!nightMode)}
+              className={`text-[10px] px-2 py-1 rounded font-orbitron transition ${nightMode ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'text-white/30 border border-white/5 hover:text-white/50'}`}>
+              {nightMode ? '🌙 NIGHT' : '☀️ DAY'}
+            </button>
+            <button onClick={() => setRunning(!running)}
+              className={`text-[10px] px-2 py-1 rounded font-orbitron transition ${running ? 'text-green-400 border border-green-500/20' : 'text-red-400 border border-red-500/20'}`}>
+              {running ? '⏸ PAUSE' : '▶ START'}
+            </button>
+          </div>
+
+          {/* Camera Canvas */}
+          <div className="flex-1 relative bg-black min-h-0">
+            <CameraCanvas mode={mode} speed={speed} nightMode={nightMode} onDetection={handleDetection} running={running} />
+          </div>
+
+          {/* Stats Bar */}
+          <div className="grid grid-cols-4 gap-px bg-dark-panel/80 border-t border-cyan-grace/10 flex-shrink-0">
+            <div className="px-3 py-2 text-center">
+              <div className="text-[9px] text-white/30 font-orbitron tracking-wider">DETECTED</div>
+              <div className="text-lg font-orbitron font-bold text-cyan-grace">{todayCount}</div>
+            </div>
+            <div className="px-3 py-2 text-center">
+              <div className="text-[9px] text-white/30 font-orbitron tracking-wider">ROAD SCORE</div>
+              <div className={`text-lg font-orbitron font-bold ${roadScore > 70 ? 'text-green-400' : roadScore > 40 ? 'text-yellow-400' : 'text-red-400'}`}>
+                {roadScore}
+              </div>
+            </div>
+            <div className="px-3 py-2 text-center">
+              <div className="text-[9px] text-white/30 font-orbitron tracking-wider">DISTANCE</div>
+              <div className="text-lg font-orbitron font-bold text-cyan-grace">{distance.toFixed(1)}<span className="text-[10px] text-white/30 ml-1">km</span></div>
+            </div>
+            <div className="px-3 py-2 text-center">
+              <div className="text-[9px] text-white/30 font-orbitron tracking-wider">ALERT RATE</div>
+              <div className="text-lg font-orbitron font-bold text-yellow-400">{alertRate}<span className="text-[10px] text-white/30 ml-1">/km</span></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Side Panel */}
+        <div className="w-72 flex-shrink-0 border-l border-cyan-grace/10 bg-dark-panel/60 flex flex-col overflow-hidden
+          max-md:hidden">
+          {/* Mini Map */}
+          <div className="p-3 border-b border-cyan-grace/10">
+            <div className="text-[9px] font-orbitron text-white/30 tracking-wider mb-2">ANOMALY MAP</div>
+            <MiniMap detections={detections} />
+          </div>
+
+          {/* Report Button */}
+          <div className="px-3 py-2 border-b border-cyan-grace/10">
+            <button onClick={() => generateReport(detections, distance)}
+              className="w-full text-[10px] font-orbitron tracking-wider py-2 rounded bg-cyan-grace/10 text-cyan-grace border border-cyan-grace/20 hover:bg-cyan-grace/20 transition">
+              GENERATE REPORT
+            </button>
+          </div>
+
+          {/* Detection Log */}
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="px-3 py-2 text-[9px] font-orbitron text-white/30 tracking-wider border-b border-cyan-grace/5">
+              DETECTION LOG ({detections.length})
+            </div>
+            <div ref={logRef} className="flex-1 overflow-y-auto">
+              {detections.length === 0 && (
+                <div className="px-3 py-8 text-center text-white/20 text-xs">
+                  検知待機中...
+                </div>
+              )}
+              {detections.map((d, i) => (
+                <div key={d.id} className={`px-3 py-2 border-b border-white/5 ${i === 0 ? 'animate-pulse' : ''}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${riskBg(d.type.risk)} ${riskColor(d.type.risk)} font-orbitron`}>
+                      {d.type.risk}
+                    </span>
+                    <span className="text-[10px] text-white/50">{d.timestamp}</span>
+                  </div>
+                  <div className="text-xs text-white/80 flex items-center gap-1">
+                    <span>{d.type.icon}</span>
+                    <span>{d.type.label}</span>
+                    <span className="text-cyan-grace/60 ml-auto text-[10px]">{d.confidence}%</span>
+                  </div>
+                  <div className="text-[9px] text-white/25 mt-0.5 font-mono">
+                    {d.gps.lat}, {d.gps.lng}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile: collapsed log */}
+      <div className="md:hidden border-t border-cyan-grace/10 bg-dark-panel/80">
+        <details className="group">
+          <summary className="px-3 py-2 text-[10px] font-orbitron text-white/40 tracking-wider cursor-pointer">
+            DETECTION LOG ({detections.length}) ▾
+          </summary>
+          <div className="max-h-48 overflow-y-auto">
+            {detections.slice(0, 10).map(d => (
+              <div key={d.id} className="px-3 py-1.5 border-b border-white/5 flex items-center gap-2">
+                <span className={`text-[9px] ${riskColor(d.type.risk)} font-orbitron`}>{d.type.risk}</span>
+                <span className="text-[10px] text-white/60">{d.type.icon} {d.type.label}</span>
+                <span className="text-[9px] text-white/30 ml-auto">{d.confidence}%</span>
+              </div>
+            ))}
+          </div>
+        </details>
+        <div className="px-3 py-2 border-t border-cyan-grace/5">
+          <button onClick={() => generateReport(detections, distance)}
+            className="w-full text-[10px] font-orbitron py-1.5 rounded bg-cyan-grace/10 text-cyan-grace border border-cyan-grace/20">
+            GENERATE REPORT
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
