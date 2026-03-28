@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>Video Studio — Grace of Touch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        cyan: { DEFAULT: '#00ffff', dim: 'rgba(0,255,255,0.4)', dark: 'rgba(0,255,255,0.08)' },
+        got: { bg: '#020510', panel: '#0a0e1a', card: '#0d1220' }
+      },
+      fontFamily: {
+        orbit: ['Orbitron', 'monospace'],
+        jp: ['Noto Sans JP', 'sans-serif']
+      }
+    }
+  }
+};
+</script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #020510; color: #d8d8d8; font-family: 'Noto Sans JP', sans-serif; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,255,255,0.15); border-radius: 3px; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in { animation: fadeIn 0.4s ease forwards; }
+  @keyframes pulse-glow { 0%,100% { box-shadow: 0 0 8px rgba(0,255,255,0.1); } 50% { box-shadow: 0 0 16px rgba(0,255,255,0.25); } }
+  .glow-pulse { animation: pulse-glow 3s ease infinite; }
+  @media print {
+    body { background: white !important; color: black !important; }
+    .no-print { display: none !important; }
+    .print-break { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useCallback, useMemo, useRef, useEffect } = React;
+
+// ==================== DATA ====================
+const TEMPLATES = [
+  {
+    id: 'infrascan',
+    title: 'InfraScan AI',
+    subtitle: 'トンネル点検の未来',
+    duration: 60,
+    format: 'youtube',
+    icon: '🔍',
+    tags: ['AI', 'INSPECTION', 'INFRA'],
+    color: '#00ff88',
+    scenes: [
+      { num: 1, dur: 8, visual: 'トンネル内部の暗い映像。ドローンが飛行開始、LEDが点灯。', narration: '日本全国に約1万本のトンネル。その点検に革命が起きています。', camera: 'ドローン視点→トンネル入口から内部へゆっくり進入', bgm: 'エレクトロニック・アンビエント（低音重め）' },
+      { num: 2, dur: 10, visual: 'AIがひび割れを検出。赤いハイライトがリアルタイムで表示。', narration: 'InfraScan AIは、ミリ単位のひび割れをリアルタイムで検出。', camera: '壁面クローズアップ→AI検出オーバーレイ', bgm: 'テンポアップ、デジタルパルス追加' },
+      { num: 3, dur: 12, visual: 'DXFレイヤー比較画面。2024年→2025年→2026年の変化を色分け表示。', narration: '年次レイヤー比較で、ひび割れの成長を追跡。優先度ベースのメンテナンス計画を実現。', camera: '画面録画風→レイヤー切替アニメーション', bgm: 'ストリングス追加、広がりのある音' },
+      { num: 4, dur: 10, visual: 'クラウド管理画面。レポート自動生成、CSV/DXFエクスポート。', narration: 'レポート自動生成。DXF出力で既存のCADワークフローにそのまま統合。', camera: 'UI画面の操作デモ', bgm: '落ち着いたビート' },
+      { num: 5, dur: 8, visual: '現場作業員がタブレットで結果を確認。笑顔。', narration: '点検時間を80%短縮。人手不足の現場に、AIという新しい仲間を。', camera: '人物越しにタブレット画面→ワイドショット', bgm: 'エモーショナルなピアノ' },
+      { num: 6, dur: 12, visual: 'Grace of Touchロゴ、問い合わせURL、QRコード。', narration: 'InfraScan AI。トンネル点検の未来は、ここから始まります。Grace of Touch。', camera: 'ロゴ中央表示→フェードアウト', bgm: 'メインテーマ回帰→余韻' }
+    ]
+  },
+  {
+    id: 'megarocket',
+    title: 'Mega Rocket Explorer',
+    subtitle: '宇宙への旅',
+    duration: 30,
+    format: 'tiktok',
+    icon: '🚀',
+    tags: ['SPACE', '3D', 'EXPLORE'],
+    color: '#ff6b35',
+    scenes: [
+      { num: 1, dur: 5, visual: '地球の大気圏を突き破るロケット。Unreal Bloom エフェクト全開。', narration: '宇宙への扉が、ブラウザで開く。', camera: 'ロケット追従→地球が遠ざかる', bgm: 'エピックオーケストラ（冒頭のインパクト）' },
+      { num: 2, dur: 8, visual: '太陽系の惑星を次々と通過。リアルスケール比率。', narration: '太陽系7天体をリアルスケールで探索。NASA Blue Marbleテクスチャ。', camera: 'FPSカメラで惑星間を飛行', bgm: 'シンセウェーブ、スペーシー' },
+      { num: 3, dur: 7, visual: '地震マーカーがリアルタイムで地球上に表示。パンダゾーンも。', narration: 'USGSリアルタイム地震データ。世界のパンダ生息地も発見。', camera: '地球にズームイン→マーカーハイライト', bgm: 'ビートドロップ' },
+      { num: 4, dur: 5, visual: '海上プラットフォームでのロケット着陸シーケンス。', narration: 'メカジラキャッチ。SpaceX風の着陸を体験。', camera: 'プラットフォーム側から着陸を撮影', bgm: 'クライマックス' },
+      { num: 5, dur: 5, visual: 'Grace of Touchロゴとアプリリンク。', narration: '今すぐ無料で体験。grace-of-touch.web.app', camera: 'ロゴ表示→CTA', bgm: 'ジングル' }
+    ]
+  },
+  {
+    id: 'eventgate',
+    title: 'EventGate',
+    subtitle: 'イベント管理を簡単に',
+    duration: 45,
+    format: 'youtube',
+    icon: '🚪',
+    tags: ['EVENT', 'QR', 'MGMT'],
+    color: '#a855f7',
+    scenes: [
+      { num: 1, dur: 8, visual: 'イベント会場の入口。長い行列。テキスト: 「受付に30分...？」', narration: 'イベント受付、まだ紙でやっていますか？', camera: '行列の俯瞰→受付デスクへズーム', bgm: 'ストレスを感じる不協和音→解決へ' },
+      { num: 2, dur: 10, visual: 'EventGate画面。QRコード生成→参加者にメール送信。', narration: 'EventGateなら、QRコードでワンタッチ入場。チケット発行からチェックインまで一元管理。', camera: 'UI操作デモ→QR生成アニメーション', bgm: 'ポップで軽快なビート' },
+      { num: 3, dur: 10, visual: 'スマホでQRスキャン。ピッと音が鳴り「Welcome!」表示。', narration: '参加者はスマホを見せるだけ。リアルタイムで参加者リストが更新。', camera: 'スマホ画面→チェックイン成功画面', bgm: 'テンポアップ' },
+      { num: 4, dur: 7, visual: '管理画面のダッシュボード。参加率グラフ、CSV出力ボタン。', narration: 'イベント後のデータ集計もワンクリック。CSV出力で報告書作成も楽々。', camera: 'ダッシュボード画面の操作', bgm: '達成感のあるコード進行' },
+      { num: 5, dur: 10, visual: 'Grace of Touchロゴ、プラン表示、問い合わせ情報。', narration: 'EventGate。あなたのイベントを、もっとスマートに。', camera: 'ロゴ→プラン表示→CTA', bgm: 'ジングル→フェードアウト' }
+    ]
+  },
+  {
+    id: 'trackforge',
+    title: 'TrackForge',
+    subtitle: '音楽制作をDIY',
+    duration: 30,
+    format: 'tiktok',
+    icon: '🎛️',
+    tags: ['MUSIC', 'MTR', 'COLLAB'],
+    color: '#eab308',
+    scenes: [
+      { num: 1, dur: 5, visual: 'ヘッドフォンをつけた手がスマホをタップ。TrackForge画面が開く。', narration: '音楽制作、はじめよう。', camera: '手元クローズアップ→画面展開', bgm: 'ローファイビート（自作デモ曲使用）' },
+      { num: 2, dur: 8, visual: 'MTR画面でトラックを重ねていく。波形が増えていく。', narration: '録音、ミックス、マスタリング。ブラウザだけで完結するデジタルMTR。', camera: '画面録画→トラック追加アニメーション', bgm: 'ビルドアップ（トラックが重なる演出）' },
+      { num: 3, dur: 7, visual: '歌詞カード表示、テイク管理、壁紙カスタマイズ。', narration: '歌詞カード、テイク管理、壁紙カスタマイズ。あなたのスタジオを自由に。', camera: 'UI切替デモ→カスタマイズ例', bgm: 'フルミックス再生' },
+      { num: 4, dur: 5, visual: '貢献証明書が表示される。コラボレーター名が並ぶ。', narration: 'コラボ機能と貢献証明書で、みんなの音楽を。', camera: '証明書ズーム→グループ写真風', bgm: 'エモーショナルなピアノ→ジングル' },
+      { num: 5, dur: 5, visual: 'Grace of Touchロゴ。「今すぐ無料で」。', narration: 'TrackForge。音楽制作をDIY。', camera: 'ロゴ→CTA', bgm: 'ジングル' }
+    ]
+  },
+  {
+    id: 'autotaxi',
+    title: 'Auto Taxi',
+    subtitle: '自動運転の世界',
+    duration: 30,
+    format: 'tiktok',
+    icon: '🚕',
+    tags: ['AUTO', 'SIM', 'CITY'],
+    color: '#06b6d4',
+    scenes: [
+      { num: 1, dur: 5, visual: '都市の空撮。車が自動で走る。信号が変わる。', narration: '自動運転の未来を、シミュレーションで。', camera: '俯瞰→道路レベルへ降下', bgm: 'フューチャリスティック・アンビエント' },
+      { num: 2, dur: 8, visual: 'Auto Taxi画面。AIが経路を計算、車が動き出す。', narration: 'AIが最適経路を計算。リアルタイム交通シミュレーション。', camera: '画面録画→経路ハイライト', bgm: 'テクノビート' },
+      { num: 3, dur: 7, visual: '複数台の車が交差点を安全に通過。センサー可視化。', narration: 'センサー可視化で、AIの判断をリアルタイムに確認。', camera: '交差点俯瞰→センサー範囲表示', bgm: 'ビルドアップ' },
+      { num: 4, dur: 5, visual: 'ダッシュボード統計。安全率99.9%表示。', narration: '安全な街づくりのための、自動運転シミュレーション。', camera: 'ダッシュボード→ロゴ', bgm: 'クロージング' },
+      { num: 5, dur: 5, visual: 'Grace of Touchロゴ。', narration: 'Auto Taxi。grace-of-touch.web.app', camera: 'ロゴ→CTA', bgm: 'ジングル' }
+    ]
+  },
+  {
+    id: 'engine',
+    title: 'Grace of Touch Engine',
+    subtitle: 'あなたのビジネスを加速',
+    duration: 60,
+    format: 'youtube',
+    icon: '⚡',
+    tags: ['PLATFORM', 'ENGINE', 'BRAND'],
+    color: '#00ffff',
+    scenes: [
+      { num: 1, dur: 10, visual: 'ポータル画面。20以上のアプリカードが並ぶ。', narration: 'Grace of Touch。ひとつのプラットフォームから、無限のデジタル体験を。', camera: 'ポータル全景→スクロールダウン', bgm: 'グランドオープニング・オーケストラ' },
+      { num: 2, dur: 10, visual: '各アプリのハイライトが高速で切り替わる（InfraScan→Rocket→EventGate→TrackForge...）', narration: 'インフラ点検AI、宇宙探索、イベント管理、音楽制作。全てがブラウザで動く。', camera: '高速カット（2秒ごと）', bgm: 'テンポの速いエレクトロ' },
+      { num: 3, dur: 12, visual: 'コードエディタ画面→ワンクリックでアプリ生成。', narration: 'Grace of Touch Engineは、アプリのDIYプラットフォーム。技術のブラックボックスを開放します。', camera: 'コード画面→デプロイ→完成アプリ', bgm: '希望的なピアノ＋ストリングス' },
+      { num: 4, dur: 10, visual: 'ビジネスプラン表示。Starter→Pro→Enterprise。', narration: 'あなたのビジネスに合ったプランを。カスタム開発からフルサポートまで。', camera: 'プラン表比較→ハイライト', bgm: '安定感のあるコーポレート' },
+      { num: 5, dur: 8, visual: 'チーム写真（プレースホルダー）、クライアントの声。', narration: '日本発、世界へ。デジタルの力で、あなたの「できない」を「できる」に。', camera: 'チーム→クライアント→ワイドショット', bgm: 'エモーショナルなクライマックス' },
+      { num: 6, dur: 10, visual: 'ロゴ、URL、QRコード、各SNSアイコン。', narration: 'Grace of Touch Engine。あなたのビジネスを加速する。今すぐ始めよう。', camera: 'ロゴ中央→CTA表示→フェードアウト', bgm: 'メインテーマ→余韻' }
+    ]
+  },
+  {
+    id: 'satellite',
+    title: '衛星×地上補完',
+    subtitle: '見えないインフラを可視化',
+    duration: 45,
+    format: 'youtube',
+    icon: '🛰️',
+    tags: ['SATELLITE', 'IoT', 'INFRA'],
+    color: '#34d399',
+    scenes: [
+      { num: 1, dur: 8, visual: '宇宙から見た日本列島。衛星がオービットを描く。', narration: '日本のインフラ。その多くは、目に見えない場所に潜んでいます。', camera: '宇宙俯瞰→日本列島にズーム', bgm: 'シネマティック・アンビエント' },
+      { num: 2, dur: 10, visual: '衛星データ（SAR画像）→地盤変位のヒートマップ。', narration: '衛星SARデータで、地盤のミリ単位の変位を広域で検出。', camera: 'SAR画像→ヒートマップオーバーレイ', bgm: 'テクノロジー感のあるパルス' },
+      { num: 3, dur: 10, visual: '地上センサー（IoT）のデータが衛星データと重なる。', narration: '地上IoTセンサーとの融合で、衛星だけでは見えない詳細を補完。', camera: 'データ統合アニメーション', bgm: 'レイヤーが重なる音楽構造' },
+      { num: 4, dur: 7, visual: '管理ダッシュボード。アラート、優先度マップ。', narration: 'リスクの可視化から優先度判定まで。インフラ維持管理の新しいカタチ。', camera: 'ダッシュボード操作デモ', bgm: '安心感のあるコード進行' },
+      { num: 5, dur: 10, visual: 'Grace of Touchロゴ、コンセプト図、問い合わせ。', narration: '衛星×地上補完。見えないインフラを、見える化する。Grace of Touch。', camera: 'コンセプト図→ロゴ→CTA', bgm: 'メインテーマ→余韻' }
+    ]
+  }
+];
+
+const FORMAT_LABELS = { tiktok: 'TikTok / Reels', youtube: 'YouTube', short: 'Short' };
+const DURATION_PRESETS = [
+  { label: '15s', value: 15, format: 'tiktok' },
+  { label: '30s', value: 30, format: 'tiktok' },
+  { label: '60s', value: 60, format: 'tiktok' },
+  { label: '3min', value: 180, format: 'youtube' },
+  { label: '5min', value: 300, format: 'youtube' }
+];
+
+// ==================== COMPONENTS ====================
+
+function Header({ onBack }) {
+  return (
+    <header className="no-print sticky top-0 z-50 border-b border-cyan-dim/20 bg-got-bg/95 backdrop-blur-sm px-4 py-3 flex items-center gap-3">
+      <a href="index.html" className="font-orbit text-[10px] text-cyan-dim hover:text-cyan tracking-[0.2em] border border-cyan-dim/30 px-3 py-1.5 rounded transition-colors hover:border-cyan/50 hover:bg-cyan-dark">
+        PORTAL
+      </a>
+      <div className="flex-1">
+        <h1 className="font-orbit text-sm text-cyan tracking-[0.15em]">VIDEO STUDIO</h1>
+        <p className="font-jp text-[10px] text-white/30 mt-0.5">映像制作テンプレート & ストーリーボード</p>
+      </div>
+      <span className="font-orbit text-[9px] text-cyan-dim/50 tracking-widest">GRACE OF TOUCH</span>
+    </header>
+  );
+}
+
+function TemplateCard({ template, onClick, isSelected }) {
+  return (
+    <button
+      onClick={() => onClick(template)}
+      className={`text-left w-full p-4 rounded-xl border transition-all duration-300 ${
+        isSelected
+          ? 'border-cyan/40 bg-cyan-dark shadow-lg shadow-cyan/5'
+          : 'border-white/5 bg-got-card hover:border-cyan/20 hover:bg-cyan-dark/50'
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="text-2xl w-10 h-10 flex items-center justify-center rounded-lg bg-white/5 border border-white/5 shrink-0">
+          {template.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-orbit text-xs tracking-wider" style={{ color: template.color }}>{template.title}</div>
+          <div className="font-jp text-xs text-white/50 mt-0.5">{template.subtitle}</div>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className="font-orbit text-[9px] px-2 py-0.5 rounded border border-white/10 text-white/40">
+              {template.duration}s
+            </span>
+            <span className="font-orbit text-[9px] px-2 py-0.5 rounded border border-white/10 text-white/40 uppercase">
+              {FORMAT_LABELS[template.format]}
+            </span>
+            {template.tags.map(t => (
+              <span key={t} className="font-orbit text-[8px] px-1.5 py-0.5 rounded border border-cyan/10 text-cyan-dim/60">{t}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function SceneEditor({ scene, index, color, onChange }) {
+  const handleChange = (field, value) => {
+    onChange(index, { ...scene, [field]: value });
+  };
+
+  return (
+    <div className="fade-in p-4 rounded-xl border border-white/5 bg-got-card relative group hover:border-cyan/15 transition-colors print:border-gray-300">
+      <div className="flex items-center gap-3 mb-3">
+        <div
+          className="font-orbit text-lg font-bold w-10 h-10 flex items-center justify-center rounded-lg"
+          style={{ background: color + '15', color, borderWidth: 1, borderColor: color + '30' }}
+        >
+          {scene.num}
+        </div>
+        <div className="flex-1">
+          <span className="font-orbit text-[10px] text-white/40 tracking-wider">SCENE {scene.num}</span>
+          <div className="flex items-center gap-2 mt-0.5">
+            <label className="font-orbit text-[9px] text-white/30">DUR:</label>
+            <input
+              type="number"
+              value={scene.dur}
+              onChange={e => handleChange('dur', parseInt(e.target.value) || 0)}
+              className="no-print w-14 bg-white/5 border border-white/10 rounded px-2 py-0.5 text-xs text-white/70 font-orbit outline-none focus:border-cyan/30"
+            />
+            <span className="font-orbit text-[9px] text-white/30">sec</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <label className="font-orbit text-[9px] text-cyan-dim/60 tracking-wider block mb-1">VISUAL</label>
+          <textarea
+            value={scene.visual}
+            onChange={e => handleChange('visual', e.target.value)}
+            className="w-full bg-white/3 border border-white/8 rounded-lg px-3 py-2 text-xs text-white/70 font-jp resize-none outline-none focus:border-cyan/20 print:border-gray-300"
+            rows={2}
+          />
+        </div>
+        <div>
+          <label className="font-orbit text-[9px] text-cyan-dim/60 tracking-wider block mb-1">NARRATION</label>
+          <textarea
+            value={scene.narration}
+            onChange={e => handleChange('narration', e.target.value)}
+            className="w-full bg-white/3 border border-white/8 rounded-lg px-3 py-2 text-xs text-white/70 font-jp resize-none outline-none focus:border-cyan/20 print:border-gray-300"
+            rows={2}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="font-orbit text-[9px] text-cyan-dim/60 tracking-wider block mb-1">CAMERA</label>
+            <input
+              value={scene.camera}
+              onChange={e => handleChange('camera', e.target.value)}
+              className="w-full bg-white/3 border border-white/8 rounded-lg px-3 py-1.5 text-[11px] text-white/60 font-jp outline-none focus:border-cyan/20 print:border-gray-300"
+            />
+          </div>
+          <div>
+            <label className="font-orbit text-[9px] text-cyan-dim/60 tracking-wider block mb-1">BGM</label>
+            <input
+              value={scene.bgm}
+              onChange={e => handleChange('bgm', e.target.value)}
+              className="w-full bg-white/3 border border-white/8 rounded-lg px-3 py-1.5 text-[11px] text-white/60 font-jp outline-none focus:border-cyan/20 print:border-gray-300"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StoryboardView({ template, scenes, onSceneChange, onAddScene, onRemoveScene }) {
+  const totalDur = scenes.reduce((sum, s) => sum + (s.dur || 0), 0);
+
+  return (
+    <div className="fade-in">
+      {/* Header info */}
+      <div className="mb-6 p-4 rounded-xl border border-white/5 bg-got-card">
+        <div className="flex items-center gap-3 mb-3">
+          <span className="text-3xl">{template.icon}</span>
+          <div>
+            <h2 className="font-orbit text-base tracking-wider" style={{ color: template.color }}>{template.title}</h2>
+            <p className="font-jp text-sm text-white/50">{template.subtitle}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3 text-[10px] font-orbit">
+          <span className="px-3 py-1 rounded-full border border-cyan/20 text-cyan-dim">
+            {scenes.length} SCENES
+          </span>
+          <span className="px-3 py-1 rounded-full border border-cyan/20 text-cyan-dim">
+            TOTAL: {totalDur}s / {template.duration}s
+          </span>
+          <span className={`px-3 py-1 rounded-full border ${totalDur > template.duration ? 'border-red-500/40 text-red-400' : 'border-green-500/30 text-green-400'}`}>
+            {totalDur > template.duration ? `OVER +${totalDur - template.duration}s` : totalDur === template.duration ? 'PERFECT' : `REMAINING ${template.duration - totalDur}s`}
+          </span>
+          <span className="px-3 py-1 rounded-full border border-white/10 text-white/40 uppercase">
+            {FORMAT_LABELS[template.format]}
+          </span>
+        </div>
+        {/* Timeline bar */}
+        <div className="mt-3 h-2 bg-white/5 rounded-full overflow-hidden flex">
+          {scenes.map((s, i) => (
+            <div
+              key={i}
+              style={{
+                width: `${(s.dur / Math.max(totalDur, 1)) * 100}%`,
+                background: template.color,
+                opacity: 0.3 + (i % 2) * 0.3
+              }}
+              className="h-full border-r border-got-bg/50"
+              title={`Scene ${s.num}: ${s.dur}s`}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Scenes */}
+      <div className="space-y-4">
+        {scenes.map((scene, i) => (
+          <div key={i} className="relative">
+            <SceneEditor scene={scene} index={i} color={template.color} onChange={onSceneChange} />
+            {scenes.length > 1 && (
+              <button
+                onClick={() => onRemoveScene(i)}
+                className="no-print absolute -top-2 -right-2 w-6 h-6 rounded-full bg-red-900/50 border border-red-500/30 text-red-400 text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
+                title="シーン削除"
+              >
+                x
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={onAddScene}
+        className="no-print mt-4 w-full py-3 rounded-xl border border-dashed border-cyan/15 text-cyan-dim/50 font-orbit text-xs tracking-wider hover:border-cyan/30 hover:text-cyan-dim hover:bg-cyan-dark/30 transition-all"
+      >
+        + ADD SCENE
+      </button>
+    </div>
+  );
+}
+
+function ExportPanel({ template, scenes }) {
+  const [copied, setCopied] = useState(false);
+
+  const generateText = useCallback(() => {
+    const totalDur = scenes.reduce((s, sc) => s + sc.dur, 0);
+    let text = `========================================\n`;
+    text += `${template.title} — ${template.subtitle}\n`;
+    text += `Format: ${FORMAT_LABELS[template.format]} | Duration: ${totalDur}s\n`;
+    text += `========================================\n\n`;
+    scenes.forEach(s => {
+      text += `--- SCENE ${s.num} (${s.dur}s) ---\n`;
+      text += `[Visual] ${s.visual}\n`;
+      text += `[Narration] ${s.narration}\n`;
+      text += `[Camera] ${s.camera}\n`;
+      text += `[BGM] ${s.bgm}\n\n`;
+    });
+    text += `========================================\n`;
+    text += `Generated by Grace of Touch Video Studio\n`;
+    text += `Date: ${new Date().toLocaleDateString('ja-JP')}\n`;
+    return text;
+  }, [template, scenes]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(generateText()).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handlePrint = () => window.print();
+
+  return (
+    <div className="no-print flex gap-3 mt-6">
+      <button
+        onClick={handleCopy}
+        className={`flex-1 py-3 rounded-xl font-orbit text-xs tracking-wider transition-all ${
+          copied
+            ? 'bg-green-900/30 border border-green-500/30 text-green-400'
+            : 'bg-cyan-dark border border-cyan/20 text-cyan-dim hover:border-cyan/40 hover:text-cyan'
+        }`}
+      >
+        {copied ? 'COPIED!' : 'COPY AS TEXT'}
+      </button>
+      <button
+        onClick={handlePrint}
+        className="flex-1 py-3 rounded-xl font-orbit text-xs tracking-wider bg-white/3 border border-white/10 text-white/40 hover:border-white/20 hover:text-white/60 transition-all"
+      >
+        PRINT VIEW
+      </button>
+    </div>
+  );
+}
+
+function DurationFilter({ selected, onSelect }) {
+  return (
+    <div className="flex flex-wrap gap-2 mb-4">
+      <button
+        onClick={() => onSelect(null)}
+        className={`font-orbit text-[9px] tracking-wider px-3 py-1.5 rounded-lg border transition-all ${
+          !selected ? 'border-cyan/30 text-cyan bg-cyan-dark' : 'border-white/10 text-white/30 hover:border-white/20'
+        }`}
+      >
+        ALL
+      </button>
+      {DURATION_PRESETS.map(p => (
+        <button
+          key={p.label}
+          onClick={() => onSelect(p)}
+          className={`font-orbit text-[9px] tracking-wider px-3 py-1.5 rounded-lg border transition-all ${
+            selected?.label === p.label ? 'border-cyan/30 text-cyan bg-cyan-dark' : 'border-white/10 text-white/30 hover:border-white/20'
+          }`}
+        >
+          {p.label} ({p.format === 'tiktok' ? 'SHORT' : 'LONG'})
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ==================== MAIN APP ====================
+
+function App() {
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [scenes, setScenes] = useState([]);
+  const [durationFilter, setDurationFilter] = useState(null);
+  const [view, setView] = useState('templates'); // templates | editor
+
+  const selectTemplate = useCallback((tmpl) => {
+    setSelectedTemplate(tmpl);
+    setScenes(tmpl.scenes.map(s => ({ ...s })));
+    setView('editor');
+  }, []);
+
+  const handleSceneChange = useCallback((index, updatedScene) => {
+    setScenes(prev => prev.map((s, i) => i === index ? updatedScene : s));
+  }, []);
+
+  const addScene = useCallback(() => {
+    setScenes(prev => [
+      ...prev,
+      { num: prev.length + 1, dur: 5, visual: '', narration: '', camera: '', bgm: '' }
+    ]);
+  }, []);
+
+  const removeScene = useCallback((index) => {
+    setScenes(prev => prev.filter((_, i) => i !== index).map((s, i) => ({ ...s, num: i + 1 })));
+  }, []);
+
+  const filteredTemplates = useMemo(() => {
+    if (!durationFilter) return TEMPLATES;
+    return TEMPLATES.filter(t => t.format === durationFilter.format && t.duration <= durationFilter.value);
+  }, [durationFilter]);
+
+  return (
+    <div className="min-h-screen bg-got-bg">
+      <Header />
+
+      <main className="max-w-4xl mx-auto px-4 py-6">
+        {view === 'templates' && (
+          <div className="fade-in">
+            <div className="mb-6">
+              <h2 className="font-orbit text-sm text-cyan tracking-[0.2em] mb-1">TEMPLATE LIBRARY</h2>
+              <p className="font-jp text-xs text-white/30">動画テンプレートを選択して編集を開始</p>
+            </div>
+
+            <DurationFilter selected={durationFilter} onSelect={setDurationFilter} />
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {filteredTemplates.map(t => (
+                <TemplateCard
+                  key={t.id}
+                  template={t}
+                  onClick={selectTemplate}
+                  isSelected={selectedTemplate?.id === t.id}
+                />
+              ))}
+            </div>
+
+            {filteredTemplates.length === 0 && (
+              <div className="text-center py-12">
+                <div className="text-3xl mb-3 opacity-30">🎬</div>
+                <p className="font-jp text-xs text-white/30">該当するテンプレートがありません</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === 'editor' && selectedTemplate && (
+          <div>
+            <button
+              onClick={() => setView('templates')}
+              className="no-print mb-4 font-orbit text-[10px] text-cyan-dim/50 tracking-wider hover:text-cyan-dim transition-colors"
+            >
+              &larr; BACK TO TEMPLATES
+            </button>
+
+            <StoryboardView
+              template={selectedTemplate}
+              scenes={scenes}
+              onSceneChange={handleSceneChange}
+              onAddScene={addScene}
+              onRemoveScene={removeScene}
+            />
+
+            <ExportPanel template={selectedTemplate} scenes={scenes} />
+          </div>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="no-print text-center py-8 border-t border-white/5 mt-8">
+        <p className="font-orbit text-[9px] text-white/15 tracking-[0.3em]">GRACE OF TOUCH VIDEO STUDIO</p>
+        <p className="font-jp text-[10px] text-white/10 mt-1">&copy; 2024-2026 Grace of Touch Co.</p>
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

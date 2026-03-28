@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>Ground Sensor — Satellite-Ground Complementary Coverage</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<link href="https://cdn.tailwindcss.com" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0a0e1a;color:#e0e8f0;font-family:'Noto Sans JP','sans-serif';overflow-x:hidden;}
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:#0a0e1a;}
+::-webkit-scrollbar-thumb{background:rgba(0,255,255,0.3);border-radius:3px;}
+.font-orbitron{font-family:'Orbitron',monospace;}
+.glow-cyan{text-shadow:0 0 10px rgba(0,255,255,0.6),0 0 20px rgba(0,255,255,0.3);}
+.panel{background:rgba(10,14,26,0.92);border:1px solid rgba(0,255,255,0.12);border-radius:12px;backdrop-filter:blur(8px);}
+.btn{background:rgba(0,255,255,0.08);border:1px solid rgba(0,255,255,0.25);color:#00ffff;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:12px;font-family:'Noto Sans JP',sans-serif;transition:all 0.2s;}
+.btn:hover{background:rgba(0,255,255,0.18);border-color:rgba(0,255,255,0.5);}
+.btn.active{background:rgba(0,255,255,0.2);border-color:#00ffff;box-shadow:0 0 12px rgba(0,255,255,0.3);}
+.btn-preset{background:rgba(0,200,255,0.06);border:1px solid rgba(0,200,255,0.2);color:#7dd3fc;font-size:11px;padding:5px 10px;}
+.btn-preset:hover,.btn-preset.active{background:rgba(0,200,255,0.18);border-color:#38bdf8;color:#fff;}
+.toggle-dot{transition:transform 0.2s;}
+.stat-value{font-family:'Orbitron',monospace;font-size:20px;color:#00ffff;}
+.stat-label{font-size:10px;color:rgba(255,255,255,0.45);letter-spacing:0.1em;}
+canvas.map-canvas{border-radius:10px;border:1px solid rgba(0,255,255,0.1);}
+#view3d{border-radius:10px;border:1px solid rgba(0,255,255,0.1);}
+.sensor-legend{display:flex;align-items:center;gap:6px;font-size:11px;}
+.legend-dot{width:10px;height:10px;border-radius:50%;}
+@keyframes pulse{0%,100%{opacity:0.6;}50%{opacity:1;}}
+.pulse-anim{animation:pulse 2s ease-in-out infinite;}
+@keyframes scanLine{0%{transform:rotate(0deg);}100%{transform:rotate(360deg);}}
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Header -->
+<header class="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3" style="background:linear-gradient(180deg,rgba(10,14,26,0.95),rgba(10,14,26,0.7));">
+  <div class="flex items-center gap-3">
+    <a href="index.html" class="text-cyan-400 hover:text-cyan-300 text-sm">&larr; Portal</a>
+    <div class="w-px h-5 bg-cyan-900"></div>
+    <h1 class="font-orbitron text-sm md:text-base tracking-wider glow-cyan">GROUND SENSOR</h1>
+    <span class="text-xs text-cyan-700 hidden md:inline">Satellite-Ground Complementary Coverage</span>
+  </div>
+  <div class="flex items-center gap-2">
+    <button id="btnToggle3D" class="btn text-xs">3D VIEW</button>
+    <button id="btnBlindSpots" class="btn text-xs">BLIND SPOTS</button>
+  </div>
+</header>
+
+<!-- Main Content -->
+<main class="pt-14 pb-4 px-3 md:px-4 flex flex-col gap-3" style="height:100vh;">
+
+  <!-- Info Banner -->
+  <div class="panel px-4 py-3 flex flex-col md:flex-row items-start md:items-center gap-2">
+    <div class="text-cyan-400 text-lg">&#x1F6F0;&#xFE0F;</div>
+    <div class="flex-1">
+      <div class="text-sm font-medium text-cyan-200">衛星がカバーできない領域を地上センサーで補完</div>
+      <div class="text-xs text-gray-400 mt-0.5">トンネル内部、橋梁裏面、都市の死角をドローン・車載カメラ・LiDARでカバーします</div>
+    </div>
+    <div class="flex gap-1 flex-wrap">
+      <div class="sensor-legend"><div class="legend-dot" style="background:#22c55e;"></div><span class="text-green-300">Satellite</span></div>
+      <div class="sensor-legend"><div class="legend-dot" style="background:#3b82f6;"></div><span class="text-blue-300">Drone</span></div>
+      <div class="sensor-legend"><div class="legend-dot" style="background:#f97316;"></div><span class="text-orange-300">Vehicle Cam</span></div>
+      <div class="sensor-legend"><div class="legend-dot" style="background:#a855f7;"></div><span class="text-purple-300">LiDAR</span></div>
+    </div>
+  </div>
+
+  <!-- Split View + Controls Row -->
+  <div class="flex-1 flex flex-col md:flex-row gap-3 min-h-0">
+
+    <!-- Left: Map Views -->
+    <div class="flex-1 flex flex-col gap-3 min-h-0" id="mapContainer">
+      <!-- 2D Split View -->
+      <div id="view2d" class="flex-1 flex gap-3 min-h-0">
+        <div class="flex-1 flex flex-col min-h-0">
+          <div class="text-xs font-orbitron text-green-400 mb-1 tracking-wider">SATELLITE COVERAGE</div>
+          <canvas id="canvasSat" class="map-canvas flex-1 w-full"></canvas>
+        </div>
+        <div class="flex-1 flex flex-col min-h-0">
+          <div class="text-xs font-orbitron text-blue-400 mb-1 tracking-wider">GROUND SENSOR COVERAGE</div>
+          <canvas id="canvasGnd" class="map-canvas flex-1 w-full"></canvas>
+        </div>
+      </div>
+      <!-- 3D View (hidden by default) -->
+      <div id="view3d" class="flex-1 hidden min-h-0" style="min-height:300px;"></div>
+    </div>
+
+    <!-- Right: Controls -->
+    <div class="w-full md:w-72 flex flex-col gap-3 overflow-y-auto" style="max-height:calc(100vh - 140px);">
+
+      <!-- Stats Panel -->
+      <div class="panel p-4">
+        <div class="text-xs font-orbitron text-cyan-500 tracking-wider mb-3">COVERAGE STATS</div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><div class="stat-value" id="statTotal">0%</div><div class="stat-label">TOTAL COVERED</div></div>
+          <div><div class="stat-value text-green-400" id="statSat">0%</div><div class="stat-label">SATELLITE ONLY</div></div>
+          <div><div class="stat-value text-blue-400" id="statGround">0%</div><div class="stat-label">GROUND COMP.</div></div>
+          <div><div class="stat-value text-red-400" id="statBlind">0%</div><div class="stat-label">BLIND REDUCE</div></div>
+        </div>
+        <div class="mt-3 flex items-center justify-between text-xs">
+          <span class="text-gray-400">Active Sensors</span>
+          <span class="font-orbitron text-cyan-300" id="statSensors">0</span>
+        </div>
+      </div>
+
+      <!-- Sensor Toggles -->
+      <div class="panel p-4">
+        <div class="text-xs font-orbitron text-cyan-500 tracking-wider mb-3">SENSOR CONTROLS</div>
+        <div class="flex flex-col gap-2">
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="text-sm text-green-300 flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span>Satellite</span>
+            <input type="checkbox" id="togSat" checked class="sr-only peer">
+            <div class="w-9 h-5 bg-gray-700 rounded-full relative peer-checked:bg-green-900 transition"><div class="toggle-dot absolute left-0.5 top-0.5 w-4 h-4 bg-gray-400 rounded-full peer-checked:translate-x-4 peer-checked:bg-green-400 transition"></div></div>
+          </label>
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="text-sm text-blue-300 flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>Drone</span>
+            <input type="checkbox" id="togDrone" checked class="sr-only peer">
+            <div class="w-9 h-5 bg-gray-700 rounded-full relative peer-checked:bg-blue-900 transition"><div class="toggle-dot absolute left-0.5 top-0.5 w-4 h-4 bg-gray-400 rounded-full peer-checked:translate-x-4 peer-checked:bg-blue-400 transition"></div></div>
+          </label>
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="text-sm text-orange-300 flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block"></span>Vehicle Camera</span>
+            <input type="checkbox" id="togVehicle" checked class="sr-only peer">
+            <div class="w-9 h-5 bg-gray-700 rounded-full relative peer-checked:bg-orange-900 transition"><div class="toggle-dot absolute left-0.5 top-0.5 w-4 h-4 bg-gray-400 rounded-full peer-checked:translate-x-4 peer-checked:bg-orange-400 transition"></div></div>
+          </label>
+          <label class="flex items-center justify-between cursor-pointer">
+            <span class="text-sm text-purple-300 flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"></span>LiDAR Scanner</span>
+            <input type="checkbox" id="togLidar" checked class="sr-only peer">
+            <div class="w-9 h-5 bg-gray-700 rounded-full relative peer-checked:bg-purple-900 transition"><div class="toggle-dot absolute left-0.5 top-0.5 w-4 h-4 bg-gray-400 rounded-full peer-checked:translate-x-4 peer-checked:bg-purple-400 transition"></div></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Speed Slider -->
+      <div class="panel p-4">
+        <div class="text-xs font-orbitron text-cyan-500 tracking-wider mb-2">SIMULATION SPEED</div>
+        <input type="range" id="speedSlider" min="0.1" max="5" step="0.1" value="1" class="w-full accent-cyan-400">
+        <div class="flex justify-between text-xs text-gray-500 mt-1"><span>0.1x</span><span id="speedLabel">1.0x</span><span>5.0x</span></div>
+      </div>
+
+      <!-- Scenario Presets -->
+      <div class="panel p-4">
+        <div class="text-xs font-orbitron text-cyan-500 tracking-wider mb-3">SCENARIO PRESETS</div>
+        <div class="grid grid-cols-2 gap-2">
+          <button class="btn-preset" data-scenario="tunnel">Tunnel<br><span class="text-[10px] text-gray-400">トンネル検査</span></button>
+          <button class="btn-preset" data-scenario="bridge">Bridge<br><span class="text-[10px] text-gray-400">橋梁裏面</span></button>
+          <button class="btn-preset" data-scenario="urban">Urban Canyon<br><span class="text-[10px] text-gray-400">都市峡谷</span></button>
+          <button class="btn-preset" data-scenario="full">Full Coverage<br><span class="text-[10px] text-gray-400">全センサー</span></button>
+        </div>
+      </div>
+
+      <!-- Deploy Mode -->
+      <div class="panel p-4">
+        <div class="text-xs font-orbitron text-cyan-500 tracking-wider mb-2">DEPLOY SENSOR</div>
+        <div class="text-xs text-gray-400 mb-2">Click on map to place sensor</div>
+        <div class="flex gap-2 flex-wrap">
+          <button class="btn text-xs" data-deploy="drone">+ Drone</button>
+          <button class="btn text-xs" data-deploy="vehicle">+ Vehicle</button>
+          <button class="btn text-xs" data-deploy="lidar">+ LiDAR</button>
+        </div>
+        <div class="text-xs text-gray-500 mt-2" id="deployStatus">Select sensor type, then click map</div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<script>
+// ===================== CITY MAP DATA =====================
+const MAP_W = 800, MAP_H = 600;
+
+// Buildings: {x, y, w, h, tall}
+const buildings = [
+  // Downtown cluster (urban canyon)
+  {x:80,y:60,w:40,h:50,tall:true},{x:130,y:55,w:35,h:60,tall:true},{x:175,y:50,w:45,h:55,tall:true},
+  {x:80,y:130,w:50,h:40,tall:true},{x:140,y:125,w:40,h:50,tall:true},{x:190,y:120,w:35,h:45,tall:true},
+  {x:85,y:195,w:45,h:35,tall:true},{x:140,y:190,w:50,h:45,tall:true},
+  // Residential
+  {x:320,y:60,w:30,h:25,tall:false},{x:360,y:55,w:25,h:30,tall:false},{x:395,y:60,w:30,h:25,tall:false},
+  {x:320,y:100,w:25,h:20,tall:false},{x:360,y:100,w:30,h:25,tall:false},
+  // Industrial
+  {x:550,y:350,w:60,h:40,tall:false},{x:620,y:340,w:50,h:50,tall:false},{x:560,y:400,w:45,h:35,tall:false},
+  // Near bridge
+  {x:440,y:180,w:35,h:30,tall:false},{x:490,y:175,w:30,h:35,tall:false},
+  // Near tunnel
+  {x:600,y:120,w:40,h:30,tall:false},{x:650,y:110,w:35,h:40,tall:false},
+];
+
+// Roads: [{x1,y1,x2,y2}]
+const roads = [
+  // Horizontal main
+  {x1:0,y1:250,x2:800,y2:250},
+  {x1:0,y1:320,x2:800,y2:320},
+  {x1:0,y1:160,x2:800,y2:160},
+  // Vertical main
+  {x1:260,y1:0,x2:260,y2:600},
+  {x1:450,y1:0,x2:450,y2:600},
+  {x1:530,y1:0,x2:530,y2:600},
+  // Side streets
+  {x1:60,y1:0,x2:60,y2:250},
+  {x1:240,y1:320,x2:240,y2:600},
+  {x1:680,y1:0,x2:680,y2:600},
+];
+
+// Tunnel: horizontal through a "hill"
+const tunnel = {x:580,y:240,w:160,h:30};
+// Hill around tunnel
+const hill = {x:560,y:210,w:200,h:90};
+
+// Bridge over river
+const bridge = {x:435,y:410,w:40,h:80};
+// River
+const river = {x1:0,y1:420,x2:430,y2:440, x3:480,y3:440, x4:800,y4:470, width:50};
+
+// LiDAR fixed positions
+let lidarPoints = [{x:260,y:250},{x:530,y:320},{x:680,y:160}];
+
+// Drones
+let drones = [
+  {x:150,y:170,tx:660,ty:255,inTunnel:false,phase:0},
+  {x:455,y:380,tx:455,ty:490,underBridge:false,phase:0},
+  {x:120,y:100,tx:200,ty:200,inTunnel:false,phase:0},
+];
+
+// Vehicle (taxi) path along roads
+let vehicles = [
+  {path:[{x:0,y:250},{x:260,y:250},{x:260,y:160},{x:450,y:160},{x:450,y:250},{x:580,y:250},{x:740,y:250},{x:800,y:250}],progress:0,trail:[]},
+  {path:[{x:260,y:0},{x:260,y:250},{x:260,y:320},{x:260,y:600}],progress:0,trail:[]},
+];
+
+// State
+let showSat=true, showDrone=true, showVehicle=true, showLidar=true;
+let showBlindSpots=false, show3D=false;
+let simSpeed=1, time=0;
+let deployMode=null;
+let scenarioActive=null;
+
+// ===================== 2D CANVAS RENDERING =====================
+const canvasSat = document.getElementById('canvasSat');
+const canvasGnd = document.getElementById('canvasGnd');
+const ctxS = canvasSat.getContext('2d');
+const ctxG = canvasGnd.getContext('2d');
+
+function resizeCanvases(){
+  [canvasSat,canvasGnd].forEach(c=>{
+    const r = c.parentElement.getBoundingClientRect();
+    c.width = r.width;
+    c.height = r.height - 20;
+  });
+}
+window.addEventListener('resize',()=>{resizeCanvases(); if(show3D) resize3D();});
+setTimeout(resizeCanvases,100);
+
+function drawCityBase(ctx, w, h){
+  const sx=w/MAP_W, sy=h/MAP_H;
+  ctx.save();
+  ctx.scale(sx,sy);
+
+  // Background
+  ctx.fillStyle='#0d1117';
+  ctx.fillRect(0,0,MAP_W,MAP_H);
+
+  // River
+  ctx.beginPath();
+  ctx.moveTo(0,430);
+  ctx.bezierCurveTo(150,410,300,450,430,440);
+  ctx.lineTo(480,440);
+  ctx.bezierCurveTo(600,445,700,465,800,470);
+  ctx.lineTo(800,520);
+  ctx.bezierCurveTo(700,515,600,495,480,490);
+  ctx.lineTo(430,490);
+  ctx.bezierCurveTo(300,500,150,460,0,480);
+  ctx.closePath();
+  ctx.fillStyle='#0c2d48';
+  ctx.fill();
+
+  // Roads
+  roads.forEach(r=>{
+    ctx.beginPath();
+    ctx.moveTo(r.x1,r.y1);
+    ctx.lineTo(r.x2,r.y2);
+    ctx.strokeStyle='#1e293b';
+    ctx.lineWidth=12;
+    ctx.stroke();
+    ctx.strokeStyle='#334155';
+    ctx.lineWidth=10;
+    ctx.stroke();
+    // Center line
+    ctx.strokeStyle='#475569';
+    ctx.lineWidth=1;
+    ctx.setLineDash([8,8]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  });
+
+  // Hill
+  ctx.fillStyle='#1a2332';
+  ctx.beginPath();
+  ctx.ellipse(hill.x+hill.w/2, hill.y+hill.h/2, hill.w/2, hill.h/2, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Tunnel
+  ctx.fillStyle='#111827';
+  ctx.fillRect(tunnel.x, tunnel.y, tunnel.w, tunnel.h);
+  ctx.strokeStyle='#374151';
+  ctx.lineWidth=2;
+  ctx.strokeRect(tunnel.x, tunnel.y, tunnel.w, tunnel.h);
+  // Tunnel label
+  ctx.fillStyle='#6b7280';
+  ctx.font='10px sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('TUNNEL',tunnel.x+tunnel.w/2, tunnel.y+tunnel.h/2+3);
+
+  // Bridge
+  ctx.fillStyle='#374151';
+  ctx.fillRect(bridge.x, bridge.y, bridge.w, bridge.h);
+  ctx.strokeStyle='#4b5563';
+  ctx.lineWidth=2;
+  ctx.strokeRect(bridge.x, bridge.y, bridge.w, bridge.h);
+  ctx.fillStyle='#6b7280';
+  ctx.font='10px sans-serif';
+  ctx.fillText('BRIDGE',bridge.x+bridge.w/2, bridge.y+bridge.h/2+3);
+
+  // Buildings
+  buildings.forEach(b=>{
+    ctx.fillStyle=b.tall?'#1e293b':'#1a2332';
+    ctx.fillRect(b.x,b.y,b.w,b.h);
+    ctx.strokeStyle=b.tall?'#334155':'#293548';
+    ctx.lineWidth=1;
+    ctx.strokeRect(b.x,b.y,b.w,b.h);
+  });
+
+  // Urban canyon label
+  ctx.fillStyle='rgba(255,100,100,0.4)';
+  ctx.font='9px sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('URBAN CANYON',150,45);
+
+  ctx.restore();
+}
+
+// Check if point is inside a building or structure that blocks satellite
+function isSatBlocked(px,py){
+  // Tunnel blocks satellite
+  if(px>=tunnel.x && px<=tunnel.x+tunnel.w && py>=tunnel.y && py<=tunnel.y+tunnel.h) return true;
+  // Bridge underside blocks satellite for what's under it
+  if(px>=bridge.x && px<=bridge.x+bridge.w && py>=bridge.y && py<=bridge.y+bridge.h) return 'bridge';
+  // Tall buildings create shadow
+  for(let b of buildings){
+    if(b.tall && px>=b.x && px<=b.x+b.w && py>=b.y && py<=b.y+b.h) return true;
+    // Shadow zone (east side of tall buildings)
+    if(b.tall && px>=b.x+b.w && px<=b.x+b.w+20 && py>=b.y && py<=b.y+b.h) return true;
+  }
+  return false;
+}
+
+function drawSatelliteCoverage(ctx, w, h){
+  const sx=w/MAP_W, sy=h/MAP_H;
+  if(!showSat) return;
+
+  ctx.save();
+  ctx.scale(sx,sy);
+
+  // Large satellite coverage circle
+  const satX=400, satY=300, satR=350;
+  const grad = ctx.createRadialGradient(satX,satY,0,satX,satY,satR);
+  grad.addColorStop(0,'rgba(34,197,94,0.15)');
+  grad.addColorStop(0.7,'rgba(34,197,94,0.08)');
+  grad.addColorStop(1,'rgba(34,197,94,0)');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,MAP_W,MAP_H);
+
+  // Draw blocked zones in red
+  // Tunnel
+  ctx.fillStyle='rgba(239,68,68,0.3)';
+  ctx.fillRect(tunnel.x,tunnel.y,tunnel.w,tunnel.h);
+
+  // Bridge underside
+  ctx.fillStyle='rgba(239,68,68,0.25)';
+  ctx.fillRect(bridge.x,bridge.y,bridge.w,bridge.h);
+
+  // Tall building shadows
+  buildings.forEach(b=>{
+    if(b.tall){
+      ctx.fillStyle='rgba(239,68,68,0.2)';
+      ctx.fillRect(b.x+b.w, b.y, 20, b.h);
+      ctx.fillStyle='rgba(239,68,68,0.1)';
+      ctx.fillRect(b.x,b.y,b.w,b.h);
+    }
+  });
+
+  // Urban canyon zone
+  ctx.fillStyle='rgba(239,68,68,0.15)';
+  ctx.beginPath();
+  ctx.rect(60,40,180,210);
+  ctx.fill();
+  ctx.strokeStyle='rgba(239,68,68,0.3)';
+  ctx.lineWidth=1;
+  ctx.setLineDash([4,4]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='rgba(239,68,68,0.5)';
+  ctx.font='bold 9px sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('GPS DEGRADATION',150,260);
+
+  // Satellite icon
+  const satAngle = time*0.3;
+  const iconX = 400+Math.cos(satAngle)*60;
+  const iconY = 50+Math.sin(satAngle*0.5)*10;
+  ctx.fillStyle='rgba(34,197,94,0.8)';
+  ctx.font='20px sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('\u{1F6F0}\uFE0F', iconX, iconY);
+
+  // Coverage cone lines
+  ctx.beginPath();
+  ctx.moveTo(iconX,iconY+10);
+  ctx.lineTo(iconX-200,MAP_H);
+  ctx.moveTo(iconX,iconY+10);
+  ctx.lineTo(iconX+200,MAP_H);
+  ctx.strokeStyle='rgba(34,197,94,0.1)';
+  ctx.lineWidth=1;
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawGroundCoverage(ctx, w, h){
+  const sx=w/MAP_W, sy=h/MAP_H;
+  ctx.save();
+  ctx.scale(sx,sy);
+
+  // Drones
+  if(showDrone){
+    drones.forEach((d,i)=>{
+      // Drone coverage circle
+      const grad = ctx.createRadialGradient(d.x,d.y,0,d.x,d.y,40);
+      grad.addColorStop(0,'rgba(59,130,246,0.25)');
+      grad.addColorStop(1,'rgba(59,130,246,0)');
+      ctx.fillStyle=grad;
+      ctx.beginPath();
+      ctx.arc(d.x,d.y,40,0,Math.PI*2);
+      ctx.fill();
+
+      // Drone icon
+      ctx.fillStyle='rgba(59,130,246,0.9)';
+      ctx.font='14px sans-serif';
+      ctx.textAlign='center';
+      ctx.fillText('\u{1F681}',d.x,d.y+5);
+
+      // Path line
+      ctx.beginPath();
+      ctx.moveTo(d.x,d.y);
+      ctx.lineTo(d.tx,d.ty);
+      ctx.strokeStyle='rgba(59,130,246,0.15)';
+      ctx.lineWidth=1;
+      ctx.setLineDash([3,3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+  }
+
+  // Vehicle trails
+  if(showVehicle){
+    vehicles.forEach(v=>{
+      if(v.trail.length>1){
+        ctx.beginPath();
+        ctx.moveTo(v.trail[0].x,v.trail[0].y);
+        for(let i=1;i<v.trail.length;i++){
+          ctx.lineTo(v.trail[i].x,v.trail[i].y);
+        }
+        ctx.strokeStyle='rgba(249,115,22,0.5)';
+        ctx.lineWidth=8;
+        ctx.lineCap='round';
+        ctx.stroke();
+
+        // Glow
+        ctx.strokeStyle='rgba(249,115,22,0.15)';
+        ctx.lineWidth=20;
+        ctx.stroke();
+      }
+      // Vehicle icon at current pos
+      if(v.trail.length>0){
+        const last = v.trail[v.trail.length-1];
+        ctx.fillStyle='rgba(249,115,22,0.9)';
+        ctx.font='14px sans-serif';
+        ctx.textAlign='center';
+        ctx.fillText('\u{1F695}',last.x,last.y+5);
+      }
+    });
+  }
+
+  // LiDAR
+  if(showLidar){
+    lidarPoints.forEach(lp=>{
+      const numRays = 24;
+      const range = 70;
+      const rotOffset = time*0.8;
+      for(let i=0;i<numRays;i++){
+        const angle = (i/numRays)*Math.PI*2 + rotOffset;
+        ctx.beginPath();
+        ctx.moveTo(lp.x,lp.y);
+        ctx.lineTo(lp.x+Math.cos(angle)*range, lp.y+Math.sin(angle)*range);
+        ctx.strokeStyle='rgba(168,85,247,0.3)';
+        ctx.lineWidth=1.5;
+        ctx.stroke();
+      }
+      // Coverage circle
+      const grad = ctx.createRadialGradient(lp.x,lp.y,0,lp.x,lp.y,range);
+      grad.addColorStop(0,'rgba(168,85,247,0.12)');
+      grad.addColorStop(1,'rgba(168,85,247,0)');
+      ctx.fillStyle=grad;
+      ctx.beginPath();
+      ctx.arc(lp.x,lp.y,range,0,Math.PI*2);
+      ctx.fill();
+
+      // LiDAR icon
+      ctx.fillStyle='rgba(168,85,247,0.8)';
+      ctx.font='12px sans-serif';
+      ctx.textAlign='center';
+      ctx.fillText('\u{1F4E1}',lp.x,lp.y+4);
+    });
+  }
+
+  // Blind spots highlight
+  if(showBlindSpots){
+    // Tunnel interior - only ground sensors can see
+    ctx.fillStyle='rgba(59,130,246,0.3)';
+    ctx.strokeStyle='rgba(59,130,246,0.6)';
+    ctx.lineWidth=2;
+    ctx.setLineDash([4,2]);
+    ctx.fillRect(tunnel.x,tunnel.y,tunnel.w,tunnel.h);
+    ctx.strokeRect(tunnel.x,tunnel.y,tunnel.w,tunnel.h);
+
+    // Bridge underside
+    ctx.fillStyle='rgba(59,130,246,0.25)';
+    ctx.fillRect(bridge.x,bridge.y,bridge.w,bridge.h);
+    ctx.strokeRect(bridge.x,bridge.y,bridge.w,bridge.h);
+
+    // Urban canyon
+    ctx.fillStyle='rgba(59,130,246,0.15)';
+    ctx.fillRect(60,40,180,210);
+    ctx.strokeRect(60,40,180,210);
+    ctx.setLineDash([]);
+
+    // Labels
+    ctx.fillStyle='rgba(96,165,250,0.9)';
+    ctx.font='bold 10px sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText('DRONE COVERAGE',tunnel.x+tunnel.w/2,tunnel.y-5);
+    ctx.fillText('DRONE UNDERSIDE',bridge.x+bridge.w/2,bridge.y-5);
+    ctx.fillText('VEHICLE + LiDAR',150,35);
+  }
+
+  ctx.restore();
+}
+
+// ===================== SIMULATION UPDATE =====================
+function updateSimulation(dt){
+  time += dt * simSpeed;
+
+  // Update drones
+  drones.forEach(d=>{
+    d.phase += dt * simSpeed * 0.5;
+    const t = (Math.sin(d.phase)+1)/2;
+    d.x = d.x + (d.tx - d.x) * 0.002 * simSpeed;
+    d.y = d.y + (d.ty - d.y) * 0.002 * simSpeed;
+    // Bounce back
+    if(Math.abs(d.x-d.tx)<5 && Math.abs(d.y-d.ty)<5){
+      const tmp = {x:d.tx,y:d.ty};
+      d.tx = d.x + (Math.random()-0.5)*200;
+      d.ty = d.y + (Math.random()-0.5)*200;
+      d.tx = Math.max(20,Math.min(MAP_W-20,d.tx));
+      d.ty = Math.max(20,Math.min(MAP_H-20,d.ty));
+    }
+    // Check tunnel
+    d.inTunnel = d.x>=tunnel.x && d.x<=tunnel.x+tunnel.w && d.y>=tunnel.y && d.y<=tunnel.y+tunnel.h;
+  });
+
+  // Update vehicles
+  vehicles.forEach(v=>{
+    v.progress += dt * simSpeed * 0.03;
+    if(v.progress>=v.path.length-1) v.progress=0;
+
+    const idx = Math.floor(v.progress);
+    const frac = v.progress - idx;
+    const p0 = v.path[idx];
+    const p1 = v.path[Math.min(idx+1,v.path.length-1)];
+    const cx = p0.x + (p1.x-p0.x)*frac;
+    const cy = p0.y + (p1.y-p0.y)*frac;
+
+    v.trail.push({x:cx,y:cy});
+    if(v.trail.length>200) v.trail.shift();
+  });
+}
+
+function computeStats(){
+  // Simplified coverage calculation
+  const totalArea = MAP_W*MAP_H;
+  let satCov=0, gndCov=0, bothCov=0;
+
+  // Sample grid
+  const step=20;
+  let totalPts=0, satPts=0, gndPts=0;
+  for(let x=0;x<MAP_W;x+=step){
+    for(let y=0;y<MAP_H;y+=step){
+      totalPts++;
+      const blocked = isSatBlocked(x,y);
+      if(showSat && !blocked) satPts++;
+
+      let gndHit=false;
+      if(showDrone){
+        for(let d of drones){
+          if(Math.hypot(d.x-x,d.y-y)<40){gndHit=true;break;}
+        }
+      }
+      if(!gndHit && showVehicle){
+        for(let v of vehicles){
+          for(let t of v.trail){
+            if(Math.hypot(t.x-x,t.y-y)<15){gndHit=true;break;}
+          }
+          if(gndHit) break;
+        }
+      }
+      if(!gndHit && showLidar){
+        for(let lp of lidarPoints){
+          if(Math.hypot(lp.x-x,lp.y-y)<70){gndHit=true;break;}
+        }
+      }
+      if(gndHit) gndPts++;
+    }
+  }
+
+  const satPct = (satPts/totalPts*100);
+  const gndPct = (gndPts/totalPts*100);
+  const totalPct = Math.min(100,satPct+gndPct - (satPct*gndPct/100)*0.5);
+  const blindReduction = gndPct > 0 ? Math.min(99, gndPct * 1.5) : 0;
+
+  document.getElementById('statTotal').textContent = totalPct.toFixed(1)+'%';
+  document.getElementById('statSat').textContent = satPct.toFixed(1)+'%';
+  document.getElementById('statGround').textContent = gndPct.toFixed(1)+'%';
+  document.getElementById('statBlind').textContent = blindReduction.toFixed(1)+'%';
+
+  let sensorCount = 0;
+  if(showSat) sensorCount++;
+  if(showDrone) sensorCount += drones.length;
+  if(showVehicle) sensorCount += vehicles.length;
+  if(showLidar) sensorCount += lidarPoints.length;
+  document.getElementById('statSensors').textContent = sensorCount;
+}
+
+// ===================== 2D RENDER LOOP =====================
+let lastTime = performance.now();
+let statsTimer=0;
+
+function render2D(){
+  const now = performance.now();
+  const dt = (now-lastTime)/1000;
+  lastTime = now;
+
+  updateSimulation(dt);
+  statsTimer += dt;
+  if(statsTimer>0.5){computeStats();statsTimer=0;}
+
+  // Satellite canvas
+  const wS=canvasSat.width, hS=canvasSat.height;
+  ctxS.clearRect(0,0,wS,hS);
+  drawCityBase(ctxS,wS,hS);
+  drawSatelliteCoverage(ctxS,wS,hS);
+
+  // Ground canvas
+  const wG=canvasGnd.width, hG=canvasGnd.height;
+  ctxG.clearRect(0,0,wG,hG);
+  drawCityBase(ctxG,wG,hG);
+  drawGroundCoverage(ctxG,wG,hG);
+
+  if(!show3D) requestAnimationFrame(render2D);
+}
+
+// ===================== 3D VIEW (Three.js) =====================
+let scene3d, camera3d, renderer3d, animFrame3d;
+let drone3dMeshes=[], vehicle3dMeshes=[], lidar3dMeshes=[];
+let satelliteMesh, satConeMesh;
+
+function init3D(){
+  const container = document.getElementById('view3d');
+  const rect = container.getBoundingClientRect();
+
+  scene3d = new THREE.Scene();
+  scene3d.background = new THREE.Color(0x0a0e1a);
+  scene3d.fog = new THREE.Fog(0x0a0e1a, 400, 900);
+
+  camera3d = new THREE.PerspectiveCamera(55, rect.width/rect.height, 1, 2000);
+  camera3d.position.set(400, 350, 500);
+  camera3d.lookAt(400,0,300);
+
+  renderer3d = new THREE.WebGLRenderer({antialias:true});
+  renderer3d.setSize(rect.width, rect.height);
+  renderer3d.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  container.appendChild(renderer3d.domElement);
+
+  // Ambient + directional light
+  scene3d.add(new THREE.AmbientLight(0x334466,0.6));
+  const dirLight = new THREE.DirectionalLight(0xffffff,0.5);
+  dirLight.position.set(200,300,100);
+  scene3d.add(dirLight);
+
+  // Ground plane
+  const groundGeo = new THREE.PlaneGeometry(MAP_W,MAP_H);
+  const groundMat = new THREE.MeshPhongMaterial({color:0x0d1117,side:THREE.DoubleSide});
+  const ground = new THREE.Mesh(groundGeo,groundMat);
+  ground.rotation.x=-Math.PI/2;
+  ground.position.set(MAP_W/2,0,MAP_H/2);
+  scene3d.add(ground);
+
+  // Roads
+  roads.forEach(r=>{
+    const dx=r.x2-r.x1, dy=r.y2-r.y1;
+    const len=Math.sqrt(dx*dx+dy*dy);
+    const roadGeo = new THREE.PlaneGeometry(len,10);
+    const roadMat = new THREE.MeshPhongMaterial({color:0x334155});
+    const road = new THREE.Mesh(roadGeo,roadMat);
+    road.rotation.x=-Math.PI/2;
+    road.position.set((r.x1+r.x2)/2, 0.1, (r.y1+r.y2)/2);
+    if(Math.abs(dx)<1) road.rotation.z=Math.PI/2;
+    scene3d.add(road);
+  });
+
+  // Buildings
+  buildings.forEach(b=>{
+    const h = b.tall ? 40+Math.random()*30 : 10+Math.random()*10;
+    const geo = new THREE.BoxGeometry(b.w,h,b.h);
+    const mat = new THREE.MeshPhongMaterial({color:b.tall?0x1e293b:0x1a2332, transparent:true, opacity:0.8});
+    const mesh = new THREE.Mesh(geo,mat);
+    mesh.position.set(b.x+b.w/2, h/2, b.y+b.h/2);
+    scene3d.add(mesh);
+    // Edges
+    const edges = new THREE.EdgesGeometry(geo);
+    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({color:0x334155}));
+    line.position.copy(mesh.position);
+    scene3d.add(line);
+  });
+
+  // Hill + Tunnel
+  const hillGeo = new THREE.SphereGeometry(100,16,8,0,Math.PI*2,0,Math.PI/2);
+  const hillMat = new THREE.MeshPhongMaterial({color:0x1a2332,transparent:true,opacity:0.7});
+  const hillMesh = new THREE.Mesh(hillGeo,hillMat);
+  hillMesh.position.set(tunnel.x+tunnel.w/2,0,tunnel.y+tunnel.h/2);
+  hillMesh.scale.set(1,0.4,0.5);
+  scene3d.add(hillMesh);
+
+  // Tunnel tube
+  const tunnelPath = new THREE.LineCurve3(
+    new THREE.Vector3(tunnel.x,15,tunnel.y+tunnel.h/2),
+    new THREE.Vector3(tunnel.x+tunnel.w,15,tunnel.y+tunnel.h/2)
+  );
+  const tunnelGeo = new THREE.TubeGeometry(tunnelPath,20,15,8,false);
+  const tunnelMat = new THREE.MeshPhongMaterial({color:0x111827,side:THREE.DoubleSide,transparent:true,opacity:0.6});
+  const tunnelMesh = new THREE.Mesh(tunnelGeo,tunnelMat);
+  scene3d.add(tunnelMesh);
+
+  // River
+  const riverGeo = new THREE.PlaneGeometry(MAP_W,50);
+  const riverMat = new THREE.MeshPhongMaterial({color:0x0c2d48,transparent:true,opacity:0.7});
+  const riverMesh = new THREE.Mesh(riverGeo,riverMat);
+  riverMesh.rotation.x=-Math.PI/2;
+  riverMesh.position.set(MAP_W/2,0.2,455);
+  scene3d.add(riverMesh);
+
+  // Bridge
+  const bridgeGeo = new THREE.BoxGeometry(bridge.w, 3, bridge.h);
+  const bridgeMat = new THREE.MeshPhongMaterial({color:0x4b5563});
+  const bridgeMesh = new THREE.Mesh(bridgeGeo,bridgeMat);
+  bridgeMesh.position.set(bridge.x+bridge.w/2, 12, bridge.y+bridge.h/2);
+  scene3d.add(bridgeMesh);
+  // Bridge pillars
+  [bridge.y+10, bridge.y+bridge.h-10].forEach(z=>{
+    const pillarGeo = new THREE.CylinderGeometry(2,2,12,8);
+    const pillar = new THREE.Mesh(pillarGeo, bridgeMat);
+    pillar.position.set(bridge.x+bridge.w/2, 6, z);
+    scene3d.add(pillar);
+  });
+
+  // Satellite
+  const satGeo = new THREE.OctahedronGeometry(8,0);
+  const satMat = new THREE.MeshPhongMaterial({color:0x22c55e,emissive:0x22c55e,emissiveIntensity:0.3});
+  satelliteMesh = new THREE.Mesh(satGeo,satMat);
+  satelliteMesh.position.set(400,250,300);
+  scene3d.add(satelliteMesh);
+
+  // Satellite cone
+  const coneGeo = new THREE.ConeGeometry(200,250,16,1,true);
+  const coneMat = new THREE.MeshBasicMaterial({color:0x22c55e,transparent:true,opacity:0.04,side:THREE.DoubleSide});
+  satConeMesh = new THREE.Mesh(coneGeo,coneMat);
+  satConeMesh.position.set(400,125,300);
+  scene3d.add(satConeMesh);
+
+  // Drone meshes
+  drones.forEach(d=>{
+    const droneGeo = new THREE.SphereGeometry(4,8,6);
+    const droneMat = new THREE.MeshPhongMaterial({color:0x3b82f6,emissive:0x3b82f6,emissiveIntensity:0.5});
+    const droneMesh = new THREE.Mesh(droneGeo,droneMat);
+    droneMesh.position.set(d.x,25,d.y);
+    scene3d.add(droneMesh);
+    drone3dMeshes.push(droneMesh);
+
+    // Drone coverage cone
+    const dcGeo = new THREE.ConeGeometry(40,25,12,1,true);
+    const dcMat = new THREE.MeshBasicMaterial({color:0x3b82f6,transparent:true,opacity:0.06,side:THREE.DoubleSide});
+    const dcMesh = new THREE.Mesh(dcGeo,dcMat);
+    dcMesh.position.set(d.x,12,d.y);
+    scene3d.add(dcMesh);
+    droneMesh.userData.cone = dcMesh;
+  });
+
+  // Vehicle meshes
+  vehicles.forEach(v=>{
+    const vGeo = new THREE.BoxGeometry(8,4,5);
+    const vMat = new THREE.MeshPhongMaterial({color:0xf97316,emissive:0xf97316,emissiveIntensity:0.3});
+    const vMesh = new THREE.Mesh(vGeo,vMat);
+    vMesh.position.set(0,2,0);
+    scene3d.add(vMesh);
+    vehicle3dMeshes.push(vMesh);
+  });
+
+  // LiDAR meshes
+  lidarPoints.forEach(lp=>{
+    const lpGeo = new THREE.CylinderGeometry(3,3,10,8);
+    const lpMat = new THREE.MeshPhongMaterial({color:0xa855f7,emissive:0xa855f7,emissiveIntensity:0.4});
+    const lpMesh = new THREE.Mesh(lpGeo,lpMat);
+    lpMesh.position.set(lp.x,5,lp.y);
+    scene3d.add(lpMesh);
+    lidar3dMeshes.push(lpMesh);
+  });
+
+  // Grid helper
+  const grid = new THREE.GridHelper(800,40,0x1a2332,0x111827);
+  grid.position.set(400,0.05,300);
+  scene3d.add(grid);
+
+  // Camera orbit
+  let camAngle = 0;
+  container.addEventListener('mousemove',(e)=>{
+    if(e.buttons===1){
+      camAngle += e.movementX * 0.005;
+      const r = 450;
+      camera3d.position.x = 400 + Math.sin(camAngle)*r;
+      camera3d.position.z = 300 + Math.cos(camAngle)*r;
+      camera3d.lookAt(400,0,300);
+    }
+  });
+  container.addEventListener('wheel',(e)=>{
+    camera3d.position.y = Math.max(50, Math.min(600, camera3d.position.y + e.deltaY*0.5));
+    camera3d.lookAt(400,0,300);
+  });
+}
+
+function render3D(){
+  if(!show3D) return;
+  const now = performance.now();
+  const dt = (now-lastTime)/1000;
+  lastTime = now;
+
+  updateSimulation(dt);
+  statsTimer += dt;
+  if(statsTimer>0.5){computeStats();statsTimer=0;}
+
+  // Update satellite orbit
+  const satAngle = time*0.3;
+  satelliteMesh.position.x = 400 + Math.cos(satAngle)*60;
+  satelliteMesh.rotation.y = time*0.5;
+  satConeMesh.position.x = satelliteMesh.position.x;
+  satelliteMesh.visible = showSat;
+  satConeMesh.visible = showSat;
+
+  // Update drones
+  drone3dMeshes.forEach((dm,i)=>{
+    if(i<drones.length){
+      dm.position.x = drones[i].x;
+      dm.position.z = drones[i].y;
+      dm.position.y = drones[i].inTunnel ? 10 : 25;
+      dm.visible = showDrone;
+      if(dm.userData.cone){
+        dm.userData.cone.position.x = drones[i].x;
+        dm.userData.cone.position.z = drones[i].y;
+        dm.userData.cone.visible = showDrone;
+      }
+    }
+  });
+
+  // Update vehicles
+  vehicle3dMeshes.forEach((vm,i)=>{
+    if(i<vehicles.length && vehicles[i].trail.length>0){
+      const last = vehicles[i].trail[vehicles[i].trail.length-1];
+      vm.position.x = last.x;
+      vm.position.z = last.y;
+      vm.visible = showVehicle;
+    }
+  });
+
+  // LiDAR visibility
+  lidar3dMeshes.forEach(lm=>{lm.visible=showLidar;});
+
+  renderer3d.render(scene3d,camera3d);
+  animFrame3d = requestAnimationFrame(render3D);
+}
+
+function resize3D(){
+  if(!renderer3d) return;
+  const container = document.getElementById('view3d');
+  const rect = container.getBoundingClientRect();
+  camera3d.aspect = rect.width/rect.height;
+  camera3d.updateProjectionMatrix();
+  renderer3d.setSize(rect.width,rect.height);
+}
+
+// ===================== EVENT HANDLERS =====================
+
+// Sensor toggles
+document.getElementById('togSat').addEventListener('change',e=>{showSat=e.target.checked;});
+document.getElementById('togDrone').addEventListener('change',e=>{showDrone=e.target.checked;});
+document.getElementById('togVehicle').addEventListener('change',e=>{showVehicle=e.target.checked;});
+document.getElementById('togLidar').addEventListener('change',e=>{showLidar=e.target.checked;});
+
+// Speed slider
+document.getElementById('speedSlider').addEventListener('input',e=>{
+  simSpeed=parseFloat(e.target.value);
+  document.getElementById('speedLabel').textContent=simSpeed.toFixed(1)+'x';
+});
+
+// Blind spots toggle
+document.getElementById('btnBlindSpots').addEventListener('click',()=>{
+  showBlindSpots=!showBlindSpots;
+  document.getElementById('btnBlindSpots').classList.toggle('active',showBlindSpots);
+});
+
+// 3D toggle
+document.getElementById('btnToggle3D').addEventListener('click',()=>{
+  show3D=!show3D;
+  document.getElementById('btnToggle3D').classList.toggle('active',show3D);
+  document.getElementById('view2d').classList.toggle('hidden',show3D);
+  document.getElementById('view3d').classList.toggle('hidden',!show3D);
+
+  if(show3D){
+    if(!scene3d) init3D();
+    lastTime=performance.now();
+    setTimeout(()=>{resize3D();render3D();},100);
+  } else {
+    if(animFrame3d) cancelAnimationFrame(animFrame3d);
+    lastTime=performance.now();
+    requestAnimationFrame(render2D);
+  }
+});
+
+// Scenario presets
+document.querySelectorAll('[data-scenario]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const sc = btn.dataset.scenario;
+    document.querySelectorAll('[data-scenario]').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    scenarioActive=sc;
+
+    switch(sc){
+      case 'tunnel':
+        showSat=true;showDrone=true;showVehicle=false;showLidar=false;
+        drones = [
+          {x:570,y:255,tx:750,ty:255,inTunnel:true,phase:0},
+          {x:660,y:255,tx:580,ty:255,inTunnel:true,phase:1},
+        ];
+        showBlindSpots=true;
+        break;
+      case 'bridge':
+        showSat=true;showDrone=true;showVehicle=false;showLidar=false;
+        drones = [
+          {x:455,y:430,tx:455,ty:470,underBridge:true,phase:0},
+          {x:455,y:400,tx:455,ty:500,underBridge:true,phase:1},
+        ];
+        showBlindSpots=true;
+        break;
+      case 'urban':
+        showSat=true;showDrone=false;showVehicle=true;showLidar=true;
+        vehicles = [
+          {path:[{x:60,y:0},{x:60,y:250}],progress:0,trail:[]},
+          {path:[{x:0,y:160},{x:260,y:160}],progress:0,trail:[]},
+        ];
+        lidarPoints = [{x:150,y:130},{x:120,y:200}];
+        showBlindSpots=true;
+        break;
+      case 'full':
+        showSat=true;showDrone=true;showVehicle=true;showLidar=true;
+        drones = [
+          {x:150,y:170,tx:660,ty:255,inTunnel:false,phase:0},
+          {x:455,y:380,tx:455,ty:490,underBridge:false,phase:0},
+          {x:120,y:100,tx:200,ty:200,inTunnel:false,phase:0},
+          {x:600,y:255,tx:740,ty:255,inTunnel:true,phase:1},
+        ];
+        vehicles = [
+          {path:[{x:0,y:250},{x:260,y:250},{x:260,y:160},{x:450,y:160},{x:450,y:250},{x:580,y:250},{x:740,y:250},{x:800,y:250}],progress:0,trail:[]},
+          {path:[{x:260,y:0},{x:260,y:250},{x:260,y:320},{x:260,y:600}],progress:0,trail:[]},
+        ];
+        lidarPoints = [{x:260,y:250},{x:530,y:320},{x:680,y:160},{x:150,y:130}];
+        showBlindSpots=false;
+        break;
+    }
+
+    // Sync toggles
+    document.getElementById('togSat').checked=showSat;
+    document.getElementById('togDrone').checked=showDrone;
+    document.getElementById('togVehicle').checked=showVehicle;
+    document.getElementById('togLidar').checked=showLidar;
+    document.getElementById('btnBlindSpots').classList.toggle('active',showBlindSpots);
+
+    // Reset 3D meshes if in 3D mode
+    if(show3D && scene3d){
+      // Rebuild - simpler to just reset
+      drone3dMeshes.forEach(m=>{scene3d.remove(m);if(m.userData.cone)scene3d.remove(m.userData.cone);});
+      drone3dMeshes=[];
+      drones.forEach(d=>{
+        const droneGeo = new THREE.SphereGeometry(4,8,6);
+        const droneMat = new THREE.MeshPhongMaterial({color:0x3b82f6,emissive:0x3b82f6,emissiveIntensity:0.5});
+        const dm = new THREE.Mesh(droneGeo,droneMat);
+        dm.position.set(d.x,25,d.y);
+        scene3d.add(dm);
+        drone3dMeshes.push(dm);
+      });
+    }
+  });
+});
+
+// Deploy mode
+document.querySelectorAll('[data-deploy]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const type=btn.dataset.deploy;
+    if(deployMode===type){
+      deployMode=null;
+      document.querySelectorAll('[data-deploy]').forEach(b=>b.classList.remove('active'));
+      document.getElementById('deployStatus').textContent='Select sensor type, then click map';
+    } else {
+      deployMode=type;
+      document.querySelectorAll('[data-deploy]').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const names={drone:'Drone',vehicle:'Vehicle Camera',lidar:'LiDAR Scanner'};
+      document.getElementById('deployStatus').textContent='Click map to place '+names[type];
+    }
+  });
+});
+
+// Map click to deploy
+[canvasSat,canvasGnd].forEach(c=>{
+  c.addEventListener('click',(e)=>{
+    if(!deployMode) return;
+    const rect=c.getBoundingClientRect();
+    const mx = (e.clientX-rect.left)/rect.width * MAP_W;
+    const my = (e.clientY-rect.top)/rect.height * MAP_H;
+
+    switch(deployMode){
+      case 'drone':
+        drones.push({x:mx,y:my,tx:mx+(Math.random()-0.5)*100,ty:my+(Math.random()-0.5)*100,inTunnel:false,phase:Math.random()*6});
+        break;
+      case 'vehicle':
+        // Add vehicle that follows nearest road
+        const nearestRoad = roads.reduce((best,r)=>{
+          const dist = Math.min(Math.hypot(r.x1-mx,r.y1-my),Math.hypot(r.x2-mx,r.y2-my));
+          return dist<best.dist?{dist,road:r}:best;
+        },{dist:Infinity,road:null});
+        if(nearestRoad.road){
+          const r=nearestRoad.road;
+          vehicles.push({path:[{x:r.x1,y:r.y1},{x:r.x2,y:r.y2}],progress:0,trail:[]});
+        }
+        break;
+      case 'lidar':
+        lidarPoints.push({x:mx,y:my});
+        break;
+    }
+    document.getElementById('deployStatus').textContent='Sensor deployed! Click again or select another type';
+  });
+});
+
+// ===================== START =====================
+requestAnimationFrame(render2D);
+</script>
+</body>
+</html>

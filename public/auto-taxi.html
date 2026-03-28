@@ -1,0 +1,1048 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="(c) 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>Auto Taxi Simulator - Grace of Touch</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚕</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{overflow:hidden;background:#0a0e1a;font-family:'Orbitron',monospace;color:#e0e0e0;}
+#canvas3d{position:absolute;inset:0;z-index:0;}
+#minimap{position:absolute;bottom:20px;right:20px;width:200px;height:200px;border:1px solid rgba(0,255,255,0.3);
+  background:rgba(0,0,0,0.7);border-radius:4px;z-index:10;}
+#hud{position:absolute;top:0;left:0;z-index:10;pointer-events:none;}
+#hud-panel{background:rgba(5,10,25,0.85);border-bottom:1px solid rgba(0,255,255,0.2);
+  padding:10px 20px;display:flex;gap:30px;align-items:center;backdrop-filter:blur(8px);}
+.hud-item{display:flex;flex-direction:column;align-items:center;}
+.hud-label{font-size:8px;color:rgba(0,255,255,0.5);letter-spacing:0.15em;margin-bottom:2px;}
+.hud-value{font-size:16px;font-weight:700;color:#00ffff;text-shadow:0 0 10px rgba(0,255,255,0.5);}
+.hud-value.revenue{color:#00ff88;}
+#controls{position:absolute;bottom:20px;left:20px;z-index:10;background:rgba(5,10,25,0.85);
+  border:1px solid rgba(0,255,255,0.2);border-radius:8px;padding:14px 18px;
+  backdrop-filter:blur(8px);display:flex;flex-direction:column;gap:10px;min-width:220px;}
+.ctrl-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.ctrl-label{font-size:9px;color:rgba(0,255,255,0.6);letter-spacing:0.1em;}
+.ctrl-btn{background:rgba(0,255,255,0.1);border:1px solid rgba(0,255,255,0.3);color:#00ffff;
+  font-family:'Orbitron',monospace;font-size:10px;padding:4px 10px;border-radius:4px;cursor:pointer;
+  transition:all 0.2s;}
+.ctrl-btn:hover{background:rgba(0,255,255,0.25);border-color:#00ffff;}
+.ctrl-btn.active{background:rgba(0,255,255,0.3);border-color:#00ffff;box-shadow:0 0 8px rgba(0,255,255,0.3);}
+input[type="range"]{-webkit-appearance:none;width:100px;height:4px;background:rgba(0,255,255,0.2);
+  border-radius:2px;outline:none;}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;
+  background:#00ffff;border-radius:50%;cursor:pointer;}
+#cam-mode{position:absolute;top:50px;left:20px;z-index:10;display:flex;gap:6px;}
+.cam-btn{background:rgba(5,10,25,0.85);border:1px solid rgba(0,255,255,0.2);color:rgba(0,255,255,0.6);
+  font-family:'Orbitron',monospace;font-size:9px;padding:5px 10px;border-radius:4px;cursor:pointer;
+  transition:all 0.2s;letter-spacing:0.05em;}
+.cam-btn:hover,.cam-btn.active{color:#00ffff;border-color:#00ffff;background:rgba(0,255,255,0.15);}
+#info-popup{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:20;
+  background:rgba(5,10,25,0.95);border:1px solid rgba(0,255,255,0.4);border-radius:12px;
+  padding:30px 40px;text-align:center;pointer-events:none;opacity:0;transition:opacity 0.5s;}
+#info-popup.show{opacity:1;}
+#info-popup .title{font-size:14px;color:#00ffff;letter-spacing:0.2em;margin-bottom:8px;}
+#info-popup .detail{font-size:11px;color:rgba(255,255,255,0.6);letter-spacing:0.05em;}
+#fare-popup{position:absolute;z-index:15;pointer-events:none;opacity:0;transition:opacity 0.4s;
+  background:rgba(0,255,136,0.15);border:1px solid rgba(0,255,136,0.4);border-radius:6px;
+  padding:6px 12px;font-size:12px;color:#00ff88;white-space:nowrap;}
+#fare-popup.show{opacity:1;}
+#title-bar{position:absolute;top:0;left:0;right:0;z-index:11;text-align:center;padding-top:12px;pointer-events:none;}
+#title-bar h1{font-size:10px;color:rgba(0,255,255,0.4);letter-spacing:0.4em;font-weight:400;}
+</style>
+</head>
+<body>
+<canvas id="canvas3d"></canvas>
+<canvas id="minimap"></canvas>
+
+<div id="title-bar"><h1>GRACE OF TOUCH / AUTO TAXI SIMULATOR</h1></div>
+
+<div id="hud">
+  <div id="hud-panel">
+    <div class="hud-item"><span class="hud-label">TAXIS</span><span class="hud-value" id="h-taxis">0</span></div>
+    <div class="hud-item"><span class="hud-label">WAITING</span><span class="hud-value" id="h-waiting">0</span></div>
+    <div class="hud-item"><span class="hud-label">SERVED</span><span class="hud-value" id="h-served">0</span></div>
+    <div class="hud-item"><span class="hud-label">REVENUE</span><span class="hud-value revenue" id="h-revenue">0</span></div>
+    <div class="hud-item"><span class="hud-label">AVG WAIT</span><span class="hud-value" id="h-wait">0s</span></div>
+    <div class="hud-item"><span class="hud-label">UTILIZATION</span><span class="hud-value" id="h-util">0%</span></div>
+  </div>
+</div>
+
+<div id="cam-mode">
+  <button class="cam-btn active" data-cam="orbit">ORBIT</button>
+  <button class="cam-btn" data-cam="follow">FOLLOW</button>
+  <button class="cam-btn" data-cam="fps">FPS RIDE</button>
+</div>
+
+<div id="controls">
+  <div class="ctrl-row"><span class="ctrl-label">SPEED</span><input type="range" id="speed-slider" min="1" max="10" value="1"><span class="ctrl-label" id="speed-val">1x</span></div>
+  <div class="ctrl-row"><span class="ctrl-label">TIME</span><input type="range" id="time-slider" min="0" max="24" step="0.5" value="10"><span class="ctrl-label" id="time-val">10:00</span></div>
+  <div class="ctrl-row">
+    <button class="ctrl-btn" id="btn-add">+ TAXI</button>
+    <button class="ctrl-btn" id="btn-remove">- TAXI</button>
+    <button class="ctrl-btn" id="btn-pause">PAUSE</button>
+  </div>
+</div>
+
+<div id="info-popup"><div class="title"></div><div class="detail"></div></div>
+<div id="fare-popup"></div>
+
+<script>
+// === CONSTANTS ===
+const GRID = 20, BLOCK = 12, ROAD = 6, CELL = BLOCK + ROAD;
+const CITY_SIZE = GRID * CELL;
+const HALF = CITY_SIZE / 2;
+const MAX_TAXIS = 15, MIN_TAXIS = 1;
+
+// === STATE ===
+let simSpeed = 1, paused = false, timeOfDay = 10, totalServed = 0, totalRevenue = 0;
+let totalWaitTime = 0, cameraMode = 'orbit', followTaxiIdx = 0;
+const taxis = [], passengers = [], waitTimes = [];
+
+// === THREE.JS SETUP ===
+const canvas = document.getElementById('canvas3d');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0a0e1a, 0.003);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+camera.position.set(0, 180, 200);
+camera.lookAt(0, 0, 0);
+
+// Orbit controls (simple)
+let orbitTheta = Math.PI / 4, orbitPhi = Math.PI / 4, orbitDist = 280;
+let isDragging = false, lastMX = 0, lastMY = 0;
+
+// === LIGHTING ===
+const ambientLight = new THREE.AmbientLight(0x334466, 0.3);
+scene.add(ambientLight);
+const dirLight = new THREE.DirectionalLight(0xffeedd, 1.0);
+dirLight.position.set(100, 200, 100);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048, 2048);
+dirLight.shadow.camera.left = -HALF;
+dirLight.shadow.camera.right = HALF;
+dirLight.shadow.camera.top = HALF;
+dirLight.shadow.camera.bottom = -HALF;
+scene.add(dirLight);
+
+const hemiLight = new THREE.HemisphereLight(0x446688, 0x223344, 0.4);
+scene.add(hemiLight);
+
+// === CITY GENERATION ===
+function getIntersections() {
+  const pts = [];
+  for (let i = 0; i <= GRID; i++) {
+    for (let j = 0; j <= GRID; j++) {
+      pts.push({ ix: i, iz: j, x: -HALF + i * CELL, z: -HALF + j * CELL });
+    }
+  }
+  return pts;
+}
+const intersections = getIntersections();
+
+function getRoadSegments() {
+  const segs = [];
+  for (let i = 0; i <= GRID; i++) {
+    for (let j = 0; j < GRID; j++) {
+      // Horizontal road segment (along z)
+      segs.push({ from: { x: -HALF + i * CELL, z: -HALF + j * CELL }, to: { x: -HALF + i * CELL, z: -HALF + (j + 1) * CELL }, dir: 'z' });
+    }
+    for (let j = 0; j < GRID; j++) {
+      // Vertical road segment (along x)
+      segs.push({ from: { x: -HALF + j * CELL, z: -HALF + i * CELL }, to: { x: -HALF + (j + 1) * CELL, z: -HALF + i * CELL }, dir: 'x' });
+    }
+  }
+  return segs;
+}
+
+// Ground
+const groundGeo = new THREE.PlaneGeometry(CITY_SIZE + 40, CITY_SIZE + 40);
+const groundMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.9 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.1;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Roads
+const roadMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.8 });
+const sidewalkMat = new THREE.MeshStandardMaterial({ color: 0x3a3a4a, roughness: 0.7 });
+
+// Road grid - horizontal roads (along x at each z-grid line)
+for (let j = 0; j <= GRID; j++) {
+  const z = -HALF + j * CELL;
+  const roadMesh = new THREE.Mesh(new THREE.BoxGeometry(CITY_SIZE, 0.1, ROAD), roadMat);
+  roadMesh.position.set(0, 0.01, z);
+  roadMesh.receiveShadow = true;
+  scene.add(roadMesh);
+  // Sidewalks
+  const sw1 = new THREE.Mesh(new THREE.BoxGeometry(CITY_SIZE, 0.2, 1), sidewalkMat);
+  sw1.position.set(0, 0.1, z - ROAD / 2 - 0.5);
+  scene.add(sw1);
+  const sw2 = new THREE.Mesh(new THREE.BoxGeometry(CITY_SIZE, 0.2, 1), sidewalkMat);
+  sw2.position.set(0, 0.1, z + ROAD / 2 + 0.5);
+  scene.add(sw2);
+}
+// Vertical roads (along z at each x-grid line)
+for (let i = 0; i <= GRID; i++) {
+  const x = -HALF + i * CELL;
+  const roadMesh = new THREE.Mesh(new THREE.BoxGeometry(ROAD, 0.1, CITY_SIZE), roadMat);
+  roadMesh.position.set(x, 0.02, 0);
+  roadMesh.receiveShadow = true;
+  scene.add(roadMesh);
+  const sw1 = new THREE.Mesh(new THREE.BoxGeometry(1, 0.2, CITY_SIZE), sidewalkMat);
+  sw1.position.set(x - ROAD / 2 - 0.5, 0.1, 0);
+  scene.add(sw1);
+  const sw2 = new THREE.Mesh(new THREE.BoxGeometry(1, 0.2, CITY_SIZE), sidewalkMat);
+  sw2.position.set(x + ROAD / 2 + 0.5, 0.1, 0);
+  scene.add(sw2);
+}
+
+// Center line markings
+const lineMat = new THREE.MeshBasicMaterial({ color: 0xffff44 });
+for (let j = 0; j <= GRID; j++) {
+  const z = -HALF + j * CELL;
+  for (let i = 0; i < GRID; i++) {
+    const x = -HALF + i * CELL + CELL / 2;
+    const dash = new THREE.Mesh(new THREE.BoxGeometry(3, 0.05, 0.15), lineMat);
+    dash.position.set(x, 0.06, z);
+    scene.add(dash);
+  }
+}
+for (let i = 0; i <= GRID; i++) {
+  const x = -HALF + i * CELL;
+  for (let j = 0; j < GRID; j++) {
+    const z = -HALF + j * CELL + CELL / 2;
+    const dash = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.05, 3), lineMat);
+    dash.position.set(x, 0.06, z);
+    scene.add(dash);
+  }
+}
+
+// Buildings (instanced)
+const buildingColors = [0x1a2a4a, 0x2a1a3a, 0x1a3a3a, 0x2a2a2a, 0x1a1a3a, 0x3a2a1a, 0x2a3a2a];
+const buildings = [];
+for (let i = 0; i < GRID; i++) {
+  for (let j = 0; j < GRID; j++) {
+    const cx = -HALF + i * CELL + CELL / 2;
+    const cz = -HALF + j * CELL + CELL / 2;
+    const h = 4 + Math.random() * 36;
+    const w = BLOCK * (0.6 + Math.random() * 0.35);
+    const d = BLOCK * (0.6 + Math.random() * 0.35);
+    const color = buildingColors[Math.floor(Math.random() * buildingColors.length)];
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.2 });
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    mesh.position.set(cx, h / 2, cz);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    buildings.push(mesh);
+
+    // Window lights (emissive planes on sides)
+    if (h > 10) {
+      const winMat = new THREE.MeshBasicMaterial({ color: 0xffeeaa, transparent: true, opacity: 0.0 });
+      const winSize = 0.6;
+      const rows = Math.floor(h / 4);
+      const cols = Math.floor(w / 3);
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < Math.min(cols, 3); c++) {
+          if (Math.random() < 0.4) {
+            const win = new THREE.Mesh(new THREE.PlaneGeometry(winSize, winSize * 1.4), winMat.clone());
+            win.position.set(cx - w / 2 - 0.01, 3 + r * 4, cz - d / 4 + c * (d / 3));
+            win.rotation.y = -Math.PI / 2;
+            scene.add(win);
+            buildings.push({ isWindow: true, mesh: win });
+          }
+        }
+      }
+    }
+  }
+}
+
+// Traffic lights at intersections
+const trafficLights = [];
+const tlGeo = new THREE.BoxGeometry(0.3, 1.5, 0.3);
+const tlRedMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+const tlGreenMat = new THREE.MeshBasicMaterial({ color: 0x22ff22 });
+const lightGeo = new THREE.SphereGeometry(0.25, 8, 8);
+
+for (let i = 1; i < GRID; i++) {
+  for (let j = 1; j < GRID; j++) {
+    const x = -HALF + i * CELL;
+    const z = -HALF + j * CELL;
+    const pole = new THREE.Mesh(tlGeo, new THREE.MeshStandardMaterial({ color: 0x444444 }));
+    pole.position.set(x + ROAD / 2 + 0.5, 1.5, z + ROAD / 2 + 0.5);
+    scene.add(pole);
+
+    const redLight = new THREE.Mesh(lightGeo, tlRedMat.clone());
+    redLight.position.set(x + ROAD / 2 + 0.5, 2.5, z + ROAD / 2 + 0.5);
+    scene.add(redLight);
+
+    const greenLight = new THREE.Mesh(lightGeo, tlGreenMat.clone());
+    greenLight.position.set(x + ROAD / 2 + 0.5, 2.0, z + ROAD / 2 + 0.5);
+    scene.add(greenLight);
+
+    const phase = (i + j) % 2 === 0; // alternating phases
+    trafficLights.push({ x: i, z: j, wx: x, wz: z, redMesh: redLight, greenMesh: greenLight, phase, timer: 0, state: phase ? 'green' : 'red' });
+  }
+}
+
+// === TAXI CREATION ===
+function createTaxi() {
+  const group = new THREE.Group();
+
+  // Body
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x00cccc, metalness: 0.4, roughness: 0.3 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.8, 4.0), bodyMat);
+  body.position.y = 0.5;
+  body.castShadow = true;
+  group.add(body);
+
+  // Roof
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0x00aaaa, metalness: 0.3, roughness: 0.4 });
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 2.2), roofMat);
+  roof.position.set(0, 1.1, -0.2);
+  roof.castShadow = true;
+  group.add(roof);
+
+  // Headlights
+  const hlMat = new THREE.MeshBasicMaterial({ color: 0xffffee });
+  const hl1 = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), hlMat);
+  hl1.position.set(-0.7, 0.5, 2.0);
+  group.add(hl1);
+  const hl2 = new THREE.Mesh(new THREE.SphereGeometry(0.15, 6, 6), hlMat.clone());
+  hl2.position.set(0.7, 0.5, 2.0);
+  group.add(hl2);
+
+  // Taillights
+  const tlMat = new THREE.MeshBasicMaterial({ color: 0xff2222 });
+  const tl1 = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), tlMat);
+  tl1.position.set(-0.7, 0.5, -2.0);
+  group.add(tl1);
+  const tl2 = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 6), tlMat.clone());
+  tl2.position.set(0.7, 0.5, -2.0);
+  group.add(tl2);
+
+  // Turn signals
+  const tsMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0 });
+  const tsL = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), tsMat.clone());
+  tsL.position.set(-1.05, 0.5, 1.5);
+  group.add(tsL);
+  const tsR = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), tsMat.clone());
+  tsR.position.set(1.05, 0.5, 1.5);
+  group.add(tsR);
+
+  // Taxi sign on roof
+  const signMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.8 });
+  const sign = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.25, 0.4), signMat);
+  sign.position.set(0, 1.55, 0);
+  group.add(sign);
+
+  // Wheels
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+  const wheelGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.2, 8);
+  [[-0.9, 0.3, 1.3], [0.9, 0.3, 1.3], [-0.9, 0.3, -1.3], [0.9, 0.3, -1.3]].forEach(p => {
+    const w = new THREE.Mesh(wheelGeo, wheelMat);
+    w.rotation.z = Math.PI / 2;
+    w.position.set(...p);
+    group.add(w);
+  });
+
+  scene.add(group);
+
+  // Spotlight headlights (for night)
+  const spotL = new THREE.SpotLight(0xffffee, 0, 20, Math.PI / 6, 0.5);
+  spotL.position.set(-0.7, 0.5, 2.0);
+  spotL.target.position.set(-0.7, 0, 10);
+  group.add(spotL);
+  group.add(spotL.target);
+  const spotR = new THREE.SpotLight(0xffffee, 0, 20, Math.PI / 6, 0.5);
+  spotR.position.set(0.7, 0.5, 2.0);
+  spotR.target.position.set(0.7, 0, 10);
+  group.add(spotR);
+  group.add(spotR.target);
+
+  return {
+    mesh: group, headlights: [hl1, hl2], taillights: [tl1, tl2],
+    turnL: tsL, turnR: tsR, spotL, spotR, sign,
+    // State
+    pos: new THREE.Vector2(0, 0), // grid position (intersection index)
+    worldPos: new THREE.Vector3(0, 0, 0),
+    targetPos: new THREE.Vector3(0, 0, 0),
+    path: [], pathIdx: 0,
+    speed: 0, maxSpeed: 15, accel: 8, decel: 12,
+    heading: 0, targetHeading: 0,
+    state: 'idle', // idle, driving, pickup, dropoff
+    passenger: null, fare: 0,
+    turnSignal: 'none', turnTimer: 0,
+    waitTimer: 0, pickupTimer: 0
+  };
+}
+
+function snapToNearestRoad(x, z) {
+  // Find nearest intersection
+  let bestDist = Infinity, best = null;
+  for (const isc of intersections) {
+    const d = Math.abs(isc.x - x) + Math.abs(isc.z - z);
+    if (d < bestDist) { bestDist = d; best = isc; }
+  }
+  return best;
+}
+
+function getIntersectionAt(ix, iz) {
+  return intersections.find(p => p.ix === ix && p.iz === iz);
+}
+
+function randomIntersection() {
+  const ix = Math.floor(Math.random() * (GRID + 1));
+  const iz = Math.floor(Math.random() * (GRID + 1));
+  return getIntersectionAt(ix, iz);
+}
+
+// BFS pathfinding on grid
+function findPath(fromIx, fromIz, toIx, toIz) {
+  if (fromIx === toIx && fromIz === toIz) return [];
+  const key = (x, z) => x + ',' + z;
+  const visited = new Set();
+  const queue = [{ ix: fromIx, iz: fromIz, path: [] }];
+  visited.add(key(fromIx, fromIz));
+
+  while (queue.length > 0) {
+    const { ix, iz, path } = queue.shift();
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (const [dx, dz] of dirs) {
+      const nx = ix + dx, nz = iz + dz;
+      if (nx < 0 || nx > GRID || nz < 0 || nz > GRID) continue;
+      const k = key(nx, nz);
+      if (visited.has(k)) continue;
+      visited.add(k);
+      const newPath = [...path, getIntersectionAt(nx, nz)];
+      if (nx === toIx && nz === toIz) return newPath;
+      queue.push({ ix: nx, iz: nz, path: newPath });
+    }
+  }
+  return [];
+}
+
+// Traffic light check
+function isRedLight(ix, iz, fromDir) {
+  const tl = trafficLights.find(t => t.x === ix && t.z === iz);
+  if (!tl) return false;
+  // phase true = NS green, EW red; phase false = EW green, NS red
+  if (fromDir === 'x') return tl.state === 'red'; // approaching from x means EW
+  return tl.state === 'green'; // approaching from z means NS — green for NS means stop for z? No...
+  // Simplify: just alternate
+}
+
+function isRedForTaxi(taxi, nextIsc) {
+  if (!nextIsc) return false;
+  const tl = trafficLights.find(t => t.x === nextIsc.ix && t.z === nextIsc.iz);
+  if (!tl) return false;
+  // Determine approach direction
+  const dx = Math.abs(nextIsc.x - taxi.worldPos.x);
+  const dz = Math.abs(nextIsc.z - taxi.worldPos.z);
+  const approachX = dx > dz; // approaching along X axis
+  if (approachX) return tl.state === 'red';
+  return tl.state !== 'red'; // NS direction
+}
+
+function spawnTaxi() {
+  if (taxis.length >= MAX_TAXIS) return;
+  const taxi = createTaxi();
+  const isc = randomIntersection();
+  taxi.pos = new THREE.Vector2(isc.ix, isc.iz);
+  taxi.worldPos.set(isc.x, 0, isc.z);
+  taxi.mesh.position.set(isc.x, 0, isc.z);
+  taxis.push(taxi);
+  return taxi;
+}
+
+function removeTaxi() {
+  if (taxis.length <= MIN_TAXIS) return;
+  const taxi = taxis.find(t => t.state === 'idle') || taxis[taxis.length - 1];
+  scene.remove(taxi.mesh);
+  // Remove route line if exists
+  if (taxi.routeLine) { scene.remove(taxi.routeLine); taxi.routeLine = null; }
+  const idx = taxis.indexOf(taxi);
+  taxis.splice(idx, 1);
+}
+
+// Initial taxis
+for (let i = 0; i < 7; i++) spawnTaxi();
+
+// === PASSENGERS ===
+const passengerGroup = new THREE.Group();
+scene.add(passengerGroup);
+
+function spawnPassenger() {
+  if (passengers.length >= 10) return;
+  const from = randomIntersection();
+  let to = randomIntersection();
+  while (to.ix === from.ix && to.iz === from.iz) to = randomIntersection();
+
+  // Offset to sidewalk
+  const offX = (Math.random() > 0.5 ? 1 : -1) * (ROAD / 2 + 1.5);
+  const offZ = (Math.random() > 0.5 ? 1 : -1) * (ROAD / 2 + 1.5);
+
+  const group = new THREE.Group();
+
+  // Body
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff6644 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), bodyMat);
+  body.position.y = 1.0;
+  group.add(body);
+
+  // Exclamation marker
+  const markerMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+  const marker = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.8, 4), markerMat);
+  marker.position.y = 2.5;
+  marker.rotation.x = Math.PI;
+  group.add(marker);
+
+  // Pulsing ring
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0.3, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.8, 1.2, 16), ringMat);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.05;
+  group.add(ring);
+
+  group.position.set(from.x + offX, 0, from.z + offZ);
+  passengerGroup.add(group);
+
+  const p = {
+    mesh: group, marker, ring,
+    from, to, fromWorld: new THREE.Vector3(from.x + offX, 0, from.z + offZ),
+    destWorld: new THREE.Vector3(to.x, 0, to.z),
+    state: 'waiting', // waiting, riding, arrived
+    spawnTime: performance.now(),
+    taxi: null, routeLine: null,
+    pulsePhase: Math.random() * Math.PI * 2
+  };
+  passengers.push(p);
+  return p;
+}
+
+// Route line
+function createRouteLine(points, color = 0x00ffff) {
+  const geo = new THREE.BufferGeometry();
+  const positions = [];
+  for (const p of points) {
+    positions.push(p.x, 0.3, p.z || p.y || 0);
+  }
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  const mat = new THREE.LineDashedMaterial({ color, dashSize: 1, gapSize: 0.5, transparent: true, opacity: 0.6 });
+  const line = new THREE.Line(geo, mat);
+  line.computeLineDistances();
+  scene.add(line);
+  return line;
+}
+
+// === DISPATCH SYSTEM ===
+function dispatch() {
+  for (const p of passengers) {
+    if (p.state !== 'waiting' || p.taxi) continue;
+    // Find nearest idle taxi
+    let bestTaxi = null, bestDist = Infinity;
+    for (const t of taxis) {
+      if (t.state !== 'idle') continue;
+      const dist = Math.abs(t.pos.x - p.from.ix) + Math.abs(t.pos.y - p.from.iz);
+      if (dist < bestDist) { bestDist = dist; bestTaxi = t; }
+    }
+    if (bestTaxi) {
+      p.taxi = bestTaxi;
+      bestTaxi.state = 'pickup';
+      bestTaxi.passenger = p;
+      bestTaxi.path = findPath(bestTaxi.pos.x, bestTaxi.pos.y, p.from.ix, p.from.iz);
+      bestTaxi.pathIdx = 0;
+      // Show route
+      if (bestTaxi.path.length > 0) {
+        const routePts = [{ x: bestTaxi.worldPos.x, z: bestTaxi.worldPos.z }, ...bestTaxi.path.map(i => ({ x: i.x, z: i.z }))];
+        bestTaxi.routeLine = createRouteLine(routePts, 0x00ffff);
+      }
+    }
+  }
+}
+
+// === UPDATE TAXIS ===
+function updateTaxi(taxi, dt) {
+  if (taxi.state === 'idle') return;
+
+  const path = taxi.path;
+  if (!path || path.length === 0) {
+    if (taxi.state === 'pickup') {
+      // Arrived at pickup
+      taxi.pickupTimer += dt;
+      if (taxi.pickupTimer > 1.0) {
+        taxi.pickupTimer = 0;
+        const p = taxi.passenger;
+        if (p) {
+          p.state = 'riding';
+          p.mesh.visible = false;
+          // Record wait time
+          const wt = (performance.now() - p.spawnTime) / 1000;
+          waitTimes.push(wt);
+          totalWaitTime += wt;
+          // Plan route to destination
+          taxi.state = 'driving';
+          taxi.path = findPath(taxi.pos.x, taxi.pos.y, p.to.ix, p.to.iz);
+          taxi.pathIdx = 0;
+          if (taxi.routeLine) { scene.remove(taxi.routeLine); taxi.routeLine = null; }
+          if (taxi.path.length > 0) {
+            const routePts = [{ x: taxi.worldPos.x, z: taxi.worldPos.z }, ...taxi.path.map(i => ({ x: i.x, z: i.z }))];
+            taxi.routeLine = createRouteLine(routePts, 0x00ff88);
+          }
+        }
+      }
+      return;
+    }
+    if (taxi.state === 'driving') {
+      // Arrived at destination
+      taxi.pickupTimer += dt;
+      if (taxi.pickupTimer > 1.0) {
+        taxi.pickupTimer = 0;
+        const p = taxi.passenger;
+        if (p) {
+          p.state = 'arrived';
+          // Calculate fare
+          const dist = Math.abs(p.from.ix - p.to.ix) + Math.abs(p.from.iz - p.to.iz);
+          const fare = 410 + dist * 80 + Math.floor(Math.random() * 200);
+          totalRevenue += fare;
+          totalServed++;
+          // Show fare popup
+          showFare(taxi.worldPos, fare);
+          // Remove passenger
+          passengerGroup.remove(p.mesh);
+          if (p.routeLine) { scene.remove(p.routeLine); p.routeLine = null; }
+          const pIdx = passengers.indexOf(p);
+          if (pIdx >= 0) passengers.splice(pIdx, 1);
+        }
+        if (taxi.routeLine) { scene.remove(taxi.routeLine); taxi.routeLine = null; }
+        taxi.state = 'idle';
+        taxi.passenger = null;
+        taxi.speed = 0;
+      }
+      return;
+    }
+    taxi.state = 'idle';
+    return;
+  }
+
+  const target = path[taxi.pathIdx];
+  if (!target) { taxi.path = []; return; }
+
+  const tx = target.x, tz = target.z;
+  const dx = tx - taxi.worldPos.x;
+  const dz = tz - taxi.worldPos.z;
+  const dist = Math.sqrt(dx * dx + dz * dz);
+
+  // Red light check
+  const nextIsc = path[taxi.pathIdx];
+  if (dist > 3 && isRedForTaxi(taxi, nextIsc)) {
+    taxi.speed = Math.max(0, taxi.speed - taxi.decel * dt);
+  } else {
+    // Collision avoidance
+    let tooClose = false;
+    for (const other of taxis) {
+      if (other === taxi) continue;
+      const od = taxi.worldPos.distanceTo(other.worldPos);
+      if (od < 5 && od > 0.1) {
+        // Check if other is ahead
+        const toOther = new THREE.Vector3().subVectors(other.worldPos, taxi.worldPos);
+        const fwd = new THREE.Vector3(Math.sin(taxi.heading), 0, Math.cos(taxi.heading));
+        if (toOther.dot(fwd) > 0) { tooClose = true; break; }
+      }
+    }
+
+    if (tooClose) {
+      taxi.speed = Math.max(0, taxi.speed - taxi.decel * dt);
+    } else if (dist < 3) {
+      taxi.speed = Math.max(2, taxi.speed - taxi.decel * 0.5 * dt);
+    } else {
+      taxi.speed = Math.min(taxi.maxSpeed, taxi.speed + taxi.accel * dt);
+    }
+  }
+
+  // Heading
+  const targetAngle = Math.atan2(dx, dz);
+  taxi.targetHeading = targetAngle;
+  let angleDiff = targetAngle - taxi.heading;
+  while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+  while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+  // Turn signals
+  if (Math.abs(angleDiff) > 0.3) {
+    taxi.turnSignal = angleDiff > 0 ? 'right' : 'left';
+  } else {
+    taxi.turnSignal = 'none';
+  }
+
+  taxi.heading += angleDiff * Math.min(1, 5 * dt);
+
+  // Move
+  const moveSpeed = taxi.speed * dt;
+  if (dist > 0.5) {
+    const nx = (dx / dist) * Math.min(moveSpeed, dist);
+    const nz = (dz / dist) * Math.min(moveSpeed, dist);
+    taxi.worldPos.x += nx;
+    taxi.worldPos.z += nz;
+  }
+
+  // Reached waypoint
+  if (dist < 1.5) {
+    taxi.pos.set(target.ix, target.iz);
+    taxi.pathIdx++;
+    if (taxi.pathIdx >= path.length) {
+      taxi.path = [];
+      taxi.pathIdx = 0;
+    }
+  }
+
+  // Apply transform
+  taxi.mesh.position.set(taxi.worldPos.x, 0, taxi.worldPos.z);
+  taxi.mesh.rotation.y = taxi.heading;
+
+  // Turn signal blink
+  taxi.turnTimer += dt;
+  const blinkOn = Math.sin(taxi.turnTimer * 8) > 0;
+  taxi.turnL.material.opacity = (taxi.turnSignal === 'left' && blinkOn) ? 1 : 0;
+  taxi.turnR.material.opacity = (taxi.turnSignal === 'right' && blinkOn) ? 1 : 0;
+}
+
+// === FARE POPUP ===
+const fareEl = document.getElementById('fare-popup');
+let fareTimeout = null;
+function showFare(worldPos, fare) {
+  fareEl.textContent = '¥' + fare.toLocaleString();
+  fareEl.classList.add('show');
+  // Project to screen
+  const v = worldPos.clone();
+  v.y = 3;
+  v.project(camera);
+  fareEl.style.left = ((v.x + 1) / 2 * window.innerWidth) + 'px';
+  fareEl.style.top = ((-v.y + 1) / 2 * window.innerHeight) + 'px';
+  clearTimeout(fareTimeout);
+  fareTimeout = setTimeout(() => fareEl.classList.remove('show'), 2000);
+}
+
+// === TRAFFIC LIGHT UPDATE ===
+const TL_CYCLE = 8; // seconds per phase
+function updateTrafficLights(dt) {
+  for (const tl of trafficLights) {
+    tl.timer += dt;
+    if (tl.timer >= TL_CYCLE) {
+      tl.timer = 0;
+      tl.state = tl.state === 'red' ? 'green' : 'red';
+    }
+    tl.redMesh.material.color.setHex(tl.state === 'red' ? 0xff2222 : 0x331111);
+    tl.greenMesh.material.color.setHex(tl.state === 'green' ? 0x22ff22 : 0x113311);
+  }
+}
+
+// === DAY/NIGHT CYCLE ===
+function updateLighting() {
+  const t = timeOfDay;
+  let sunIntensity, ambIntensity, fogColor;
+  if (t >= 6 && t <= 18) {
+    // Day
+    const noon = 1 - Math.abs(t - 12) / 6;
+    sunIntensity = 0.3 + noon * 0.7;
+    ambIntensity = 0.2 + noon * 0.3;
+    const r = Math.floor(10 + noon * 20);
+    const g = Math.floor(14 + noon * 20);
+    const b = Math.floor(26 + noon * 30);
+    fogColor = (r << 16) | (g << 8) | b;
+  } else {
+    // Night
+    sunIntensity = 0.05;
+    ambIntensity = 0.08;
+    fogColor = 0x050810;
+  }
+  dirLight.intensity = sunIntensity;
+  ambientLight.intensity = ambIntensity;
+  scene.fog.color.setHex(fogColor);
+  renderer.setClearColor(fogColor);
+
+  const isNight = t < 6 || t > 18;
+  // Window lights
+  for (const b of buildings) {
+    if (b.isWindow && b.mesh) {
+      b.mesh.material.opacity = isNight ? 0.6 + Math.random() * 0.3 : 0;
+    }
+  }
+  // Taxi headlights
+  for (const taxi of taxis) {
+    const intensity = isNight ? 2 : 0;
+    taxi.spotL.intensity = intensity;
+    taxi.spotR.intensity = intensity;
+    taxi.headlights.forEach(h => h.material.color.setHex(isNight ? 0xffffee : 0xccccaa));
+    taxi.sign.material.opacity = isNight ? 1.0 : 0.5;
+  }
+}
+
+// === CAMERA ===
+function updateCamera(dt) {
+  if (cameraMode === 'orbit') {
+    const x = orbitDist * Math.sin(orbitPhi) * Math.sin(orbitTheta);
+    const y = orbitDist * Math.cos(orbitPhi);
+    const z = orbitDist * Math.sin(orbitPhi) * Math.cos(orbitTheta);
+    camera.position.set(x, y, z);
+    camera.lookAt(0, 0, 0);
+  } else if (cameraMode === 'follow' && taxis.length > 0) {
+    const taxi = taxis[followTaxiIdx % taxis.length];
+    const behind = new THREE.Vector3(
+      -Math.sin(taxi.heading) * 15,
+      10,
+      -Math.cos(taxi.heading) * 15
+    );
+    const target = taxi.worldPos.clone().add(behind);
+    camera.position.lerp(target, 3 * dt);
+    const lookAt = taxi.worldPos.clone();
+    lookAt.y = 2;
+    camera.lookAt(lookAt);
+  } else if (cameraMode === 'fps' && taxis.length > 0) {
+    const taxi = taxis[followTaxiIdx % taxis.length];
+    const inside = new THREE.Vector3(0, 1.5, 0.5);
+    inside.applyAxisAngle(new THREE.Vector3(0, 1, 0), taxi.heading);
+    inside.add(taxi.worldPos);
+    camera.position.lerp(inside, 5 * dt);
+    const lookFwd = new THREE.Vector3(Math.sin(taxi.heading) * 20, 1.5, Math.cos(taxi.heading) * 20);
+    lookFwd.add(taxi.worldPos);
+    camera.lookAt(lookFwd);
+  }
+}
+
+// === MINIMAP ===
+const minimapCanvas = document.getElementById('minimap');
+const mmCtx = minimapCanvas.getContext('2d');
+minimapCanvas.width = 200;
+minimapCanvas.height = 200;
+
+function drawMinimap() {
+  const w = 200, h = 200;
+  mmCtx.fillStyle = '#0a0e1a';
+  mmCtx.fillRect(0, 0, w, h);
+
+  const scale = w / CITY_SIZE;
+  const ox = w / 2, oz = h / 2;
+
+  // Roads
+  mmCtx.strokeStyle = 'rgba(60,60,80,0.8)';
+  mmCtx.lineWidth = 1;
+  for (let i = 0; i <= GRID; i++) {
+    const p = (-HALF + i * CELL) * scale;
+    mmCtx.beginPath();
+    mmCtx.moveTo(p + ox, 0);
+    mmCtx.lineTo(p + ox, h);
+    mmCtx.stroke();
+    mmCtx.beginPath();
+    mmCtx.moveTo(0, p + oz);
+    mmCtx.lineTo(w, p + oz);
+    mmCtx.stroke();
+  }
+
+  // Passengers
+  for (const p of passengers) {
+    if (p.state !== 'waiting') continue;
+    const px = p.fromWorld.x * scale + ox;
+    const pz = p.fromWorld.z * scale + oz;
+    mmCtx.fillStyle = '#ffff00';
+    mmCtx.beginPath();
+    mmCtx.arc(px, pz, 3, 0, Math.PI * 2);
+    mmCtx.fill();
+  }
+
+  // Taxis
+  for (const t of taxis) {
+    const tx = t.worldPos.x * scale + ox;
+    const tz = t.worldPos.z * scale + oz;
+    mmCtx.fillStyle = t.state === 'idle' ? '#00ffff' : '#00ff88';
+    mmCtx.beginPath();
+    mmCtx.arc(tx, tz, 3, 0, Math.PI * 2);
+    mmCtx.fill();
+  }
+
+  // Camera FOV indicator
+  mmCtx.strokeStyle = 'rgba(255,255,255,0.3)';
+  mmCtx.lineWidth = 1;
+  const cx = camera.position.x * scale + ox;
+  const cz = camera.position.z * scale + oz;
+  mmCtx.beginPath();
+  mmCtx.arc(cx, cz, 4, 0, Math.PI * 2);
+  mmCtx.stroke();
+}
+
+// === HUD ===
+function updateHUD() {
+  document.getElementById('h-taxis').textContent = taxis.length;
+  document.getElementById('h-waiting').textContent = passengers.filter(p => p.state === 'waiting').length;
+  document.getElementById('h-served').textContent = totalServed;
+  document.getElementById('h-revenue').textContent = '¥' + totalRevenue.toLocaleString();
+  const avgWait = waitTimes.length > 0 ? (totalWaitTime / waitTimes.length).toFixed(1) : '0';
+  document.getElementById('h-wait').textContent = avgWait + 's';
+  const busy = taxis.filter(t => t.state !== 'idle').length;
+  const util = taxis.length > 0 ? Math.round(busy / taxis.length * 100) : 0;
+  document.getElementById('h-util').textContent = util + '%';
+}
+
+// === PASSENGER SPAWN TIMER ===
+let passengerSpawnTimer = 0;
+const SPAWN_INTERVAL = 3; // seconds
+
+// === ANIMATION LOOP ===
+let lastTime = performance.now();
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  let dt = (now - lastTime) / 1000;
+  lastTime = now;
+  if (paused) { renderer.render(scene, camera); return; }
+  dt *= simSpeed;
+  dt = Math.min(dt, 0.1); // clamp
+
+  // Traffic lights
+  updateTrafficLights(dt);
+
+  // Spawn passengers
+  passengerSpawnTimer += dt;
+  if (passengerSpawnTimer >= SPAWN_INTERVAL) {
+    passengerSpawnTimer = 0;
+    spawnPassenger();
+  }
+
+  // Dispatch
+  dispatch();
+
+  // Update taxis
+  for (const taxi of taxis) updateTaxi(taxi, dt);
+
+  // Update passengers (pulse animation)
+  for (const p of passengers) {
+    if (p.state === 'waiting') {
+      p.pulsePhase += dt * 3;
+      p.marker.position.y = 2.5 + Math.sin(p.pulsePhase) * 0.3;
+      p.ring.scale.setScalar(1 + Math.sin(p.pulsePhase * 0.7) * 0.3);
+      p.ring.material.opacity = 0.15 + Math.sin(p.pulsePhase) * 0.15;
+    }
+  }
+
+  // Update lighting
+  updateLighting();
+
+  // Camera
+  updateCamera(Math.min(dt, 0.05));
+
+  renderer.render(scene, camera);
+
+  // Minimap + HUD (throttled)
+  if (Math.random() < 0.3) {
+    drawMinimap();
+    updateHUD();
+  }
+}
+
+// === MOUSE / INPUT ===
+canvas.addEventListener('mousedown', e => {
+  if (e.button === 0 || e.button === 2) { isDragging = true; lastMX = e.clientX; lastMY = e.clientY; }
+  // Racast click to select taxi
+  if (e.button === 0 && (cameraMode === 'follow' || cameraMode === 'fps')) {
+    const mouse = new THREE.Vector2(
+      (e.clientX / window.innerWidth) * 2 - 1,
+      -(e.clientY / window.innerHeight) * 2 + 1
+    );
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, camera);
+    for (let i = 0; i < taxis.length; i++) {
+      const intersects = raycaster.intersectObjects(taxis[i].mesh.children, true);
+      if (intersects.length > 0) { followTaxiIdx = i; break; }
+    }
+  }
+});
+canvas.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - lastMX;
+  const dy = e.clientY - lastMY;
+  lastMX = e.clientX; lastMY = e.clientY;
+  if (cameraMode === 'orbit') {
+    orbitTheta -= dx * 0.005;
+    orbitPhi = Math.max(0.1, Math.min(Math.PI / 2 - 0.05, orbitPhi - dy * 0.005));
+  }
+});
+canvas.addEventListener('mouseup', () => isDragging = false);
+canvas.addEventListener('wheel', e => {
+  if (cameraMode === 'orbit') {
+    orbitDist = Math.max(50, Math.min(600, orbitDist + e.deltaY * 0.3));
+  }
+});
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+// Controls
+document.getElementById('speed-slider').addEventListener('input', e => {
+  simSpeed = parseInt(e.target.value);
+  document.getElementById('speed-val').textContent = simSpeed + 'x';
+});
+document.getElementById('time-slider').addEventListener('input', e => {
+  timeOfDay = parseFloat(e.target.value);
+  const h = Math.floor(timeOfDay);
+  const m = Math.floor((timeOfDay - h) * 60);
+  document.getElementById('time-val').textContent = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+});
+document.getElementById('btn-add').addEventListener('click', () => spawnTaxi());
+document.getElementById('btn-remove').addEventListener('click', () => removeTaxi());
+document.getElementById('btn-pause').addEventListener('click', function() {
+  paused = !paused;
+  this.textContent = paused ? 'RESUME' : 'PAUSE';
+  this.classList.toggle('active', paused);
+});
+
+// Camera mode buttons
+document.querySelectorAll('.cam-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    cameraMode = this.dataset.cam;
+    if (cameraMode === 'follow' || cameraMode === 'fps') {
+      // Pick nearest taxi to camera
+      let best = 0, bestDist = Infinity;
+      for (let i = 0; i < taxis.length; i++) {
+        const d = camera.position.distanceTo(taxis[i].worldPos);
+        if (d < bestDist) { bestDist = d; best = i; }
+      }
+      followTaxiIdx = best;
+    }
+  });
+});
+
+// TAB to cycle taxi in follow/fps mode
+document.addEventListener('keydown', e => {
+  if (e.key === 'Tab' && (cameraMode === 'follow' || cameraMode === 'fps')) {
+    e.preventDefault();
+    followTaxiIdx = (followTaxiIdx + 1) % taxis.length;
+  }
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Spawn initial passengers
+for (let i = 0; i < 5; i++) spawnPassenger();
+
+// Start
+updateLighting();
+animate();
+</script>
+</body>
+</html>

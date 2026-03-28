@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>License Management - Grace of Touch Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+/* Anti-copy protection */
+body{-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;}
+input,textarea{-webkit-user-select:text;-moz-user-select:text;-ms-user-select:text;user-select:text;}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{background:#050510;color:#d8d8d8;font-family:'Noto Sans JP',sans-serif;}
+body{min-height:100vh;background:radial-gradient(ellipse at 50% 0%,rgba(0,40,60,0.5),transparent 60%),#050510;overflow-x:hidden;}
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(0,255,255,0.15);border-radius:2px;}
+@keyframes pulse-glow{0%,100%{box-shadow:0 0 8px rgba(0,255,255,0.1)}50%{box-shadow:0 0 20px rgba(0,255,255,0.25)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn 0.4s ease-out forwards;}
+</style>
+<script>
+tailwind.config={theme:{extend:{fontFamily:{orbitron:['Orbitron','monospace'],noto:['Noto Sans JP','sans-serif']},colors:{cyan:{glow:'rgba(0,255,255,0.7)',dim:'rgba(0,255,255,0.3)',bg:'rgba(0,255,255,0.04)'},gold:{DEFAULT:'#c9a96e',dim:'rgba(201,169,110,0.5)'}}}}}
+</script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useMemo } = React;
+
+// ── Demo License Data ──
+const DEMO_LICENSES = {
+  'GOT-STARTER-2026-001': {
+    client: '株式会社テストカンパニー',
+    plan: 'Starter',
+    status: 'ACTIVE',
+    expiry: '2027-03-28',
+    modules: ['InfraScan AI'],
+    created: '2026-03-28'
+  },
+  'GOT-PRO-2026-042': {
+    client: '合同会社インフラテック',
+    plan: 'Professional',
+    status: 'ACTIVE',
+    expiry: '2027-06-15',
+    modules: ['InfraScan AI', 'DroneSimulator', 'EventGate'],
+    created: '2026-01-15'
+  },
+  'GOT-ENT-2025-007': {
+    client: '大手建設株式会社',
+    plan: 'Enterprise',
+    status: 'EXPIRED',
+    expiry: '2026-01-01',
+    modules: ['InfraScan AI', 'EventGate', 'DroneSimulator', 'TrackForge MTR', 'Auto Taxi', 'Invest Dashboard', 'SNS Hub'],
+    created: '2025-01-01'
+  }
+};
+
+// ── Module Definitions ──
+const MODULES = [
+  { id: 'infrascan', name: 'InfraScan AI', desc: 'トンネル・壁面ひび割れ検出エンジン', icon: '🔍', plans: ['Starter', 'Professional', 'Enterprise'] },
+  { id: 'eventgate', name: 'EventGate', desc: '入退場・QR・同意書管理', icon: '🚪', plans: ['Professional', 'Enterprise'] },
+  { id: 'dronesim', name: 'DroneSimulator', desc: '点検ドローンシミュレーション', icon: '🚁', plans: ['Professional', 'Enterprise'] },
+  { id: 'trackforge', name: 'TrackForge MTR', desc: 'マルチトラック音楽制作', icon: '🎛️', plans: ['Enterprise'] },
+  { id: 'autotaxi', name: 'Auto Taxi', desc: '自動運転シミュレーション', icon: '🚕', plans: ['Enterprise'] },
+  { id: 'invest', name: 'Invest Dashboard', desc: '投資ポートフォリオ管理', icon: '📊', plans: ['Enterprise'] },
+  { id: 'snshub', name: 'SNS Hub', desc: 'SNSコンテンツ管理', icon: '📡', plans: ['Enterprise'] },
+];
+
+// ── Plan Tiers ──
+const PLANS = [
+  { name: 'Starter', price: '¥9,800', period: '/月', modules: 1, color: 'cyan', desc: '1モジュール選択', features: ['モジュール1つ選択', 'メールサポート', '月次レポート', 'APIアクセス（制限あり）'] },
+  { name: 'Professional', price: '¥29,800', period: '/月', modules: 3, color: 'blue', desc: '3モジュール選択', features: ['モジュール3つ選択', '優先サポート', '週次レポート', 'APIフルアクセス', 'カスタムダッシュボード'] },
+  { name: 'Enterprise', price: '要相談', period: '', modules: 7, color: 'gold', desc: '全モジュール', features: ['全モジュール利用可', '24/7専属サポート', 'リアルタイムレポート', 'APIフルアクセス', 'カスタム開発対応', 'SLA保証'] },
+  { name: 'カスタム開発', price: '要相談', period: '', modules: null, color: 'purple', desc: '独自モジュール構築', features: ['独自モジュール開発', '専属エンジニア', 'オンプレミス対応', 'ソースコードは非公開', 'フルカスタマイズ'] },
+];
+
+// ── Status Badge ──
+function StatusBadge({ status }) {
+  const colors = {
+    ACTIVE: 'bg-green-500/20 text-green-400 border-green-500/30',
+    EXPIRED: 'bg-red-500/20 text-red-400 border-red-500/30',
+    INVALID: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+  };
+  return (
+    <span className={`px-3 py-1 rounded-full text-xs font-orbitron tracking-widest border ${colors[status] || colors.INVALID}`}>
+      {status}
+    </span>
+  );
+}
+
+// ── Plan Tag on Module Card ──
+function PlanTag({ plan }) {
+  const colors = {
+    Starter: 'text-cyan-400 border-cyan-500/30',
+    Professional: 'text-blue-400 border-blue-500/30',
+    Enterprise: 'text-yellow-500 border-yellow-500/30',
+  };
+  return (
+    <span className={`px-2 py-0.5 rounded text-[9px] font-orbitron tracking-wider border ${colors[plan]}`}>
+      {plan}
+    </span>
+  );
+}
+
+// ── Header ──
+function Header() {
+  return (
+    <header className="relative px-4 pt-6 pb-4 text-center">
+      <a href="index.html" className="inline-block mb-3 text-[10px] font-orbitron tracking-[0.2em] text-cyan-500/40 hover:text-cyan-500/70 transition-colors">
+        &larr; PORTAL
+      </a>
+      <h1 className="font-orbitron text-lg tracking-[0.25em] text-white/90 mb-1">
+        LICENSE MANAGEMENT
+      </h1>
+      <p className="font-orbitron text-[9px] tracking-[0.3em] text-cyan-500/40">
+        GRACE OF TOUCH ENGINE
+      </p>
+      <div className="mt-3 h-px bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" />
+    </header>
+  );
+}
+
+// ── License Verification Section ──
+function LicenseVerification({ onVerify, result, loading }) {
+  const [key, setKey] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (key.trim()) onVerify(key.trim());
+  };
+
+  return (
+    <section className="px-4 mb-6 fade-in">
+      <div className="font-orbitron text-[10px] tracking-[0.25em] text-cyan-500/50 mb-3">
+        LICENSE VERIFICATION
+      </div>
+      <div className="bg-white/[0.02] border border-cyan-500/10 rounded-xl p-4">
+        <form onSubmit={handleSubmit} className="flex gap-2 mb-3">
+          <input
+            type="text"
+            value={key}
+            onChange={e => setKey(e.target.value)}
+            placeholder="ライセンスキーを入力 (例: GOT-PRO-2026-042)"
+            className="flex-1 bg-black/40 border border-cyan-500/15 rounded-lg px-3 py-2.5 text-sm text-white/80 font-noto placeholder:text-white/20 outline-none focus:border-cyan-500/40 transition-colors"
+          />
+          <button
+            type="submit"
+            disabled={loading || !key.trim()}
+            className="px-5 py-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg font-orbitron text-[10px] tracking-[0.2em] text-cyan-500/70 hover:bg-cyan-500/20 hover:text-cyan-500 disabled:opacity-30 transition-all"
+          >
+            {loading ? '...' : 'VERIFY'}
+          </button>
+        </form>
+
+        <div className="text-[10px] text-white/25 font-noto mb-2">
+          デモキー: GOT-STARTER-2026-001 / GOT-PRO-2026-042 / GOT-ENT-2025-007
+        </div>
+
+        {result && (
+          <div className="mt-4 border-t border-cyan-500/10 pt-4 fade-in">
+            {result.status === 'INVALID' ? (
+              <div className="text-center py-4">
+                <StatusBadge status="INVALID" />
+                <p className="mt-3 text-sm text-white/40 font-noto">
+                  このライセンスキーは登録されていません。<br/>
+                  正しいキーをご確認ください。
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-noto font-medium text-white/80">{result.client}</span>
+                  <StatusBadge status={result.status} />
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-black/30 rounded-lg p-2.5">
+                    <div className="font-orbitron text-[8px] tracking-wider text-cyan-500/40 mb-1">PLAN</div>
+                    <div className="text-white/70 font-noto">{result.plan}</div>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-2.5">
+                    <div className="font-orbitron text-[8px] tracking-wider text-cyan-500/40 mb-1">EXPIRY</div>
+                    <div className="text-white/70 font-noto">{result.expiry}</div>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-2.5">
+                    <div className="font-orbitron text-[8px] tracking-wider text-cyan-500/40 mb-1">CREATED</div>
+                    <div className="text-white/70 font-noto">{result.created}</div>
+                  </div>
+                  <div className="bg-black/30 rounded-lg p-2.5">
+                    <div className="font-orbitron text-[8px] tracking-wider text-cyan-500/40 mb-1">MODULES</div>
+                    <div className="text-white/70 font-noto">{result.modules.length}個</div>
+                  </div>
+                </div>
+                <div>
+                  <div className="font-orbitron text-[8px] tracking-wider text-cyan-500/40 mb-2">INCLUDED MODULES</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {result.modules.map(m => (
+                      <span key={m} className="px-2.5 py-1 bg-cyan-500/8 border border-cyan-500/20 rounded-full text-[10px] text-cyan-500/60 font-noto">
+                        {m}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ── Module Cards Section ──
+function ModulesSection() {
+  return (
+    <section className="px-4 mb-6 fade-in" style={{animationDelay:'0.1s'}}>
+      <div className="font-orbitron text-[10px] tracking-[0.25em] text-cyan-500/50 mb-3">
+        AVAILABLE MODULES
+      </div>
+      <div className="space-y-2">
+        {MODULES.map(mod => (
+          <div key={mod.id} className="bg-white/[0.02] border border-cyan-500/8 rounded-xl p-3.5 hover:border-cyan-500/25 hover:bg-white/[0.04] transition-all duration-300">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-cyan-500/5 border border-cyan-500/10 flex items-center justify-center text-lg flex-shrink-0">
+                {mod.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-orbitron text-xs tracking-wider text-white/85">{mod.name}</span>
+                </div>
+                <p className="text-[11px] text-white/40 font-noto mb-2 leading-relaxed">{mod.desc}</p>
+                <div className="flex flex-wrap gap-1">
+                  {mod.plans.map(p => <PlanTag key={p} plan={p} />)}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ── Plan Tiers Section ──
+function PlanTiers() {
+  const borderColors = {
+    cyan: 'border-cyan-500/20 hover:border-cyan-500/40',
+    blue: 'border-blue-500/20 hover:border-blue-500/40',
+    gold: 'border-yellow-500/20 hover:border-yellow-500/40',
+    purple: 'border-purple-500/20 hover:border-purple-500/40',
+  };
+  const priceColors = {
+    cyan: 'text-cyan-400',
+    blue: 'text-blue-400',
+    gold: 'text-yellow-500',
+    purple: 'text-purple-400',
+  };
+  const dotColors = {
+    cyan: 'bg-cyan-500/50',
+    blue: 'bg-blue-500/50',
+    gold: 'bg-yellow-500/50',
+    purple: 'bg-purple-500/50',
+  };
+
+  return (
+    <section className="px-4 mb-6 fade-in" style={{animationDelay:'0.15s'}}>
+      <div className="font-orbitron text-[10px] tracking-[0.25em] text-cyan-500/50 mb-3">
+        PLAN TIERS
+      </div>
+      <div className="space-y-2.5">
+        {PLANS.map(plan => (
+          <div key={plan.name} className={`bg-white/[0.02] border rounded-xl p-4 transition-all duration-300 ${borderColors[plan.color]}`}>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <div className="font-orbitron text-sm tracking-wider text-white/85">{plan.name}</div>
+                <div className="text-[10px] text-white/30 font-noto mt-0.5">{plan.desc}</div>
+              </div>
+              <div className="text-right">
+                <span className={`font-orbitron text-lg font-bold ${priceColors[plan.color]}`}>{plan.price}</span>
+                <span className="text-[10px] text-white/30 font-noto">{plan.period}</span>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              {plan.features.map((f, i) => (
+                <div key={i} className="flex items-center gap-2 text-[11px] text-white/45 font-noto">
+                  <div className={`w-1 h-1 rounded-full flex-shrink-0 ${dotColors[plan.color]}`} />
+                  {f}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ── License Agreement Section ──
+function LicenseAgreement() {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <section className="px-4 mb-6 fade-in" style={{animationDelay:'0.2s'}}>
+      <div className="font-orbitron text-[10px] tracking-[0.25em] text-cyan-500/50 mb-3">
+        LICENSE AGREEMENT
+      </div>
+      <div className="bg-white/[0.02] border border-cyan-500/8 rounded-xl overflow-hidden">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full flex items-center justify-between p-4 text-left hover:bg-white/[0.02] transition-colors"
+        >
+          <span className="font-noto text-sm text-white/70">Grace of Touch Engine 使用許諾契約</span>
+          <span className="font-orbitron text-[10px] text-cyan-500/40 tracking-wider">
+            {expanded ? 'COLLAPSE' : 'EXPAND'}
+          </span>
+        </button>
+
+        {expanded && (
+          <div className="px-4 pb-4 border-t border-cyan-500/8 pt-3 fade-in">
+            <div className="space-y-3 text-[11px] text-white/50 font-noto leading-relaxed">
+              <div>
+                <div className="text-white/70 font-medium mb-1">第1条（使用許諾）</div>
+                本契約は、Grace of Touch（以下「当社」）が提供するソフトウェアエンジン（以下「本製品」）の使用権を許諾するものです。ライセンスキーの有効期間中、契約プランに含まれるモジュールを使用する非独占的な権利を付与します。
+              </div>
+              <div>
+                <div className="text-white/70 font-medium mb-1">第2条（著作権）</div>
+                本製品の著作権、知的財産権その他一切の権利は当社に帰属します。お客様に譲渡されるのは使用権のみであり、所有権は移転しません。
+              </div>
+              <div>
+                <div className="text-white/70 font-medium mb-1">第3条（ソースコード非公開）</div>
+                本製品のソースコードは非公開です。リバースエンジニアリング、逆コンパイル、逆アセンブル等の行為を禁止します。
+              </div>
+              <div>
+                <div className="text-white/70 font-medium mb-1">第4条（禁止事項）</div>
+                <ul className="list-disc list-inside ml-2 space-y-0.5">
+                  <li>ライセンスキーの第三者への譲渡・共有</li>
+                  <li>本製品の再配布・サブライセンス</li>
+                  <li>本製品を用いた競合サービスの構築</li>
+                  <li>セキュリティ機構の回避・改変</li>
+                </ul>
+              </div>
+              <div>
+                <div className="text-white/70 font-medium mb-1">第5条（サポート）</div>
+                契約プランに応じたサポートを提供します。Enterprise以上のプランでは、SLA（サービスレベル合意）に基づく対応を行います。
+              </div>
+              <div>
+                <div className="text-white/70 font-medium mb-1">第6条（免責事項）</div>
+                本製品は「現状のまま」提供されます。当社は、本製品の使用により生じた直接的・間接的損害について、法律で認められる範囲で責任を負いません。
+              </div>
+              <div>
+                <div className="text-white/70 font-medium mb-1">第7条（契約の終了）</div>
+                ライセンス有効期間の満了、お客様による解約、または本契約への違反があった場合、使用権は直ちに失効します。
+              </div>
+              <div className="pt-2 border-t border-cyan-500/8 text-white/30 text-[10px]">
+                最終更新: 2026年3月28日 | Grace of Touch — All Rights Reserved
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ── FAQ Section ──
+function FAQSection() {
+  const [openIdx, setOpenIdx] = useState(null);
+  const faqs = [
+    { q: 'ライセンスキーはどのように発行されますか？', a: 'ご契約完了後、登録メールアドレスに自動送信されます。管理画面からもご確認いただけます。' },
+    { q: 'プランの変更は可能ですか？', a: 'はい、月単位でのアップグレード・ダウングレードが可能です。差額は日割り計算で調整されます。' },
+    { q: 'モジュールの追加購入はできますか？', a: 'Professional以上のプランでは、個別モジュールの追加が可能です。詳細はお問い合わせください。' },
+    { q: 'ライセンスの更新方法は？', a: '有効期限の30日前に更新案内メールが届きます。自動更新設定も管理画面から設定可能です。' },
+    { q: 'オンプレミス対応は可能ですか？', a: 'Enterprise以上のプランで対応可能です。カスタム開発プランではオンプレミス環境への導入支援も行います。' },
+    { q: 'APIの利用制限はありますか？', a: 'Starterプランでは月間10,000リクエスト、Professionalでは100,000リクエスト、Enterpriseは無制限です。' },
+  ];
+
+  return (
+    <section className="px-4 mb-6 fade-in" style={{animationDelay:'0.25s'}}>
+      <div className="font-orbitron text-[10px] tracking-[0.25em] text-cyan-500/50 mb-3">
+        FAQ
+      </div>
+      <div className="space-y-1.5">
+        {faqs.map((faq, i) => (
+          <div key={i} className="bg-white/[0.02] border border-cyan-500/8 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setOpenIdx(openIdx === i ? null : i)}
+              className="w-full flex items-center justify-between p-3 text-left hover:bg-white/[0.02] transition-colors"
+            >
+              <span className="font-noto text-[12px] text-white/65 pr-2">{faq.q}</span>
+              <span className="text-cyan-500/30 text-xs flex-shrink-0">{openIdx === i ? '−' : '＋'}</span>
+            </button>
+            {openIdx === i && (
+              <div className="px-3 pb-3 text-[11px] text-white/40 font-noto leading-relaxed fade-in">
+                {faq.a}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ── Support Section ──
+function SupportSection() {
+  return (
+    <section className="px-4 mb-6 fade-in" style={{animationDelay:'0.3s'}}>
+      <div className="font-orbitron text-[10px] tracking-[0.25em] text-cyan-500/50 mb-3">
+        SUPPORT
+      </div>
+      <div className="bg-white/[0.02] border border-cyan-500/8 rounded-xl p-4">
+        <div className="space-y-3">
+          <a
+            href="about.html#contact"
+            className="flex items-center gap-3 p-3 bg-cyan-500/5 border border-cyan-500/15 rounded-lg hover:bg-cyan-500/10 hover:border-cyan-500/30 transition-all"
+          >
+            <span className="text-lg">📨</span>
+            <div>
+              <div className="font-orbitron text-[10px] tracking-wider text-white/70">CONTACT US</div>
+              <div className="text-[10px] text-white/35 font-noto">お問い合わせ・ご相談</div>
+            </div>
+          </a>
+          <a
+            href="#"
+            className="flex items-center gap-3 p-3 bg-white/[0.02] border border-cyan-500/8 rounded-lg hover:bg-cyan-500/5 hover:border-cyan-500/15 transition-all opacity-50"
+          >
+            <span className="text-lg">📖</span>
+            <div>
+              <div className="font-orbitron text-[10px] tracking-wider text-white/70">DOCUMENTATION</div>
+              <div className="text-[10px] text-white/35 font-noto">技術ドキュメント（準備中）</div>
+            </div>
+          </a>
+          <a
+            href="#"
+            className="flex items-center gap-3 p-3 bg-white/[0.02] border border-cyan-500/8 rounded-lg hover:bg-cyan-500/5 hover:border-cyan-500/15 transition-all opacity-50"
+          >
+            <span className="text-lg">🎓</span>
+            <div>
+              <div className="font-orbitron text-[10px] tracking-wider text-white/70">API REFERENCE</div>
+              <div className="text-[10px] text-white/35 font-noto">APIリファレンス（準備中）</div>
+            </div>
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── Footer ──
+function Footer() {
+  return (
+    <footer className="px-4 py-6 text-center border-t border-cyan-500/8 mt-4">
+      <a href="index.html" className="inline-block mb-3 px-5 py-2 border border-cyan-500/15 rounded-lg font-orbitron text-[9px] tracking-[0.2em] text-cyan-500/40 hover:text-cyan-500/70 hover:border-cyan-500/35 hover:bg-cyan-500/5 transition-all">
+        BACK TO PORTAL
+      </a>
+      <div className="font-orbitron text-[8px] tracking-[0.2em] text-white/15">
+        &copy; 2025 GRACE OF TOUCH &middot; ALL RIGHTS RESERVED
+      </div>
+    </footer>
+  );
+}
+
+// ── Main App ──
+function App() {
+  const [verifyResult, setVerifyResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Initialize demo licenses in localStorage if not present
+    const stored = localStorage.getItem('got_licenses');
+    if (!stored) {
+      localStorage.setItem('got_licenses', JSON.stringify(DEMO_LICENSES));
+    }
+  }, []);
+
+  const handleVerify = useCallback((key) => {
+    setLoading(true);
+    setVerifyResult(null);
+    // Simulate network delay
+    setTimeout(() => {
+      const licenses = JSON.parse(localStorage.getItem('got_licenses') || '{}');
+      const license = licenses[key] || DEMO_LICENSES[key];
+      if (license) {
+        // Check if expired
+        const now = new Date();
+        const expiry = new Date(license.expiry);
+        const status = expiry < now ? 'EXPIRED' : license.status;
+        setVerifyResult({ ...license, status });
+      } else {
+        setVerifyResult({ status: 'INVALID' });
+      }
+      setLoading(false);
+    }, 600);
+  }, []);
+
+  return (
+    <div className="max-w-lg mx-auto pb-4">
+      <Header />
+      <LicenseVerification onVerify={handleVerify} result={verifyResult} loading={loading} />
+      <ModulesSection />
+      <PlanTiers />
+      <LicenseAgreement />
+      <FAQSection />
+      <SupportSection />
+      <Footer />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

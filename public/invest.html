@@ -295,8 +295,8 @@ function App() {
     // Crypto
     const cryptoHoldings = data.holdings.filter(h => h.category === 'crypto');
     const cryptoSymbols = [...new Set(cryptoHoldings.map(h => h.ticker))];
-    // Always fetch BTC/ETH for market overview
-    const allCryptoSymbols = [...new Set([...cryptoSymbols, 'BTC', 'ETH'])];
+    // Always fetch core cryptos for market overview
+    const allCryptoSymbols = [...new Set([...cryptoSymbols, 'BTC', 'ETH', 'XRP', 'SOL', 'DOGE', 'ADA'])];
     const cryptoPrices = await fetchCryptoPrices(allCryptoSymbols);
 
     // Forex
@@ -478,9 +478,157 @@ function App() {
     reader.readAsText(file);
   }
 
+  // Coincheck CSV column name mappings
+  const COINCHECK_COLS = {
+    date: ['time', 'date', '日時', '日付', 'timestamp'],
+    operation: ['operation', 'type', '種別', 'side', '操作'],
+    amount: ['amount', 'quantity', '数量', '取引量'],
+    currency: ['trading_currency', 'currency', '通貨', 'ticker', 'pair', 'symbol'],
+    price: ['rate', 'price', '価格', 'レート'],
+    jpyAmount: ['jpy_value', 'original_currency_amount', '日本円', 'JPY金額', 'jpy'],
+    fee: ['fee', '手数料'],
+    comment: ['comment', 'コメント', '備考'],
+  };
+
+  function findColIdx(headers, aliases) {
+    for (const alias of aliases) {
+      const idx = headers.findIndex(h => h === alias || h.includes(alias));
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  }
+
+  function parseCoincheckCSV(text) {
+    // Handle quoted fields with commas inside
+    function splitCSVLine(line) {
+      const result = [];
+      let current = '';
+      let inQuote = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') { inQuote = !inQuote; continue; }
+        if (ch === ',' && !inQuote) { result.push(current.trim()); current = ''; continue; }
+        current += ch;
+      }
+      result.push(current.trim());
+      return result;
+    }
+
+    const lines = text.split('\n').filter(l => l.trim());
+    if (lines.length < 2) return [];
+
+    const headers = splitCSVLine(lines[0]).map(h => h.toLowerCase().replace(/["\s]/g, ''));
+
+    const dateIdx = findColIdx(headers, COINCHECK_COLS.date);
+    const opIdx = findColIdx(headers, COINCHECK_COLS.operation);
+    const amountIdx = findColIdx(headers, COINCHECK_COLS.amount);
+    const currencyIdx = findColIdx(headers, COINCHECK_COLS.currency);
+    const priceIdx = findColIdx(headers, COINCHECK_COLS.price);
+    const jpyIdx = findColIdx(headers, COINCHECK_COLS.jpyAmount);
+    const feeIdx = findColIdx(headers, COINCHECK_COLS.fee);
+    const commentIdx = findColIdx(headers, COINCHECK_COLS.comment);
+
+    const txs = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = splitCSVLine(lines[i]);
+      if (cols.length < 3) continue;
+
+      // Extract date
+      let dateStr = cols[dateIdx >= 0 ? dateIdx : 0] || '';
+      // Coincheck format: "2024-01-15 10:30:00 +0900" → "2024-01-15"
+      const dateMatch = dateStr.match(/(\d{4}[-/]\d{1,2}[-/]\d{1,2})/);
+      const date = dateMatch ? dateMatch[1].replace(/\//g, '-') : new Date().toISOString().slice(0, 10);
+
+      // Operation type
+      const opRaw = (cols[opIdx >= 0 ? opIdx : 1] || '').toLowerCase();
+      // Coincheck operations: buy, sell, 購入, 売却, received, sent, deposit, withdraw
+      let type = 'buy';
+      if (opRaw.includes('sell') || opRaw.includes('売却') || opRaw.includes('sent') || opRaw.includes('送金')) {
+        type = 'sell';
+      } else if (opRaw.includes('buy') || opRaw.includes('購入') || opRaw.includes('received') || opRaw.includes('受取')) {
+        type = 'buy';
+      } else {
+        // Skip non-trade operations (deposit, withdraw JPY, etc.)
+        continue;
+      }
+
+      // Currency / ticker
+      let ticker = (cols[currencyIdx >= 0 ? currencyIdx : 2] || 'BTC').toUpperCase().replace(/[^A-Z]/g, '');
+      if (ticker === 'JPY' || ticker === '') continue; // Skip JPY-only rows
+
+      // Amount (absolute value)
+      let amount = Math.abs(parseFloat((cols[amountIdx >= 0 ? amountIdx : 3] || '0').replace(/[,"]/g, '')));
+
+      // Price per unit
+      let price = 0;
+      if (priceIdx >= 0 && cols[priceIdx]) {
+        price = Math.abs(parseFloat(cols[priceIdx].replace(/[,"]/g, '')));
+      }
+      // If rate is missing, try to calculate from JPY total
+      if ((!price || price === 0) && jpyIdx >= 0 && cols[jpyIdx] && amount > 0) {
+        const jpyTotal = Math.abs(parseFloat(cols[jpyIdx].replace(/[,"]/g, '')));
+        if (jpyTotal > 0) price = jpyTotal / amount;
+      }
+
+      // Fee
+      let fee = 0;
+      if (feeIdx >= 0 && cols[feeIdx]) {
+        fee = Math.abs(parseFloat(cols[feeIdx].replace(/[,"]/g, '')) || 0);
+      }
+
+      if (amount > 0 && price > 0) {
+        const cryptoNames = { BTC: 'Bitcoin', ETH: 'Ethereum', XRP: 'Ripple (XRP)', SOL: 'Solana', ADA: 'Cardano', DOGE: 'Dogecoin', DOT: 'Polkadot', MATIC: 'Polygon', LTC: 'Litecoin', LINK: 'Chainlink', AVAX: 'Avalanche', SHIB: 'Shiba Inu' };
+        txs.push({
+          date, ticker, type, quantity: amount, price, fee,
+          category: 'crypto',
+          name: cryptoNames[ticker] || ticker,
+          comment: commentIdx >= 0 ? cols[commentIdx] || '' : '',
+        });
+      }
+    }
+    return txs;
+  }
+
+  function importCoincheckCSV(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = ''; // reset for re-import
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const txs = parseCoincheckCSV(ev.target.result);
+        if (txs.length === 0) { alert('有効な取引データが見つかりませんでした。\nCoincheck CSV形式を確認してください。'); return; }
+
+        // Process each transaction
+        let currentHoldings = [...data.holdings];
+        let currentTxs = [...data.transactions];
+        let totalFees = 0;
+        txs.forEach(tx => {
+          const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+          currentTxs.push({ ...tx, id, createdAt: new Date().toISOString() });
+          currentHoldings = recalcHoldings(currentHoldings, currentTxs, tx);
+          totalFees += tx.fee || 0;
+        });
+        setData({ holdings: currentHoldings, transactions: currentTxs });
+
+        // Summary
+        const buys = txs.filter(t => t.type === 'buy').length;
+        const sells = txs.filter(t => t.type === 'sell').length;
+        const tickers = [...new Set(txs.map(t => t.ticker))];
+        alert(`Coincheck CSV インポート完了\n\n` +
+          `取引件数: ${txs.length}件 (購入: ${buys} / 売却: ${sells})\n` +
+          `銘柄: ${tickers.join(', ')}\n` +
+          (totalFees > 0 ? `手数料合計: ${fmtJPY(totalFees)}\n` : '') +
+          `\n保有資産と平均取得価格を自動計算しました。`);
+      } catch(err) { alert('CSVの解析に失敗しました: ' + err.message); }
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+
   function importCSV(e) {
     const file = e.target.files[0];
     if (!file) return;
+    e.target.value = '';
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
@@ -491,7 +639,6 @@ function App() {
         for (let i = 1; i < lines.length; i++) {
           const cols = lines[i].split(',').map(c => c.trim());
           if (cols.length < 4) continue;
-          // Try to detect columns: date, ticker/pair, side(buy/sell), amount, price
           const dateIdx = headers.findIndex(h => h.includes('date') || h.includes('日'));
           const typeIdx = headers.findIndex(h => h.includes('type') || h.includes('種別') || h.includes('side'));
           const amountIdx = headers.findIndex(h => h.includes('amount') || h.includes('数量') || h.includes('quantity'));
@@ -510,7 +657,6 @@ function App() {
           if (tx.quantity > 0 && tx.price > 0) txs.push(tx);
         }
         if (txs.length === 0) { alert('有効な取引データが見つかりませんでした'); return; }
-        // Process each transaction
         let currentHoldings = [...data.holdings];
         let currentTxs = [...data.transactions];
         txs.forEach(tx => {
@@ -523,6 +669,33 @@ function App() {
       } catch(err) { alert('CSVの解析に失敗しました: ' + err.message); }
     };
     reader.readAsText(file);
+  }
+
+  // Load Sample Data
+  function loadSampleData() {
+    if (data.holdings.length > 0 && !confirm('既存データに追加します。よろしいですか？')) return;
+    const sampleTxs = [
+      { date: '2025-06-15', ticker: 'BTC', name: 'Bitcoin', category: 'crypto', type: 'buy', quantity: 0.3, price: 4800000 },
+      { date: '2025-09-20', ticker: 'BTC', name: 'Bitcoin', category: 'crypto', type: 'buy', quantity: 0.2, price: 4200000 },
+      { date: '2025-08-10', ticker: 'ETH', name: 'Ethereum', category: 'crypto', type: 'buy', quantity: 3.0, price: 380000 },
+      { date: '2025-11-05', ticker: 'ETH', name: 'Ethereum', category: 'crypto', type: 'buy', quantity: 2.0, price: 320000 },
+      { date: '2025-07-01', ticker: 'XRP', name: 'Ripple (XRP)', category: 'crypto', type: 'buy', quantity: 10000, price: 80 },
+      { date: '2025-10-15', ticker: 'SOL', name: 'Solana', category: 'crypto', type: 'buy', quantity: 20, price: 12500 },
+      { date: '2026-01-10', ticker: 'DOGE', name: 'Dogecoin', category: 'crypto', type: 'buy', quantity: 50000, price: 15 },
+      { date: '2026-02-01', ticker: 'ADA', name: 'Cardano', category: 'crypto', type: 'buy', quantity: 5000, price: 45 },
+      { date: '2025-05-20', ticker: '7203', name: 'トヨタ自動車', category: 'stock', type: 'buy', quantity: 100, price: 2800 },
+      { date: '2025-12-01', ticker: '6758', name: 'ソニーグループ', category: 'stock', type: 'buy', quantity: 50, price: 14500 },
+    ];
+    let currentHoldings = [...data.holdings];
+    let currentTxs = [...data.transactions];
+    sampleTxs.forEach(tx => {
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      currentTxs.push({ ...tx, id, createdAt: new Date().toISOString() });
+      currentHoldings = recalcHoldings(currentHoldings, currentTxs, tx);
+    });
+    setData({ holdings: currentHoldings, transactions: currentTxs });
+    setActiveTab('crypto');
+    alert('サンプルデータを読み込みました\n\nBTC 0.5, ETH 5.0, XRP 10,000, SOL 20, DOGE 50,000, ADA 5,000\nトヨタ 100株, ソニー 50株');
   }
 
   // Filter holdings by tab
@@ -545,13 +718,15 @@ function App() {
         {/* Market Ticker */}
         <div className="overflow-hidden" style={{ borderTop: '1px solid rgba(0,255,255,0.05)', height: 28 }}>
           <div className="flex items-center gap-8 px-4 py-1 text-xs whitespace-nowrap market-ticker" style={{ width: 'max-content' }}>
-            {marketData.crypto?.BTC && <span>BTC {fmtJPY(marketData.crypto.BTC.price)} <span className={marketData.crypto.BTC.change24h >= 0 ? 'gain' : 'loss'}>{fmtPct(marketData.crypto.BTC.change24h)}</span></span>}
-            {marketData.crypto?.ETH && <span>ETH {fmtJPY(marketData.crypto.ETH.price)} <span className={marketData.crypto.ETH.change24h >= 0 ? 'gain' : 'loss'}>{fmtPct(marketData.crypto.ETH.change24h)}</span></span>}
+            {['BTC','ETH','XRP','SOL','DOGE','ADA'].map(sym => marketData.crypto?.[sym] && (
+              <span key={sym}>{sym} {fmtJPY(marketData.crypto[sym].price)} <span className={marketData.crypto[sym].change24h >= 0 ? 'gain' : 'loss'}>{fmtPct(marketData.crypto[sym].change24h)}</span></span>
+            ))}
             {forexRates['USD/JPY'] && <span>USD/JPY {fmtNum(forexRates['USD/JPY'], 2)}</span>}
             {forexRates['EUR/JPY'] && <span>EUR/JPY {fmtNum(forexRates['EUR/JPY'], 2)}</span>}
             {/* Duplicate for seamless scroll */}
-            {marketData.crypto?.BTC && <span>BTC {fmtJPY(marketData.crypto.BTC.price)} <span className={marketData.crypto.BTC.change24h >= 0 ? 'gain' : 'loss'}>{fmtPct(marketData.crypto.BTC.change24h)}</span></span>}
-            {marketData.crypto?.ETH && <span>ETH {fmtJPY(marketData.crypto.ETH.price)} <span className={marketData.crypto.ETH.change24h >= 0 ? 'gain' : 'loss'}>{fmtPct(marketData.crypto.ETH.change24h)}</span></span>}
+            {['BTC','ETH','XRP','SOL','DOGE','ADA'].map(sym => marketData.crypto?.[sym] && (
+              <span key={'d'+sym}>{sym} {fmtJPY(marketData.crypto[sym].price)} <span className={marketData.crypto[sym].change24h >= 0 ? 'gain' : 'loss'}>{fmtPct(marketData.crypto[sym].change24h)}</span></span>
+            ))}
             {forexRates['USD/JPY'] && <span>USD/JPY {fmtNum(forexRates['USD/JPY'], 2)}</span>}
             {forexRates['EUR/JPY'] && <span>EUR/JPY {fmtNum(forexRates['EUR/JPY'], 2)}</span>}
           </div>
@@ -619,6 +794,7 @@ function App() {
                   ))}
                 </div>
                 <div className="flex gap-2">
+                  <button onClick={loadSampleData} className="px-3 py-1.5 text-sm rounded-lg border transition" style={{ borderColor: 'rgba(0,255,136,0.3)', color: '#00ff88', background: 'rgba(0,255,136,0.05)' }}>デモ</button>
                   <button onClick={() => { setShowAddHolding(true); setEditingId(null); }} className="btn-primary px-3 py-1.5 text-sm">+ 資産追加</button>
                   <button onClick={() => setShowAddTx(true)} className="btn-primary px-3 py-1.5 text-sm">+ 取引追加</button>
                 </div>
@@ -684,20 +860,20 @@ function App() {
             <div className="card p-5 mb-6">
               <h3 className="orbitron text-sm font-bold mb-3" style={{ color: 'rgba(0,255,255,0.7)' }}>マーケット概況</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {marketData.crypto?.BTC && (
-                  <div className="p-3 rounded-lg" style={{ background: 'rgba(255,170,0,0.05)', border: '1px solid rgba(255,170,0,0.15)' }}>
-                    <div className="text-xs text-gray-500">Bitcoin</div>
-                    <div className="font-bold">{fmtJPY(marketData.crypto.BTC.price)}</div>
-                    <div className={`text-xs ${marketData.crypto.BTC.change24h >= 0 ? 'gain' : 'loss'}`}>{fmtPct(marketData.crypto.BTC.change24h)} (24h)</div>
+                {[
+                  { sym: 'BTC', name: 'Bitcoin', bg: 'rgba(255,170,0,0.05)', border: 'rgba(255,170,0,0.15)' },
+                  { sym: 'ETH', name: 'Ethereum', bg: 'rgba(100,100,255,0.05)', border: 'rgba(100,100,255,0.15)' },
+                  { sym: 'XRP', name: 'Ripple', bg: 'rgba(0,180,255,0.05)', border: 'rgba(0,180,255,0.15)' },
+                  { sym: 'SOL', name: 'Solana', bg: 'rgba(150,50,255,0.05)', border: 'rgba(150,50,255,0.15)' },
+                  { sym: 'DOGE', name: 'Dogecoin', bg: 'rgba(200,180,50,0.05)', border: 'rgba(200,180,50,0.15)' },
+                  { sym: 'ADA', name: 'Cardano', bg: 'rgba(50,100,200,0.05)', border: 'rgba(50,100,200,0.15)' },
+                ].map(({ sym, name, bg, border }) => marketData.crypto?.[sym] && (
+                  <div key={sym} className="p-3 rounded-lg" style={{ background: bg, border: `1px solid ${border}` }}>
+                    <div className="text-xs text-gray-500">{name} ({sym})</div>
+                    <div className="font-bold">{fmtJPY(marketData.crypto[sym].price)}</div>
+                    <div className={`text-xs ${marketData.crypto[sym].change24h >= 0 ? 'gain' : 'loss'}`}>{fmtPct(marketData.crypto[sym].change24h)} (24h)</div>
                   </div>
-                )}
-                {marketData.crypto?.ETH && (
-                  <div className="p-3 rounded-lg" style={{ background: 'rgba(100,100,255,0.05)', border: '1px solid rgba(100,100,255,0.15)' }}>
-                    <div className="text-xs text-gray-500">Ethereum</div>
-                    <div className="font-bold">{fmtJPY(marketData.crypto.ETH.price)}</div>
-                    <div className={`text-xs ${marketData.crypto.ETH.change24h >= 0 ? 'gain' : 'loss'}`}>{fmtPct(marketData.crypto.ETH.change24h)} (24h)</div>
-                  </div>
-                )}
+                ))}
                 {forexRates['USD/JPY'] && (
                   <div className="p-3 rounded-lg" style={{ background: 'rgba(0,255,255,0.05)', border: '1px solid rgba(0,255,255,0.15)' }}>
                     <div className="text-xs text-gray-500">USD/JPY</div>
@@ -757,6 +933,7 @@ function App() {
                       <th className="text-right py-2 px-2">数量</th>
                       <th className="text-right py-2 px-2">価格</th>
                       <th className="text-right py-2 px-2">合計</th>
+                      <th className="text-right py-2 px-2">手数料</th>
                       <th className="text-right py-2 px-2">操作</th>
                     </tr>
                   </thead>
@@ -773,6 +950,7 @@ function App() {
                         <td className="text-right py-2 px-2">{fmtNum(tx.quantity, 6)}</td>
                         <td className="text-right py-2 px-2">{fmtJPY(tx.price)}</td>
                         <td className="text-right py-2 px-2 font-medium">{fmtJPY(tx.quantity * tx.price)}</td>
+                        <td className="text-right py-2 px-2 text-gray-500">{tx.fee ? fmtJPY(tx.fee) : '-'}</td>
                         <td className="text-right py-2 px-2">
                           <button onClick={() => deleteTransaction(tx.id)} className="btn-danger px-2 py-1 text-xs">削除</button>
                         </td>
@@ -801,13 +979,46 @@ function App() {
                   <input type="file" accept=".json" onChange={importJSON} className="hidden" />
                 </label>
                 <label className="btn-primary px-4 py-2 text-sm cursor-pointer">
-                  CSVインポート
+                  CSVインポート (汎用)
                   <input type="file" accept=".csv" onChange={importCSV} className="hidden" />
                 </label>
               </div>
+
+              {/* Coincheck Import Section */}
+              <div className="p-4 rounded-lg" style={{ background: 'rgba(255,170,0,0.03)', border: '1px solid rgba(255,170,0,0.15)' }}>
+                <h4 className="text-sm font-medium mb-2" style={{ color: '#ffaa00' }}>Coincheck CSV インポート</h4>
+                <p className="text-xs text-gray-500 mb-3">
+                  Coincheckの取引履歴CSVを直接読み込めます。<br />
+                  購入/売却を自動判定し、保有数量と平均取得価格を計算します。
+                </p>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  <label className="btn-primary px-4 py-2 text-sm cursor-pointer" style={{ borderColor: 'rgba(255,170,0,0.4)', color: '#ffaa00' }}>
+                    Coincheck CSV を読み込む
+                    <input type="file" accept=".csv" onChange={importCoincheckCSV} className="hidden" />
+                  </label>
+                </div>
+                <div className="text-xs text-gray-600">
+                  <div className="mb-1">対応カラム: time, operation, trading_currency, amount, rate, fee</div>
+                  <div>対応操作: buy/sell, 購入/売却, received/sent</div>
+                </div>
+              </div>
+
+              {/* Sample Data */}
+              <div className="p-4 rounded-lg" style={{ background: 'rgba(0,255,136,0.03)', border: '1px solid rgba(0,255,136,0.15)' }}>
+                <h4 className="text-sm font-medium mb-2" style={{ color: '#00ff88' }}>サンプルデータ</h4>
+                <p className="text-xs text-gray-500 mb-3">
+                  デモ用のサンプル取引データを読み込みます。<br />
+                  BTC 0.5, ETH 5.0, XRP 10,000, SOL 20, DOGE 50,000, ADA 5,000 + 株式
+                </p>
+                <button onClick={loadSampleData} className="btn-primary px-4 py-2 text-sm" style={{ borderColor: 'rgba(0,255,136,0.4)', color: '#00ff88' }}>
+                  サンプルデータを読み込む
+                </button>
+              </div>
+
+              {/* Generic CSV Format Info */}
               <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
-                <h4 className="text-sm font-medium text-gray-300 mb-2">CSVフォーマット</h4>
-                <p className="text-xs text-gray-500 mb-2">coincheck等の取引履歴CSVに対応。以下のカラムを含むCSVを読み込めます:</p>
+                <h4 className="text-sm font-medium text-gray-300 mb-2">汎用CSVフォーマット</h4>
+                <p className="text-xs text-gray-500 mb-2">一般的な取引履歴CSVに対応。以下のカラムを含むCSVを読み込めます:</p>
                 <code className="text-xs" style={{ color: 'rgba(0,255,255,0.6)' }}>date, ticker, type(buy/sell), quantity, price</code>
               </div>
               <div className="p-4 rounded-lg border border-red-900/30" style={{ background: 'rgba(255,60,60,0.03)' }}>
