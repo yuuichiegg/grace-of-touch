@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TrackForge — Digital MTR</title>
 <!--
-  TrackForge v0.4 — Digital MTR & Music Collaboration
+  TrackForge v0.2 — Digital MTR & Music Collaboration
   Copyright (c) 2026 GRACE OF TOUCH. All rights reserved.
-  v0.4: Theme, Highlighter, Loop, Take Management, Version Management
 -->
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -288,55 +287,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .welcome-item .wi-text{font-size:9px;color:var(--text2)}
 .start-btn{padding:10px 28px;border:1px solid var(--accent-dim);background:transparent;color:var(--accent);font-family:var(--font);font-size:13px;cursor:pointer;border-radius:4px;letter-spacing:3px;transition:all .25s}
 .start-btn:hover{background:var(--accent-bg);box-shadow:0 0 20px rgba(0,255,65,.15)}
-
-/* ===== THEME SELECTOR ===== */
-.theme-panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:460px;max-height:80vh;background:#1a1a1a;border:1px solid var(--accent);border-radius:12px;z-index:150;padding:20px;box-shadow:0 8px 40px rgba(0,0,0,.8);display:none;flex-direction:column;gap:12px;overflow-y:auto}
-.theme-panel.show{display:flex}
-.theme-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.theme-card{padding:12px 8px;border:2px solid var(--border);border-radius:8px;cursor:pointer;text-align:center;transition:all .15s}
-.theme-card:hover{border-color:var(--text2);transform:translateY(-1px)}
-.theme-card.active{border-color:var(--accent);box-shadow:0 0 12px rgba(0,255,65,.2)}
-.theme-swatch{width:100%;height:32px;border-radius:4px;margin-bottom:6px}
-.theme-name{font-size:10px;color:var(--text);letter-spacing:1px}
-.custom-colors{display:flex;gap:8px;align-items:center;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin-top:4px}
-.custom-colors label{font-size:9px;color:var(--text2);letter-spacing:.5px}
-.custom-colors input[type="color"]{width:32px;height:24px;border:1px solid var(--border);border-radius:3px;background:none;cursor:pointer;padding:0}
-
-/* ===== HIGHLIGHTER / DRAWING ===== */
-.marker-canvas-overlay{position:absolute;top:0;left:0;width:100%;height:100%;z-index:3;pointer-events:none;cursor:default}
-.marker-canvas-overlay.active{pointer-events:auto;cursor:crosshair}
-.marker-canvas-overlay.erasing{cursor:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="16" height="16" x="2" y="2" fill="none" stroke="white" stroke-width="1"/></svg>') 10 10, crosshair}
-.marker-toolbar{position:absolute;top:2px;right:2px;display:none;gap:2px;z-index:5;background:#000000cc;border-radius:4px;padding:2px 4px}
-.marker-toolbar.show{display:flex}
-.marker-color-btn{width:16px;height:16px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:all .1s}
-.marker-color-btn.active{border-color:#fff;box-shadow:0 0 4px #fff}
-.marker-tool-btn{font-size:10px;padding:2px 5px;background:var(--bg4);border:1px solid var(--border);border-radius:3px;color:var(--text2);cursor:pointer;font-family:var(--font)}
-.marker-tool-btn:hover{border-color:var(--text2);color:var(--text)}
-.marker-tool-btn.active{background:var(--accent-bg);border-color:var(--accent-dim);color:var(--accent)}
-
-/* ===== LOOP MARKERS ===== */
-.loop-region{position:absolute;top:0;height:100%;background:rgba(255,215,0,.08);border-left:2px solid var(--solo);border-right:2px solid var(--solo);z-index:1;pointer-events:none}
-.loop-handle{position:absolute;top:-2px;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid var(--solo);z-index:4;cursor:ew-resize;pointer-events:auto}
-.loop-btn{position:relative}
-.loop-btn.on{color:var(--solo)!important;border-color:var(--solo)!important;background:rgba(255,215,0,.15)!important}
-
-/* ===== TAKE SELECTOR ===== */
-.take-selector{display:flex;align-items:center;gap:2px;font-size:8px}
-.take-select{background:var(--bg);border:1px solid var(--border);color:var(--text);font-family:var(--font);font-size:8px;padding:1px 2px;border-radius:2px;outline:none;cursor:pointer;max-width:70px}
-.take-btn{width:18px;height:16px;font-size:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:2px;background:var(--bg4);border:1px solid var(--border);color:var(--text3);font-family:var(--font)}
-.take-btn:hover{border-color:var(--text2);color:var(--text)}
-
-/* ===== VERSION PANEL ===== */
-.version-panel{position:fixed;top:0;right:0;bottom:0;width:320px;background:linear-gradient(180deg,#1a1a1a,#131313);border-left:2px solid #0a0a0a;z-index:120;transform:translateX(340px);transition:transform .25s;display:flex;flex-direction:column;overflow:hidden}
-.version-panel.open{transform:translateX(0)}
-.version-header{padding:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
-.version-list{flex:1;overflow-y:auto;padding:8px}
-.version-card{padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer;transition:all .15s}
-.version-card:hover{border-color:var(--accent-dim)}
-.version-card .v-name{font-size:11px;color:var(--text);font-weight:bold}
-.version-card .v-meta{font-size:8px;color:var(--text3);margin-top:2px}
-.version-card .v-tracks{font-size:8px;color:var(--accent);margin-top:3px}
-.version-footer{padding:8px 12px;border-top:1px solid var(--border)}
 </style>
 </head>
 <body>
@@ -352,18 +302,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="welcome-item"><div class="wi-icon">📜</div><div class="wi-text">貢献証明書</div></div>
   </div>
   <button class="start-btn" onclick="boot()">▶ START</button>
-  <div style="font-size:8px;color:var(--text3);margin-top:12px">v0.4 — GRACE OF TOUCH</div>
+  <div style="font-size:8px;color:var(--text3);margin-top:12px">v0.2 — GRACE OF TOUCH</div>
 </div>
 
 <!-- TOP BAR -->
 <div class="topbar">
-  <div class="logo"><span class="tf">TRACKFORGE</span><span class="ver">v0.4</span></div>
+  <div class="logo"><span class="tf">TRACKFORGE</span><span class="ver">v0.2</span></div>
   <button class="tab-btn active" data-tab="mtr" onclick="switchTab('mtr')">MTR</button>
   <button class="tab-btn" data-tab="community" onclick="switchTab('community')">COMMUNITY</button>
   <button class="tab-btn" data-tab="certs" onclick="switchTab('certs')">CERTIFICATES</button>
   <div class="topbar-right">
-    <button class="tab-btn" onclick="openThemePanel()" title="テーマ切替">🎨</button>
-    <button class="tab-btn" onclick="toggleVersionPanel()" title="バージョン管理">💾</button>
     <div class="input-indicator" id="inputIndicator" title="入力レベル">
       <span style="font-size:8px">IN</span>
       <div class="bar"><div class="bar-fill" id="inputMeter" style="height:0%"></div></div>
@@ -583,8 +531,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="tr-btn" onclick="tStop()" title="停止">⏹</button>
     <button class="tr-btn play-btn" id="btnPlay" onclick="tPlay()" title="再生 [Space]">▶</button>
     <button class="tr-btn rec-btn" id="btnRec" onclick="tRecord()" title="録音 [R]">⏺</button>
-    <button class="tr-btn loop-btn" id="btnLoop" onclick="toggleLoop()" title="ループ [L]">🔁</button>
-    <button class="tr-btn" id="btnMarker" onclick="toggleMarkerMode()" title="蛍光ペン">🖍</button>
   </div>
 
   <div class="time-box">
@@ -631,44 +577,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   </div>
 </div>
 
-<!-- THEME PANEL -->
-<div class="theme-panel" id="themePanel">
-  <div style="display:flex;justify-content:space-between;align-items:center">
-    <div style="font-size:14px;color:var(--accent);letter-spacing:2px;font-weight:700">🎨 THEME / 壁紙テーマ</div>
-    <div onclick="closeThemePanel()" style="cursor:pointer;color:var(--text3);font-size:18px">✕</div>
-  </div>
-  <div style="height:1px;background:var(--border)"></div>
-  <div class="theme-grid" id="themeGrid"></div>
-  <div id="customColorArea" style="display:none">
-    <div class="custom-colors">
-      <label>Primary</label><input type="color" id="customPrimary" value="#00ff41" oninput="applyCustomTheme()">
-      <label>Secondary</label><input type="color" id="customSecondary" value="#e040fb" oninput="applyCustomTheme()">
-      <label>BG</label><input type="color" id="customBg" value="#0d0d0d" oninput="applyCustomTheme()">
-    </div>
-  </div>
-</div>
-
-<!-- VERSION PANEL -->
-<div class="version-panel" id="versionPanel">
-  <div class="version-header">
-    <div style="font-size:12px;color:var(--accent);letter-spacing:2px;font-weight:700">💾 VERSIONS</div>
-    <div onclick="toggleVersionPanel()" style="cursor:pointer;color:var(--text3);font-size:16px">✕</div>
-  </div>
-  <div class="version-list" id="versionList"></div>
-  <div class="version-footer">
-    <button class="rubber-btn" style="width:100%;padding:8px;font-size:10px;color:var(--accent);letter-spacing:1px" onclick="saveVersion()">+ SAVE VERSION</button>
-    <div style="font-size:8px;color:var(--text3);text-align:center;margin-top:4px" id="autoSaveStatus">自動保存: 5分ごと</div>
-  </div>
-</div>
-
 <!-- NOTIFICATION -->
 <div class="notif" id="notif"></div>
 
 <script>
 // ======================================================================
-//  TrackForge v0.4 — Copyright (c) 2026 GRACE OF TOUCH
+//  TrackForge v0.2 — Copyright (c) 2026 GRACE OF TOUCH
 //  Core logic protected. Server-side operations via Firebase Functions.
-//  v0.4: Theme, Highlighter, Loop, Take Management, Version Management
 // ======================================================================
 
 const SR = 44100, MAX_TR = 8;
@@ -752,9 +667,7 @@ function mkTrack(name,m,who){
   return{id:++tidC,name:name||`Track ${tracks.length+1}`,mode:m||mode,who:who||'@You',
     blob:null,buf:null,muted:false,solo:false,armed:false,mon:false,
     vol:.8,pan:0,gain:null,panN:null,src:null,ana:null,plays:0,
-    jacket:null,locked:false,
-    takes:[{name:'Take 1',buf:null,blob:null}],activeTake:0,
-    drawings:[]};
+    jacket:null,locked:false};
 }
 
 function addTrack(){
@@ -775,9 +688,6 @@ async function importAudioToTrack(idx,file){
     tracks[idx].buf=decoded;
     tracks[idx].blob=file;
     tracks[idx].name=file.name.replace(/\.[^.]+$/,'').substring(0,20);
-    // Save to active take
-    const at2=tracks[idx].activeTake;
-    if(tracks[idx].takes[at2]){tracks[idx].takes[at2].buf=decoded;tracks[idx].takes[at2].blob=file}
     render();
     notify(`Track ${idx+1} にインポート完了`);
   }catch(e){notify('デコード失敗: '+e.message)}
@@ -924,9 +834,6 @@ async function tRecord(){
       const ab=await blob.arrayBuffer();
       const decoded=await ctx.decodeAudioData(ab);
       tracks[armedIdx].blob=blob;tracks[armedIdx].buf=decoded;
-      // Also save to active take
-      const at=tracks[armedIdx].activeTake;
-      if(tracks[armedIdx].takes[at]){tracks[armedIdx].takes[at].buf=decoded;tracks[armedIdx].takes[at].blob=blob}
       tracks[armedIdx].armed=false;armedIdx=-1;
       render();notify('録音完了');
     }catch(e){notify('デコード失敗')}
@@ -1197,20 +1104,13 @@ function renderTracks(){
         <select class="track-mode-select" onchange="changeTrackMode(${i},this.value)" style="background:var(--bg);border:1px solid var(--border);color:${m.color};font-family:var(--font);font-size:8px;padding:1px 2px;border-radius:2px;outline:none;width:fit-content;cursor:pointer"${t.locked?' disabled':''}>${modeOpts}</select>
         <span class="track-contributor">${t.who}</span>
       </div>
-      <div class="waveform-container" onclick="${!t.buf?`openFilePicker(${i})`:''}" onmousedown="onWaveformMouseDown(event,${i})" onmousemove="onWaveformMouseMove(event,${i})" onmouseup="onWaveformMouseUp(event,${i})">
+      <div class="waveform-container" onclick="${!t.buf?`openFilePicker(${i})`:''}">
         <canvas id="wv-${i}"></canvas>
         ${!t.buf?'<div class="waveform-empty">ドラッグ&ドロップ or クリックでインポート</div>':''}
-        ${loopEnabled&&t.buf?`<div class="loop-region" id="loop-${i}" style="left:${loopStart/t.buf.duration*100}%;width:${(loopEnd-loopStart)/t.buf.duration*100}%"></div>`:''}
         <div class="waveform-time">${dur}</div>
         <div class="playhead-line" id="ph-${i}"></div>
-        <canvas class="marker-canvas-overlay${markerMode?' active':''}" id="draw-${i}" width="800" height="96"></canvas>
-        <div class="marker-toolbar${markerMode?' show':''}" id="mtb-${i}">
-          ${['#ffff00','#00ff88','#ff69b4','#44aaff'].map(c=>`<div class="marker-color-btn${markerColor===c?' active':''}" style="background:${c}" onclick="setMarkerColor('${c}')"></div>`).join('')}
-          <div class="marker-tool-btn${markerEraser?' active':''}" onclick="toggleMarkerEraser()" title="消しゴム">E</div>
-          <div class="marker-tool-btn" onclick="clearDrawing(${i})" title="全消去">C</div>
-        </div>
       </div>
-      <div class="track-btns" style="flex-wrap:wrap;max-width:180px">
+      <div class="track-btns">
         <div class="tbtn arm${t.armed?' on':''}" onclick="armTrack(${i})" title="ARM (録音)" style="${lockStyle}">R</div>
         <div class="tbtn" onclick="openFilePicker(${i})" title="ファイルインポート" style="font-size:10px;${lockStyle}">📂</div>
         <div class="tbtn mute${t.muted?' on':''}" onclick="muteTrack(${i})" title="Mute">M</div>
@@ -1218,11 +1118,6 @@ function renderTracks(){
         <div class="tbtn" onclick="dupTrack(${i})" title="複製" style="${lockStyle}">⧉</div>
         <div class="tbtn" onclick="clearTrack(${i})" title="トラッククリア" style="color:var(--mute);${lockStyle}">⌫</div>
         <div class="tbtn del" onclick="rmTrack(${i})" title="削除" style="${lockStyle}">×</div>
-        <div class="take-selector">
-          <select class="take-select" onchange="switchTake(${i},+this.value)" style="${lockStyle}">${t.takes.map((tk,ti)=>`<option value="${ti}"${ti===t.activeTake?' selected':''}>${tk.name}</option>`).join('')}</select>
-          <div class="take-btn" onclick="newTake(${i})" title="新規テイク" style="${lockStyle}">+</div>
-          <div class="take-btn" onclick="dupTake(${i})" title="テイク複製" style="${lockStyle}">⧉</div>
-        </div>
       </div>
     </div>`}).join('');
 }
@@ -1655,505 +1550,6 @@ document.addEventListener('paste',e=>{
       return;
     }
   }
-});
-
-// ======================================================================
-//  THEME SYSTEM
-// ======================================================================
-const THEMES={
-  dark:{name:'Dark Studio',bg:'#0d0d0d',bg2:'#151515',accent:'#00ff41',accent2:'#e040fb',border:'#2a2a2a',text:'#d0d0d0',
-    grad:'linear-gradient(180deg,#0d0d0d,#0a0a0a)'},
-  midnight:{name:'Midnight Blue',bg:'#0a0e1a',bg2:'#101828',accent:'#4488ff',accent2:'#88ccff',border:'#1a2a4a',text:'#b0c8e8',
-    grad:'linear-gradient(180deg,#0a0e1a,#060a12)'},
-  sunset:{name:'Sunset',bg:'#1a0e0a',bg2:'#201410',accent:'#ff8844',accent2:'#cc44aa',border:'#3a2218',text:'#e8c8b0',
-    grad:'linear-gradient(180deg,#1a0e0a,#120806)'},
-  forest:{name:'Forest',bg:'#0a1a0e',bg2:'#102818',accent:'#44cc66',accent2:'#88aa44',border:'#1a3a22',text:'#b0d8c0',
-    grad:'linear-gradient(180deg,#0a1a0e,#060e08)'},
-  neon:{name:'Neon',bg:'#0a0a14',bg2:'#101020',accent:'#00ffff',accent2:'#ff00ff',border:'#2a2a4a',text:'#e0e0ff',
-    grad:'linear-gradient(180deg,#0a0a14,#06060e)'},
-  custom:{name:'Custom',bg:'#0d0d0d',bg2:'#151515',accent:'#00ff41',accent2:'#e040fb',border:'#2a2a2a',text:'#d0d0d0',
-    grad:'linear-gradient(180deg,#0d0d0d,#0a0a0a)'}
-};
-let currentTheme='dark';
-
-function applyTheme(id){
-  const t=THEMES[id];if(!t)return;
-  currentTheme=id;
-  const r=document.documentElement.style;
-  r.setProperty('--bg',t.bg);
-  r.setProperty('--bg2',t.bg2);
-  r.setProperty('--bg3',t.bg2);
-  r.setProperty('--accent',t.accent);
-  r.setProperty('--accent-dim',t.accent);
-  r.setProperty('--accent-bg',t.accent+'08');
-  r.setProperty('--border',t.border);
-  r.setProperty('--border2',t.border);
-  r.setProperty('--text',t.text);
-  r.setProperty('--vocal',t.accent2);
-  document.body.style.background=t.bg;
-  // Update LED text-shadow
-  document.querySelectorAll('.led').forEach(el=>{
-    el.style.color=t.accent;
-    el.style.textShadow=`0 0 6px ${t.accent},0 0 12px ${t.accent}40`;
-  });
-  localStorage.setItem('tf_theme',id);
-  if(id==='custom')localStorage.setItem('tf_custom_theme',JSON.stringify(t));
-  renderThemeGrid();
-  render();
-}
-
-function applyCustomTheme(){
-  const p=document.getElementById('customPrimary').value;
-  const s=document.getElementById('customSecondary').value;
-  const b=document.getElementById('customBg').value;
-  THEMES.custom.bg=b;THEMES.custom.bg2=lightenColor(b,8);
-  THEMES.custom.accent=p;THEMES.custom.accent2=s;
-  THEMES.custom.border=lightenColor(b,20);THEMES.custom.text=lightenColor(b,80);
-  THEMES.custom.grad=`linear-gradient(180deg,${b},${darkenColor(b,5)})`;
-  applyTheme('custom');
-}
-
-function lightenColor(hex,amt){
-  let r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
-  r=Math.min(255,r+amt);g=Math.min(255,g+amt);b=Math.min(255,b+amt);
-  return'#'+[r,g,b].map(c=>c.toString(16).padStart(2,'0')).join('');
-}
-function darkenColor(hex,amt){return lightenColor(hex,-amt)}
-
-function openThemePanel(){document.getElementById('themePanel').classList.add('show');renderThemeGrid()}
-function closeThemePanel(){document.getElementById('themePanel').classList.remove('show')}
-
-function renderThemeGrid(){
-  const grid=document.getElementById('themeGrid');
-  grid.innerHTML=Object.keys(THEMES).map(id=>{
-    const t=THEMES[id];
-    return`<div class="theme-card${currentTheme===id?' active':''}" onclick="${id==='custom'?'selectCustomTheme()':'applyTheme(\''+id+'\')'}">
-      <div class="theme-swatch" style="background:linear-gradient(135deg,${t.bg},${t.accent}40,${t.accent2}30)"></div>
-      <div class="theme-name">${t.name}</div>
-    </div>`;
-  }).join('');
-  document.getElementById('customColorArea').style.display=currentTheme==='custom'?'block':'none';
-}
-
-function selectCustomTheme(){
-  document.getElementById('customColorArea').style.display='block';
-  applyTheme('custom');
-}
-
-// ======================================================================
-//  HIGHLIGHTER / DRAWING SYSTEM
-// ======================================================================
-let markerMode=false, markerColor='#ffff00', markerEraser=false;
-let drawingCtx=null, isDrawing=false;
-
-function toggleMarkerMode(){
-  markerMode=!markerMode;
-  const btn=document.getElementById('btnMarker');
-  if(markerMode){
-    btn.style.color='var(--solo)';btn.style.borderColor='var(--solo)';btn.style.background='rgba(255,215,0,.15)';
-  }else{
-    btn.style.color='';btn.style.borderColor='';btn.style.background='';
-  }
-  render();
-}
-
-function setMarkerColor(c){markerColor=c;markerEraser=false;render()}
-function toggleMarkerEraser(){markerEraser=!markerEraser;render()}
-
-function onWaveformMouseDown(e,idx){
-  if(!markerMode)return;
-  const canvas=document.getElementById(`draw-${idx}`);
-  if(!canvas)return;
-  const rect=canvas.getBoundingClientRect();
-  canvas.width=rect.width*2;canvas.height=rect.height*2;
-  drawingCtx=canvas.getContext('2d');
-  drawingCtx.scale(2,2);
-  isDrawing=true;
-  // Restore existing drawings
-  restoreDrawing(idx);
-  const x=e.clientX-rect.left, y=e.clientY-rect.top;
-  drawingCtx.beginPath();
-  drawingCtx.moveTo(x,y);
-  if(markerEraser){
-    drawingCtx.globalCompositeOperation='destination-out';
-    drawingCtx.lineWidth=20;
-  }else{
-    drawingCtx.globalCompositeOperation='source-over';
-    drawingCtx.strokeStyle=markerColor+'88';
-    drawingCtx.lineWidth=8;
-    drawingCtx.lineCap='round';
-    drawingCtx.lineJoin='round';
-  }
-  e.preventDefault();e.stopPropagation();
-}
-
-function onWaveformMouseMove(e,idx){
-  if(!isDrawing||!drawingCtx)return;
-  const canvas=document.getElementById(`draw-${idx}`);
-  if(!canvas)return;
-  const rect=canvas.getBoundingClientRect();
-  const x=e.clientX-rect.left, y=e.clientY-rect.top;
-  drawingCtx.lineTo(x,y);
-  drawingCtx.stroke();
-  e.preventDefault();e.stopPropagation();
-}
-
-function onWaveformMouseUp(e,idx){
-  if(!isDrawing)return;
-  isDrawing=false;
-  // Save drawing data
-  const canvas=document.getElementById(`draw-${idx}`);
-  if(canvas){
-    tracks[idx].drawings=canvas.toDataURL();
-    saveDrawingsToStorage();
-  }
-  drawingCtx=null;
-}
-
-function restoreDrawing(idx){
-  const canvas=document.getElementById(`draw-${idx}`);
-  if(!canvas||!tracks[idx].drawings)return;
-  const ctx2=canvas.getContext('2d');
-  const img=new Image();
-  img.onload=()=>{ctx2.drawImage(img,0,0,canvas.width/2,canvas.height/2)};
-  img.src=tracks[idx].drawings;
-}
-
-function clearDrawing(idx){
-  const canvas=document.getElementById(`draw-${idx}`);
-  if(canvas){
-    const ctx2=canvas.getContext('2d');
-    ctx2.clearRect(0,0,canvas.width,canvas.height);
-  }
-  tracks[idx].drawings=[];
-  saveDrawingsToStorage();
-  notify(`Track ${idx+1} のマーカーをクリア`);
-}
-
-function saveDrawingsToStorage(){
-  const data=tracks.map(t=>({id:t.id,drawings:t.drawings}));
-  try{localStorage.setItem('tf_drawings',JSON.stringify(data))}catch(e){}
-}
-
-function loadDrawingsFromStorage(){
-  try{
-    const data=JSON.parse(localStorage.getItem('tf_drawings')||'[]');
-    data.forEach(d=>{
-      const t=tracks.find(tr=>tr.id===d.id);
-      if(t)t.drawings=d.drawings;
-    });
-  }catch(e){}
-}
-
-// Restore drawings after render
-function restoreAllDrawings(){
-  requestAnimationFrame(()=>{
-    tracks.forEach((t,i)=>{
-      if(t.drawings&&typeof t.drawings==='string'){
-        const canvas=document.getElementById(`draw-${i}`);
-        if(canvas){
-          const rect=canvas.getBoundingClientRect();
-          canvas.width=rect.width*2;canvas.height=rect.height*2;
-          const ctx2=canvas.getContext('2d');
-          ctx2.scale(2,2);
-          const img=new Image();
-          img.onload=()=>{ctx2.drawImage(img,0,0,rect.width,rect.height)};
-          img.src=t.drawings;
-        }
-      }
-    });
-  });
-}
-
-// ======================================================================
-//  LOOP SYSTEM
-// ======================================================================
-let loopEnabled=false, loopStart=0, loopEnd=10, settingLoop=false;
-
-function toggleLoop(){
-  loopEnabled=!loopEnabled;
-  document.getElementById('btnLoop').classList.toggle('on',loopEnabled);
-  render();
-  notify(loopEnabled?`ループ ON (${loopStart.toFixed(1)}s - ${loopEnd.toFixed(1)}s)`:'ループ OFF');
-}
-
-// Override tick to handle loop
-const _origTickRef=tick;
-
-// Patch the existing tick function to add loop behavior
-function patchedTick(){
-  if(state==='stopped')return;
-  curTime=ctx.currentTime-startTs;
-  // Loop logic
-  if(loopEnabled&&state==='playing'&&curTime>=loopEnd){
-    // Jump back to loop start
-    tStop();
-    curTime=loopStart;
-    startTs=ctx.currentTime-curTime;
-    state='playing';
-    document.getElementById('btnPlay').classList.add('on');
-    playAll();
-  }
-  updateTime(curTime);
-  updateMeters();
-  updateInputMeter();
-  updatePlayheads();
-  const maxD=Math.max(...tracks.map(t=>t.buf?t.buf.duration:0),0);
-  if(state==='playing'&&!loopEnabled&&maxD>0&&curTime>=maxD){tStop();return}
-  af=requestAnimationFrame(patchedTick);
-}
-
-// Replace tick references
-(function(){
-  // Override the global tick
-  window._patchedTick=patchedTick;
-})();
-
-// Override tPlay, tRecord to use patchedTick
-const _origTPlay=tPlay;
-const _origTRecord=tRecord;
-
-// Monkey-patch: replace tick calls in tPlay/tRecord
-// We redefine tick to call patchedTick
-window.tick=patchedTick;
-
-// Set loop region via clicking on waveform timeline area
-// (This is handled via the loop-handle dragging in the waveform container)
-function setLoopFromWaveform(idx,e){
-  if(markerMode)return;
-  const container=e.currentTarget;
-  const rect=container.getBoundingClientRect();
-  const pct=(e.clientX-rect.left)/rect.width;
-  const t=tracks[idx];
-  if(!t||!t.buf)return;
-  const time=pct*t.buf.duration;
-  if(!settingLoop){
-    loopStart=time;settingLoop=true;
-  }else{
-    loopEnd=Math.max(loopStart+0.1,time);
-    if(loopEnd<loopStart){const tmp=loopStart;loopStart=loopEnd;loopEnd=tmp}
-    settingLoop=false;
-    if(!loopEnabled)toggleLoop();
-    else render();
-    notify(`ループ区間: ${loopStart.toFixed(1)}s - ${loopEnd.toFixed(1)}s`);
-  }
-}
-
-// ======================================================================
-//  TAKE MANAGEMENT
-// ======================================================================
-function newTake(idx){
-  if(tracks[idx].locked){notify('ロック中');return}
-  const t=tracks[idx];
-  // Save current buf to current take
-  t.takes[t.activeTake].buf=t.buf;
-  t.takes[t.activeTake].blob=t.blob;
-  // Create new empty take
-  const num=t.takes.length+1;
-  t.takes.push({name:`Take ${num}`,buf:null,blob:null});
-  t.activeTake=t.takes.length-1;
-  t.buf=null;t.blob=null;
-  render();
-  notify(`Track ${idx+1}: Take ${num} 作成`);
-  saveTakesToStorage();
-}
-
-function dupTake(idx){
-  if(tracks[idx].locked){notify('ロック中');return}
-  const t=tracks[idx];
-  // Save current to current take first
-  t.takes[t.activeTake].buf=t.buf;
-  t.takes[t.activeTake].blob=t.blob;
-  const num=t.takes.length+1;
-  t.takes.push({name:`Take ${num}`,buf:t.buf,blob:t.blob});
-  t.activeTake=t.takes.length-1;
-  render();
-  notify(`Track ${idx+1}: テイク複製 → Take ${num}`);
-  saveTakesToStorage();
-}
-
-function switchTake(idx,takeIdx){
-  const t=tracks[idx];
-  if(state!=='stopped'){notify('停止してからテイクを切替');return}
-  // Save current buf to current take
-  t.takes[t.activeTake].buf=t.buf;
-  t.takes[t.activeTake].blob=t.blob;
-  // Switch
-  t.activeTake=takeIdx;
-  t.buf=t.takes[takeIdx].buf;
-  t.blob=t.takes[takeIdx].blob;
-  render();
-  notify(`Track ${idx+1}: ${t.takes[takeIdx].name} に切替`);
-  saveTakesToStorage();
-}
-
-function saveTakesToStorage(){
-  // Save take metadata (not audio data, which is too large)
-  const data=tracks.map(t=>({
-    id:t.id,activeTake:t.activeTake,
-    takes:t.takes.map(tk=>({name:tk.name,hasBuf:!!tk.buf}))
-  }));
-  try{localStorage.setItem('tf_takes',JSON.stringify(data))}catch(e){}
-}
-
-// ======================================================================
-//  VERSION MANAGEMENT
-// ======================================================================
-let versions=[];
-let versionPanelOpen=false;
-let autoSaveTimer=null;
-
-function toggleVersionPanel(){
-  versionPanelOpen=!versionPanelOpen;
-  document.getElementById('versionPanel').classList.toggle('open',versionPanelOpen);
-  if(versionPanelOpen)renderVersionList();
-}
-
-function saveVersion(autoName){
-  const name=autoName||prompt('バージョン名を入力:','Version '+(versions.length+1));
-  if(!name)return;
-  const ver={
-    id:Date.now(),
-    name:name,
-    date:new Date().toLocaleString('ja-JP'),
-    trackCount:tracks.length,
-    tracks:tracks.map(t=>({
-      id:t.id,name:t.name,mode:t.mode,who:t.who,
-      vol:t.vol,pan:t.pan,muted:t.muted,solo:t.solo,
-      hasBuf:!!t.buf,jacket:t.jacket,locked:t.locked,
-      activeTake:t.activeTake,
-      takes:t.takes.map(tk=>({name:tk.name,hasBuf:!!tk.buf})),
-      drawings:t.drawings
-    })),
-    bpm:bpm,
-    theme:currentTheme,
-    loopEnabled:loopEnabled,
-    loopStart:loopStart,
-    loopEnd:loopEnd,
-    markers:markers.slice()
-  };
-  versions.push(ver);
-  try{localStorage.setItem('tf_versions',JSON.stringify(versions))}catch(e){
-    // If storage full, remove oldest version
-    if(versions.length>10){versions.shift();localStorage.setItem('tf_versions',JSON.stringify(versions))}
-  }
-  if(versionPanelOpen)renderVersionList();
-  if(!autoName)notify(`バージョン "${name}" 保存完了`);
-}
-
-function loadVersion(id){
-  const ver=versions.find(v=>v.id===id);
-  if(!ver){notify('バージョンが見つかりません');return}
-  if(!confirm(`"${ver.name}" を読み込みますか？現在の作業は失われます。`))return;
-  // Restore state
-  bpm=ver.bpm||120;
-  document.getElementById('bpmDisplay').textContent=bpm;
-  loopEnabled=ver.loopEnabled||false;
-  loopStart=ver.loopStart||0;
-  loopEnd=ver.loopEnd||10;
-  document.getElementById('btnLoop').classList.toggle('on',loopEnabled);
-  markers=ver.markers||[];
-  if(ver.theme)applyTheme(ver.theme);
-  // Restore track metadata (audio buffers cannot be serialized)
-  tracks=ver.tracks.map(vt=>{
-    const t=mkTrack(vt.name,vt.mode,vt.who);
-    t.id=vt.id;t.vol=vt.vol;t.pan=vt.pan;
-    t.muted=vt.muted;t.solo=vt.solo;
-    t.jacket=vt.jacket;t.locked=vt.locked;
-    t.drawings=vt.drawings||[];
-    t.activeTake=vt.activeTake||0;
-    if(vt.takes)t.takes=vt.takes.map(tk=>({name:tk.name,buf:null,blob:null}));
-    return t;
-  });
-  render();renderMarkers();
-  notify(`"${ver.name}" を復元しました（オーディオデータは再インポートが必要）`);
-}
-
-function deleteVersion(id){
-  versions=versions.filter(v=>v.id!==id);
-  try{localStorage.setItem('tf_versions',JSON.stringify(versions))}catch(e){}
-  renderVersionList();
-  notify('バージョン削除');
-}
-
-function renderVersionList(){
-  const list=document.getElementById('versionList');
-  if(!versions.length){
-    list.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:10px">保存されたバージョンはありません</div>';
-    return;
-  }
-  list.innerHTML=versions.slice().reverse().map(v=>`
-    <div class="version-card">
-      <div class="v-name">${v.name}</div>
-      <div class="v-meta">${v.date} | BPM ${v.bpm||120}</div>
-      <div class="v-tracks">${v.trackCount} tracks | Theme: ${THEMES[v.theme]?.name||'Dark Studio'}</div>
-      <div style="display:flex;gap:4px;margin-top:6px">
-        <button class="rubber-btn" style="flex:1;padding:4px;font-size:9px;color:var(--accent)" onclick="loadVersion(${v.id})">復元</button>
-        <button class="rubber-btn" style="padding:4px 8px;font-size:9px;color:var(--rec)" onclick="deleteVersion(${v.id})">削除</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-function loadVersionsFromStorage(){
-  try{versions=JSON.parse(localStorage.getItem('tf_versions')||'[]')}catch(e){versions=[]}
-}
-
-// Auto-save every 5 minutes
-function startAutoSave(){
-  if(autoSaveTimer)clearInterval(autoSaveTimer);
-  autoSaveTimer=setInterval(()=>{
-    if(tracks.length>0){
-      saveVersion('Auto-save '+new Date().toLocaleTimeString('ja-JP'));
-      const el=document.getElementById('autoSaveStatus');
-      if(el)el.textContent='最終自動保存: '+new Date().toLocaleTimeString('ja-JP');
-    }
-  },5*60*1000);
-}
-
-// ======================================================================
-//  INIT: Load saved state
-// ======================================================================
-function loadSavedState(){
-  // Theme
-  const savedTheme=localStorage.getItem('tf_theme');
-  if(savedTheme&&THEMES[savedTheme]){
-    if(savedTheme==='custom'){
-      try{
-        const ct=JSON.parse(localStorage.getItem('tf_custom_theme'));
-        if(ct)Object.assign(THEMES.custom,ct);
-      }catch(e){}
-    }
-    applyTheme(savedTheme);
-  }
-  // Versions
-  loadVersionsFromStorage();
-  // Drawings
-  loadDrawingsFromStorage();
-  // Start auto-save
-  startAutoSave();
-}
-
-// Patch boot to load saved state
-const _origBoot=boot;
-window.boot=function(){
-  _origBoot();
-  loadSavedState();
-  restoreAllDrawings();
-};
-
-// Patch render to restore drawings after DOM update
-const _origRender=render;
-window.render=function(){
-  _origRender();
-  restoreAllDrawings();
-};
-
-// Add L key for loop toggle
-const _origKeydown=document.onkeydown;
-document.addEventListener('keydown',e=>{
-  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
-  if(e.code==='KeyL'&&!e.ctrlKey){e.preventDefault();toggleLoop()}
 });
 </script>
 </body>

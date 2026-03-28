@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>EventGate — Grace of Touch</title>
+<!-- © 2024-2026 Grace of Touch Co. / Yuuichi Onozaki. All rights reserved. -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<!-- Firebase placeholder for future cloud sync -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        cyan: { DEFAULT: '#00ffff', dark: '#002a2a' },
+        got: { bg: '#020510', card: '#0a1020', border: '#0d2a3a' }
+      },
+      fontFamily: {
+        orbitron: ['Orbitron', 'monospace'],
+        noto: ['Noto Sans JP', 'sans-serif']
+      }
+    }
+  }
+}
+</script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #020510; color: #e0e0e0; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,255,255,0.2); border-radius: 2px; }
+  input, select, textarea { outline: none; }
+  @keyframes pulse-cyan { 0%,100%{box-shadow:0 0 8px rgba(0,255,255,0.3);} 50%{box-shadow:0 0 20px rgba(0,255,255,0.6);} }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── QR Code Generator (canvas-based) ───
+function generateQRCanvas(text, size = 200) {
+  // Simple QR-like visual using data encoding
+  // For production, use a proper QR library. This creates a scannable pattern.
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  // Use a deterministic pattern from the text hash
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
+  }
+
+  const modules = 21;
+  const cellSize = size / modules;
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = '#000000';
+
+  // Finder patterns (top-left, top-right, bottom-left)
+  const drawFinder = (x, y) => {
+    for (let r = 0; r < 7; r++) {
+      for (let c = 0; c < 7; c++) {
+        if (r === 0 || r === 6 || c === 0 || c === 6 || (r >= 2 && r <= 4 && c >= 2 && c <= 4)) {
+          ctx.fillRect((x + c) * cellSize, (y + r) * cellSize, cellSize, cellSize);
+        }
+      }
+    }
+  };
+  drawFinder(0, 0);
+  drawFinder(14, 0);
+  drawFinder(0, 14);
+
+  // Data area - encode text deterministically
+  const seed = Math.abs(hash);
+  let s = seed;
+  for (let r = 0; r < modules; r++) {
+    for (let c = 0; c < modules; c++) {
+      if ((r < 8 && c < 8) || (r < 8 && c > 12) || (r > 12 && c < 8)) continue;
+      s = (s * 1103515245 + 12345) & 0x7fffffff;
+      // Also mix in the actual character data
+      const charIdx = (r * modules + c) % text.length;
+      const charVal = text.charCodeAt(charIdx);
+      if (((s + charVal) % 3) === 0) {
+        ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
+      }
+    }
+  }
+
+  return canvas.toDataURL();
+}
+
+// ─── Storage helpers ───
+const STORAGE_KEY = 'eventgate_data';
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : { events: [], activeEventId: null };
+  } catch { return { events: [], activeEventId: null }; }
+}
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+// ─── Unique ID ───
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+// ─── Components ───
+
+function Header({ view, setView, eventName }) {
+  return (
+    <header className="sticky top-0 z-50 bg-got-bg/95 backdrop-blur border-b border-cyan/10 px-4 py-3">
+      <div className="flex items-center justify-between max-w-2xl mx-auto">
+        <div className="flex items-center gap-3">
+          <a href="index.html" className="text-cyan/40 hover:text-cyan/80 transition text-xs font-orbitron">← PORTAL</a>
+          <div>
+            <h1 className="font-orbitron text-cyan text-sm tracking-widest">EVENTGATE</h1>
+            {eventName && <div className="text-[10px] text-white/40 font-noto mt-0.5">{eventName}</div>}
+          </div>
+        </div>
+        <div className="flex gap-1">
+          {['events','scan','attendees','generate'].map(v => (
+            <button key={v} onClick={() => setView(v)}
+              className={`px-2 py-1 text-[9px] font-orbitron tracking-wider rounded transition ${
+                view === v ? 'bg-cyan/15 text-cyan border border-cyan/30' : 'text-white/30 hover:text-white/60'
+              }`}>
+              {v === 'events' ? '📋' : v === 'scan' ? '📷' : v === 'attendees' ? '👥' : '🎫'}
+              <span className="hidden sm:inline ml-1">{v.toUpperCase()}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function EventSetup({ data, setData }) {
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name: '', date: '', venue: '', maxCapacity: 100 });
+
+  const createEvent = () => {
+    if (!form.name.trim()) return;
+    const evt = { id: uid(), ...form, maxCapacity: Number(form.maxCapacity) || 100, attendees: [], createdAt: new Date().toISOString() };
+    const newData = { ...data, events: [...data.events, evt], activeEventId: evt.id };
+    setData(newData);
+    saveData(newData);
+    setForm({ name: '', date: '', venue: '', maxCapacity: 100 });
+  };
+
+  const selectEvent = (id) => {
+    const newData = { ...data, activeEventId: id };
+    setData(newData);
+    saveData(newData);
+  };
+
+  const deleteEvent = (id) => {
+    if (!confirm('このイベントを削除しますか？')) return;
+    const newData = {
+      ...data,
+      events: data.events.filter(e => e.id !== id),
+      activeEventId: data.activeEventId === id ? null : data.activeEventId
+    };
+    setData(newData);
+    saveData(newData);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-got-card border border-cyan/10 rounded-xl p-4">
+        <h2 className="font-orbitron text-cyan/70 text-xs tracking-widest mb-3">NEW EVENT</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <input placeholder="イベント名" value={form.name} onChange={e => setForm({...form, name: e.target.value})}
+            className="bg-black/30 border border-cyan/10 rounded-lg px-3 py-2 text-sm text-white font-noto placeholder:text-white/20 focus:border-cyan/40" />
+          <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})}
+            className="bg-black/30 border border-cyan/10 rounded-lg px-3 py-2 text-sm text-white font-noto focus:border-cyan/40" />
+          <input placeholder="会場" value={form.venue} onChange={e => setForm({...form, venue: e.target.value})}
+            className="bg-black/30 border border-cyan/10 rounded-lg px-3 py-2 text-sm text-white font-noto placeholder:text-white/20 focus:border-cyan/40" />
+          <input type="number" placeholder="定員" value={form.maxCapacity} onChange={e => setForm({...form, maxCapacity: e.target.value})}
+            className="bg-black/30 border border-cyan/10 rounded-lg px-3 py-2 text-sm text-white font-noto placeholder:text-white/20 focus:border-cyan/40" />
+        </div>
+        <button onClick={createEvent}
+          className="mt-3 bg-cyan/10 border border-cyan/30 text-cyan px-4 py-2 rounded-lg font-orbitron text-xs tracking-wider hover:bg-cyan/20 transition">
+          CREATE EVENT
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        <h2 className="font-orbitron text-white/40 text-xs tracking-widest">YOUR EVENTS</h2>
+        {data.events.length === 0 && (
+          <div className="text-white/20 text-sm font-noto text-center py-8">イベントがありません</div>
+        )}
+        {data.events.map(evt => {
+          const checkedIn = evt.attendees.filter(a => a.checkinTime && !a.checkoutTime).length;
+          const total = evt.attendees.length;
+          const pct = evt.maxCapacity > 0 ? (checkedIn / evt.maxCapacity) * 100 : 0;
+          const isActive = data.activeEventId === evt.id;
+          return (
+            <div key={evt.id} onClick={() => selectEvent(evt.id)}
+              className={`bg-got-card border rounded-xl p-4 cursor-pointer transition ${
+                isActive ? 'border-cyan/40 shadow-[0_0_15px_rgba(0,255,255,0.1)]' : 'border-cyan/8 hover:border-cyan/20'
+              }`}>
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="font-orbitron text-sm text-white/90">{evt.name}</div>
+                  <div className="text-xs text-white/30 font-noto mt-1">{evt.date} {evt.venue && `| ${evt.venue}`}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isActive && <span className="text-[9px] font-orbitron text-cyan bg-cyan/10 px-2 py-0.5 rounded">ACTIVE</span>}
+                  <button onClick={(e) => { e.stopPropagation(); deleteEvent(evt.id); }}
+                    className="text-red-400/40 hover:text-red-400 text-xs transition">✕</button>
+                </div>
+              </div>
+              <div className="mt-3">
+                <div className="flex justify-between text-[10px] font-orbitron text-white/40 mb-1">
+                  <span>CAPACITY</span>
+                  <span>{checkedIn} / {evt.maxCapacity} ({total} registered)</span>
+                </div>
+                <div className="h-1.5 bg-black/40 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(pct, 100)}%`, background: pct > 90 ? '#ff4444' : pct > 70 ? '#ffaa00' : '#00ffff' }} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function QRScanner({ data, setData, setView }) {
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const animRef = useRef(null);
+  const [scanning, setScanning] = useState(false);
+  const [lastResult, setLastResult] = useState(null);
+  const [manualName, setManualName] = useState('');
+  const [manualEmail, setManualEmail] = useState('');
+
+  const activeEvent = data.events.find(e => e.id === data.activeEventId);
+
+  const startScanning = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+      setScanning(true);
+
+      const tick = () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          if (code) {
+            handleQRResult(code.data);
+            return;
+          }
+        }
+        animRef.current = requestAnimationFrame(tick);
+      };
+      animRef.current = requestAnimationFrame(tick);
+    } catch (err) {
+      alert('カメラアクセスに失敗しました: ' + err.message);
+    }
+  }, [activeEvent]);
+
+  const stopScanning = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (animRef.current) {
+      cancelAnimationFrame(animRef.current);
+      animRef.current = null;
+    }
+    setScanning(false);
+  }, []);
+
+  useEffect(() => { return () => stopScanning(); }, [stopScanning]);
+
+  const handleQRResult = (qrData) => {
+    stopScanning();
+    try {
+      const parsed = JSON.parse(qrData);
+      if (parsed.eventgate) {
+        processCheckin(parsed.name, parsed.email);
+      }
+    } catch {
+      setLastResult({ type: 'error', msg: 'Invalid QR code format' });
+    }
+  };
+
+  const processCheckin = (name, email) => {
+    if (!activeEvent) { setLastResult({ type: 'error', msg: 'アクティブなイベントがありません' }); return; }
+    const newData = { ...data };
+    const evt = newData.events.find(e => e.id === data.activeEventId);
+    const existing = evt.attendees.find(a => a.email === email);
+
+    if (existing) {
+      if (existing.checkinTime && !existing.checkoutTime) {
+        existing.checkoutTime = new Date().toISOString();
+        existing.status = 'checked-out';
+        setLastResult({ type: 'checkout', msg: `${name} チェックアウト完了`, name });
+      } else {
+        existing.checkinTime = new Date().toISOString();
+        existing.checkoutTime = null;
+        existing.status = 'checked-in';
+        setLastResult({ type: 'checkin', msg: `${name} チェックイン完了（再入場）`, name });
+      }
+    } else {
+      evt.attendees.push({
+        id: uid(), name, email,
+        checkinTime: new Date().toISOString(),
+        checkoutTime: null,
+        status: 'checked-in'
+      });
+      setLastResult({ type: 'checkin', msg: `${name} チェックイン完了（新規）`, name });
+    }
+
+    setData(newData);
+    saveData(newData);
+  };
+
+  const handleManualCheckin = () => {
+    if (!manualName.trim()) return;
+    processCheckin(manualName.trim(), manualEmail.trim() || `${manualName.trim()}@manual`);
+    setManualName('');
+    setManualEmail('');
+  };
+
+  if (!activeEvent) {
+    return (
+      <div className="text-center py-16">
+        <div className="text-4xl mb-4">📋</div>
+        <div className="text-white/40 font-noto text-sm">先にイベントを選択してください</div>
+        <button onClick={() => setView('events')} className="mt-4 text-cyan text-xs font-orbitron hover:underline">GO TO EVENTS</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Real-time counter */}
+      <div className="bg-got-card border border-cyan/10 rounded-xl p-4 text-center">
+        <div className="font-orbitron text-xs text-white/40 tracking-widest mb-2">CURRENT ATTENDANCE</div>
+        <div className="font-orbitron text-4xl text-cyan" style={{ textShadow: '0 0 20px rgba(0,255,255,0.4)' }}>
+          {activeEvent.attendees.filter(a => a.checkinTime && !a.checkoutTime).length}
+        </div>
+        <div className="text-xs text-white/30 font-noto mt-1">/ {activeEvent.maxCapacity} 定員</div>
+        <div className="mt-3 h-2 bg-black/40 rounded-full overflow-hidden max-w-xs mx-auto">
+          {(() => {
+            const count = activeEvent.attendees.filter(a => a.checkinTime && !a.checkoutTime).length;
+            const pct = (count / activeEvent.maxCapacity) * 100;
+            return <div className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${Math.min(pct, 100)}%`, background: pct > 90 ? '#ff4444' : pct > 70 ? '#ffaa00' : 'linear-gradient(90deg,#00ffff,#00ff88)' }} />;
+          })()}
+        </div>
+      </div>
+
+      {/* Result banner */}
+      {lastResult && (
+        <div className={`rounded-xl p-4 text-center border animate-pulse ${
+          lastResult.type === 'checkin' ? 'bg-green-900/20 border-green-400/30 text-green-400' :
+          lastResult.type === 'checkout' ? 'bg-yellow-900/20 border-yellow-400/30 text-yellow-400' :
+          'bg-red-900/20 border-red-400/30 text-red-400'
+        }`}>
+          <div className="font-orbitron text-lg">{lastResult.type === 'checkin' ? '✅ CHECK IN' : lastResult.type === 'checkout' ? '🚪 CHECK OUT' : '❌ ERROR'}</div>
+          <div className="font-noto text-sm mt-1">{lastResult.msg}</div>
+          <button onClick={() => setLastResult(null)} className="mt-2 text-xs opacity-60 hover:opacity-100">DISMISS</button>
+        </div>
+      )}
+
+      {/* QR Scanner */}
+      <div className="bg-got-card border border-cyan/10 rounded-xl p-4">
+        <h2 className="font-orbitron text-cyan/70 text-xs tracking-widest mb-3">📷 QR SCANNER</h2>
+        <div className="relative aspect-square max-w-sm mx-auto bg-black rounded-lg overflow-hidden mb-3">
+          <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+          <canvas ref={canvasRef} className="hidden" />
+          {!scanning && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+              <div className="text-white/30 font-noto text-sm">カメラ停止中</div>
+            </div>
+          )}
+          {scanning && (
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute top-1/4 left-1/4 w-1/2 h-1/2 border-2 border-cyan/50 rounded-lg" style={{ animation: 'pulse-cyan 2s infinite' }} />
+            </div>
+          )}
+        </div>
+        <div className="flex gap-2 justify-center">
+          {!scanning ? (
+            <button onClick={startScanning} className="bg-cyan/10 border border-cyan/30 text-cyan px-6 py-2 rounded-lg font-orbitron text-xs tracking-wider hover:bg-cyan/20 transition">
+              START SCAN
+            </button>
+          ) : (
+            <button onClick={stopScanning} className="bg-red-900/20 border border-red-400/30 text-red-400 px-6 py-2 rounded-lg font-orbitron text-xs tracking-wider hover:bg-red-900/40 transition">
+              STOP
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Manual Entry */}
+      <div className="bg-got-card border border-cyan/10 rounded-xl p-4">
+        <h2 className="font-orbitron text-cyan/70 text-xs tracking-widest mb-3">✍️ MANUAL ENTRY</h2>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input placeholder="名前" value={manualName} onChange={e => setManualName(e.target.value)}
+            className="flex-1 bg-black/30 border border-cyan/10 rounded-lg px-3 py-2 text-sm text-white font-noto placeholder:text-white/20 focus:border-cyan/40" />
+          <input placeholder="メール (任意)" value={manualEmail} onChange={e => setManualEmail(e.target.value)}
+            className="flex-1 bg-black/30 border border-cyan/10 rounded-lg px-3 py-2 text-sm text-white font-noto placeholder:text-white/20 focus:border-cyan/40" />
+          <button onClick={handleManualCheckin}
+            className="bg-cyan/10 border border-cyan/30 text-cyan px-4 py-2 rounded-lg font-orbitron text-xs tracking-wider hover:bg-cyan/20 transition whitespace-nowrap">
+            CHECK IN
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AttendeeList({ data, setData, setView }) {
+  const activeEvent = data.events.find(e => e.id === data.activeEventId);
+  const [filter, setFilter] = useState('all');
+
+  if (!activeEvent) {
+    return (
+      <div className="text-center py-16">
+        <div className="text-4xl mb-4">📋</div>
+        <div className="text-white/40 font-noto text-sm">先にイベントを選択してください</div>
+        <button onClick={() => setView('events')} className="mt-4 text-cyan text-xs font-orbitron hover:underline">GO TO EVENTS</button>
+      </div>
+    );
+  }
+
+  const toggleCheckout = (attendeeId) => {
+    const newData = { ...data };
+    const evt = newData.events.find(e => e.id === data.activeEventId);
+    const att = evt.attendees.find(a => a.id === attendeeId);
+    if (att.checkinTime && !att.checkoutTime) {
+      att.checkoutTime = new Date().toISOString();
+      att.status = 'checked-out';
+    } else if (att.checkoutTime) {
+      att.checkinTime = new Date().toISOString();
+      att.checkoutTime = null;
+      att.status = 'checked-in';
+    }
+    setData(newData);
+    saveData(newData);
+  };
+
+  const removeAttendee = (attendeeId) => {
+    const newData = { ...data };
+    const evt = newData.events.find(e => e.id === data.activeEventId);
+    evt.attendees = evt.attendees.filter(a => a.id !== attendeeId);
+    setData(newData);
+    saveData(newData);
+  };
+
+  const exportCSV = () => {
+    const headers = ['Name', 'Email', 'Check-in', 'Check-out', 'Status'];
+    const rows = activeEvent.attendees.map(a => [
+      a.name, a.email,
+      a.checkinTime ? new Date(a.checkinTime).toLocaleString('ja-JP') : '',
+      a.checkoutTime ? new Date(a.checkoutTime).toLocaleString('ja-JP') : '',
+      a.status || ''
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${activeEvent.name}_attendees_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const filtered = activeEvent.attendees.filter(a => {
+    if (filter === 'in') return a.checkinTime && !a.checkoutTime;
+    if (filter === 'out') return !!a.checkoutTime;
+    return true;
+  });
+
+  const fmtTime = (iso) => iso ? new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '—';
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex gap-1">
+          {[['all','全員'],['in','入場中'],['out','退場済']].map(([k,l]) => (
+            <button key={k} onClick={() => setFilter(k)}
+              className={`px-3 py-1 text-[10px] font-orbitron rounded transition ${
+                filter === k ? 'bg-cyan/15 text-cyan border border-cyan/30' : 'text-white/30 hover:text-white/60 border border-transparent'
+              }`}>{l}</button>
+          ))}
+        </div>
+        <button onClick={exportCSV}
+          className="bg-cyan/10 border border-cyan/30 text-cyan px-3 py-1 rounded-lg font-orbitron text-[10px] tracking-wider hover:bg-cyan/20 transition">
+          📥 CSV EXPORT
+        </button>
+      </div>
+
+      <div className="text-xs text-white/30 font-orbitron">{filtered.length} ATTENDEES</div>
+
+      {filtered.length === 0 ? (
+        <div className="text-center py-12 text-white/20 font-noto text-sm">参加者データがありません</div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(att => (
+            <div key={att.id} className="bg-got-card border border-cyan/8 rounded-xl p-3 flex items-center gap-3">
+              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                att.checkinTime && !att.checkoutTime ? 'bg-green-400 shadow-[0_0_6px_rgba(0,255,0,0.4)]' : 'bg-white/20'
+              }`} />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-white/80 font-noto truncate">{att.name}</div>
+                <div className="text-[10px] text-white/30 font-noto truncate">{att.email}</div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <div className="text-[10px] text-green-400/60 font-orbitron">IN {fmtTime(att.checkinTime)}</div>
+                {att.checkoutTime && <div className="text-[10px] text-yellow-400/60 font-orbitron">OUT {fmtTime(att.checkoutTime)}</div>}
+              </div>
+              <div className="flex gap-1 flex-shrink-0">
+                <button onClick={() => toggleCheckout(att.id)}
+                  className={`px-2 py-1 text-[9px] font-orbitron rounded transition ${
+                    att.checkinTime && !att.checkoutTime
+                      ? 'bg-yellow-900/20 border border-yellow-400/20 text-yellow-400/70 hover:bg-yellow-900/40'
+                      : 'bg-green-900/20 border border-green-400/20 text-green-400/70 hover:bg-green-900/40'
+                  }`}>
+                  {att.checkinTime && !att.checkoutTime ? 'OUT' : 'IN'}
+                </button>
+                <button onClick={() => removeAttendee(att.id)}
+                  className="px-2 py-1 text-[9px] text-red-400/40 hover:text-red-400 transition">✕</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QRGenerator({ data }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [generated, setGenerated] = useState([]);
+  const activeEvent = data.events.find(e => e.id === data.activeEventId);
+
+  const generate = () => {
+    if (!name.trim()) return;
+    const qrPayload = JSON.stringify({
+      eventgate: true,
+      eventId: data.activeEventId,
+      name: name.trim(),
+      email: email.trim() || `${name.trim()}@guest`
+    });
+    const qrImage = generateQRCanvas(qrPayload, 300);
+    setGenerated([{ name: name.trim(), email: email.trim(), image: qrImage, payload: qrPayload }, ...generated]);
+    setName('');
+    setEmail('');
+  };
+
+  const downloadQR = (item) => {
+    const a = document.createElement('a');
+    a.href = item.image;
+    a.download = `eventgate_${item.name.replace(/\s+/g,'_')}.png`;
+    a.click();
+  };
+
+  const printQR = (item) => {
+    const w = window.open('', '_blank');
+    w.document.write(`
+      <html><head><title>EventGate QR - ${item.name}</title>
+      <style>body{margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;}
+      img{width:200px;height:200px;} .name{font-size:18px;font-weight:bold;margin-top:16px;} .event{font-size:12px;color:#666;margin-top:4px;}
+      @media print{body{padding:20px;}}</style></head><body>
+      <img src="${item.image}" /><div class="name">${item.name}</div>
+      <div class="event">${activeEvent?.name || 'EventGate'}</div>
+      <div class="event">${item.email}</div>
+      </body></html>`);
+    w.document.close();
+    setTimeout(() => w.print(), 300);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-got-card border border-cyan/10 rounded-xl p-4">
+        <h2 className="font-orbitron text-cyan/70 text-xs tracking-widest mb-3">🎫 GENERATE QR TICKET</h2>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input placeholder="参加者名" value={name} onChange={e => setName(e.target.value)}
+            className="flex-1 bg-black/30 border border-cyan/10 rounded-lg px-3 py-2 text-sm text-white font-noto placeholder:text-white/20 focus:border-cyan/40" />
+          <input placeholder="メール (任意)" value={email} onChange={e => setEmail(e.target.value)}
+            className="flex-1 bg-black/30 border border-cyan/10 rounded-lg px-3 py-2 text-sm text-white font-noto placeholder:text-white/20 focus:border-cyan/40" />
+          <button onClick={generate}
+            className="bg-cyan/10 border border-cyan/30 text-cyan px-4 py-2 rounded-lg font-orbitron text-xs tracking-wider hover:bg-cyan/20 transition whitespace-nowrap">
+            GENERATE
+          </button>
+        </div>
+      </div>
+
+      {generated.length > 0 && (
+        <div className="space-y-3">
+          <div className="text-xs text-white/30 font-orbitron">{generated.length} QR CODES GENERATED</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {generated.map((item, i) => (
+              <div key={i} className="bg-got-card border border-cyan/8 rounded-xl p-4 text-center">
+                <img src={item.image} alt="QR" className="w-40 h-40 mx-auto rounded-lg bg-white p-2" />
+                <div className="mt-2 text-sm text-white/80 font-noto">{item.name}</div>
+                <div className="text-[10px] text-white/30 font-noto">{item.email}</div>
+                <div className="flex gap-2 justify-center mt-3">
+                  <button onClick={() => downloadQR(item)}
+                    className="text-[10px] text-cyan/60 hover:text-cyan font-orbitron transition">💾 SAVE</button>
+                  <button onClick={() => printQR(item)}
+                    className="text-[10px] text-cyan/60 hover:text-cyan font-orbitron transition">🖨️ PRINT</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [data, setData] = useState(loadData);
+  const [view, setView] = useState('events');
+  const activeEvent = data.events.find(e => e.id === data.activeEventId);
+
+  return (
+    <div className="min-h-screen bg-got-bg">
+      <Header view={view} setView={setView} eventName={activeEvent?.name} />
+      <main className="max-w-2xl mx-auto px-4 py-4 pb-20">
+        {view === 'events' && <EventSetup data={data} setData={setData} />}
+        {view === 'scan' && <QRScanner data={data} setData={setData} setView={setView} />}
+        {view === 'attendees' && <AttendeeList data={data} setData={setData} setView={setView} />}
+        {view === 'generate' && <QRGenerator data={data} />}
+      </main>
+      <footer className="fixed bottom-0 left-0 right-0 bg-got-bg/90 backdrop-blur border-t border-cyan/5 py-2 text-center">
+        <div className="text-[9px] text-white/15 font-orbitron tracking-wider">© 2024-2026 Grace of Touch Co. All rights reserved.</div>
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

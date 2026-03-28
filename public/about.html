@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="&copy; 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>About — Grace of Touch</title>
+<!-- &copy; 2024-2026 Grace of Touch Co. / Yuuichi Onozaki. All rights reserved.
+     Unauthorized copying, modification, or distribution is strictly prohibited. -->
+<script></script>
+<meta name="theme-color" content="#00ffff">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ===================== RESET & BASE ===================== */
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  background:#020510;color:#e0e0e0;
+  font-family:'Noto Sans JP',sans-serif;font-weight:300;
+  line-height:1.8;overflow-x:hidden;
+  -webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;
+}
+
+/* ===================== ANTI-COPY ===================== */
+body{-webkit-touch-callout:none;}
+
+/* ===================== CSS VARIABLES ===================== */
+:root{
+  --cyan:#00d8ff;--cyan-dim:rgba(0,216,255,0.15);--cyan-glow:rgba(0,216,255,0.4);
+  --green:#00ff88;--gold:#c9a96e;
+  --bg-dark:#020510;--bg-card:rgba(0,216,255,0.03);
+  --font-head:'Orbitron',monospace;--font-body:'Noto Sans JP',sans-serif;
+}
+
+/* ===================== ANIMATED BACKGROUND ===================== */
+#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;}
+
+/* ===================== BACK BUTTON ===================== */
+.back-btn{
+  position:fixed;top:24px;left:24px;z-index:100;
+  display:flex;align-items:center;gap:8px;
+  background:rgba(0,216,255,0.04);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border:1px solid rgba(0,216,255,0.18);border-radius:10px;
+  padding:10px 18px;cursor:pointer;text-decoration:none;
+  transition:all 0.3s ease;
+}
+.back-btn:hover{background:rgba(0,216,255,0.1);border-color:rgba(0,216,255,0.45);box-shadow:0 0 20px rgba(0,216,255,0.15);}
+.back-btn svg{width:16px;height:16px;fill:var(--cyan);opacity:0.8;}
+.back-btn span{font-family:var(--font-head);font-size:9px;color:var(--cyan);letter-spacing:0.15em;opacity:0.7;}
+
+/* ===================== SCROLL CONTAINER ===================== */
+.scroll-wrap{position:relative;z-index:1;}
+
+/* ===================== SECTION BASE ===================== */
+section{padding:100px 24px;max-width:960px;margin:0 auto;opacity:0;transform:translateY(40px);transition:opacity 0.8s ease,transform 0.8s ease;}
+section.visible{opacity:1;transform:translateY(0);}
+
+/* ===================== HERO ===================== */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding-top:60px;}
+.hero-pre{font-family:var(--font-head);font-size:clamp(9px,1.2vw,12px);color:rgba(0,216,255,0.4);letter-spacing:0.5em;margin-bottom:20px;}
+.hero-title{
+  font-family:var(--font-head);font-weight:900;
+  font-size:clamp(36px,8vw,80px);color:var(--cyan);letter-spacing:0.1em;
+  text-shadow:0 0 20px var(--cyan-glow),0 0 40px rgba(0,216,255,0.2);
+  animation:heroGlow 3s ease-in-out infinite alternate;line-height:1.1;
+}
+@keyframes heroGlow{
+  from{text-shadow:0 0 20px var(--cyan-glow),0 0 40px rgba(0,216,255,0.2);}
+  to{text-shadow:0 0 30px rgba(0,216,255,0.6),0 0 60px rgba(0,216,255,0.3),0 0 100px rgba(0,216,255,0.15);}
+}
+.hero-tagline{
+  font-family:var(--font-body);font-weight:300;
+  font-size:clamp(13px,2vw,20px);color:rgba(255,255,255,0.55);
+  letter-spacing:0.15em;margin-top:28px;max-width:600px;
+}
+.hero-scroll-hint{
+  font-family:var(--font-head);font-size:10px;color:rgba(0,216,255,0.35);
+  letter-spacing:0.25em;margin-top:80px;animation:blink 2.5s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:0.3;}50%{opacity:1;}}
+
+/* ===================== SECTION TITLE ===================== */
+.section-label{
+  font-family:var(--font-head);font-size:clamp(8px,1vw,10px);
+  color:rgba(0,216,255,0.4);letter-spacing:0.4em;margin-bottom:8px;
+}
+.section-title{
+  font-family:var(--font-head);font-weight:700;
+  font-size:clamp(20px,4vw,36px);color:#fff;letter-spacing:0.08em;margin-bottom:32px;
+}
+.section-title span{color:var(--cyan);}
+
+/* ===================== ABOUT SECTION ===================== */
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+.about-text{font-size:14px;color:rgba(255,255,255,0.6);line-height:2;}
+.about-meta{display:flex;flex-direction:column;gap:16px;}
+.meta-item{
+  background:var(--bg-card);border:1px solid rgba(0,216,255,0.08);
+  border-radius:12px;padding:18px 20px;
+}
+.meta-label{font-family:var(--font-head);font-size:8px;color:rgba(0,216,255,0.4);letter-spacing:0.3em;margin-bottom:6px;}
+.meta-value{font-family:var(--font-body);font-size:15px;color:rgba(255,255,255,0.8);font-weight:400;}
+
+/* ===================== OPERATOR SECTION ===================== */
+.operator-card{
+  background:var(--bg-card);border:1px solid rgba(0,216,255,0.1);
+  border-radius:16px;padding:36px;display:flex;align-items:flex-start;gap:28px;
+}
+.operator-avatar{
+  width:80px;height:80px;border-radius:50%;flex-shrink:0;
+  background:linear-gradient(135deg,rgba(0,216,255,0.15),rgba(0,255,136,0.1));
+  border:2px solid rgba(0,216,255,0.25);
+  display:flex;align-items:center;justify-content:center;
+  font-size:36px;
+}
+.operator-name{font-family:var(--font-head);font-size:18px;color:#fff;letter-spacing:0.06em;}
+.operator-name-jp{font-family:var(--font-body);font-size:13px;color:rgba(255,255,255,0.4);margin-top:4px;}
+.operator-role{font-family:var(--font-head);font-size:9px;color:var(--cyan);letter-spacing:0.2em;margin-top:10px;opacity:0.7;}
+.operator-bio{font-size:13px;color:rgba(255,255,255,0.5);line-height:1.9;margin-top:14px;}
+
+/* ===================== SERVICES ===================== */
+.services-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;}
+.service-card{
+  background:var(--bg-card);border:1px solid rgba(0,216,255,0.08);
+  border-radius:14px;padding:24px;transition:all 0.3s ease;position:relative;overflow:hidden;
+}
+.service-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:0;transition:opacity 0.3s;
+}
+.service-card:hover{border-color:rgba(0,216,255,0.25);transform:translateY(-4px);box-shadow:0 8px 32px rgba(0,216,255,0.06);}
+.service-card:hover::before{opacity:1;}
+.service-icon{font-size:28px;margin-bottom:12px;}
+.service-name{font-family:var(--font-head);font-size:13px;color:var(--cyan);letter-spacing:0.04em;margin-bottom:6px;}
+.service-desc{font-size:12px;color:rgba(255,255,255,0.45);line-height:1.7;}
+.service-tags{display:flex;gap:5px;margin-top:10px;flex-wrap:wrap;}
+.service-tag{
+  font-family:var(--font-head);font-size:7px;
+  color:rgba(0,216,255,0.55);background:rgba(0,216,255,0.07);
+  border:1px solid rgba(0,216,255,0.18);border-radius:4px;padding:2px 7px;letter-spacing:0.12em;
+}
+
+/* ===================== PORTFOLIO ===================== */
+.portfolio-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;}
+.portfolio-card{
+  background:var(--bg-card);border:1px solid rgba(0,216,255,0.08);
+  border-radius:14px;padding:24px;cursor:pointer;
+  transition:all 0.3s ease;text-decoration:none;display:block;
+}
+.portfolio-card:hover{border-color:rgba(0,216,255,0.3);transform:translateY(-4px);box-shadow:0 8px 32px rgba(0,216,255,0.08);}
+.portfolio-top{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.portfolio-icon{font-size:28px;}
+.portfolio-name{font-family:var(--font-head);font-size:13px;color:var(--cyan);letter-spacing:0.04em;}
+.portfolio-ver{font-family:var(--font-head);font-size:9px;color:rgba(0,216,255,0.4);letter-spacing:0.1em;}
+.portfolio-desc{font-size:12px;color:rgba(255,255,255,0.45);line-height:1.7;}
+.portfolio-tags{display:flex;gap:5px;margin-top:10px;flex-wrap:wrap;}
+.portfolio-tag{
+  font-family:var(--font-head);font-size:7px;
+  color:rgba(0,216,255,0.55);background:rgba(0,216,255,0.07);
+  border:1px solid rgba(0,216,255,0.18);border-radius:4px;padding:2px 7px;letter-spacing:0.12em;
+}
+.portfolio-link{
+  display:inline-flex;align-items:center;gap:6px;margin-top:12px;
+  font-family:var(--font-head);font-size:8px;color:rgba(0,216,255,0.4);letter-spacing:0.22em;
+  transition:color 0.3s;
+}
+.portfolio-card:hover .portfolio-link{color:rgba(0,216,255,0.75);}
+.portfolio-link::after{content:'\203A';font-size:14px;line-height:1;}
+
+/* ===================== TECH STACK ===================== */
+.tech-wrap{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;}
+.tech-tag{
+  font-family:var(--font-head);font-size:11px;font-weight:400;
+  color:rgba(0,216,255,0.7);background:rgba(0,216,255,0.05);
+  border:1px solid rgba(0,216,255,0.2);border-radius:8px;
+  padding:10px 20px;letter-spacing:0.08em;transition:all 0.3s;
+}
+.tech-tag:hover{background:rgba(0,216,255,0.1);border-color:rgba(0,216,255,0.4);box-shadow:0 0 16px rgba(0,216,255,0.1);transform:translateY(-2px);}
+
+/* ===================== ORIGIN STORY ===================== */
+.origin-quote{
+  border-left:2px solid rgba(0,216,255,0.3);padding-left:24px;
+  font-size:15px;color:rgba(255,255,255,0.55);line-height:2;
+  font-style:italic;max-width:700px;
+}
+.origin-quote em{font-style:normal;color:var(--cyan);opacity:0.8;}
+
+/* ===================== CONTACT ===================== */
+.contact-box{
+  background:var(--bg-card);border:1px solid rgba(0,216,255,0.1);
+  border-radius:16px;padding:36px;max-width:600px;margin:0 auto;
+}
+.contact-msg{font-size:14px;color:rgba(255,255,255,0.5);text-align:center;margin-bottom:24px;line-height:1.8;}
+.contact-field{
+  width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(0,216,255,0.1);
+  border-radius:8px;color:#d8d8d8;font-family:var(--font-body);font-size:13px;
+  padding:12px 16px;outline:none;margin-bottom:12px;transition:border-color 0.3s;
+  -webkit-user-select:text;-moz-user-select:text;-ms-user-select:text;user-select:text;
+}
+.contact-field:focus{border-color:rgba(0,216,255,0.35);}
+textarea.contact-field{min-height:120px;resize:vertical;}
+.contact-send{
+  font-family:var(--font-head);font-size:10px;letter-spacing:0.15em;
+  color:var(--cyan);background:rgba(0,216,255,0.08);
+  border:1px solid rgba(0,216,255,0.25);border-radius:8px;
+  padding:12px 32px;cursor:pointer;transition:all 0.3s;
+}
+.contact-send:hover{background:rgba(0,216,255,0.15);border-color:rgba(0,216,255,0.5);box-shadow:0 0 20px rgba(0,216,255,0.15);}
+
+/* ===================== FOOTER ===================== */
+.site-footer{
+  text-align:center;padding:60px 24px 40px;
+  border-top:1px solid rgba(0,216,255,0.06);
+}
+.footer-brand{font-family:var(--font-head);font-size:14px;color:rgba(0,216,255,0.3);letter-spacing:0.15em;}
+.footer-copy{font-family:var(--font-head);font-size:8px;color:rgba(255,255,255,0.15);letter-spacing:0.18em;margin-top:12px;}
+.footer-link{color:rgba(0,216,255,0.3);text-decoration:none;transition:color 0.3s;}
+.footer-link:hover{color:var(--cyan);}
+
+/* ===================== RESPONSIVE ===================== */
+@media(max-width:640px){
+  section{padding:60px 16px;}
+  .about-grid{grid-template-columns:1fr;}
+  .operator-card{flex-direction:column;align-items:center;text-align:center;padding:24px;}
+  .services-grid{grid-template-columns:1fr;}
+  .portfolio-grid{grid-template-columns:1fr;}
+  .contact-box{padding:24px 16px;}
+}
+</style>
+</head>
+<body>
+
+<!-- ======= ANIMATED BACKGROUND ======= -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- ======= BACK TO PORTAL ======= -->
+<a href="index.html" class="back-btn">
+  <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+  <span>PORTAL</span>
+</a>
+
+<!-- ======= SCROLL CONTENT ======= -->
+<div class="scroll-wrap">
+
+  <!-- ===== HERO ===== -->
+  <section class="hero visible">
+    <div class="hero-pre">ABOUT</div>
+    <div class="hero-title">GRACE<br>OF TOUCH</div>
+    <div class="hero-tagline">アプリのDIY &mdash; 唯一無二のデジタル体験を創る</div>
+    <div class="hero-scroll-hint">&darr; SCROLL TO EXPLORE &darr;</div>
+  </section>
+
+  <!-- ===== ABOUT ===== -->
+  <section id="about">
+    <div class="section-label">ABOUT US</div>
+    <div class="section-title">Grace of <span>Touch</span> とは</div>
+    <div class="about-grid">
+      <div class="about-text">
+        テクノロジーとクリエイティビティの融合で、誰もが体験したことのないデジタル空間を創造する。
+        <br><br>
+        インフラ点検AI、宇宙シミュレーション、ドローン安全訓練、イベント管理 &mdash;
+        一見バラバラに見えるこれらのプロジェクトに共通するのは、
+        「触れた瞬間にわかる品質」と「実用と遊び心の両立」です。
+        <br><br>
+        全てのアプリケーションはブラウザだけで動作する、ビルド不要のシングルファイルアーキテクチャ。
+        誰でもどこからでもアクセスできる、開かれたデジタル体験を提供します。
+      </div>
+      <div class="about-meta">
+        <div class="meta-item">
+          <div class="meta-label">FOUNDED</div>
+          <div class="meta-value">2024</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">LOCATION</div>
+          <div class="meta-value">Japan</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">PHILOSOPHY</div>
+          <div class="meta-value">Single-File Architecture</div>
+        </div>
+        <div class="meta-item">
+          <div class="meta-label">PORTAL</div>
+          <div class="meta-value">grace-of-touch.web.app</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ORIGIN ===== -->
+  <section id="origin">
+    <div class="section-label">OUR STORY</div>
+    <div class="section-title"><span>きっかけ</span></div>
+    <div class="origin-quote">
+      バイブコーディングの時代、AIの力で誰でもアプリが作れるようになった。
+      だからこそ問いかける &mdash; <em>「私たちにしかできないものは何か」</em>と。
+      <br><br>
+      インフラの安全を守る技術と、宇宙を夢見るクリエイティビティ。
+      現場の泥臭い課題解決と、子供のような好奇心。
+      その両方を一つのポータルに集めたのが Grace of Touch です。
+      <br><br>
+      一つひとつのアプリに、修正を重ね、判断を重ね、
+      人間の創作的関与を証明できる &mdash; それが私たちの誇りです。
+    </div>
+  </section>
+
+  <!-- ===== OPERATOR ===== -->
+  <section id="operator">
+    <div class="section-label">OPERATOR</div>
+    <div class="section-title"><span>代表者</span></div>
+    <div class="operator-card">
+      <div class="operator-avatar">Y</div>
+      <div>
+        <div class="operator-name">Yuuichi Onozaki</div>
+        <div class="operator-name-jp">小野崎 悠一</div>
+        <div class="operator-role">FOUNDER / DEVELOPER / CREATOR</div>
+        <div class="operator-bio">
+          インフラ点検業界のDX推進とクリエイティブテクノロジーの融合を手がける。
+          トンネル・外壁のAI画像解析からドローンシミュレーション、宇宙物理シミュレーター、
+          音楽制作ツールまで、領域を超えたプロダクト開発を一人で行う。
+          <br><br>
+          一等無人航空機操縦士の知見を活かし、ドローン安全運航支援アプリ DroneGuard や
+          点検業務シミュレーター TunnelDrone を開発。
+          全プロダクトの著作権証明と知財保護を重視し、Creator Provenance システムを構築。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SERVICES ===== -->
+  <section id="services">
+    <div class="section-label">SERVICES</div>
+    <div class="section-title">サービス<span>一覧</span></div>
+    <div class="services-grid">
+      <div class="service-card">
+        <div class="service-icon">🔍</div>
+        <div class="service-name">InfraScan AI</div>
+        <div class="service-desc">トンネル・壁面のひび割れをAIが自動検出。経年変化追跡、幅計測、DXFレイヤー出力に対応。点検業務のDXを推進します。</div>
+        <div class="service-tags"><span class="service-tag">AI</span><span class="service-tag">INSPECTION</span><span class="service-tag">DXF</span></div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🚁</div>
+        <div class="service-name">ドローンシミュレーション</div>
+        <div class="service-desc">点検業務の安全訓練をブラウザ上で実現。自動飛行、LiDAR可視化、損傷検出AIを搭載したリアルなシミュレーター。</div>
+        <div class="service-tags"><span class="service-tag">DRONE</span><span class="service-tag">TRAINING</span><span class="service-tag">SAFETY</span></div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">📋</div>
+        <div class="service-name">イベント管理システム</div>
+        <div class="service-desc">入退場管理、電子同意書、QRコード発行を一括処理。スマートフォン対応の現場運営プラットフォーム。</div>
+        <div class="service-tags"><span class="service-tag">EVENT</span><span class="service-tag">QR</span><span class="service-tag">MANAGEMENT</span></div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🚀</div>
+        <div class="service-name">宇宙シミュレーター</div>
+        <div class="service-desc">リアルな物理演算による太陽系探索と宇宙体験。天文工学ライブラリを活用した精密な天体シミュレーション。</div>
+        <div class="service-tags"><span class="service-tag">SPACE</span><span class="service-tag">PHYSICS</span><span class="service-tag">3D</span></div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">💻</div>
+        <div class="service-name">カスタムWebアプリ開発</div>
+        <div class="service-desc">業務課題に合わせたオーダーメイドWebアプリケーション。ビルド不要・ブラウザ完結のシングルファイル設計。</div>
+        <div class="service-tags"><span class="service-tag">CUSTOM</span><span class="service-tag">WEB</span><span class="service-tag">B2B</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== PORTFOLIO ===== -->
+  <section id="portfolio">
+    <div class="section-label">PORTFOLIO</div>
+    <div class="section-title"><span>実績</span></div>
+    <div class="portfolio-grid">
+
+      <a href="rocket.html" class="portfolio-card">
+        <div class="portfolio-top">
+          <div class="portfolio-icon">🚀</div>
+          <div>
+            <div class="portfolio-name">Mega Rocket Explorer</div>
+            <div class="portfolio-ver">v70</div>
+          </div>
+        </div>
+        <div class="portfolio-desc">リアル物理演算の宇宙シミュレーター。太陽系7天体、地震リアルタイムモニター、FPS搭乗視点、宇宙エレベーターを搭載。</div>
+        <div class="portfolio-tags">
+          <span class="portfolio-tag">THREE.JS</span><span class="portfolio-tag">PHYSICS</span><span class="portfolio-tag">SPACE</span>
+        </div>
+        <div class="portfolio-link">VIEW PROJECT</div>
+      </a>
+
+      <a href="tunneldrone.html" class="portfolio-card">
+        <div class="portfolio-top">
+          <div class="portfolio-icon">🚁</div>
+          <div>
+            <div class="portfolio-name">TunnelDrone Simulator</div>
+            <div class="portfolio-ver">v9</div>
+          </div>
+        </div>
+        <div class="portfolio-desc">トンネル点検ドローンシミュレータ。自動飛行イージング、LiDAR可視化、損傷検出AI、DXF/JSON出力に対応。</div>
+        <div class="portfolio-tags">
+          <span class="portfolio-tag">DRONE</span><span class="portfolio-tag">INSPECTION</span><span class="portfolio-tag">AI</span>
+        </div>
+        <div class="portfolio-link">VIEW PROJECT</div>
+      </a>
+
+      <a href="wallguard.html" class="portfolio-card">
+        <div class="portfolio-top">
+          <div class="portfolio-icon">&#128737;&#65039;</div>
+          <div>
+            <div class="portfolio-name">WallGuard FlickCheck</div>
+            <div class="portfolio-ver"></div>
+          </div>
+        </div>
+        <div class="portfolio-desc">外壁点検AIチームツール。マーカー配置、安全コックピット、PTT通話、チームコラボレーション機能を統合。</div>
+        <div class="portfolio-tags">
+          <span class="portfolio-tag">SAFETY</span><span class="portfolio-tag">TEAM</span><span class="portfolio-tag">INSPECTION</span>
+        </div>
+        <div class="portfolio-link">VIEW PROJECT</div>
+      </a>
+
+      <a href="/trackforge/" class="portfolio-card">
+        <div class="portfolio-top">
+          <div class="portfolio-icon">🎛️</div>
+          <div>
+            <div class="portfolio-name">TrackForge MTR</div>
+            <div class="portfolio-ver">v0.3</div>
+          </div>
+        </div>
+        <div class="portfolio-desc">デジタルMTRと音楽コラボプラットフォーム。録音・ミックス・マスタリング・歌詞カード・貢献証明書を統合。</div>
+        <div class="portfolio-tags">
+          <span class="portfolio-tag">MUSIC</span><span class="portfolio-tag">WEB AUDIO</span><span class="portfolio-tag">COLLAB</span>
+        </div>
+        <div class="portfolio-link">VIEW PROJECT</div>
+      </a>
+
+      <a href="provenance.html" class="portfolio-card">
+        <div class="portfolio-top">
+          <div class="portfolio-icon">📜</div>
+          <div>
+            <div class="portfolio-name">Creator Provenance</div>
+            <div class="portfolio-ver"></div>
+          </div>
+        </div>
+        <div class="portfolio-desc">創作物に証明番号を付与する知財管理システム。著作権証拠の記録とタイムスタンプによる改竄防止。</div>
+        <div class="portfolio-tags">
+          <span class="portfolio-tag">IP</span><span class="portfolio-tag">CERT</span><span class="portfolio-tag">PROOF</span>
+        </div>
+        <div class="portfolio-link">VIEW PROJECT</div>
+      </a>
+
+      <div class="portfolio-card" style="cursor:default;">
+        <div class="portfolio-top">
+          <div class="portfolio-icon">🎪</div>
+          <div>
+            <div class="portfolio-name">DreamOn Event Platform</div>
+            <div class="portfolio-ver"></div>
+          </div>
+        </div>
+        <div class="portfolio-desc">イベント入退場管理、電子同意書、QRコード発行、リアルタイム参加者トラッキングを統合した運営プラットフォーム。</div>
+        <div class="portfolio-tags">
+          <span class="portfolio-tag">EVENT</span><span class="portfolio-tag">QR</span><span class="portfolio-tag">FIREBASE</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== TECH STACK ===== -->
+  <section id="tech">
+    <div class="section-label">TECHNOLOGY</div>
+    <div class="section-title">テクノロジー<span>スタック</span></div>
+    <div class="tech-wrap">
+      <div class="tech-tag">Three.js</div>
+      <div class="tech-tag">React</div>
+      <div class="tech-tag">Firebase</div>
+      <div class="tech-tag">Web Audio API</div>
+      <div class="tech-tag">Canvas API</div>
+      <div class="tech-tag">Node.js</div>
+      <div class="tech-tag">Python</div>
+      <div class="tech-tag">DJI SDK</div>
+      <div class="tech-tag">WebGL</div>
+      <div class="tech-tag">R3F</div>
+      <div class="tech-tag">Astronomy Engine</div>
+      <div class="tech-tag">Sharp</div>
+    </div>
+  </section>
+
+  <!-- ===== CONTACT ===== -->
+  <section id="contact">
+    <div class="section-label">CONTACT</div>
+    <div class="section-title">お問い<span>合わせ</span></div>
+    <div class="contact-box">
+      <div class="contact-msg">
+        制作のご依頼・ご相談はお気軽にどうぞ。<br>
+        内容を確認の上、折り返しご連絡いたします。
+      </div>
+      <input class="contact-field" type="text" placeholder="お名前">
+      <input class="contact-field" type="email" placeholder="メールアドレス">
+      <textarea class="contact-field" placeholder="ご要望・ご相談内容をご記入ください..."></textarea>
+      <div style="text-align:center;margin-top:8px;">
+        <button class="contact-send" onclick="alert('お問い合わせありがとうございます。現在フォームは準備中です。grace-of-touch.web.app ポータルからログインしてメッセージをお送りください。')">SEND MESSAGE</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="site-footer">
+    <div class="footer-brand">GRACE OF TOUCH</div>
+    <div class="footer-copy">
+      &copy; 2024-2026 Grace of Touch Co. / Yuuichi Onozaki &middot; ALL RIGHTS RESERVED
+      <br><br>
+      <a href="index.html" class="footer-link">PORTAL</a> &nbsp;&middot;&nbsp;
+      <a href="provenance.html" class="footer-link">PROVENANCE</a>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+/* ===================== ANTI-COPY PROTECTION ===================== */
+document.addEventListener('contextmenu',function(e){e.preventDefault();});
+document.addEventListener('keydown',function(e){
+  if((e.ctrlKey||e.metaKey)&&(e.key==='u'||e.key==='s'||e.key==='c')){e.preventDefault();}
+  if(e.key==='F12'){e.preventDefault();}
+  if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==='I'||e.key==='J'||e.key==='C')){e.preventDefault();}
+});
+document.addEventListener('selectstart',function(e){
+  if(e.target.classList.contains('contact-field'))return;
+  e.preventDefault();
+});
+document.addEventListener('dragstart',function(e){e.preventDefault();});
+
+/* ===================== BACKGROUND PARTICLES ===================== */
+(function(){
+  const canvas=document.getElementById('bg-canvas');
+  const ctx=canvas.getContext('2d');
+  let w,h,stars=[];
+  const STAR_COUNT=200;
+
+  function resize(){
+    w=canvas.width=window.innerWidth;
+    h=canvas.height=window.innerHeight;
+  }
+  function initStars(){
+    stars=[];
+    for(let i=0;i<STAR_COUNT;i++){
+      stars.push({
+        x:Math.random()*w,
+        y:Math.random()*h,
+        r:Math.random()*1.5+0.3,
+        a:Math.random()*0.6+0.1,
+        dx:(Math.random()-0.5)*0.15,
+        dy:(Math.random()-0.5)*0.1,
+        pulse:Math.random()*Math.PI*2,
+        pulseSpeed:Math.random()*0.02+0.005
+      });
+    }
+  }
+  function draw(){
+    ctx.clearRect(0,0,w,h);
+
+    /* Subtle gradient overlay */
+    const g=ctx.createRadialGradient(w/2,h*0.3,0,w/2,h*0.3,Math.max(w,h)*0.7);
+    g.addColorStop(0,'rgba(0,20,60,0.15)');
+    g.addColorStop(1,'transparent');
+    ctx.fillStyle=g;
+    ctx.fillRect(0,0,w,h);
+
+    for(const s of stars){
+      s.x+=s.dx;s.y+=s.dy;
+      s.pulse+=s.pulseSpeed;
+      if(s.x<-5)s.x=w+5;if(s.x>w+5)s.x=-5;
+      if(s.y<-5)s.y=h+5;if(s.y>h+5)s.y=-5;
+      const alpha=s.a*(0.6+0.4*Math.sin(s.pulse));
+      ctx.beginPath();
+      ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(0,216,255,${alpha})`;
+      ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+  window.addEventListener('resize',()=>{resize();initStars();});
+  resize();initStars();draw();
+})();
+
+/* ===================== SCROLL REVEAL ===================== */
+(function(){
+  const sections=document.querySelectorAll('section:not(.hero)');
+  const obs=new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');});
+  },{threshold:0.12});
+  sections.forEach(s=>obs.observe(s));
+})();
+</script>
+</body>
+</html>

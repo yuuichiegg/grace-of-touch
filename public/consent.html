@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>ConsentForm — Grace of Touch</title>
+<!-- © 2024-2026 Grace of Touch Co. / Yuuichi Onozaki. All rights reserved. -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Firebase placeholder for future cloud sync -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        cyan: { DEFAULT: '#00ffff', dark: '#002a2a' },
+        got: { bg: '#020510', card: '#0a1020', border: '#0d2a3a' }
+      },
+      fontFamily: {
+        orbitron: ['Orbitron', 'monospace'],
+        noto: ['Noto Sans JP', 'sans-serif']
+      }
+    }
+  }
+}
+</script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #020510; color: #e0e0e0; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,255,255,0.2); border-radius: 2px; }
+  input, select, textarea { outline: none; }
+  @media print {
+    body { background: white !important; color: black !important; }
+    .no-print { display: none !important; }
+    .print-only { display: block !important; }
+    .consent-preview { border: none !important; background: white !important; color: black !important; box-shadow: none !important; }
+    .consent-preview * { color: black !important; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── Storage ───
+const STORAGE_KEY = 'consent_data';
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : { templates: [], submissions: [], activeTemplateId: null };
+  } catch { return { templates: [], submissions: [], activeTemplateId: null }; }
+}
+function saveData(data) { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+// ─── Pre-built Templates ───
+const PREBUILT_TEMPLATES = [
+  {
+    name: 'VR体験同意書',
+    category: 'VR/XR',
+    content: `【VR体験参加同意書】
+
+本同意書は、VR（バーチャルリアリティ）体験への参加に際し、以下の事項をご理解・ご同意いただくためのものです。
+
+1. 体験内容について
+VR機器を装着し、仮想空間内での体験を行います。体験時間は約______分です。
+
+2. 健康上の注意
+- VR酔い（めまい、吐き気）が生じる場合があります
+- 光過敏性発作の既往がある方はお申し出ください
+- 体調に異変を感じた場合は、直ちにスタッフにお知らせください
+- 妊娠中の方、心臓疾患のある方は体験をお控えください
+
+3. 安全について
+- スタッフの指示に従ってください
+- 体験中は周囲の安全をスタッフが確保します
+- 機器の故意の破損は弁償をお願いする場合があります
+
+4. 個人情報の取扱い
+収集した個人情報は、本イベントの運営目的のみに使用し、第三者に提供することはありません。
+
+上記内容を理解し、自己の責任においてVR体験に参加することに同意します。`,
+    fields: ['name', 'email', 'phone', 'date', 'signature']
+  },
+  {
+    name: 'ドローン飛行見学同意書',
+    category: 'DRONE',
+    content: `【ドローン飛行見学同意書】
+
+本同意書は、無人航空機（ドローン）の飛行デモンストレーション見学に際し、安全確保のため以下の事項にご同意いただくものです。
+
+1. 見学上の注意
+- 指定された見学エリア内でご観覧ください
+- 飛行エリアへの立ち入りは厳禁です
+- スタッフの指示に必ず従ってください
+
+2. 安全対策
+- 主催者は安全対策を講じておりますが、万一の事故に備え、参加者ご自身の注意もお願いいたします
+- 天候等により飛行が中止になる場合があります
+- 緊急時は速やかにスタッフの指示に従い避難してください
+
+3. 撮影について
+- 見学中の写真・動画撮影は許可制です
+- SNS等への投稿は主催者の許可を得てください
+
+4. 免責事項
+- 参加者の不注意による事故について、主催者は責任を負いかねます
+- 指示に従わなかった場合の事故について、主催者は責任を負いかねます
+
+上記内容を理解し、ドローン飛行見学に参加することに同意します。`,
+    fields: ['name', 'email', 'phone', 'date', 'signature']
+  },
+  {
+    name: 'イベント参加同意書',
+    category: 'EVENT',
+    content: `【イベント参加同意書】
+
+本同意書は、主催イベントへの参加に際し、以下の事項にご同意いただくものです。
+
+イベント名: ______________________
+開催日: ______________________
+会場: ______________________
+
+1. 参加上の注意
+- 主催者およびスタッフの指示に従ってください
+- 他の参加者への迷惑行為はおやめください
+- 会場内は禁煙です（指定喫煙所を除く）
+
+2. 健康管理
+- 体調不良の場合は無理をせず、スタッフにお申し出ください
+- アレルギー等がある場合は事前にお知らせください
+
+3. 持ち物・貴重品
+- 貴重品は各自で管理してください
+- 紛失・盗難について主催者は責任を負いかねます
+
+4. 天候・不可抗力
+- 天候や不可抗力によりイベントが中止・変更になる場合があります
+
+5. 個人情報
+- 収集した個人情報はイベント運営のみに使用します
+
+上記内容を理解し、イベントに参加することに同意します。`,
+    fields: ['name', 'email', 'phone', 'date', 'signature']
+  },
+  {
+    name: '撮影・肖像権同意書',
+    category: 'MEDIA',
+    content: `【撮影・肖像権使用同意書】
+
+本同意書は、イベント等における撮影および肖像権の使用について、以下の事項にご同意いただくものです。
+
+1. 撮影について
+本イベントでは、主催者またはその委託先により、写真・動画の撮影を行う場合があります。
+
+2. 使用目的
+撮影した写真・動画は、以下の目的で使用する場合があります：
+- 主催者のウェブサイト、SNSでの活動報告
+- 広報資料・パンフレットへの掲載
+- メディアへの提供
+
+3. 使用期間
+使用期間に制限はありませんが、使用中止の申し出があった場合は、合理的な期間内に対応いたします。
+
+4. 報酬
+撮影および肖像権の使用に対する報酬は発生しません。
+
+5. 同意の撤回
+同意の撤回を希望される場合は、主催者までご連絡ください。ただし、既に公開された素材については、完全な削除が困難な場合があります。
+
+上記内容を理解し、撮影および肖像権の使用に同意します。`,
+    fields: ['name', 'email', 'date', 'signature']
+  }
+];
+
+// ─── Signature Pad Component ───
+function SignaturePad({ value, onChange }) {
+  const canvasRef = useRef(null);
+  const [drawing, setDrawing] = useState(false);
+  const lastPos = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    // Set canvas resolution
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * 2;
+    canvas.height = rect.height * 2;
+    ctx.scale(2, 2);
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#00ffff';
+    // Restore if value exists
+    if (value) {
+      const img = new Image();
+      img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      img.src = value;
+    }
+  }, []);
+
+  const getPos = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  };
+
+  const startDraw = (e) => {
+    e.preventDefault();
+    setDrawing(true);
+    lastPos.current = getPos(e);
+  };
+
+  const draw = (e) => {
+    if (!drawing) return;
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(lastPos.current.x, lastPos.current.y);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+    lastPos.current = pos;
+  };
+
+  const endDraw = () => {
+    if (!drawing) return;
+    setDrawing(false);
+    lastPos.current = null;
+    const canvas = canvasRef.current;
+    onChange(canvas.toDataURL());
+  };
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    onChange('');
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-xs text-white/40 font-orbitron tracking-wider">SIGNATURE / 署名</label>
+        <button type="button" onClick={clear} className="text-[9px] text-red-400/50 hover:text-red-400 font-orbitron">CLEAR</button>
+      </div>
+      <canvas ref={canvasRef}
+        onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
+        onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw}
+        className="w-full h-32 bg-black/40 border border-cyan/15 rounded-lg cursor-crosshair touch-none"
+        style={{ touchAction: 'none' }} />
+    </div>
+  );
+}
+
+// ─── Components ───
+
+function Header({ view, setView }) {
+  return (
+    <header className="sticky top-0 z-50 bg-got-bg/95 backdrop-blur border-b border-cyan/10 px-4 py-3 no-print">
+      <div className="flex items-center justify-between max-w-2xl mx-auto">
+        <div className="flex items-center gap-3">
+          <a href="index.html" className="text-cyan/40 hover:text-cyan/80 transition text-xs font-orbitron">← PORTAL</a>
+          <h1 className="font-orbitron text-cyan text-sm tracking-widest">CONSENT FORM</h1>
+        </div>
+        <div className="flex gap-1">
+          {['templates','fill','submissions'].map(v => (
+            <button key={v} onClick={() => setView(v)}
+              className={`px-2 py-1 text-[9px] font-orbitron tracking-wider rounded transition ${
+                view === v ? 'bg-cyan/15 text-cyan border border-cyan/30' : 'text-white/30 hover:text-white/60'
+              }`}>
+              {v === 'templates' ? '📄' : v === 'fill' ? '✍️' : '📋'}
+              <span className="hidden sm:inline ml-1">{v === 'templates' ? 'TEMPLATES' : v === 'fill' ? 'FILL' : 'LIST'}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function TemplateManager({ data, setData, setView }) {
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', category: '', content: '', fields: [] });
+
+  const importPrebuilt = (template) => {
+    const newTpl = { id: uid(), ...template, createdAt: new Date().toISOString() };
+    const newData = { ...data, templates: [...data.templates, newTpl], activeTemplateId: newTpl.id };
+    setData(newData);
+    saveData(newData);
+  };
+
+  const selectTemplate = (id) => {
+    const newData = { ...data, activeTemplateId: id };
+    setData(newData);
+    saveData(newData);
+  };
+
+  const deleteTemplate = (id) => {
+    if (!confirm('このテンプレートを削除しますか？')) return;
+    const newData = {
+      ...data,
+      templates: data.templates.filter(t => t.id !== id),
+      activeTemplateId: data.activeTemplateId === id ? null : data.activeTemplateId
+    };
+    setData(newData);
+    saveData(newData);
+  };
+
+  const startEdit = (tpl) => {
+    setEditingId(tpl.id);
+    setEditForm({ name: tpl.name, category: tpl.category, content: tpl.content, fields: [...tpl.fields] });
+  };
+
+  const saveEdit = () => {
+    const newData = { ...data };
+    const tpl = newData.templates.find(t => t.id === editingId);
+    if (tpl) {
+      tpl.name = editForm.name;
+      tpl.category = editForm.category;
+      tpl.content = editForm.content;
+      tpl.fields = editForm.fields;
+    }
+    setData(newData);
+    saveData(newData);
+    setEditingId(null);
+  };
+
+  const createCustom = () => {
+    const newTpl = {
+      id: uid(), name: '新規同意書', category: 'CUSTOM',
+      content: '【同意書タイトル】\n\nここに同意書の内容を記入してください。',
+      fields: ['name', 'email', 'date', 'signature'],
+      createdAt: new Date().toISOString()
+    };
+    const newData = { ...data, templates: [...data.templates, newTpl], activeTemplateId: newTpl.id };
+    setData(newData);
+    saveData(newData);
+    startEdit(newTpl);
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Pre-built templates */}
+      <div className="bg-got-card border border-cyan/10 rounded-xl p-4">
+        <h2 className="font-orbitron text-cyan/70 text-xs tracking-widest mb-3">PRE-BUILT TEMPLATES</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {PREBUILT_TEMPLATES.map((tpl, i) => (
+            <button key={i} onClick={() => importPrebuilt(tpl)}
+              className="bg-black/30 border border-cyan/8 rounded-lg p-3 text-left hover:border-cyan/25 transition group">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">{tpl.category === 'VR/XR' ? '🥽' : tpl.category === 'DRONE' ? '🚁' : tpl.category === 'EVENT' ? '🎪' : '📸'}</span>
+                <div>
+                  <div className="text-xs text-white/70 font-noto group-hover:text-white/90">{tpl.name}</div>
+                  <div className="text-[9px] text-cyan/40 font-orbitron">{tpl.category}</div>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+        <button onClick={createCustom}
+          className="mt-3 w-full bg-cyan/5 border border-dashed border-cyan/20 rounded-lg p-3 text-cyan/50 text-xs font-orbitron hover:bg-cyan/10 hover:text-cyan/70 transition">
+          + CREATE CUSTOM TEMPLATE
+        </button>
+      </div>
+
+      {/* Editing modal */}
+      {editingId && (
+        <div className="bg-got-card border border-cyan/20 rounded-xl p-4">
+          <h2 className="font-orbitron text-cyan/70 text-xs tracking-widest mb-3">EDIT TEMPLATE</h2>
+          <div className="space-y-3">
+            <input value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})}
+              placeholder="テンプレート名"
+              className="w-full bg-black/30 border border-cyan/10 rounded-lg px-3 py-2 text-sm text-white font-noto placeholder:text-white/20 focus:border-cyan/40" />
+            <input value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value})}
+              placeholder="カテゴリ"
+              className="w-full bg-black/30 border border-cyan/10 rounded-lg px-3 py-2 text-sm text-white font-noto placeholder:text-white/20 focus:border-cyan/40" />
+            <textarea value={editForm.content} onChange={e => setEditForm({...editForm, content: e.target.value})}
+              rows={12}
+              className="w-full bg-black/30 border border-cyan/10 rounded-lg px-3 py-2 text-sm text-white font-noto placeholder:text-white/20 focus:border-cyan/40 resize-y leading-relaxed" />
+            <div>
+              <div className="text-[10px] text-white/30 font-orbitron mb-1">FIELDS (comma-separated)</div>
+              <input value={editForm.fields.join(', ')} onChange={e => setEditForm({...editForm, fields: e.target.value.split(',').map(f => f.trim()).filter(Boolean)})}
+                className="w-full bg-black/30 border border-cyan/10 rounded-lg px-3 py-2 text-sm text-white font-noto focus:border-cyan/40" />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={saveEdit} className="bg-cyan/10 border border-cyan/30 text-cyan px-4 py-2 rounded-lg font-orbitron text-xs tracking-wider hover:bg-cyan/20 transition">SAVE</button>
+              <button onClick={() => setEditingId(null)} className="text-white/30 hover:text-white/60 px-4 py-2 text-xs font-orbitron transition">CANCEL</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Your templates */}
+      <div className="space-y-2">
+        <h2 className="font-orbitron text-white/40 text-xs tracking-widest">YOUR TEMPLATES</h2>
+        {data.templates.length === 0 && (
+          <div className="text-center py-8 text-white/20 font-noto text-sm">テンプレートを追加してください</div>
+        )}
+        {data.templates.map(tpl => {
+          const isActive = data.activeTemplateId === tpl.id;
+          return (
+            <div key={tpl.id} onClick={() => selectTemplate(tpl.id)}
+              className={`bg-got-card border rounded-xl p-4 cursor-pointer transition ${
+                isActive ? 'border-cyan/40 shadow-[0_0_15px_rgba(0,255,255,0.1)]' : 'border-cyan/8 hover:border-cyan/20'
+              }`}>
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="font-orbitron text-sm text-white/90">{tpl.name}</div>
+                  <div className="text-[10px] text-cyan/40 font-orbitron mt-1">{tpl.category}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isActive && <span className="text-[9px] font-orbitron text-cyan bg-cyan/10 px-2 py-0.5 rounded">ACTIVE</span>}
+                  <button onClick={(e) => { e.stopPropagation(); startEdit(tpl); }}
+                    className="text-cyan/30 hover:text-cyan text-xs transition">✎</button>
+                  <button onClick={(e) => { e.stopPropagation(); deleteTemplate(tpl.id); }}
+                    className="text-red-400/40 hover:text-red-400 text-xs transition">✕</button>
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-white/30 font-noto line-clamp-2 leading-relaxed">
+                {tpl.content.slice(0, 100)}...
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ConsentFillForm({ data, setData, setView }) {
+  const template = data.templates.find(t => t.id === data.activeTemplateId);
+  const [formValues, setFormValues] = useState({});
+  const [signature, setSignature] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+
+  if (!template) {
+    return (
+      <div className="text-center py-16">
+        <div className="text-4xl mb-4">📄</div>
+        <div className="text-white/40 font-noto text-sm">先にテンプレートを選択してください</div>
+        <button onClick={() => setView('templates')} className="mt-4 text-cyan text-xs font-orbitron hover:underline">GO TO TEMPLATES</button>
+      </div>
+    );
+  }
+
+  const fieldLabels = {
+    name: { label: '氏名', type: 'text', placeholder: '山田 太郎' },
+    email: { label: 'メールアドレス', type: 'email', placeholder: 'taro@example.com' },
+    phone: { label: '電話番号', type: 'tel', placeholder: '090-1234-5678' },
+    date: { label: '日付', type: 'date', placeholder: '' },
+    signature: { label: '署名', type: 'signature', placeholder: '' }
+  };
+
+  const handleSubmit = () => {
+    // Validate required fields
+    const missingFields = template.fields.filter(f => {
+      if (f === 'signature') return !signature;
+      return !formValues[f]?.trim();
+    });
+    if (missingFields.length > 0) {
+      alert(`未入力のフィールドがあります: ${missingFields.map(f => fieldLabels[f]?.label || f).join(', ')}`);
+      return;
+    }
+
+    const submission = {
+      id: uid(),
+      templateId: template.id,
+      templateName: template.name,
+      values: { ...formValues },
+      signature,
+      content: template.content,
+      submittedAt: new Date().toISOString()
+    };
+
+    const newData = { ...data, submissions: [submission, ...data.submissions] };
+    setData(newData);
+    saveData(newData);
+    setSubmitted(true);
+    setFormValues({});
+    setSignature('');
+  };
+
+  if (submitted) {
+    return (
+      <div className="text-center py-16">
+        <div className="text-5xl mb-4">✅</div>
+        <div className="font-orbitron text-cyan text-lg tracking-wider">SUBMITTED</div>
+        <div className="text-white/40 font-noto text-sm mt-2">同意書が送信されました</div>
+        <div className="flex gap-3 justify-center mt-6">
+          <button onClick={() => setSubmitted(false)} className="bg-cyan/10 border border-cyan/30 text-cyan px-4 py-2 rounded-lg font-orbitron text-xs hover:bg-cyan/20 transition">NEW FORM</button>
+          <button onClick={() => setView('submissions')} className="text-white/40 hover:text-white/60 px-4 py-2 text-xs font-orbitron transition">VIEW LIST</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (previewing) {
+    return (
+      <div>
+        <div className="no-print flex items-center justify-between mb-4">
+          <button onClick={() => setPreviewing(false)} className="text-cyan/60 hover:text-cyan text-xs font-orbitron">← BACK TO FORM</button>
+          <button onClick={() => window.print()} className="bg-cyan/10 border border-cyan/30 text-cyan px-4 py-2 rounded-lg font-orbitron text-xs hover:bg-cyan/20 transition">🖨️ PRINT / PDF</button>
+        </div>
+        <div className="consent-preview bg-white/5 border border-cyan/10 rounded-xl p-6 sm:p-8">
+          <div className="text-center mb-6">
+            <div className="font-noto text-lg font-bold text-white/90">{template.name}</div>
+            <div className="text-xs text-white/30 mt-1">Grace of Touch Co.</div>
+          </div>
+          <div className="font-noto text-sm text-white/70 whitespace-pre-wrap leading-relaxed mb-8">{template.content}</div>
+          <div className="border-t border-cyan/10 pt-6 space-y-3">
+            {template.fields.filter(f => f !== 'signature').map(f => (
+              <div key={f} className="flex items-baseline gap-2">
+                <span className="text-xs text-white/40 font-noto w-24 flex-shrink-0">{fieldLabels[f]?.label || f}:</span>
+                <span className="text-sm text-white/80 font-noto">{formValues[f] || '未入力'}</span>
+              </div>
+            ))}
+            {template.fields.includes('signature') && signature && (
+              <div className="mt-4">
+                <div className="text-xs text-white/40 font-noto mb-1">署名:</div>
+                <img src={signature} alt="Signature" className="h-16 bg-black/20 rounded-lg p-1" />
+              </div>
+            )}
+          </div>
+          <div className="text-right mt-6 text-[10px] text-white/20 font-orbitron">
+            Submitted: {new Date().toLocaleString('ja-JP')}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-got-card border border-cyan/10 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="font-orbitron text-cyan/70 text-xs tracking-widest">{template.name}</h2>
+            <div className="text-[10px] text-cyan/30 font-orbitron mt-0.5">{template.category}</div>
+          </div>
+          <button onClick={() => setPreviewing(true)}
+            className="text-[10px] text-cyan/50 hover:text-cyan font-orbitron transition">👁 PREVIEW</button>
+        </div>
+
+        {/* Consent content display */}
+        <div className="bg-black/20 border border-cyan/5 rounded-lg p-4 mb-4 max-h-48 overflow-y-auto">
+          <div className="font-noto text-xs text-white/50 whitespace-pre-wrap leading-relaxed">{template.content}</div>
+        </div>
+
+        {/* Form fields */}
+        <div className="space-y-3">
+          {template.fields.map(f => {
+            if (f === 'signature') {
+              return <SignaturePad key={f} value={signature} onChange={setSignature} />;
+            }
+            const field = fieldLabels[f] || { label: f, type: 'text', placeholder: '' };
+            return (
+              <div key={f}>
+                <label className="text-xs text-white/40 font-orbitron tracking-wider mb-1 block">{field.label}</label>
+                <input type={field.type} placeholder={field.placeholder}
+                  value={formValues[f] || ''}
+                  onChange={e => setFormValues({...formValues, [f]: e.target.value})}
+                  className="w-full bg-black/30 border border-cyan/10 rounded-lg px-3 py-2 text-sm text-white font-noto placeholder:text-white/20 focus:border-cyan/40" />
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex gap-2 mt-4">
+          <button onClick={handleSubmit}
+            className="flex-1 bg-cyan/10 border border-cyan/30 text-cyan px-4 py-3 rounded-lg font-orbitron text-xs tracking-wider hover:bg-cyan/20 transition">
+            SUBMIT / 同意して送信
+          </button>
+          <button onClick={() => setPreviewing(true)}
+            className="bg-white/5 border border-white/10 text-white/40 px-4 py-3 rounded-lg font-orbitron text-xs tracking-wider hover:bg-white/10 transition">
+            PREVIEW
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SubmissionList({ data, setData }) {
+  const [selectedId, setSelectedId] = useState(null);
+
+  const exportCSV = () => {
+    const headers = ['Template', 'Name', 'Email', 'Phone', 'Date', 'Submitted At', 'Has Signature'];
+    const rows = data.submissions.map(s => [
+      s.templateName,
+      s.values.name || '', s.values.email || '', s.values.phone || '', s.values.date || '',
+      new Date(s.submittedAt).toLocaleString('ja-JP'),
+      s.signature ? 'Yes' : 'No'
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `consent_submissions_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const printSubmission = (sub) => {
+    const tpl = data.templates.find(t => t.id === sub.templateId);
+    const w = window.open('', '_blank');
+    const fieldsHtml = Object.entries(sub.values).map(([k,v]) => `<div><strong>${k}:</strong> ${v}</div>`).join('');
+    const sigHtml = sub.signature ? `<div style="margin-top:16px"><strong>署名:</strong><br/><img src="${sub.signature}" style="height:60px;margin-top:4px;"/></div>` : '';
+    w.document.write(`
+      <html><head><title>Consent - ${sub.values.name || 'Unknown'}</title>
+      <style>body{font-family:sans-serif;max-width:700px;margin:40px auto;padding:0 20px;line-height:1.8;}
+      h1{font-size:18px;text-align:center;} .content{white-space:pre-wrap;font-size:13px;border:1px solid #ddd;padding:20px;border-radius:8px;margin:20px 0;}
+      .fields{font-size:13px;} .footer{font-size:10px;color:#999;margin-top:30px;text-align:right;}
+      @media print{body{margin:20px;}}</style></head><body>
+      <h1>${sub.templateName}</h1>
+      <div class="content">${(tpl?.content || sub.content || '').replace(/\n/g, '<br/>')}</div>
+      <div class="fields">${fieldsHtml}${sigHtml}</div>
+      <div class="footer">Submitted: ${new Date(sub.submittedAt).toLocaleString('ja-JP')} | Grace of Touch Co.</div>
+      </body></html>`);
+    w.document.close();
+    setTimeout(() => w.print(), 300);
+  };
+
+  const deleteSubmission = (id) => {
+    if (!confirm('この同意書を削除しますか？')) return;
+    const newData = { ...data, submissions: data.submissions.filter(s => s.id !== id) };
+    setData(newData);
+    saveData(newData);
+  };
+
+  const selected = data.submissions.find(s => s.id === selectedId);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="text-xs text-white/30 font-orbitron">{data.submissions.length} SUBMISSIONS</div>
+        <button onClick={exportCSV}
+          className="bg-cyan/10 border border-cyan/30 text-cyan px-3 py-1 rounded-lg font-orbitron text-[10px] tracking-wider hover:bg-cyan/20 transition">
+          📥 CSV EXPORT
+        </button>
+      </div>
+
+      {/* Detail view */}
+      {selected && (
+        <div className="consent-preview bg-got-card border border-cyan/20 rounded-xl p-4 sm:p-6">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <div className="font-orbitron text-sm text-white/90">{selected.templateName}</div>
+              <div className="text-[10px] text-white/30 font-noto mt-1">{new Date(selected.submittedAt).toLocaleString('ja-JP')}</div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => printSubmission(selected)} className="text-[10px] text-cyan/50 hover:text-cyan font-orbitron">🖨️ PRINT</button>
+              <button onClick={() => setSelectedId(null)} className="text-[10px] text-white/30 hover:text-white/60 font-orbitron">CLOSE</button>
+            </div>
+          </div>
+          <div className="bg-black/20 border border-cyan/5 rounded-lg p-3 mb-3 max-h-40 overflow-y-auto">
+            <div className="font-noto text-xs text-white/40 whitespace-pre-wrap leading-relaxed">{selected.content}</div>
+          </div>
+          <div className="space-y-2">
+            {Object.entries(selected.values).map(([k, v]) => (
+              <div key={k} className="flex gap-2">
+                <span className="text-[10px] text-white/30 font-orbitron w-20">{k.toUpperCase()}</span>
+                <span className="text-xs text-white/70 font-noto">{v}</span>
+              </div>
+            ))}
+          </div>
+          {selected.signature && (
+            <div className="mt-3">
+              <div className="text-[10px] text-white/30 font-orbitron mb-1">SIGNATURE</div>
+              <img src={selected.signature} alt="Signature" className="h-16 bg-black/30 rounded-lg p-1" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* List */}
+      {data.submissions.length === 0 ? (
+        <div className="text-center py-12 text-white/20 font-noto text-sm">同意書の提出データがありません</div>
+      ) : (
+        <div className="space-y-2">
+          {data.submissions.map(sub => (
+            <div key={sub.id} onClick={() => setSelectedId(sub.id)}
+              className={`bg-got-card border rounded-xl p-3 cursor-pointer transition flex items-center gap-3 ${
+                selectedId === sub.id ? 'border-cyan/30' : 'border-cyan/8 hover:border-cyan/15'
+              }`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${
+                sub.signature ? 'bg-green-900/20 border border-green-400/20' : 'bg-yellow-900/20 border border-yellow-400/20'
+              }`}>
+                {sub.signature ? '✅' : '⚠️'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-white/80 font-noto truncate">{sub.values.name || 'Unknown'}</div>
+                <div className="text-[10px] text-white/30 font-noto">{sub.templateName}</div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <div className="text-[10px] text-white/30 font-orbitron">{new Date(sub.submittedAt).toLocaleDateString('ja-JP')}</div>
+                <div className="text-[9px] text-white/20 font-orbitron">{new Date(sub.submittedAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</div>
+              </div>
+              <div className="flex gap-1 flex-shrink-0">
+                <button onClick={(e) => { e.stopPropagation(); printSubmission(sub); }}
+                  className="text-[10px] text-cyan/30 hover:text-cyan transition">🖨️</button>
+                <button onClick={(e) => { e.stopPropagation(); deleteSubmission(sub.id); }}
+                  className="text-[10px] text-red-400/30 hover:text-red-400 transition">✕</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [data, setData] = useState(loadData);
+  const [view, setView] = useState('templates');
+
+  return (
+    <div className="min-h-screen bg-got-bg">
+      <Header view={view} setView={setView} />
+      <main className="max-w-2xl mx-auto px-4 py-4 pb-20">
+        {view === 'templates' && <TemplateManager data={data} setData={setData} setView={setView} />}
+        {view === 'fill' && <ConsentFillForm data={data} setData={setData} setView={setView} />}
+        {view === 'submissions' && <SubmissionList data={data} setData={setData} />}
+      </main>
+      <footer className="fixed bottom-0 left-0 right-0 bg-got-bg/90 backdrop-blur border-t border-cyan/5 py-2 text-center no-print">
+        <div className="text-[9px] text-white/15 font-orbitron tracking-wider">© 2024-2026 Grace of Touch Co. All rights reserved.</div>
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

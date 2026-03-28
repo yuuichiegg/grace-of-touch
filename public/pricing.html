@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="&copy; 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>Pricing — Grace of Touch</title>
+<!-- &copy; 2024-2026 Grace of Touch Co. / Yuuichi Onozaki. All rights reserved.
+     Unauthorized copying, modification, or distribution is strictly prohibited. -->
+<script></script>
+<meta name="theme-color" content="#00ffff">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💎</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        cyan: { DEFAULT: '#00d8ff', dim: 'rgba(0,216,255,0.15)', glow: 'rgba(0,216,255,0.4)' },
+        space: { bg: '#020510', card: 'rgba(0,216,255,0.03)' },
+        gold: '#c9a96e',
+        neon: '#00ff88',
+      },
+      fontFamily: {
+        head: ['Orbitron', 'monospace'],
+        body: ['Noto Sans JP', 'sans-serif'],
+      },
+    }
+  }
+};
+</script>
+<style>
+/* ===================== RESET & BASE ===================== */
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  background:#020510;color:#e0e0e0;
+  font-family:'Noto Sans JP',sans-serif;font-weight:300;
+  line-height:1.8;overflow-x:hidden;
+  -webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none;
+}
+
+/* ===================== ANTI-COPY ===================== */
+body{-webkit-touch-callout:none;}
+@media print{body{display:none !important;}}
+
+/* ===================== ANIMATED BACKGROUND ===================== */
+#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;}
+
+/* ===================== SCROLLBAR ===================== */
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(0,216,255,0.15);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:rgba(0,216,255,0.3);}
+</style>
+</head>
+<body oncontextmenu="return false" ondragstart="return false">
+
+<canvas id="bg-canvas"></canvas>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ==================== DATA ==================== */
+const services = [
+  {
+    id: 'infrascan',
+    icon: '🔍',
+    title: 'InfraScan AI',
+    subtitle: 'インフラ点検AI',
+    desc: 'AIによるひび割れ自動検出。トンネル・橋梁・壁面のインフラ点検を革新',
+    hasAnnual: true,
+    plans: [
+      {
+        name: 'Free',
+        nameJa: 'デモモード',
+        price: 0,
+        priceLabel: '無料',
+        features: ['3検出まで', '幅計測なし', '座標出力なし', 'ウォーターマーク付き'],
+        cta: 'デモを試す',
+        highlight: false,
+      },
+      {
+        name: 'Basic',
+        nameJa: 'ベーシック',
+        price: 9800,
+        annualPrice: 7840,
+        features: ['50枚/月', 'ひび割れ検出 + 幅計測', '座標出力 (CSV)', 'メールサポート'],
+        cta: 'お問い合わせ',
+        highlight: false,
+      },
+      {
+        name: 'Pro',
+        nameJa: 'プロフェッショナル',
+        price: 29800,
+        annualPrice: 23840,
+        features: ['無制限検出', 'DXF出力対応', '経年比較レイヤー', 'API連携', '優先サポート'],
+        cta: 'お問い合わせ',
+        highlight: true,
+      },
+      {
+        name: 'Enterprise',
+        nameJa: 'エンタープライズ',
+        price: -1,
+        priceLabel: '要相談',
+        features: ['専用サーバー', 'カスタムモデル', 'オンプレミス対応', 'SLA保証', '専任担当者'],
+        cta: 'お問い合わせ',
+        highlight: false,
+      },
+    ],
+  },
+  {
+    id: 'event',
+    icon: '🎪',
+    title: 'Event Management Suite',
+    subtitle: 'イベント管理',
+    desc: 'QRコード受付・同意書電子署名・入退場管理をワンストップで',
+    hasAnnual: true,
+    plans: [
+      {
+        name: 'Free',
+        nameJa: '無料プラン',
+        price: 0,
+        priceLabel: '無料',
+        features: ['1イベント/月', '最大50名', '基本受付機能', 'QRコード発行'],
+        cta: '無料で始める',
+        highlight: false,
+      },
+      {
+        name: 'Business',
+        nameJa: 'ビジネス',
+        price: 4980,
+        annualPrice: 3984,
+        features: ['無制限イベント', '参加者数無制限', 'QRコード受付', '同意書電子署名', '入退場管理', 'データエクスポート'],
+        cta: 'お問い合わせ',
+        highlight: true,
+      },
+      {
+        name: 'Enterprise',
+        nameJa: 'エンタープライズ',
+        price: -1,
+        priceLabel: '要相談',
+        features: ['カスタムブランディング', 'API連携', '複数会場同時管理', '専任サポート', 'SSO対応'],
+        cta: 'お問い合わせ',
+        highlight: false,
+      },
+    ],
+  },
+  {
+    id: 'development',
+    icon: '💻',
+    title: 'Custom Development',
+    subtitle: 'カスタム開発',
+    desc: 'Webアプリ・3D・ドローン連携など、お客様のニーズに合わせた開発',
+    hasAnnual: false,
+    plans: [
+      {
+        name: '業務委託',
+        nameJa: '時間単価',
+        price: -1,
+        priceLabel: '¥5,000〜/時間',
+        features: ['フルスタック開発', 'React / Three.js / Firebase', 'レスポンシブ対応', 'コードレビュー'],
+        cta: 'お問い合わせ',
+        highlight: false,
+      },
+      {
+        name: 'アプリ開発',
+        nameJa: 'プロジェクト',
+        price: -1,
+        priceLabel: '¥100,000〜',
+        features: ['要件定義から納品まで', 'Web / モバイル対応', '3D・XR開発可', 'Firebase / AWS基盤', '保守サポートオプション'],
+        cta: 'お問い合わせ',
+        highlight: true,
+      },
+      {
+        name: 'コンサルティング',
+        nameJa: '技術顧問',
+        price: -1,
+        priceLabel: '¥10,000/時間',
+        features: ['技術戦略アドバイス', 'アーキテクチャ設計', 'AI/ドローン導入支援', 'インフラ点検DX'],
+        cta: 'お問い合わせ',
+        highlight: false,
+      },
+    ],
+  },
+  {
+    id: 'drone',
+    icon: '🚁',
+    title: 'Drone Services',
+    subtitle: 'ドローンサービス',
+    desc: '一等無人航空機操縦士による空撮・点検飛行・操縦訓練',
+    hasAnnual: false,
+    plans: [
+      {
+        name: '空撮',
+        nameJa: 'Aerial Photo',
+        price: -1,
+        priceLabel: '¥30,000〜/回',
+        features: ['4K空撮映像', '写真100枚〜', '編集済みデータ納品', '飛行許可申請代行'],
+        cta: 'お問い合わせ',
+        highlight: false,
+      },
+      {
+        name: '点検飛行',
+        nameJa: 'Inspection Flight',
+        price: -1,
+        priceLabel: '¥50,000〜/回',
+        features: ['インフラ構造物点検', '高精細撮影', 'AI解析レポート', 'DXF/CSV出力', '飛行記録・報告書'],
+        cta: 'お問い合わせ',
+        highlight: true,
+      },
+      {
+        name: 'シミュレーション訓練',
+        nameJa: 'SIM Training',
+        price: -1,
+        priceLabel: '¥15,000/回',
+        features: ['TunnelDrone SIM使用', 'トンネル内飛行訓練', '安全運航プロトコル', 'スキル評価レポート'],
+        cta: 'お問い合わせ',
+        highlight: false,
+      },
+    ],
+  },
+];
+
+const faqData = [
+  {
+    q: '無料プランに制限はありますか？',
+    a: 'InfraScan AIのデモモードは3検出まで、座標・幅計測なし、ウォーターマーク付きとなります。イベント管理は月1イベント・50名までご利用いただけます。',
+  },
+  {
+    q: '年額プランの割引はどのように適用されますか？',
+    a: '年額プランは月額の20%オフ（年間一括払い）です。トグルスイッチで年額料金をご確認いただけます。',
+  },
+  {
+    q: '支払い方法は？',
+    a: '銀行振込・クレジットカード（Stripe経由）に対応しています。Enterprise プランは請求書払いも可能です。',
+  },
+  {
+    q: '契約期間の縛りはありますか？',
+    a: '月額プランはいつでも解約可能です。年額プランは1年契約となりますが、途中解約時は残月数分を返金いたします。',
+  },
+  {
+    q: 'カスタム開発の見積もりはどのくらいで届きますか？',
+    a: 'お問い合わせから3営業日以内にお見積もりをお送りします。初回ヒアリング（30分・無料）後に詳細な見積もりを作成します。',
+  },
+  {
+    q: 'ドローンサービスの対応エリアは？',
+    a: '関東圏を中心に対応しています。遠方の場合は交通費を別途ご相談させていただきます。',
+  },
+];
+
+/* ==================== COMPONENTS ==================== */
+
+function BackButton() {
+  return (
+    <a href="index.html"
+      className="fixed top-6 left-6 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl
+        bg-[rgba(0,216,255,0.04)] backdrop-blur-xl border border-[rgba(0,216,255,0.18)]
+        no-underline transition-all duration-300
+        hover:bg-[rgba(0,216,255,0.08)] hover:border-[rgba(0,216,255,0.35)]"
+    >
+      <span className="font-head text-[10px] tracking-[0.2em] text-[rgba(0,216,255,0.5)]">&larr;</span>
+      <span className="font-head text-[10px] tracking-[0.15em] text-[rgba(0,216,255,0.5)]
+        hover:text-[rgba(0,216,255,0.8)]">BACK TO TERMINAL</span>
+    </a>
+  );
+}
+
+function AnnualToggle({ isAnnual, onToggle }) {
+  return (
+    <div className="flex items-center justify-center gap-4 my-8">
+      <span className={`font-body text-sm tracking-wider transition-colors duration-300
+        ${!isAnnual ? 'text-cyan' : 'text-[rgba(255,255,255,0.35)]'}`}>
+        月額
+      </span>
+      <button
+        onClick={onToggle}
+        className={`relative w-14 h-7 rounded-full border transition-all duration-300 cursor-pointer
+          ${isAnnual
+            ? 'bg-[rgba(0,216,255,0.2)] border-[rgba(0,216,255,0.5)]'
+            : 'bg-[rgba(255,255,255,0.05)] border-[rgba(255,255,255,0.15)]'
+          }`}
+      >
+        <div className={`absolute top-0.5 w-6 h-6 rounded-full transition-all duration-300
+          ${isAnnual
+            ? 'left-[calc(100%-26px)] bg-cyan shadow-[0_0_10px_rgba(0,216,255,0.5)]'
+            : 'left-0.5 bg-[rgba(255,255,255,0.3)]'
+          }`}
+        />
+      </button>
+      <span className={`font-body text-sm tracking-wider transition-colors duration-300
+        ${isAnnual ? 'text-cyan' : 'text-[rgba(255,255,255,0.35)]'}`}>
+        年額 <span className="text-neon text-xs font-bold">20%OFF</span>
+      </span>
+    </div>
+  );
+}
+
+function PriceDisplay({ plan, isAnnual, hasAnnual }) {
+  if (plan.priceLabel && plan.price <= 0) {
+    return (
+      <div className="my-4">
+        <span className="font-head text-2xl font-bold text-white">{plan.priceLabel}</span>
+      </div>
+    );
+  }
+  const price = isAnnual && hasAnnual && plan.annualPrice ? plan.annualPrice : plan.price;
+  return (
+    <div className="my-4">
+      <span className="font-head text-lg text-[rgba(255,255,255,0.5)]">&yen;</span>
+      <span className="font-head text-3xl font-bold text-white mx-1">
+        {price.toLocaleString()}
+      </span>
+      <span className="font-body text-sm text-[rgba(255,255,255,0.4)]">/月</span>
+      {isAnnual && hasAnnual && plan.annualPrice && (
+        <div className="text-xs text-neon mt-1">
+          年額 &yen;{(plan.annualPrice * 12).toLocaleString()} (月額より &yen;{((plan.price - plan.annualPrice) * 12).toLocaleString()} お得)
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlanCard({ plan, isAnnual, hasAnnual }) {
+  const contactUrl = 'about.html#contact';
+  return (
+    <div className={`relative flex flex-col p-6 rounded-2xl border transition-all duration-500
+      backdrop-blur-xl group
+      ${plan.highlight
+        ? 'bg-[rgba(0,216,255,0.06)] border-[rgba(0,216,255,0.35)] shadow-[0_0_30px_rgba(0,216,255,0.1)]'
+        : 'bg-[rgba(0,216,255,0.02)] border-[rgba(0,216,255,0.08)]'
+      }
+      hover:bg-[rgba(0,216,255,0.08)] hover:border-[rgba(0,216,255,0.4)]
+      hover:shadow-[0_0_40px_rgba(0,216,255,0.15)] hover:-translate-y-1`}
+    >
+      {plan.highlight && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full
+          bg-gradient-to-r from-cyan to-neon text-[#020510] font-head text-[10px]
+          tracking-[0.15em] font-bold shadow-[0_0_20px_rgba(0,216,255,0.4)]">
+          RECOMMENDED
+        </div>
+      )}
+
+      <div className="text-center">
+        <h3 className="font-head text-sm tracking-[0.15em] text-cyan">{plan.name}</h3>
+        <p className="font-body text-xs text-[rgba(255,255,255,0.4)] mt-1">{plan.nameJa}</p>
+      </div>
+
+      <PriceDisplay plan={plan} isAnnual={isAnnual} hasAnnual={hasAnnual} />
+
+      <ul className="flex-1 space-y-2 mb-6">
+        {plan.features.map((f, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-[rgba(255,255,255,0.6)]">
+            <span className="text-neon mt-0.5 text-xs">&#10003;</span>
+            <span className="font-body">{f}</span>
+          </li>
+        ))}
+      </ul>
+
+      <a href={contactUrl}
+        className={`block text-center py-3 rounded-xl font-head text-xs tracking-[0.15em]
+          no-underline transition-all duration-300
+          ${plan.highlight
+            ? 'bg-gradient-to-r from-cyan to-[rgba(0,255,136,0.8)] text-[#020510] font-bold shadow-[0_0_20px_rgba(0,216,255,0.3)] hover:shadow-[0_0_30px_rgba(0,216,255,0.5)]'
+            : 'border border-[rgba(0,216,255,0.25)] text-[rgba(0,216,255,0.7)] hover:bg-[rgba(0,216,255,0.1)] hover:border-[rgba(0,216,255,0.5)]'
+          }`}
+      >
+        {plan.cta}
+      </a>
+    </div>
+  );
+}
+
+function ServiceSection({ service, isAnnual }) {
+  return (
+    <section className="mb-20">
+      <div className="text-center mb-10">
+        <div className="text-4xl mb-3">{service.icon}</div>
+        <h2 className="font-head text-xl md:text-2xl tracking-[0.15em] text-cyan font-bold">
+          {service.title}
+        </h2>
+        <p className="font-body text-sm text-[rgba(255,255,255,0.4)] mt-1 tracking-wider">
+          {service.subtitle}
+        </p>
+        <p className="font-body text-sm text-[rgba(255,255,255,0.55)] mt-3 max-w-lg mx-auto">
+          {service.desc}
+        </p>
+      </div>
+
+      <div className={`grid gap-6 max-w-5xl mx-auto
+        ${service.plans.length === 4
+          ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4'
+          : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+        }`}
+      >
+        {service.plans.map((plan, i) => (
+          <PlanCard key={i} plan={plan} isAnnual={isAnnual} hasAnnual={service.hasAnnual} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FAQItem({ item }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`border-b border-[rgba(0,216,255,0.08)] transition-colors duration-300
+      ${open ? 'border-[rgba(0,216,255,0.2)]' : ''}`}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full text-left py-5 flex items-center justify-between gap-4
+          cursor-pointer bg-transparent border-none text-white"
+      >
+        <span className="font-body text-sm text-[rgba(255,255,255,0.8)]">{item.q}</span>
+        <span className={`font-head text-cyan text-lg transition-transform duration-300
+          ${open ? 'rotate-45' : ''}`}>+</span>
+      </button>
+      <div className={`overflow-hidden transition-all duration-500
+        ${open ? 'max-h-40 pb-5' : 'max-h-0'}`}>
+        <p className="font-body text-sm text-[rgba(255,255,255,0.5)] leading-relaxed">
+          {item.a}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function FAQSection() {
+  return (
+    <section className="max-w-3xl mx-auto mb-20">
+      <div className="text-center mb-10">
+        <h2 className="font-head text-xl tracking-[0.15em] text-cyan font-bold">FAQ</h2>
+        <p className="font-body text-sm text-[rgba(255,255,255,0.4)] mt-2">
+          よくあるご質問
+        </p>
+      </div>
+      <div className="bg-[rgba(0,216,255,0.02)] border border-[rgba(0,216,255,0.08)]
+        rounded-2xl p-6 md:p-8 backdrop-blur-xl">
+        {faqData.map((item, i) => (
+          <FAQItem key={i} item={item} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CTABanner() {
+  return (
+    <section className="max-w-3xl mx-auto mb-20 text-center">
+      <div className="bg-gradient-to-br from-[rgba(0,216,255,0.06)] to-[rgba(0,255,136,0.04)]
+        border border-[rgba(0,216,255,0.2)] rounded-2xl p-10 backdrop-blur-xl
+        shadow-[0_0_40px_rgba(0,216,255,0.08)]">
+        <h2 className="font-head text-lg md:text-xl tracking-[0.15em] text-cyan font-bold mb-3">
+          ご不明な点がございましたら
+        </h2>
+        <p className="font-body text-sm text-[rgba(255,255,255,0.5)] mb-6">
+          サービスの詳細やカスタマイズについてお気軽にご相談ください
+        </p>
+        <a href="about.html#contact"
+          className="inline-block px-8 py-3 rounded-xl font-head text-xs tracking-[0.15em]
+            bg-gradient-to-r from-cyan to-neon text-[#020510] font-bold
+            no-underline shadow-[0_0_20px_rgba(0,216,255,0.3)]
+            transition-shadow duration-300 hover:shadow-[0_0_30px_rgba(0,216,255,0.5)]">
+          お問い合わせ
+        </a>
+      </div>
+    </section>
+  );
+}
+
+/* ==================== MAIN APP ==================== */
+function App() {
+  const [isAnnual, setIsAnnual] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    setTimeout(() => setLoaded(true), 100);
+  }, []);
+
+  return (
+    <div className={`relative z-10 min-h-screen transition-opacity duration-1000
+      ${loaded ? 'opacity-100' : 'opacity-0'}`}>
+
+      <BackButton />
+
+      {/* HEADER */}
+      <header className="pt-24 pb-6 text-center px-4">
+        <div className="font-head text-[10px] tracking-[0.5em] text-[rgba(0,216,255,0.4)] mb-4">
+          GRACE OF TOUCH
+        </div>
+        <h1 className="font-head text-3xl md:text-5xl font-bold text-cyan tracking-[0.1em]
+          drop-shadow-[0_0_30px_rgba(0,216,255,0.5)]"
+          style={{ textShadow: '0 0 30px rgba(0,216,255,0.5), 0 0 60px rgba(0,216,255,0.2)' }}>
+          PRICING
+        </h1>
+        <p className="font-body text-sm text-[rgba(255,255,255,0.45)] tracking-[0.2em] mt-4">
+          サービス料金プラン
+        </p>
+        <div className="w-24 h-px bg-gradient-to-r from-transparent via-cyan to-transparent mx-auto mt-6" />
+      </header>
+
+      {/* ANNUAL TOGGLE */}
+      <AnnualToggle isAnnual={isAnnual} onToggle={() => setIsAnnual(!isAnnual)} />
+
+      {/* SERVICE SECTIONS */}
+      <main className="px-4 md:px-8 max-w-6xl mx-auto">
+        {services.map((s) => (
+          <ServiceSection key={s.id} service={s} isAnnual={isAnnual} />
+        ))}
+
+        {/* FAQ */}
+        <FAQSection />
+
+        {/* CTA */}
+        <CTABanner />
+      </main>
+
+      {/* FOOTER */}
+      <footer className="text-center py-10 border-t border-[rgba(0,216,255,0.05)]">
+        <p className="font-body text-xs text-[rgba(255,255,255,0.2)] tracking-wider">
+          &copy; 2024-2026 Grace of Touch Co. All rights reserved.
+        </p>
+        <p className="font-body text-[10px] text-[rgba(255,255,255,0.12)] mt-2 tracking-wider">
+          Unauthorized copying, modification, or distribution is strictly prohibited.
+        </p>
+      </footer>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+
+/* ==================== STAR FIELD BACKGROUND ==================== */
+(function(){
+  const c = document.getElementById('bg-canvas');
+  const ctx = c.getContext('2d');
+  let w, h, stars = [];
+
+  function resize() {
+    w = c.width = window.innerWidth;
+    h = c.height = window.innerHeight;
+  }
+
+  function initStars() {
+    stars = [];
+    for (let i = 0; i < 200; i++) {
+      stars.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: Math.random() * 1.2 + 0.3,
+        a: Math.random() * 0.5 + 0.1,
+        speed: Math.random() * 0.3 + 0.05,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+
+  function draw(t) {
+    ctx.clearRect(0, 0, w, h);
+    stars.forEach(s => {
+      const flicker = Math.sin(t * 0.001 * s.speed + s.phase) * 0.3 + 0.7;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(0,216,255,${s.a * flicker})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', () => { resize(); initStars(); });
+  resize();
+  initStars();
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
