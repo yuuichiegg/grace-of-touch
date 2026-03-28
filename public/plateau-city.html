@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PLATEAU CITY - Grace of Touch</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#0a0a0f;font-family:'Segoe UI','Hiragino Sans',sans-serif;color:#e0e0e0}
+canvas{display:block}
+#ui-overlay{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+#ui-overlay>*{pointer-events:auto}
+/* Top bar */
+#top-bar{position:absolute;top:0;left:0;right:0;height:48px;background:rgba(10,10,20,0.85);
+  border-bottom:1px solid rgba(0,255,255,0.15);display:flex;align-items:center;padding:0 16px;gap:16px}
+#top-bar .logo{font-size:14px;color:rgba(0,255,255,0.8);font-weight:700;letter-spacing:2px;white-space:nowrap}
+#top-bar .logo span{color:rgba(255,255,255,0.5);font-weight:400;margin-left:8px;font-size:11px}
+#search-bar{flex:1;max-width:320px;margin-left:auto}
+#search-bar input{width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(0,255,255,0.15);
+  border-radius:6px;padding:6px 12px;color:#fff;font-size:12px;outline:none}
+#search-bar input:focus{border-color:rgba(0,255,255,0.4)}
+#search-bar input::placeholder{color:rgba(255,255,255,0.3)}
+/* Left panel - layers */
+#layer-panel{position:absolute;top:60px;left:12px;width:220px;background:rgba(10,10,20,0.88);
+  border:1px solid rgba(0,255,255,0.12);border-radius:10px;padding:14px;font-size:12px}
+#layer-panel h3{font-size:11px;color:rgba(0,255,255,0.6);letter-spacing:2px;margin-bottom:10px;font-weight:600}
+.layer-item{display:flex;align-items:center;gap:8px;padding:5px 0;cursor:pointer;user-select:none}
+.layer-item:hover{color:rgba(0,255,255,0.9)}
+.layer-item input[type=checkbox]{accent-color:#0ff;width:14px;height:14px}
+.layer-item label{cursor:pointer;font-size:12px}
+.layer-color{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+/* Time slider */
+#time-control{margin-top:14px;border-top:1px solid rgba(0,255,255,0.1);padding-top:10px}
+#time-control label{font-size:10px;color:rgba(255,255,255,0.5);display:block;margin-bottom:4px}
+#time-slider{width:100%;accent-color:#0ff;cursor:pointer}
+#time-label{font-size:11px;color:rgba(0,255,255,0.7);text-align:center;margin-top:2px}
+/* Right panel - stats */
+#stats-panel{position:absolute;top:60px;right:12px;width:200px;background:rgba(10,10,20,0.88);
+  border:1px solid rgba(0,255,255,0.12);border-radius:10px;padding:14px;font-size:11px}
+#stats-panel h3{font-size:11px;color:rgba(0,255,255,0.6);letter-spacing:2px;margin-bottom:10px;font-weight:600}
+.stat-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.stat-row .val{color:rgba(0,255,255,0.8);font-family:monospace}
+/* Info panel */
+#info-panel{position:absolute;bottom:12px;left:12px;width:340px;background:rgba(10,10,20,0.88);
+  border:1px solid rgba(0,255,255,0.12);border-radius:10px;padding:14px;font-size:12px;line-height:1.7}
+#info-panel h3{font-size:11px;color:rgba(0,255,255,0.6);letter-spacing:2px;margin-bottom:8px}
+#info-panel p{color:rgba(255,255,255,0.6)}
+/* Building tooltip */
+#building-info{position:absolute;display:none;background:rgba(10,10,20,0.92);border:1px solid rgba(0,255,255,0.3);
+  border-radius:8px;padding:10px 14px;font-size:11px;pointer-events:none;min-width:180px;z-index:20}
+#building-info .bi-name{font-size:13px;color:#fff;font-weight:600;margin-bottom:4px}
+#building-info .bi-row{color:rgba(255,255,255,0.6);padding:1px 0}
+#building-info .bi-row span{color:rgba(0,255,255,0.8)}
+/* Controls hint */
+#controls-hint{position:absolute;bottom:12px;right:12px;background:rgba(10,10,20,0.88);
+  border:1px solid rgba(0,255,255,0.12);border-radius:10px;padding:10px 14px;font-size:10px;
+  color:rgba(255,255,255,0.4);line-height:1.6}
+#controls-hint kbd{background:rgba(0,255,255,0.1);border:1px solid rgba(0,255,255,0.2);
+  border-radius:3px;padding:1px 5px;font-family:monospace;color:rgba(0,255,255,0.6)}
+/* Camera mode toggle */
+#cam-mode{position:absolute;top:60px;left:50%;transform:translateX(-50%);
+  background:rgba(10,10,20,0.88);border:1px solid rgba(0,255,255,0.12);border-radius:20px;
+  padding:4px;display:flex;gap:2px;font-size:11px}
+#cam-mode button{background:none;border:none;color:rgba(255,255,255,0.5);padding:4px 14px;
+  border-radius:16px;cursor:pointer;font-size:11px}
+#cam-mode button.active{background:rgba(0,255,255,0.15);color:rgba(0,255,255,0.9)}
+/* FPS */
+#fps{position:absolute;top:54px;right:220px;font-size:10px;color:rgba(0,255,255,0.4);font-family:monospace}
+</style>
+</head>
+<body>
+<div id="ui-overlay">
+  <div id="top-bar">
+    <div class="logo">PLATEAU CITY<span>Grace of Touch Engine / 3D都市モデルデモ</span></div>
+    <div id="search-bar"><input type="text" placeholder="検索... (例: Tokyo Tower, 新宿駅)"></div>
+  </div>
+
+  <div id="layer-panel">
+    <h3>OVERLAY LAYERS</h3>
+    <div class="layer-item"><input type="checkbox" id="lyr-infra"><div class="layer-color" style="background:#f44"></div><label for="lyr-infra">インフラ健全度</label></div>
+    <div class="layer-item"><input type="checkbox" id="lyr-drone"><div class="layer-color" style="background:#44f"></div><label for="lyr-drone">ドローン飛行経路</label></div>
+    <div class="layer-item"><input type="checkbox" id="lyr-traffic"><div class="layer-color" style="background:#4f4"></div><label for="lyr-traffic">交通流</label></div>
+    <div class="layer-item"><input type="checkbox" id="lyr-sports"><div class="layer-color" style="background:#f4f"></div><label for="lyr-sports">ARスポーツゾーン</label></div>
+    <div class="layer-item"><input type="checkbox" id="lyr-sat"><div class="layer-color" style="background:#ff4"></div><label for="lyr-sat">衛星カバレッジ</label></div>
+    <div id="time-control">
+      <label>TIME OF DAY / 時刻</label>
+      <input type="range" id="time-slider" min="0" max="24" step="0.1" value="10">
+      <div id="time-label">10:00</div>
+    </div>
+  </div>
+
+  <div id="stats-panel">
+    <h3>STATISTICS</h3>
+    <div class="stat-row"><span>建物数</span><span class="val" id="st-buildings">-</span></div>
+    <div class="stat-row"><span>アクティブレイヤー</span><span class="val" id="st-layers">0</span></div>
+    <div class="stat-row"><span>FPS</span><span class="val" id="st-fps">-</span></div>
+    <div class="stat-row"><span>カメラ位置</span><span class="val" id="st-cam">-</span></div>
+    <div class="stat-row"><span>緯度/経度</span><span class="val" id="st-latlon">-</span></div>
+  </div>
+
+  <div id="info-panel">
+    <h3>ABOUT PLATEAU</h3>
+    <p>PLATEAUは国土交通省が提供する日本全国の3D都市モデルデータです。Grace of Touch Engineは、このデータを活用してインフラ点検、交通分析、ARスポーツ、ドローン運用などの多層サービスを提供します。</p>
+  </div>
+
+  <div id="cam-mode">
+    <button class="active" data-mode="orbit">ORBIT</button>
+    <button data-mode="fps">FPS WALK</button>
+  </div>
+
+  <div id="controls-hint">
+    <kbd>WASD</kbd> 移動 / <kbd>Mouse</kbd> 視点<br>
+    <kbd>Click</kbd> 建物情報 / <kbd>Scroll</kbd> ズーム<br>
+    <kbd>Shift</kbd> ダッシュ
+  </div>
+
+  <div id="building-info">
+    <div class="bi-name"></div>
+    <div class="bi-row">階数: <span class="bi-floors"></span></div>
+    <div class="bi-row">築年数: <span class="bi-age"></span></div>
+    <div class="bi-row">用途: <span class="bi-use"></span></div>
+    <div class="bi-row">健全度: <span class="bi-health"></span></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+"use strict";
+
+// ===== SCENE SETUP =====
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.5, 2000);
+camera.position.set(80, 60, 120);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+document.body.prepend(renderer.domElement);
+
+// Orbit controls
+const orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+orbitControls.enableDamping = true;
+orbitControls.dampingFactor = 0.08;
+orbitControls.target.set(0, 5, 0);
+orbitControls.maxPolarAngle = Math.PI * 0.48;
+orbitControls.minDistance = 10;
+orbitControls.maxDistance = 400;
+
+// ===== LIGHTING =====
+const ambientLight = new THREE.AmbientLight(0x404060, 0.4);
+scene.add(ambientLight);
+const sunLight = new THREE.DirectionalLight(0xfff5e0, 1.2);
+sunLight.position.set(60, 80, 40);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(2048, 2048);
+sunLight.shadow.camera.left = -150;
+sunLight.shadow.camera.right = 150;
+sunLight.shadow.camera.top = 150;
+sunLight.shadow.camera.bottom = -150;
+scene.add(sunLight);
+const hemiLight = new THREE.HemisphereLight(0x8888ff, 0x444422, 0.3);
+scene.add(hemiLight);
+
+// ===== CITY GENERATION =====
+const CITY_SIZE = 200;
+const BLOCK_SIZE = 20;
+const ROAD_WIDTH = 4;
+const buildings = [];
+const buildingMeshes = [];
+const allOverlayGroups = {infra: new THREE.Group(), drone: new THREE.Group(),
+  traffic: new THREE.Group(), sports: new THREE.Group(), sat: new THREE.Group()};
+Object.values(allOverlayGroups).forEach(g => { g.visible = false; scene.add(g); });
+
+// Ground plane
+const groundGeo = new THREE.PlaneGeometry(CITY_SIZE*1.5, CITY_SIZE*1.5);
+const groundMat = new THREE.MeshLambertMaterial({color:0x2a2a2a});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Building name pools
+const prefixes = ['新宿','渋谷','港','千代田','中央','品川','目黒','世田谷','豊島','文京'];
+const suffixes_office = ['タワー','センター','ビル','プラザ','スクエア','パーク'];
+const suffixes_res = ['レジデンス','ハイツ','マンション','コート','ガーデン'];
+const suffixes_shop = ['商店街','モール','マーケット'];
+const uses = {skyscraper:'オフィス',midrise:'オフィス',residential:'住居',shop:'商業',landmark:'観光'};
+const healthLabels = ['良好','経年劣化あり','要注意','緊急対応'];
+const healthColors = [0x44ff44, 0xffff44, 0xff8844, 0xff4444];
+
+function randRange(a,b){return a+Math.random()*(b-a)}
+function randInt(a,b){return Math.floor(randRange(a,b+1))}
+function pick(arr){return arr[randInt(0,arr.length-1)]}
+
+// Materials
+const matGlassDay = new THREE.MeshPhongMaterial({color:0x88aacc,specular:0xffffff,shininess:100,transparent:true,opacity:0.7});
+const matConcreteDay = new THREE.MeshLambertMaterial({color:0xb0a89a});
+const matResidential = new THREE.MeshLambertMaterial({color:0xc8bfb0});
+const matShop = new THREE.MeshLambertMaterial({color:0xd4c8a8});
+const matLandmark = new THREE.MeshPhongMaterial({color:0xcc4444,specular:0xffffff,shininess:60});
+const matRoad = new THREE.MeshLambertMaterial({color:0x1a1a1a});
+const matLane = new THREE.MeshBasicMaterial({color:0xffff88});
+const matPark = new THREE.MeshLambertMaterial({color:0x2a6b2a});
+const matWater = new THREE.MeshPhongMaterial({color:0x1a3a5a,specular:0x4488cc,shininess:80,transparent:true,opacity:0.8});
+const matTree = new THREE.MeshLambertMaterial({color:0x1a5a1a});
+const matTrunk = new THREE.MeshLambertMaterial({color:0x4a3520});
+const matRail = new THREE.MeshLambertMaterial({color:0x555555});
+const matRailTrack = new THREE.MeshBasicMaterial({color:0x888888});
+
+// Window glow material (for night)
+const matWindowGlow = new THREE.MeshBasicMaterial({color:0xffeedd,transparent:true,opacity:0});
+
+// Generate roads
+const roads = [];
+for(let x = -CITY_SIZE/2; x <= CITY_SIZE/2; x += BLOCK_SIZE){
+  const roadGeo = new THREE.PlaneGeometry(ROAD_WIDTH, CITY_SIZE);
+  const road = new THREE.Mesh(roadGeo, matRoad);
+  road.rotation.x = -Math.PI/2;
+  road.position.set(x, 0.01, 0);
+  scene.add(road);
+  roads.push({x1:x,z1:-CITY_SIZE/2,x2:x,z2:CITY_SIZE/2,dir:'ns'});
+  // Lane markings
+  for(let z = -CITY_SIZE/2; z < CITY_SIZE/2; z += 4){
+    const lane = new THREE.Mesh(new THREE.PlaneGeometry(0.15,2), matLane);
+    lane.rotation.x = -Math.PI/2;
+    lane.position.set(x, 0.02, z);
+    scene.add(lane);
+  }
+}
+for(let z = -CITY_SIZE/2; z <= CITY_SIZE/2; z += BLOCK_SIZE){
+  const roadGeo = new THREE.PlaneGeometry(CITY_SIZE, ROAD_WIDTH);
+  const road = new THREE.Mesh(roadGeo, matRoad);
+  road.rotation.x = -Math.PI/2;
+  road.position.set(0, 0.01, z);
+  scene.add(road);
+  roads.push({x1:-CITY_SIZE/2,z1:z,x2:CITY_SIZE/2,z2:z,dir:'ew'});
+  for(let x = -CITY_SIZE/2; x < CITY_SIZE/2; x += 4){
+    const lane = new THREE.Mesh(new THREE.PlaneGeometry(2,0.15), matLane);
+    lane.rotation.x = -Math.PI/2;
+    lane.position.set(x, 0.02, z);
+    scene.add(lane);
+  }
+}
+
+// River (diagonal, Sumida-river-like)
+const riverPath = [];
+for(let i = 0; i <= 20; i++){
+  const t = i/20;
+  const x = -CITY_SIZE/2 + CITY_SIZE*0.3 + Math.sin(t*3)*15;
+  const z = -CITY_SIZE/2 + t*CITY_SIZE;
+  riverPath.push(new THREE.Vector3(x,0,z));
+}
+const riverShape = new THREE.Shape();
+riverShape.moveTo(-5,0);
+riverShape.lineTo(5,0);
+for(let i=0;i<riverPath.length-1;i++){
+  const p = riverPath[i], np = riverPath[i+1];
+  const dir = new THREE.Vector3().subVectors(np,p).normalize();
+  const perp = new THREE.Vector3(-dir.z,0,dir.x);
+  const waterGeo = new THREE.PlaneGeometry(12,p.distanceTo(np)+1);
+  const water = new THREE.Mesh(waterGeo, matWater);
+  const mid = new THREE.Vector3().addVectors(p,np).multiplyScalar(0.5);
+  water.position.set(mid.x, 0.01, mid.z);
+  water.rotation.x = -Math.PI/2;
+  water.rotation.z = -Math.atan2(dir.z,dir.x)+Math.PI/2;
+  scene.add(water);
+}
+
+// Parks
+const parkZones = [
+  {x:-60,z:-40,w:30,h:20}, {x:40,z:50,w:25,h:18}, {x:-20,z:70,w:20,h:15}
+];
+parkZones.forEach(pz => {
+  const pg = new THREE.Mesh(new THREE.PlaneGeometry(pz.w, pz.h), matPark);
+  pg.rotation.x = -Math.PI/2; pg.position.set(pz.x,0.02,pz.z);
+  scene.add(pg);
+  // Trees
+  for(let i=0;i<15;i++){
+    const tx = pz.x + randRange(-pz.w/2+2,pz.w/2-2);
+    const tz = pz.z + randRange(-pz.h/2+2,pz.h/2-2);
+    const treeH = randRange(2,5);
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.2,treeH*0.4,6), matTrunk);
+    trunk.position.set(tx, treeH*0.2, tz);
+    scene.add(trunk);
+    const canopy = new THREE.Mesh(new THREE.SphereGeometry(randRange(1,2),8,6), matTree);
+    canopy.position.set(tx, treeH*0.6, tz);
+    scene.add(canopy);
+  }
+});
+
+// Railway (elevated)
+const railY = 6;
+for(let z = -CITY_SIZE/2; z < CITY_SIZE/2; z+=1){
+  // Elevated track along x=30
+  const seg = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.3, 1.2), matRail);
+  seg.position.set(30, railY, z);
+  scene.add(seg);
+}
+// Pillars
+for(let z = -CITY_SIZE/2; z < CITY_SIZE/2; z+=8){
+  const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.6, railY, 0.6), matRail);
+  pillar.position.set(30, railY/2, z);
+  scene.add(pillar);
+}
+// Rail lines
+for(let offset of [-1, 0, 1]){
+  const railGeo = new THREE.PlaneGeometry(0.2, CITY_SIZE);
+  const rail = new THREE.Mesh(railGeo, matRailTrack);
+  rail.rotation.x = -Math.PI/2;
+  rail.position.set(30+offset, railY+0.16, 0);
+  scene.add(rail);
+}
+
+// Bridges over river
+const bridgePositions = [-60, -20, 20, 60];
+bridgePositions.forEach(bz => {
+  const riverX = -CITY_SIZE/2 + CITY_SIZE*0.3 + Math.sin((bz+CITY_SIZE/2)/CITY_SIZE*3)*15;
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(16, 0.5, 6), matRail);
+  bridge.position.set(riverX, 1, bz);
+  scene.add(bridge);
+  // Railings
+  for(let side of [-1,1]){
+    const railing = new THREE.Mesh(new THREE.BoxGeometry(16, 1, 0.2), matRail);
+    railing.position.set(riverX, 1.5, bz + side*2.8);
+    scene.add(railing);
+  }
+});
+
+// Generate buildings per block
+function isInPark(x,z){
+  return parkZones.some(p => x>p.x-p.w/2-2 && x<p.x+p.w/2+2 && z>p.z-p.h/2-2 && z<p.z+p.h/2+2);
+}
+function isInRiver(x,z){
+  for(let i=0;i<riverPath.length;i++){
+    const p=riverPath[i];
+    if(Math.abs(p.x-x)<10 && Math.abs(p.z-z)<10) return true;
+  }
+  return false;
+}
+function isOnRail(x){return Math.abs(x-30)<3;}
+
+const distFromCenter = (x,z) => Math.sqrt(x*x+z*z);
+
+// Tokyo Tower landmark
+function createTokyoTower(px,pz){
+  const group = new THREE.Group();
+  const towerH = 55;
+  // Main structure (tapered)
+  const towerGeo = new THREE.CylinderGeometry(0.5,4,towerH,8);
+  const tower = new THREE.Mesh(towerGeo, matLandmark);
+  tower.position.y = towerH/2;
+  group.add(tower);
+  // Observation deck
+  const deckGeo = new THREE.CylinderGeometry(3,3.5,3,8);
+  const deck = new THREE.Mesh(deckGeo, new THREE.MeshPhongMaterial({color:0xcc3333}));
+  deck.position.y = towerH*0.6;
+  group.add(deck);
+  // Antenna
+  const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,12,6), new THREE.MeshBasicMaterial({color:0xffffff}));
+  ant.position.y = towerH+6;
+  group.add(ant);
+  // Red-white stripes via rings
+  for(let y=0;y<towerH;y+=4){
+    const t=y/towerH;
+    const r=4*(1-t)+0.5*t;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(r,0.15,4,16),
+      new THREE.MeshBasicMaterial({color: y%8<4?0xff2200:0xffffff}));
+    ring.rotation.x = Math.PI/2;
+    ring.position.y = y;
+    group.add(ring);
+  }
+  group.position.set(px, 0, pz);
+  scene.add(group);
+  const bdata = {mesh:group,name:'東京タワー',floors:'-',age:68,type:'landmark',
+    health:0,x:px,z:pz,height:towerH};
+  buildings.push(bdata);
+  buildingMeshes.push(tower);
+  tower.userData = bdata;
+  deck.userData = bdata;
+  return bdata;
+}
+createTokyoTower(50, -30);
+
+// Building generation
+for(let bx = -CITY_SIZE/2+BLOCK_SIZE/2; bx < CITY_SIZE/2; bx += BLOCK_SIZE){
+  for(let bz = -CITY_SIZE/2+BLOCK_SIZE/2; bz < CITY_SIZE/2; bz += BLOCK_SIZE){
+    if(isInPark(bx,bz) || isInRiver(bx,bz) || isOnRail(bx)) continue;
+    // Skip if too close to Tokyo Tower
+    if(Math.abs(bx-50)<10 && Math.abs(bz+30)<10) continue;
+    const dist = distFromCenter(bx,bz);
+    const numBuildings = randInt(2,5);
+    for(let i=0;i<numBuildings;i++){
+      const ox = randRange(-BLOCK_SIZE/2+ROAD_WIDTH, BLOCK_SIZE/2-ROAD_WIDTH);
+      const oz = randRange(-BLOCK_SIZE/2+ROAD_WIDTH, BLOCK_SIZE/2-ROAD_WIDTH);
+      const px = bx+ox, pz = bz+oz;
+      if(isInRiver(px,pz)) continue;
+      let type, floors, mat, w, d;
+      if(dist < 30){
+        // Downtown - skyscrapers
+        type = Math.random()<0.6?'skyscraper':'midrise';
+      } else if(dist < 60){
+        type = Math.random()<0.3?'skyscraper':Math.random()<0.5?'midrise':'residential';
+      } else {
+        type = Math.random()<0.1?'midrise':Math.random()<0.5?'residential':'shop';
+      }
+      switch(type){
+        case 'skyscraper':
+          floors=randInt(40,60); mat=matGlassDay; w=randRange(3,6); d=randRange(3,6); break;
+        case 'midrise':
+          floors=randInt(10,20); mat=matConcreteDay; w=randRange(4,7); d=randRange(4,7); break;
+        case 'residential':
+          floors=randInt(5,10); mat=matResidential; w=randRange(5,8); d=randRange(4,6); break;
+        case 'shop':
+          floors=randInt(1,3); mat=matShop; w=randRange(4,8); d=randRange(3,6); break;
+      }
+      const height = floors*3;
+      const geo = new THREE.BoxGeometry(w, height, d);
+      const mesh = new THREE.Mesh(geo, mat.clone());
+      mesh.position.set(px, height/2, pz);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+      // Window lines
+      if(type!=='shop'){
+        const wGeo = new THREE.PlaneGeometry(w*0.9, height*0.9);
+        for(let side of [[0,0,d/2+0.01,0],[0,0,-d/2-0.01,Math.PI],
+          [w/2+0.01,0,0,Math.PI/2],[-w/2-0.01,0,0,-Math.PI/2]]){
+          const wMesh = new THREE.Mesh(wGeo.clone(), matWindowGlow.clone());
+          wMesh.position.set(px+side[0], height/2+side[1], pz+side[2]);
+          wMesh.rotation.y = side[3];
+          scene.add(wMesh);
+          mesh.userData._windows = mesh.userData._windows || [];
+          mesh.userData._windows.push(wMesh);
+        }
+      }
+      const suffix = type==='residential'?pick(suffixes_res):type==='shop'?pick(suffixes_shop):pick(suffixes_office);
+      const healthIdx = Math.random()<0.6?0:Math.random()<0.5?1:Math.random()<0.5?2:3;
+      const age = type==='skyscraper'?randInt(1,25):randInt(5,50);
+      const bdata = {mesh,name:pick(prefixes)+suffix,floors,age,type,health:healthIdx,
+        x:px,z:pz,height,w,d};
+      mesh.userData = bdata;
+      buildings.push(bdata);
+      buildingMeshes.push(mesh);
+    }
+  }
+}
+
+document.getElementById('st-buildings').textContent = buildings.length;
+
+// ===== OVERLAYS =====
+
+// 1. Infrastructure Health
+(function createInfraOverlay(){
+  const g = allOverlayGroups.infra;
+  buildings.forEach(b => {
+    if(b.type==='landmark') return;
+    const color = healthColors[b.health];
+    const geo = new THREE.BoxGeometry(
+      (b.w||4)+0.3, b.height+0.3, (b.d||4)+0.3);
+    const mat = new THREE.MeshBasicMaterial({color,transparent:true,opacity:0.25,depthWrite:false});
+    const overlay = new THREE.Mesh(geo, mat);
+    overlay.position.copy(b.mesh.position);
+    g.add(overlay);
+  });
+  // Crack markers on bridges
+  bridgePositions.forEach(bz => {
+    const riverX = -CITY_SIZE/2 + CITY_SIZE*0.3 + Math.sin((bz+CITY_SIZE/2)/CITY_SIZE*3)*15;
+    const marker = new THREE.Mesh(
+      new THREE.SphereGeometry(1.5,8,8),
+      new THREE.MeshBasicMaterial({color:0xff4444,transparent:true,opacity:0.6}));
+    marker.position.set(riverX, 3, bz);
+    g.add(marker);
+    // "Crack" text ring
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(2,0.15,4,16),
+      new THREE.MeshBasicMaterial({color:0xff0000}));
+    ring.position.copy(marker.position);
+    ring.rotation.x = Math.PI/2;
+    g.add(ring);
+  });
+})();
+
+// 2. Drone Flight Paths
+const dronePaths = [];
+(function createDroneOverlay(){
+  const g = allOverlayGroups.drone;
+  // Inspection routes (blue lines around buildings)
+  const pathData = [
+    [{x:-40,z:-40},{x:-40,z:40},{x:40,z:40},{x:40,z:-40},{x:-40,z:-40}],
+    [{x:-80,z:0},{x:-60,z:20},{x:-40,z:0},{x:-60,z:-20},{x:-80,z:0}],
+    [{x:20,z:60},{x:60,z:60},{x:60,z:80},{x:20,z:80},{x:20,z:60}]
+  ];
+  pathData.forEach(pts => {
+    const points = pts.map(p => new THREE.Vector3(p.x, 25, p.z));
+    const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+    const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({color:0x4488ff,linewidth:2}));
+    g.add(line);
+    dronePaths.push({points, progress:0, speed:0.002+Math.random()*0.002});
+    // Drone marker
+    const drone = new THREE.Mesh(new THREE.ConeGeometry(0.8,2,6), new THREE.MeshBasicMaterial({color:0x44aaff}));
+    drone.rotation.x = Math.PI;
+    g.add(drone);
+    dronePaths[dronePaths.length-1].marker = drone;
+  });
+  // No-fly zones
+  const nfzs = [{x:50,z:-30,r:15},{x:-60,z:-60,r:10}];
+  nfzs.forEach(nfz => {
+    const cyl = new THREE.Mesh(
+      new THREE.CylinderGeometry(nfz.r,nfz.r,60,16,1,true),
+      new THREE.MeshBasicMaterial({color:0xff0000,transparent:true,opacity:0.08,side:THREE.DoubleSide,depthWrite:false}));
+    cyl.position.set(nfz.x, 30, nfz.z);
+    g.add(cyl);
+    // Red ring at top
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(nfz.r,0.3,4,32),
+      new THREE.MeshBasicMaterial({color:0xff0000,transparent:true,opacity:0.4}));
+    ring.position.set(nfz.x, 60, nfz.z);
+    ring.rotation.x = Math.PI/2;
+    g.add(ring);
+  });
+})();
+
+// 3. Traffic Flow
+const trafficDots = [];
+(function createTrafficOverlay(){
+  const g = allOverlayGroups.traffic;
+  // Cars along roads
+  roads.forEach(r => {
+    const count = 12;
+    for(let i=0;i<count;i++){
+      const speed = 0.1 + Math.random()*0.4; // speed affects color
+      const color = speed>0.35?0x44ff44:speed>0.2?0xffff44:0xff4444;
+      const dot = new THREE.Mesh(
+        new THREE.BoxGeometry(1.5,0.6,2.5),
+        new THREE.MeshBasicMaterial({color}));
+      const t = Math.random();
+      if(r.dir==='ns'){
+        dot.position.set(r.x1 + (Math.random()>0.5?1:-1), 0.4, r.z1+t*(r.z2-r.z1));
+        dot.userData = {road:r,t,speed:speed*0.01,dir:'ns',sign:Math.random()>0.5?1:-1};
+      } else {
+        dot.position.set(r.x1+t*(r.x2-r.x1), 0.4, r.z1 + (Math.random()>0.5?1:-1));
+        dot.rotation.y = Math.PI/2;
+        dot.userData = {road:r,t,speed:speed*0.01,dir:'ew',sign:Math.random()>0.5?1:-1};
+      }
+      g.add(dot);
+      trafficDots.push(dot);
+    }
+  });
+})();
+
+// 4. AR Sports Zones
+(function createSportsOverlay(){
+  const g = allOverlayGroups.sports;
+  // Golf course on park
+  const p = parkZones[0];
+  const golfGeo = new THREE.PlaneGeometry(p.w-2, p.h-2);
+  const golfMat = new THREE.MeshBasicMaterial({color:0x22ff22,transparent:true,opacity:0.2,depthWrite:false});
+  const golf = new THREE.Mesh(golfGeo, golfMat);
+  golf.rotation.x = -Math.PI/2;
+  golf.position.set(p.x, 0.05, p.z);
+  g.add(golf);
+  // Golf flag
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,4,4), new THREE.MeshBasicMaterial({color:0xffffff}));
+  pole.position.set(p.x+5, 2, p.z-3);
+  g.add(pole);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.5,1), new THREE.MeshBasicMaterial({color:0xff0000,side:THREE.DoubleSide}));
+  flag.position.set(p.x+5.75, 3.5, p.z-3);
+  g.add(flag);
+  // Running route along river (magenta path)
+  const runPoints = riverPath.map(p => new THREE.Vector3(p.x+8, 0.1, p.z));
+  const runLine = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(runPoints),
+    new THREE.LineBasicMaterial({color:0xff44ff}));
+  g.add(runLine);
+  // Drone race circuit (orange through downtown)
+  const racePoints = [];
+  for(let i=0;i<=36;i++){
+    const angle = i/36*Math.PI*2;
+    racePoints.push(new THREE.Vector3(
+      Math.cos(angle)*40 + Math.sin(angle*3)*10,
+      30+Math.sin(angle*2)*10,
+      Math.sin(angle)*40 + Math.cos(angle*5)*5
+    ));
+  }
+  const raceLine = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(racePoints),
+    new THREE.LineBasicMaterial({color:0xff8800}));
+  g.add(raceLine);
+  // Race gates
+  for(let i=0;i<36;i+=6){
+    const p = racePoints[i];
+    const gate = new THREE.Mesh(
+      new THREE.TorusGeometry(4,0.3,4,8),
+      new THREE.MeshBasicMaterial({color:0xff8800,transparent:true,opacity:0.5}));
+    gate.position.copy(p);
+    g.add(gate);
+  }
+})();
+
+// 5. Satellite Coverage
+(function createSatOverlay(){
+  const g = allOverlayGroups.sat;
+  // Green coverage (most area)
+  const coverGeo = new THREE.PlaneGeometry(CITY_SIZE*1.3, CITY_SIZE*1.3);
+  const coverMat = new THREE.MeshBasicMaterial({color:0x00ff00,transparent:true,opacity:0.06,depthWrite:false});
+  const cover = new THREE.Mesh(coverGeo, coverMat);
+  cover.rotation.x = -Math.PI/2;
+  cover.position.y = 0.03;
+  g.add(cover);
+  // Blind spots (red) under bridges and between tall buildings
+  bridgePositions.forEach(bz => {
+    const riverX = -CITY_SIZE/2 + CITY_SIZE*0.3 + Math.sin((bz+CITY_SIZE/2)/CITY_SIZE*3)*15;
+    const blind = new THREE.Mesh(
+      new THREE.PlaneGeometry(18, 8),
+      new THREE.MeshBasicMaterial({color:0xff0000,transparent:true,opacity:0.15,depthWrite:false}));
+    blind.rotation.x = -Math.PI/2;
+    blind.position.set(riverX, 0.04, bz);
+    g.add(blind);
+  });
+  // Urban canyon blind spots (downtown)
+  for(let i=0;i<8;i++){
+    const bx = randRange(-30,30), bz = randRange(-30,30);
+    const blind = new THREE.Mesh(
+      new THREE.PlaneGeometry(6,6),
+      new THREE.MeshBasicMaterial({color:0xff0000,transparent:true,opacity:0.2,depthWrite:false}));
+    blind.rotation.x = -Math.PI/2;
+    blind.position.set(bx, 0.04, bz);
+    g.add(blind);
+  }
+  // Ground sensors in blind spots
+  bridgePositions.forEach(bz => {
+    const riverX = -CITY_SIZE/2 + CITY_SIZE*0.3 + Math.sin((bz+CITY_SIZE/2)/CITY_SIZE*3)*15;
+    const sensor = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.5,0.5,0.3,8),
+      new THREE.MeshBasicMaterial({color:0xffff00}));
+    sensor.position.set(riverX, 0.2, bz);
+    g.add(sensor);
+    // Antenna
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,2,4), new THREE.MeshBasicMaterial({color:0xffff00}));
+    ant.position.set(riverX, 1.2, bz);
+    g.add(ant);
+  });
+})();
+
+// ===== SKYBOX =====
+scene.fog = new THREE.FogExp2(0x8899bb, 0.002);
+
+// ===== TIME OF DAY =====
+let timeOfDay = 10;
+const timeSlider = document.getElementById('time-slider');
+const timeLabel = document.getElementById('time-label');
+
+function updateTimeOfDay(t){
+  timeOfDay = t;
+  const h = Math.floor(t), m = Math.floor((t-h)*60);
+  timeLabel.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+
+  // Sun position
+  const sunAngle = (t-6)/12*Math.PI; // 6am=horizon, 12=zenith, 18=horizon
+  const sunY = Math.sin(sunAngle)*80;
+  const sunX = Math.cos(sunAngle)*60;
+  sunLight.position.set(sunX, Math.max(sunY, -10), 40);
+
+  // Determine day/night blend
+  let dayFactor;
+  if(t >= 7 && t <= 17) dayFactor = 1;
+  else if(t >= 5 && t < 7) dayFactor = (t-5)/2;
+  else if(t > 17 && t <= 19) dayFactor = 1-(t-17)/2;
+  else dayFactor = 0;
+
+  // Lighting
+  sunLight.intensity = 0.2 + dayFactor * 1.0;
+  ambientLight.intensity = 0.1 + dayFactor * 0.3;
+  hemiLight.intensity = 0.1 + dayFactor * 0.2;
+
+  // Sky color
+  const dayColor = new THREE.Color(0x8899bb);
+  const sunsetColor = new THREE.Color(0xff6633);
+  const nightColor = new THREE.Color(0x0a0a1a);
+  let skyColor;
+  if(dayFactor > 0.5) skyColor = dayColor.clone().lerp(sunsetColor, (1-dayFactor)*2);
+  else skyColor = sunsetColor.clone().lerp(nightColor, (0.5-dayFactor)*2);
+  scene.fog.color.copy(skyColor);
+  renderer.setClearColor(skyColor);
+
+  // Sun color
+  if(dayFactor > 0.8) sunLight.color.setHex(0xfff5e0);
+  else if(dayFactor > 0.3) sunLight.color.setHex(0xffaa44);
+  else sunLight.color.setHex(0x4444aa);
+
+  // Window glow (night)
+  const glowIntensity = Math.max(0, 1-dayFactor*1.5);
+  buildingMeshes.forEach(m => {
+    if(m.userData._windows){
+      m.userData._windows.forEach(w => {
+        w.material.opacity = glowIntensity * (0.3 + Math.random()*0.15);
+        w.material.color.setHex(Math.random()>0.3?0xffeedd:0xccddff);
+      });
+    }
+  });
+
+  // Street lights (simple: darken/lighten ground)
+  groundMat.color.setHex(dayFactor > 0.5 ? 0x2a2a2a : 0x111118);
+}
+
+timeSlider.addEventListener('input', e => updateTimeOfDay(parseFloat(e.target.value)));
+updateTimeOfDay(10);
+
+// ===== LAYER TOGGLES =====
+const layerMap = {
+  'lyr-infra': 'infra', 'lyr-drone': 'drone', 'lyr-traffic': 'traffic',
+  'lyr-sports': 'sports', 'lyr-sat': 'sat'
+};
+Object.keys(layerMap).forEach(id => {
+  document.getElementById(id).addEventListener('change', e => {
+    allOverlayGroups[layerMap[id]].visible = e.target.checked;
+    updateLayerCount();
+  });
+});
+function updateLayerCount(){
+  const count = Object.values(allOverlayGroups).filter(g=>g.visible).length;
+  document.getElementById('st-layers').textContent = count;
+}
+
+// ===== BUILDING CLICK =====
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const biPanel = document.getElementById('building-info');
+
+renderer.domElement.addEventListener('click', e => {
+  if(cameraMode==='fps') return;
+  mouse.x = (e.clientX/innerWidth)*2-1;
+  mouse.y = -(e.clientY/innerHeight)*2+1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(buildingMeshes);
+  if(hits.length>0){
+    const b = hits[0].object.userData;
+    if(!b.name) return;
+    biPanel.style.display = 'block';
+    biPanel.style.left = e.clientX + 10 + 'px';
+    biPanel.style.top = e.clientY + 10 + 'px';
+    biPanel.querySelector('.bi-name').textContent = b.name;
+    biPanel.querySelector('.bi-floors').textContent = b.floors + '階';
+    biPanel.querySelector('.bi-age').textContent = b.age + '年';
+    biPanel.querySelector('.bi-use').textContent = uses[b.type] || '-';
+    biPanel.querySelector('.bi-health').textContent = healthLabels[b.health];
+    biPanel.querySelector('.bi-health').style.color = '#'+healthColors[b.health].toString(16).padStart(6,'0');
+  } else {
+    biPanel.style.display = 'none';
+  }
+});
+
+// ===== SEARCH =====
+const searchInput = document.querySelector('#search-bar input');
+searchInput.addEventListener('keydown', e => {
+  if(e.key==='Enter'){
+    const q = searchInput.value.trim().toLowerCase();
+    let target = null;
+    if(q.includes('tower') || q.includes('タワー') || q.includes('東京')){
+      target = buildings.find(b=>b.name==='東京タワー');
+    } else if(q.includes('新宿') || q.includes('shinjuku')){
+      target = buildings.find(b=>b.name.includes('新宿') && b.type==='skyscraper');
+    } else {
+      target = buildings.find(b=>b.name.toLowerCase().includes(q));
+    }
+    if(target){
+      const p = target.mesh.position || new THREE.Vector3(target.x, target.height/2, target.z);
+      orbitControls.target.set(p.x, p.y, p.z);
+      camera.position.set(p.x+30, p.y+20, p.z+30);
+      if(cameraMode==='fps'){
+        fpsPos.set(p.x+10, 1.7, p.z+10);
+      }
+    }
+    searchInput.value = '';
+  }
+});
+
+// ===== CAMERA MODES =====
+let cameraMode = 'orbit';
+const fpsPos = new THREE.Vector3(0, 1.7, 20);
+const fpsRot = {yaw: 0, pitch: 0};
+const keys = {};
+const modeBtns = document.querySelectorAll('#cam-mode button');
+modeBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    modeBtns.forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    cameraMode = btn.dataset.mode;
+    if(cameraMode==='fps'){
+      orbitControls.enabled = false;
+      fpsPos.copy(camera.position);
+      fpsPos.y = 1.7;
+    } else {
+      orbitControls.enabled = true;
+    }
+  });
+});
+
+document.addEventListener('keydown', e => keys[e.code]=true);
+document.addEventListener('keyup', e => keys[e.code]=false);
+renderer.domElement.addEventListener('mousemove', e => {
+  if(cameraMode==='fps' && (e.buttons&2)){
+    fpsRot.yaw -= e.movementX*0.003;
+    fpsRot.pitch -= e.movementY*0.003;
+    fpsRot.pitch = Math.max(-1.2,Math.min(1.2,fpsRot.pitch));
+  }
+});
+renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+function updateFPS(dt){
+  const speed = keys['ShiftLeft']||keys['ShiftRight'] ? 30 : 12;
+  const forward = new THREE.Vector3(-Math.sin(fpsRot.yaw),0,-Math.cos(fpsRot.yaw));
+  const right = new THREE.Vector3(forward.z,0,-forward.x);
+  if(keys['KeyW']) fpsPos.addScaledVector(forward, speed*dt);
+  if(keys['KeyS']) fpsPos.addScaledVector(forward, -speed*dt);
+  if(keys['KeyA']) fpsPos.addScaledVector(right, -speed*dt);
+  if(keys['KeyD']) fpsPos.addScaledVector(right, speed*dt);
+  camera.position.copy(fpsPos);
+  camera.rotation.order = 'YXZ';
+  camera.rotation.y = fpsRot.yaw;
+  camera.rotation.x = fpsRot.pitch;
+}
+
+// ===== STATS =====
+let frameCount = 0, fpsTime = 0, currentFPS = 0;
+
+function updateStats(dt){
+  frameCount++;
+  fpsTime += dt;
+  if(fpsTime >= 1){
+    currentFPS = Math.round(frameCount/fpsTime);
+    document.getElementById('st-fps').textContent = currentFPS;
+    frameCount = 0;
+    fpsTime = 0;
+  }
+  const cp = camera.position;
+  document.getElementById('st-cam').textContent = `${cp.x.toFixed(0)},${cp.y.toFixed(0)},${cp.z.toFixed(0)}`;
+  // Simulated lat/lon (centered on Shinjuku: 35.6895, 139.6917)
+  const lat = 35.6895 + cp.z * 0.00001;
+  const lon = 139.6917 + cp.x * 0.00001;
+  document.getElementById('st-latlon').textContent = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+}
+
+// ===== ANIMATION =====
+const clock = new THREE.Clock();
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  if(cameraMode==='orbit') orbitControls.update();
+  else updateFPS(dt);
+
+  // Animate drone paths
+  if(allOverlayGroups.drone.visible){
+    dronePaths.forEach(dp => {
+      dp.progress += dp.speed;
+      if(dp.progress >= 1) dp.progress -= 1;
+      const idx = dp.progress * (dp.points.length-1);
+      const i = Math.floor(idx);
+      const f = idx - i;
+      const p1 = dp.points[Math.min(i, dp.points.length-1)];
+      const p2 = dp.points[Math.min(i+1, dp.points.length-1)];
+      if(p1 && p2){
+        dp.marker.position.lerpVectors(p1, p2, f);
+      }
+    });
+  }
+
+  // Animate traffic
+  if(allOverlayGroups.traffic.visible){
+    trafficDots.forEach(dot => {
+      const d = dot.userData;
+      d.t += d.speed * d.sign;
+      if(d.t > 1){d.t=1;d.sign=-1;}
+      if(d.t < 0){d.t=0;d.sign=1;}
+      if(d.dir==='ns'){
+        dot.position.z = d.road.z1 + d.t*(d.road.z2-d.road.z1);
+      } else {
+        dot.position.x = d.road.x1 + d.t*(d.road.x2-d.road.x1);
+      }
+    });
+  }
+
+  updateStats(dt);
+  renderer.render(scene, camera);
+}
+animate();
+
+// Resize
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+})();
+</script>
+</body>
+</html>
