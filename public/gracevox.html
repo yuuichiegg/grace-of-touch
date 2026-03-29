@@ -714,7 +714,14 @@ function stopRecording(){
       finalTranscript+=interimTranscript;
       interimTranscript='';
     }
-    const finalText=processText(finalTranscript);
+    // finalTranscriptが空でもDOMにテキストがあればそれを使う
+    let finalText=processText(finalTranscript);
+    if(!finalText.trim()){
+      const domText=document.getElementById('currentText').textContent||'';
+      if(domText.trim()&&!document.getElementById('currentText').querySelector('.placeholder')){
+        finalText=domText.trim();
+      }
+    }
     if(finalText.trim()){
       copyToClipboard(finalText);
       saveToHistory(finalText);
