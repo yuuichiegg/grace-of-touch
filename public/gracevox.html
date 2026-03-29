@@ -758,26 +758,31 @@ function stopRecording(){
   setTimeout(finalize, 1500);
 }
 
-// クリップボードコピー — 常に2つの方法を両方実行
+// クリップボードコピー
 function copyToClipboard(text){
   if(!text||!text.trim()) return;
-  // 方法1: execCommand（同期、確実、ユーザージェスチャー内で動作）
+  // Clipboard API優先（フォーカスを奪わない）
   try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).catch(()=>execCopy(text));
+      return;
+    }
+  }catch(e){}
+  execCopy(text);
+}
+function execCopy(text){
+  try{
+    const prev=document.activeElement;
     const ta=document.createElement('textarea');
     ta.value=text;
     ta.setAttribute('readonly','');
-    ta.style.cssText='position:fixed;left:0;top:0;opacity:0;width:1px;height:1px;pointer-events:none;';
+    ta.style.cssText='position:fixed;left:-9999px;top:-9999px;opacity:0;';
     document.body.appendChild(ta);
-    ta.focus();
+    ta.select();
     ta.setSelectionRange(0,ta.value.length);
     document.execCommand('copy');
     document.body.removeChild(ta);
-  }catch(e){}
-  // 方法2: Clipboard API（非同期、モダン）
-  try{
-    if(navigator.clipboard&&navigator.clipboard.writeText){
-      navigator.clipboard.writeText(text).catch(()=>{});
-    }
+    if(prev) prev.focus();
   }catch(e){}
 }
 
