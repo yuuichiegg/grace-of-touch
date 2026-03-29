@@ -997,8 +997,8 @@ function renderHistory(){
   const container=document.getElementById('historyContent');
   if(history.length===0){ container.innerHTML='<div class="history-empty">テキストを選択してコピー、または Save で履歴に保存</div>'; return; }
   container.innerHTML=history.map((h,i)=>{
-    const vp=h.vprint||h.voice||null;
-    const vpStr=vp&&typeof vp==='object'?` ${vp.icon||''} ${vp.pitch||''}Hz`:(vp&&vp!=='unknown'?' '+vp:'');
+    const vp=h.vprint||null;
+    const vpStr=vp&&typeof vp==='object'&&vp.pitch>0?` ${vp.icon||''} ${vp.pitch}Hz`:'';
     return `<div class="history-item" onclick="copyHistory(${i})" style="cursor:pointer;"><div class="history-time">${h.time} — ${(h.lang||'').split('-')[0].toUpperCase()}${vpStr}</div>${escapeHtml(h.text)}</div>`;
   }).join('');
 }
