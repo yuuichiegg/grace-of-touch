@@ -713,7 +713,6 @@ function stopRecording(){
   document.getElementById('recBtn').classList.remove('recording');
 
   // 1. ピッチ確保
-  collectPitchNow();
   lastSavedPitch=sessionPitchData.length?Math.round(sessionPitchData.reduce((a,b)=>a+b,0)/sessionPitchData.length):0;
 
   // 2. テキスト確保（interim含む）
@@ -1084,13 +1083,20 @@ function drawVoicePrint(){
     ctx.fillRect(w-2,h-(i+1)*sliceH,2,sliceH);
   }
 
-  // ピッチ表示
-  if(sessionPitchData.length>0){
-    const p=sessionPitchData[sessionPitchData.length-1];
-    ctx.fillStyle='rgba(255,255,255,0.8)';
-    ctx.font='bold 11px sans-serif';
-    ctx.textAlign='right';
-    ctx.fillText(Math.round(p)+'Hz',w-4,12);
+  // ピッチ計算＆保存（描画と同時に収集 — 確実）
+  if(audioContext){
+    const binHz=audioContext.sampleRate/analyser.fftSize;
+    const minB=Math.floor(80/binHz), maxB=Math.min(Math.ceil(500/binHz),fd.length-1);
+    let pv=0,pb=0;
+    for(let i=minB;i<=maxB;i++){if(fd[i]>pv){pv=fd[i];pb=i;}}
+    if(pv>15){
+      const hz=Math.round(pb*binHz);
+      sessionPitchData.push(hz);
+      ctx.fillStyle='rgba(255,255,255,0.9)';
+      ctx.font='bold 12px sans-serif';
+      ctx.textAlign='right';
+      ctx.fillText(hz+'Hz',w-4,14);
+    }
   }
 
   requestAnimationFrame(drawVoicePrint);
@@ -1098,13 +1104,11 @@ function drawVoicePrint(){
 
 // ─── Voice Print Live ───
 let sessionPitchData=[];
-function getPitch(){
-  if(!analyser||!audioContext) return 0;
+function collectVoicePrint(){
+  if(!analyser||!audioContext) return;
   try{
-    // 周波数ドメインでピーク検出（iOS安定）
     const fd=new Uint8Array(analyser.frequencyBinCount);
     analyser.getByteFrequencyData(fd);
-    // 人声の範囲(80-500Hz)でピークを探す
     const binHz=audioContext.sampleRate/analyser.fftSize;
     const minBin=Math.floor(80/binHz);
     const maxBin=Math.min(Math.ceil(500/binHz),fd.length-1);
@@ -1112,19 +1116,9 @@ function getPitch(){
     for(let i=minBin;i<=maxBin;i++){
       if(fd[i]>peakVal){peakVal=fd[i];peakBin=i;}
     }
-    if(peakVal>30) return Math.round(peakBin*binHz);
-    return 0;
-  }catch(e){ return 0; }
-}
-function collectVoicePrint(){
-  if(!analyser) return;
-  const f=getPitch();
-  if(f>0) sessionPitchData.push(f);
-  if(isRecording) setTimeout(collectVoicePrint,100);
-}
-function collectPitchNow(){
-  const f=getPitch();
-  if(f>0) sessionPitchData.push(f);
+    if(peakVal>15) sessionPitchData.push(Math.round(peakBin*binHz));
+  }catch(e){}
+  if(isRecording) setTimeout(collectVoicePrint,80);
 }
 
 function checkVoiceCondition(){
