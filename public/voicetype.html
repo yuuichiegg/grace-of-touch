@@ -422,10 +422,19 @@ function finishSetup(){ document.getElementById('setupOverlay').classList.add('h
 function resetSetup(){ voiceProfile=null; localStorage.removeItem('vt_voiceProfile'); toggleSettings(); document.querySelectorAll('.setup-step').forEach(s=>s.classList.remove('active')); document.getElementById('setup-step-1').classList.add('active'); document.getElementById('voiceCircle').className='voice-circle'; document.getElementById('voiceCircle').innerHTML='&#127908;'; document.getElementById('setupTimer').textContent='10'; document.getElementById('setupProgress').style.width='0%'; document.getElementById('setupRecBtn').disabled=false; document.getElementById('setupRecBtn').textContent='録音開始'; document.getElementById('setupOverlay').classList.remove('hidden'); }
 
 // ─── Recognition ───
+const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+
 function initRecognition(){
-  if(!('webkitSpeechRecognition' in window)&&!('SpeechRecognition' in window)){setStatus('error','Chrome推奨');return;}
+  if(!('webkitSpeechRecognition' in window)&&!('SpeechRecognition' in window)){
+    setStatus('error','このブラウザは非対応です');
+    showToast('Chrome または Safari 最新版をお使いください');
+    return;
+  }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  recognition=new SR(); recognition.continuous=true; recognition.interimResults=true;
+  recognition=new SR();
+  // iOS Safariはcontinuous=trueだと不安定なのでfalse
+  recognition.continuous=!isIOS;
+  recognition.interimResults=true;
   recognition.lang=currentLang;
   recognition.onresult=handleResult; recognition.onerror=handleError; recognition.onend=handleEnd;
   setStatus('ready','準備完了');
@@ -436,18 +445,33 @@ function toggleRecording(){ isRecording ? stopRecording() : startRecording(); }
 async function startRecording(){
   if(isRecording) return;
   if(!recognition) initRecognition();
+  if(!recognition) return; // initRecognition failed
   const el=document.getElementById('currentText');
   if(el.querySelector('.placeholder')) el.innerHTML='';
-  // Reset for new recording
   finalTranscript=''; interimTranscript=''; sentences=[];
   recognition.lang=currentLang;
+
+  // iOS Safari: getUserMediaを先に呼んでマイク許可を得る
   try{
     mediaStream=await navigator.mediaDevices.getUserMedia({audio:true});
-    audioContext=new AudioContext(); analyser=audioContext.createAnalyser(); analyser.fftSize=256;
+    // AudioContextはユーザージェスチャー内で作成（iOS要件）
+    audioContext=new (window.AudioContext||window.webkitAudioContext)();
+    analyser=audioContext.createAnalyser(); analyser.fftSize=256;
     audioContext.createMediaStreamSource(mediaStream).connect(analyser);
     updateVolumeMeter();
-  }catch(e){setStatus('error','マイク許可が必要');return;}
-  recognition.start(); isRecording=true;
+  }catch(e){
+    setStatus('error','マイクへのアクセスを許可してください');
+    showToast(isIOS?'設定 > Safari > マイクを確認':'マイク許可が必要です');
+    return;
+  }
+
+  try{
+    recognition.start();
+  }catch(e){
+    setStatus('error','音声認識を開始できません');
+    return;
+  }
+  isRecording=true;
   document.getElementById('recBtn').classList.add('recording');
   document.getElementById('currentLabel').textContent='Recording...';
   setStatus('recording','録音中...');
@@ -514,7 +538,10 @@ function handleResult(event){
   document.getElementById('charCount').textContent=(finalTranscript.length+interimTranscript.length)+'文字';
 }
 function handleError(e){ if(e.error==='no-speech')setStatus('recording','音声待ち...'); else if(e.error==='not-allowed'){setStatus('error','マイク許可が必要');isRecording=false;document.getElementById('recBtn').classList.remove('recording');} }
-function handleEnd(){ if(isRecording){try{recognition.start();}catch(e){}} }
+function handleEnd(){
+  // iOS(continuous=false)またはChrome(無音タイムアウト)で再開
+  if(isRecording){try{recognition.start();}catch(e){}}
+}
 
 function isSimilar(a,b){
   if(!a||!b)return false;
