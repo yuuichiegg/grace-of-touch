@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>GraceVox — Grace of Touch</title>
+<!-- © 2024-2026 Grace of Touch Co. All rights reserved. Unauthorized copying prohibited. -->
+<script>
+(function(){
+  document.addEventListener('contextmenu',function(e){e.preventDefault();});
+  document.addEventListener('keydown',function(e){
+    if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&(e.key==='I'||e.key==='J'))||(e.ctrlKey&&e.key==='u')){e.preventDefault();}
+  });
+  console.log('%c⚠ WARNING','color:red;font-size:24px;font-weight:bold;');
+  console.log('%c© 2024-2026 Grace of Touch Co. Unauthorized access prohibited.','color:red;font-size:14px;');
+})();
+</script>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --text: #e0e0e8;
+    --text-dim: #6b6b80;
+    --accent: #6c5ce7;
+    --accent-glow: rgba(108,92,231,0.3);
+    --recording: #e74c3c;
+    --recording-glow: rgba(231,76,60,0.4);
+    --success: #2ecc71;
+  }
+  :root.light {
+    --bg: #f5f5f7;
+    --surface: #ffffff;
+    --border: #e0e0e6;
+    --text: #1a1a2e;
+    --text-dim: #8888a0;
+    --accent: #6c5ce7;
+    --accent-glow: rgba(108,92,231,0.2);
+    --recording: #e74c3c;
+    --recording-glow: rgba(231,76,60,0.3);
+    --success: #2ecc71;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    background: var(--bg); color: var(--text);
+    height: 100vh; height: 100dvh;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* Header */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .logo { font-size: 16px; font-weight: 700; letter-spacing: 1px; }
+  .logo span { color: var(--accent); }
+  .header-right { display: flex; gap: 8px; align-items: center; }
+  .lang-select {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    padding: 4px 6px; border-radius: 6px; font-size: 11px; cursor: pointer; font-family: inherit;
+  }
+  .mode-pill {
+    font-size: 10px; color: var(--accent); border: 1px solid rgba(108,92,231,0.4);
+    padding: 3px 10px; border-radius: 12px;
+  }
+  .icon-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-dim);
+    width: 32px; height: 32px; border-radius: 6px; cursor: pointer; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  /* Main */
+  main {
+    flex: 1; display: flex; flex-direction: column;
+    padding: 12px; gap: 8px; min-height: 0; overflow: hidden;
+  }
+
+  /* Current panel */
+  .current-panel {
+    flex: 1; display: flex; flex-direction: column;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; min-height: 80px; position: relative;
+  }
+  .current-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .current-label { font-size: 10px; color: var(--text-dim); letter-spacing: 0.5px; text-transform: uppercase; }
+  .current-actions { display: flex; gap: 6px; align-items: center; }
+  .action-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-dim);
+    padding: 3px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s;
+  }
+  .action-btn:hover { border-color: var(--accent); color: var(--text); }
+  .action-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .action-btn.primary:hover { background: #7c6cf0; }
+  .char-count { font-size: 10px; color: var(--text-dim); }
+
+  .current-text {
+    flex: 1; padding: 12px; font-size: 15px; line-height: 1.8;
+    overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; min-height: 0;
+    -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text;
+  }
+  .current-text:focus { outline: none; }
+  .interim { color: var(--text-dim); font-style: italic; }
+  .placeholder { color: var(--text-dim); font-style: italic; font-size: 13px; }
+
+  /* History panel */
+  .history-panel {
+    flex: 1; display: flex; flex-direction: column;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; min-height: 60px;
+  }
+  .history-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .history-label { font-size: 10px; color: var(--text-dim); letter-spacing: 0.5px; text-transform: uppercase; }
+  .history-content {
+    flex: 1; overflow-y: auto; padding: 8px 12px; min-height: 0;
+    -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text;
+  }
+  .history-item {
+    padding: 8px 10px; margin-bottom: 6px;
+    background: rgba(108,92,231,0.05); border: 1px solid rgba(108,92,231,0.1);
+    border-radius: 6px; font-size: 13px; line-height: 1.6;
+    position: relative; cursor: text; transition: border-color 0.2s;
+  }
+  .history-item:hover { border-color: rgba(108,92,231,0.3); }
+  .history-time {
+    font-size: 9px; color: var(--text-dim); margin-bottom: 4px; letter-spacing: 0.5px;
+  }
+  .history-empty { font-size: 12px; color: var(--text-dim); font-style: italic; padding: 12px 0; text-align: center; }
+
+  /* Controls */
+  .controls {
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0;
+  }
+  .rec-btn {
+    width: 56px; height: 56px; border-radius: 50%; border: 3px solid var(--accent);
+    background: transparent; cursor: pointer; transition: all 0.3s;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  .rec-btn:hover { box-shadow: 0 0 20px var(--accent-glow); }
+  .rec-btn .inner { width: 24px; height: 24px; background: var(--accent); border-radius: 50%; transition: all 0.3s; }
+  .rec-btn.recording { border-color: var(--recording); box-shadow: 0 0 24px var(--recording-glow); animation: pulse 1.5s ease-in-out infinite; }
+  .rec-btn.recording .inner { background: var(--recording); border-radius: 4px; width: 20px; height: 20px; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 20px var(--recording-glow)} 50%{box-shadow:0 0 44px var(--recording-glow)} }
+
+  .controls-info { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 70px; }
+  .status-bar { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+  .status-dot.ready { background: var(--success); }
+  .status-dot.recording { background: var(--recording); animation: blink 1s infinite; }
+  .status-dot.error { background: var(--recording); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .hotkey-hint { font-size: 10px; color: var(--text-dim); }
+  .hotkey-hint kbd { background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-family: monospace; font-size: 10px; color: var(--text); }
+  .volume-meter { display: flex; align-items: center; gap: 3px; height: 20px; }
+  .volume-bar { width: 3px; height: 4px; background: var(--accent); border-radius: 2px; transition: height 0.05s; }
+
+  /* Backspace Button */
+  .bs-btn {
+    width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border);
+    background: transparent; color: var(--text-dim); font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation; flex-shrink: 0;
+  }
+  .bs-btn:hover, .bs-btn:active { border-color: var(--accent); color: var(--text); }
+
+  /* iOS Copy Banner */
+  .ios-copy-banner {
+    display: none; position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    z-index: 300; background: var(--accent); color: #fff; border: none;
+    padding: 14px 40px; border-radius: 30px; font-size: 16px; font-weight: 700;
+    cursor: pointer; box-shadow: 0 4px 20px var(--accent-glow);
+    animation: bannerPulse 1.5s ease-in-out infinite;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .ios-copy-banner.show { display: block; }
+  @keyframes bannerPulse { 0%,100%{transform:translateX(-50%) scale(1)} 50%{transform:translateX(-50%) scale(1.05)} }
+
+  /* Setup */
+  .setup-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .setup-overlay.hidden { display: none; }
+  .setup-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 100%; max-width: 400px; text-align: center; }
+  .setup-card h2 { font-size: 18px; margin-bottom: 8px; }
+  .setup-card p { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; line-height: 1.6; }
+  .setup-step { display: none; }
+  .setup-step.active { display: block; }
+  .voice-circle { width: 100px; height: 100px; border-radius: 50%; margin: 20px auto; border: 3px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 32px; transition: all 0.5s; }
+  .voice-circle.listening { border-color: var(--recording); box-shadow: 0 0 30px var(--recording-glow); animation: pulse 1.5s ease-in-out infinite; }
+  .voice-circle.done { border-color: var(--success); }
+  .setup-btn { background: var(--accent); color: #fff; border: none; padding: 12px 32px; border-radius: 8px; font-size: 14px; cursor: pointer; margin-top: 16px; }
+  .setup-btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--text-dim); margin-top: 8px; }
+  .detected-lang { font-size: 24px; font-weight: 700; color: var(--accent); margin: 12px 0; }
+  .lang-options { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 16px 0; }
+  .lang-chip { padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px; font-size: 12px; cursor: pointer; background: transparent; color: var(--text-dim); transition: all 0.2s; }
+  .lang-chip:hover, .lang-chip.selected { border-color: var(--accent); color: var(--accent); background: rgba(108,92,231,0.1); }
+  .progress-bar { width: 100%; height: 4px; background: var(--border); border-radius: 2px; margin: 12px 0; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; width: 0%; }
+
+  /* Settings */
+  .settings-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; padding: 16px; }
+  .settings-overlay.open { display: flex; }
+  .settings-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; width: 100%; max-width: 420px; max-height: 80dvh; overflow-y: auto; }
+  .settings-panel h2 { font-size: 16px; margin-bottom: 16px; }
+  .setting-group { margin-bottom: 14px; }
+  .setting-group label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 6px; }
+  .setting-group select, .setting-group textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: 14px; font-family: inherit; }
+  .setting-group textarea { height: 70px; resize: vertical; }
+  .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 13px; }
+  .toggle { width: 44px; height: 24px; background: var(--border); border-radius: 12px; border: none; cursor: pointer; position: relative; transition: background 0.3s; flex-shrink: 0; }
+  .toggle::after { content:''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: var(--text); border-radius: 50%; transition: transform 0.3s; }
+  .toggle.on { background: var(--accent); }
+  .toggle.on::after { transform: translateX(20px); }
+  .sep { border-top: 1px solid var(--border); margin: 14px 0; }
+  .panel-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); padding: 8px; border-radius: 6px; font-size: 12px; cursor: pointer; width: 100%; }
+  .settings-close { margin-top: 12px; width: 100%; padding: 10px; background: var(--accent); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
+
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--accent); color: #fff; padding: 8px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 200; white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 600px) {
+    header { padding: 8px 12px; }
+    main { padding: 8px; gap: 6px; }
+    .current-text { padding: 10px; font-size: 14px; }
+    .controls { padding: 10px 12px; }
+    .hotkey-hint { display: none; }
+    .volume-meter { display: none; }
+  }
+  @supports (padding: env(safe-area-inset-bottom)) {
+    .controls { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Setup -->
+<div class="setup-overlay" id="setupOverlay">
+  <div class="setup-card">
+    <div class="setup-step active" id="setup-step-1">
+      <h2>VoiceType Setup</h2>
+      <p>声のサンプルを録音して<br>言語と声質を自動判定します</p>
+      <button class="setup-btn" onclick="setupNext(2)">セットアップ開始</button>
+      <br><button class="setup-btn secondary" onclick="skipSetup()">スキップ</button>
+    </div>
+    <div class="setup-step" id="setup-step-2">
+      <h2>声のサンプル録音</h2>
+      <p>普段の話し方で10秒ほど話してください</p>
+      <div class="voice-circle" id="voiceCircle">&#127908;</div>
+      <div class="progress-bar"><div class="progress-fill" id="setupProgress"></div></div>
+      <p id="setupTimer" style="font-size:20px;font-weight:700;color:var(--accent);">10</p>
+      <button class="setup-btn" id="setupRecBtn" onclick="startSetupRec()">録音開始</button>
+    </div>
+    <div class="setup-step" id="setup-step-3">
+      <h2>検出結果</h2>
+      <div class="detected-lang" id="detectedLang">日本語</div>
+      <div id="voicePrintInfo" style="text-align:left;background:rgba(108,92,231,0.08);border-radius:8px;padding:10px 14px;margin:12px 0;font-size:12px;line-height:1.8;color:var(--text-dim);"></div>
+      <div class="lang-options">
+        <button class="lang-chip selected" data-lang="ja-JP" onclick="selectLang(this)">日本語</button>
+        <button class="lang-chip" data-lang="en-US" onclick="selectLang(this)">English</button>
+        <button class="lang-chip" data-lang="zh-CN" onclick="selectLang(this)">中文</button>
+        <button class="lang-chip" data-lang="ko-KR" onclick="selectLang(this)">한국어</button>
+      </div>
+      <button class="setup-btn" onclick="finishSetup()">完了</button>
+    </div>
+  </div>
+</div>
+
+<!-- App -->
+<header>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <a href="/" class="icon-btn" title="Terminal" style="text-decoration:none;font-size:14px;">&#9664;</a>
+    <div class="logo">Grace<span>Vox</span></div>
+  </div>
+  <div class="header-right">
+    <select class="lang-select" id="langSelect" onchange="switchLang(this.value)">
+      <option value="ja-JP">JP 日本語</option>
+      <option value="en-US">EN English</option>
+      <option value="zh-CN">CN 中文</option>
+      <option value="zh-TW">TW 繁體中文</option>
+      <option value="ko-KR">KR 한국어</option>
+      <option value="fr-FR">FR Français</option>
+      <option value="de-DE">DE Deutsch</option>
+      <option value="es-ES">ES Español</option>
+      <option value="pt-BR">PT Português</option>
+      <option value="it-IT">IT Italiano</option>
+      <option value="ru-RU">RU Русский</option>
+      <option value="ar-SA">AR العربية</option>
+      <option value="hi-IN">HI हिन्दी</option>
+      <option value="th-TH">TH ไทย</option>
+      <option value="vi-VN">VI Tiếng Việt</option>
+      <option value="id-ID">ID Bahasa</option>
+      <option value="ms-MY">MS Malay</option>
+      <option value="nl-NL">NL Nederlands</option>
+      <option value="pl-PL">PL Polski</option>
+      <option value="tr-TR">TR Türkçe</option>
+    </select>
+    <div class="mode-pill" id="modePill">テキスト整形</div>
+    <button class="icon-btn" id="loginBtn" onclick="toggleLogin()" title="Login" style="font-size:12px;">&#128100;</button>
+    <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="テーマ切替">&#9788;</button>
+    <button class="icon-btn" onclick="toggleSettings()">&#9881;</button>
+  </div>
+</header>
+
+<main>
+  <!-- Current recording -->
+  <div class="current-panel">
+    <div class="current-header">
+      <span class="current-label" id="currentLabel">Now</span>
+      <div class="current-actions">
+        <span class="char-count" id="charCount"></span>
+        <button class="action-btn" onclick="clearCurrent()">Clear</button>
+      </div>
+    </div>
+    <div class="current-text" id="currentText">
+      <span class="placeholder">録音ボタンで開始</span>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="history-panel">
+    <div class="history-header">
+      <span class="history-label">History</span>
+      <button class="action-btn" onclick="clearHistory()" style="font-size:10px;padding:2px 8px;">Clear All</button>
+    </div>
+    <div class="history-content" id="historyContent">
+      <div class="history-empty">テキストを選択してコピー、または Save で履歴に保存</div>
+    </div>
+  </div>
+</main>
+
+<div class="controls">
+  <div class="controls-info">
+    <div class="status-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">準備完了</span>
+    </div>
+    <div class="volume-meter" id="volumeMeter"></div>
+  </div>
+  <button class="rec-btn" id="recBtn" onclick="toggleRecording()">
+    <div class="inner"></div>
+  </button>
+  <button class="bs-btn" id="bsBtn" onclick="backspace()" title="Backspace">&#9003;</button>
+  <div class="controls-info">
+    <div class="hotkey-hint"><kbd id="hotkeyDisplay">変換</kbd> or <kbd>F2</kbd></div>
+    <a href="gracevox-terms.html" style="font-size:9px;color:var(--text-dim);text-decoration:none;">Terms</a>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-panel">
+    <h2>Settings</h2>
+    <div class="setting-group">
+      <label>出力モード</label>
+      <select id="outputMode" onchange="changeMode()">
+        <option value="clean">テキスト整形</option>
+        <option value="bullets">箇条書き</option>
+        <option value="prompt">プロンプト整形</option>
+        <option value="raw">そのまま</option>
+      </select>
+    </div>
+    <div class="sep"></div>
+    <div class="setting-group">
+      <div class="setting-row"><span>フィラーワード除去</span><button class="toggle on" onclick="toggleSetting(this,'removeFiller')"></button></div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-row"><span>句読点の自動挿入</span><button class="toggle on" onclick="toggleSetting(this,'autoPunctuation')"></button></div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-row"><span>言い直し自動検出</span><button class="toggle on" onclick="toggleSetting(this,'smartCorrection')"></button></div>
+    </div>
+    <div class="sep"></div>
+    <div class="setting-group">
+      <label>録音ホットキー</label>
+      <select id="hotkeySelect" onchange="changeHotkey()">
+        <option value="Convert">変換キー</option>
+        <option value="NonConvert">無変換キー</option>
+        <option value="F2">F2</option>
+        <option value="F4">F4</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label>カスタム辞書（from→to）</label>
+      <textarea id="customDict" placeholder="クロード→Claude&#10;ファイヤーベース→Firebase"></textarea>
+    </div>
+    <div class="sep"></div>
+    <div class="setting-group"><button class="panel-btn" onclick="resetSetup()">声の再セットアップ</button></div>
+    <button class="settings-close" onclick="toggleSettings()">閉じる</button>
+  </div>
+</div>
+
+<button class="ios-copy-banner" id="iosCopyBanner" onclick="iosCopyTap()">COPY</button>
+<div class="toast" id="toast"></div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+const FIREBASE_CONFIG={apiKey:"AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",authDomain:"grace-of-touch.firebaseapp.com",projectId:"grace-of-touch",storageBucket:"grace-of-touch.firebasestorage.app",messagingSenderId:"505078300866",appId:"1:505078300866:web:adad2a27b163c3b0f1bb5b"};
+firebase.initializeApp(FIREBASE_CONFIG);
+const fbAuth=firebase.auth();
+const fbDb=firebase.firestore();
+let fbUser=null;
+
+// Auth state
+fbAuth.onAuthStateChanged((user)=>{
+  fbUser=user;
+  const btn=document.getElementById('loginBtn');
+  if(user){
+    btn.innerHTML='&#128994;'; // green dot = logged in
+    btn.title=user.displayName||user.email||'Logged in';
+    syncFromCloud();
+  }else{
+    btn.innerHTML='&#128100;';
+    btn.title='Login';
+  }
+});
+
+function toggleLogin(){
+  if(fbUser){
+    if(confirm('ログアウトしますか？')) fbAuth.signOut();
+  }else{
+    const provider=new firebase.auth.GoogleAuthProvider();
+    fbAuth.signInWithPopup(provider).catch(e=>showToast('Login: '+e.message));
+  }
+}
+
+// Cloud sync
+async function syncToCloud(){
+  if(!fbUser) return;
+  try{
+    await fbDb.collection('voicetype_history').doc(fbUser.uid).set({
+      history: history.slice(0,100),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },{merge:true});
+  }catch(e){ console.log('sync error:', e); }
+}
+
+async function syncFromCloud(){
+  if(!fbUser) return;
+  try{
+    const doc=await fbDb.collection('voicetype_history').doc(fbUser.uid).get();
+    if(doc.exists){
+      const cloudHistory=doc.data().history||[];
+      // Merge: cloud + local, dedupe by time+text
+      const merged=[...history];
+      const existing=new Set(history.map(h=>h.time+h.text));
+      cloudHistory.forEach(h=>{
+        if(!existing.has(h.time+h.text)){ merged.push(h); existing.add(h.time+h.text); }
+      });
+      // Sort by time descending
+      merged.sort((a,b)=>(b.time||'').localeCompare(a.time||''));
+      history=merged.slice(0,100);
+      localStorage.setItem('vt_history',JSON.stringify(history));
+      renderHistory();
+    }
+  }catch(e){ console.log('sync read error:', e); }
+}
+</script>
+
+<script>
+let isRecording = false, recognition = null, audioContext = null, analyser = null, mediaStream = null;
+let finalTranscript = '', interimTranscript = '', sentences = [];
+let currentLang = 'ja-JP';
+let selectedHotkey = localStorage.getItem('vt_hotkey') || 'Convert';
+let outputMode = localStorage.getItem('vt_mode') || 'clean';
+let voiceProfile = JSON.parse(localStorage.getItem('vt_voiceProfile') || 'null');
+let history = JSON.parse(localStorage.getItem('vt_history') || '[]');
+
+const settings = { removeFiller: true, autoPunctuation: true, smartCorrection: true };
+const FILLERS_JA = ['えーと','えっと','えー','あー','あのー','あの','まあ','まぁ','なんか','こう','そのー','その','ええと','うーん','うん','なんていうか','なんというか','えーっと','あのですね','そうですね','まあその'];
+const FILLERS_EN = ['uh','um','uhm','like','you know','i mean','basically','actually','literally','sort of','kind of','well'];
+const HOTKEY_LABELS = {'Convert':'変換','NonConvert':'無変換','F2':'F2','F4':'F4'};
+const MODE_LABELS = {'clean':'テキスト整形','bullets':'箇条書き','prompt':'プロンプト整形','raw':'そのまま'};
+
+// ─── UI Localization ───
+const UI_STRINGS = {
+  'ja-JP': { ready:'準備完了', recording:'録音中...', stop:'停止', processing:'処理中...', placeholder:'録音ボタンで開始', now:'Now', history:'History', clear:'Clear', clearAll:'Clear All', copy:'Copy', settings:'Settings', close:'閉じる', outputMode:'出力モード', clean:'テキスト整形', bullets:'箇条書き', prompt:'プロンプト整形', raw:'そのまま', filler:'フィラーワード除去', punct:'句読点の自動挿入', smart:'言い直し自動検出', hotkey:'録音ホットキー', dict:'カスタム辞書（from→to）', resetVoice:'声の再セットアップ', iosCopy:'テキストを長押しでコピーしてください', historyEmpty:'録音を開始してください', setupTitle:'VoiceType Setup', setupDesc:'声のサンプルを録音して言語と声質を自動判定します', setupStart:'セットアップ開始', skip:'スキップ', sampleTitle:'声のサンプル録音', sampleDesc:'普段の話し方で10秒ほど話してください', startRec:'録音開始', result:'検出結果', done:'完了', noText:'テキストがありません', copied:'コピーしました' },
+  'en-US': { ready:'Ready', recording:'Recording...', stop:'Stopped', processing:'Processing...', placeholder:'Tap record to start', now:'Now', history:'History', clear:'Clear', clearAll:'Clear All', copy:'Copy', settings:'Settings', close:'Close', outputMode:'Output Mode', clean:'Text cleanup', bullets:'Bullet points', prompt:'Prompt format', raw:'Raw', filler:'Remove filler words', punct:'Auto punctuation', smart:'Smart correction', hotkey:'Record hotkey', dict:'Custom dictionary (from→to)', resetVoice:'Re-setup voice', iosCopy:'Long-press text to copy', historyEmpty:'Start recording', setupTitle:'VoiceType Setup', setupDesc:'Record a voice sample to detect language and voice profile', setupStart:'Start setup', skip:'Skip', sampleTitle:'Voice Sample', sampleDesc:'Speak naturally for about 10 seconds', startRec:'Start recording', result:'Result', done:'Done', noText:'No text', copied:'Copied' },
+  'zh-CN': { ready:'准备就绪', recording:'录音中...', stop:'已停止', processing:'处理中...', placeholder:'点击录音按钮开始', now:'当前', history:'历史', clear:'清除', clearAll:'清除全部', copy:'复制', settings:'设置', close:'关闭', outputMode:'输出模式', clean:'文本整理', bullets:'要点列表', prompt:'提示词格式', raw:'原始', filler:'去除填充词', punct:'自动标点', smart:'智能纠正', hotkey:'录音快捷键', dict:'自定义词典（从→到）', resetVoice:'重新设置语音', iosCopy:'长按文本复制', historyEmpty:'开始录音', setupTitle:'VoiceType 设置', setupDesc:'录制语音样本以检测语言和语音特征', setupStart:'开始设置', skip:'跳过', sampleTitle:'语音采样', sampleDesc:'用自然的方式说话约10秒', startRec:'开始录音', result:'检测结果', done:'完成', noText:'没有文本', copied:'已复制' },
+  'ko-KR': { ready:'준비 완료', recording:'녹음 중...', stop:'중지됨', processing:'처리 중...', placeholder:'녹음 버튼을 눌러 시작', now:'현재', history:'기록', clear:'지우기', clearAll:'전체 삭제', copy:'복사', settings:'설정', close:'닫기', outputMode:'출력 모드', clean:'텍스트 정리', bullets:'글머리 기호', prompt:'프롬프트 형식', raw:'원본', filler:'추임새 제거', punct:'자동 구두점', smart:'자동 교정', hotkey:'녹음 단축키', dict:'사용자 사전（from→to）', resetVoice:'음성 재설정', iosCopy:'텍스트를 길게 눌러 복사하세요', historyEmpty:'녹음을 시작하세요', setupTitle:'VoiceType 설정', setupDesc:'음성 샘플을 녹음하여 언어와 음성을 감지합니다', setupStart:'설정 시작', skip:'건너뛰기', sampleTitle:'음성 샘플', sampleDesc:'자연스럽게 10초 정도 말하세요', startRec:'녹음 시작', result:'감지 결과', done:'완료', noText:'텍스트 없음', copied:'복사됨' },
+  'fr-FR': { ready:'Prêt', recording:'Enregistrement...', stop:'Arrêté', processing:'Traitement...', placeholder:'Appuyez pour enregistrer', now:'Actuel', history:'Historique', clear:'Effacer', clearAll:'Tout effacer', copy:'Copier', settings:'Paramètres', close:'Fermer', outputMode:'Mode de sortie', clean:'Mise en forme', bullets:'Liste à puces', prompt:'Format prompt', raw:'Brut', filler:'Supprimer les mots de remplissage', punct:'Ponctuation auto', smart:'Correction intelligente', hotkey:'Raccourci', dict:'Dictionnaire (de→à)', resetVoice:'Reconfigurer la voix', iosCopy:'Appui long pour copier', historyEmpty:'Commencez l\'enregistrement', setupTitle:'Configuration', setupDesc:'Enregistrez un échantillon vocal', setupStart:'Commencer', skip:'Passer', sampleTitle:'Échantillon vocal', sampleDesc:'Parlez naturellement pendant 10 secondes', startRec:'Enregistrer', result:'Résultat', done:'Terminé', noText:'Pas de texte', copied:'Copié' },
+};
+// Fallback to English for unsupported languages
+function t(key){ const lang=currentLang; return (UI_STRINGS[lang]||UI_STRINGS[lang.split('-')[0]+'-'+lang.split('-')[1]]||UI_STRINGS['en-US'])[key] || UI_STRINGS['en-US'][key] || key; }
+
+function applyUILang(){
+  const s=document.getElementById('statusText');
+  if(s&&!isRecording) s.textContent=t('ready');
+  document.getElementById('currentLabel').textContent=t('now');
+  document.querySelector('.history-label').textContent=t('history');
+  document.querySelector('.action-btn[onclick="clearCurrent()"]').textContent=t('clear');
+  document.querySelector('.action-btn[onclick="clearHistory()"]').textContent=t('clearAll');
+  document.querySelector('.settings-panel h2').textContent=t('settings');
+  document.querySelector('.settings-close').textContent=t('close');
+  // Placeholder
+  const ta=document.getElementById('currentText');
+  const ph=ta.querySelector('.placeholder');
+  if(ph) ph.textContent=t('placeholder');
+  // Mode labels
+  const modeSelect=document.getElementById('outputMode');
+  modeSelect.options[0].text=t('clean');
+  modeSelect.options[1].text=t('bullets');
+  modeSelect.options[2].text=t('prompt');
+  modeSelect.options[3].text=t('raw');
+  document.getElementById('modePill').textContent=modeSelect.options[modeSelect.selectedIndex].text;
+  // History empty
+  const he=document.querySelector('.history-empty');
+  if(he) he.textContent=t('historyEmpty');
+}
+
+// ─── Language Toggle ───
+function switchLang(lang) {
+  currentLang = lang;
+  applyUILang();
+  if (isRecording) { stopRecording(); setTimeout(startRecording, 300); }
+}
+
+// ─── Setup ───
+function checkSetup() { document.getElementById('setupOverlay').classList.toggle('hidden', !!voiceProfile); }
+function setupNext(s) { document.querySelectorAll('.setup-step').forEach(e=>e.classList.remove('active')); document.getElementById('setup-step-'+s).classList.add('active'); }
+function skipSetup() {
+  voiceProfile = { lang:'ja-JP', setupDone:true };
+  localStorage.setItem('vt_voiceProfile', JSON.stringify(voiceProfile));
+  currentLang = 'ja-JP';
+  document.getElementById('setupOverlay').classList.add('hidden');
+  initRecognition();
+}
+function startSetupRec() {
+  const btn=document.getElementById('setupRecBtn'); btn.disabled=true; btn.textContent='録音中...';
+  document.getElementById('voiceCircle').classList.add('listening');
+  let samples=[];
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const sr=new SR(); sr.continuous=true; sr.interimResults=true; sr.lang='';
+  sr.onresult=(e)=>{ for(let i=e.resultIndex;i<e.results.length;i++) if(e.results[i].isFinal) samples.push(e.results[i][0].transcript); };
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    const ac=new AudioContext(),an=ac.createAnalyser(); an.fftSize=2048;
+    ac.createMediaStreamSource(stream).connect(an);
+    const pd=[],volData=[],spectralData=[];
+    const pi=setInterval(()=>{
+      // ピッチ（ゼロクロッシング法）
+      const td=new Float32Array(an.fftSize); an.getFloatTimeDomainData(td);
+      let c=0; for(let i=1;i<td.length;i++) if((td[i]>=0&&td[i-1]<0)||(td[i]<0&&td[i-1]>=0)) c++;
+      const f=(c/2)*(ac.sampleRate/an.fftSize); if(f>50&&f<500) pd.push(f);
+      // 音量（RMS）
+      let sum=0; for(let i=0;i<td.length;i++) sum+=td[i]*td[i];
+      const rms=Math.sqrt(sum/td.length); volData.push(rms);
+      // スペクトル重心（声の明るさ指標）
+      const fd=new Uint8Array(an.frequencyBinCount); an.getByteFrequencyData(fd);
+      let wSum=0,tSum=0;
+      for(let i=0;i<fd.length;i++){wSum+=i*fd[i];tSum+=fd[i];}
+      if(tSum>0) spectralData.push(wSum/tSum*(ac.sampleRate/an.fftSize));
+    },100);
+    sr.start(); let rem=10;
+    const ti=setInterval(()=>{
+      rem--; document.getElementById('setupTimer').textContent=rem;
+      document.getElementById('setupProgress').style.width=((10-rem)/10*100)+'%';
+      if(rem<=0){
+        clearInterval(ti); clearInterval(pi); try{sr.stop();}catch(e){} stream.getTracks().forEach(t=>t.stop()); ac.close();
+        document.getElementById('voiceCircle').classList.remove('listening');
+        document.getElementById('voiceCircle').classList.add('done');
+        document.getElementById('voiceCircle').innerHTML='&#10003;';
+        const text=samples.join(' '), lang=detectLang(text);
+        // 声紋プロファイル計算
+        const avgPitch=pd.length?pd.reduce((a,b)=>a+b,0)/pd.length:0;
+        const pitchStd=pd.length>1?Math.sqrt(pd.reduce((s,v)=>s+(v-avgPitch)**2,0)/(pd.length-1)):0;
+        const avgVol=volData.length?volData.reduce((a,b)=>a+b,0)/volData.length:0;
+        const avgSpectral=spectralData.length?spectralData.reduce((a,b)=>a+b,0)/spectralData.length:0;
+        const speakingRate=text.length/10; // 文字/秒
+        voiceProfile={
+          lang,
+          avgPitch:Math.round(avgPitch),        // 基本周波数（Hz）
+          pitchRange:Math.round(pitchStd),       // ピッチ変動幅
+          avgVolume:Math.round(avgVol*1000)/1000, // 平均音量
+          spectralCentroid:Math.round(avgSpectral), // 声の明るさ
+          speakingRate:Math.round(speakingRate*10)/10, // 話速
+          setupDone:true,
+          setupDate:new Date().toISOString()
+        };
+        localStorage.setItem('vt_voiceProfile',JSON.stringify(voiceProfile));
+        currentLang=lang;
+        const names={'ja-JP':'日本語','en-US':'English','zh-CN':'中文','ko-KR':'한국어'};
+        document.getElementById('detectedLang').textContent=names[lang]||lang;
+        document.querySelectorAll('.lang-chip').forEach(c=>c.classList.toggle('selected',c.dataset.lang===lang));
+        // Update header select
+        document.getElementById('langSelect').value=lang;
+        // 声紋プロファイル表示
+        const vpInfo=document.getElementById('voicePrintInfo');
+        const pitchLabel=avgPitch<150?'低め':avgPitch<250?'標準':'高め';
+        const brightLabel=avgSpectral<500?'落ち着いた':avgSpectral<1000?'標準':'明るい';
+        vpInfo.innerHTML=`
+          <div style="font-weight:600;color:var(--accent);margin-bottom:4px;">Voice Print</div>
+          <div>🎵 ピッチ: <strong>${Math.round(avgPitch)} Hz</strong> (${pitchLabel})</div>
+          <div>📊 変動幅: <strong>±${Math.round(pitchStd)} Hz</strong></div>
+          <div>🔊 音量: <strong>${(avgVol*100).toFixed(1)}%</strong></div>
+          <div>✨ 声質: <strong>${brightLabel}トーン</strong> (${Math.round(avgSpectral)} Hz)</div>
+          <div>⚡ 話速: <strong>${speakingRate.toFixed(1)} 文字/秒</strong></div>
+        `;
+        setTimeout(()=>setupNext(3),800);
+      }
+    },1000);
+  });
+}
+function detectLang(t){ if(!t)return'ja-JP'; const ja=(t.match(/[\u3040-\u30FF]/g)||[]).length+(t.match(/[\u4E00-\u9FFF]/g)||[]).length; const ko=(t.match(/[\uAC00-\uD7AF]/g)||[]).length; if(ja>ko)return'ja-JP'; if(ko>ja)return'ko-KR'; return'en-US'; }
+function selectLang(c){ document.querySelectorAll('.lang-chip').forEach(e=>e.classList.remove('selected')); c.classList.add('selected'); if(voiceProfile){voiceProfile.lang=c.dataset.lang; currentLang=c.dataset.lang; localStorage.setItem('vt_voiceProfile',JSON.stringify(voiceProfile));} }
+function finishSetup(){ document.getElementById('setupOverlay').classList.add('hidden'); initRecognition(); }
+function resetSetup(){ voiceProfile=null; localStorage.removeItem('vt_voiceProfile'); toggleSettings(); document.querySelectorAll('.setup-step').forEach(s=>s.classList.remove('active')); document.getElementById('setup-step-1').classList.add('active'); document.getElementById('voiceCircle').className='voice-circle'; document.getElementById('voiceCircle').innerHTML='&#127908;'; document.getElementById('setupTimer').textContent='10'; document.getElementById('setupProgress').style.width='0%'; document.getElementById('setupRecBtn').disabled=false; document.getElementById('setupRecBtn').textContent='録音開始'; document.getElementById('setupOverlay').classList.remove('hidden'); }
+
+// ─── Recognition ───
+const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+
+function initRecognition(){
+  if(!('webkitSpeechRecognition' in window)&&!('SpeechRecognition' in window)){
+    setStatus('error','このブラウザは非対応です');
+    showToast('Chrome または Safari 最新版をお使いください');
+    return;
+  }
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  recognition=new SR();
+  // iOS Safariはcontinuous=trueだと不安定なのでfalse
+  recognition.continuous=!isIOS;
+  recognition.interimResults=true;
+  recognition.lang=currentLang;
+  recognition.onresult=handleResult; recognition.onerror=handleError; recognition.onend=handleEnd;
+  setStatus('ready',t('ready'));
+}
+
+function toggleRecording(){ isRecording ? stopRecording() : startRecording(); }
+
+async function startRecording(){
+  if(isRecording) return;
+  // 常に新しい認識インスタンスを作成（iOS対応: 古いインスタンスは壊れている可能性）
+  if(isIOS || !recognition) initRecognition();
+  if(!recognition) return;
+  const el=document.getElementById('currentText');
+  if(el.querySelector('.placeholder')) el.innerHTML='';
+  finalTranscript=''; interimTranscript=''; sentences=[]; errorRetryCount=0;
+  recognition.lang=currentLang;
+
+  // iOS Safari: getUserMediaを先に呼んでマイク許可を得る
+  try{
+    mediaStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    // AudioContextはユーザージェスチャー内で作成（iOS要件）
+    audioContext=new (window.AudioContext||window.webkitAudioContext)();
+    analyser=audioContext.createAnalyser(); analyser.fftSize=2048;
+    audioContext.createMediaStreamSource(mediaStream).connect(analyser);
+    sessionPitchData=[];
+    collectVoicePrint();
+    updateVolumeMeter();
+  }catch(e){
+    setStatus('error','マイクへのアクセスを許可してください');
+    showToast(isIOS?'設定 > Safari > マイクを確認':'マイク許可が必要です');
+    return;
+  }
+
+  // iOS: recognitionを毎回新しく作成（再利用で不安定になるため）
+  if(isIOS){
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    recognition=new SR();
+    recognition.continuous=false;
+    recognition.interimResults=true;
+    recognition.lang=currentLang;
+    recognition.onresult=handleResult;
+    recognition.onerror=handleError;
+    recognition.onend=handleEnd;
+  }
+
+  try{
+    recognition.start();
+  }catch(e){
+    setStatus('error','認識開始失敗: '+e.message);
+    document.getElementById('currentText').textContent='エラー: '+e.message;
+    return;
+  }
+  isRecording=true;
+  document.getElementById('recBtn').classList.add('recording');
+  document.getElementById('currentLabel').textContent='Recording...';
+  setStatus('recording',t('recording'));
+  if(navigator.vibrate) navigator.vibrate(50);
+}
+
+let stopDone=false;
+function stopRecording(){
+  if(!isRecording) return;
+  isRecording=false;
+  stopDone=false;
+  document.getElementById('recBtn').classList.remove('recording');
+
+  // interimテキストが残っていたらfinalに含める
+  if(interimTranscript.trim()){
+    finalTranscript+=interimTranscript;
+    if(settings.smartCorrection) sentences.push(basicClean(interimTranscript));
+    interimTranscript='';
+  }
+
+  // 即座にコピー（ユーザータップ内）
+  const textNow=processText(finalTranscript);
+  if(textNow.trim()) copyToClipboard(textNow);
+
+  // 完了処理（コピー＆保存＆クリア）
+  function finalize(){
+    if(stopDone) return;
+    stopDone=true;
+    if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+    if(audioContext){try{audioContext.close();}catch(e){} audioContext=null;}
+    document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
+    if(navigator.vibrate) navigator.vibrate([30,30,30]);
+    // 最終テキストでコピー＆保存
+    if(interimTranscript.trim()) finalTranscript+=interimTranscript;
+    const finalText=processText(finalTranscript);
+    if(finalText.trim()){
+      copyToClipboard(finalText);
+      saveToHistory(finalText);
+    } else {
+      // テキストがなくても画面クリア
+      const el=document.getElementById('currentText');
+      el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
+      document.getElementById('charCount').textContent='';
+      finalTranscript=''; interimTranscript=''; sentences=[];
+    }
+    setStatus('ready',t('stop'));
+    recognition.onend=handleEnd;
+  }
+
+  recognition.onend=finalize;
+  try{recognition.stop();}catch(e){}
+
+  // フォールバック: onendが2秒以内に発火しなかった場合に強制実行
+  setTimeout(finalize, 2000);
+}
+
+// クリップボードコピー（iOS対応フォールバック付き）
+function copyToClipboard(text){
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(()=>fallbackCopy(text));
+  }else{
+    fallbackCopy(text);
+  }
+}
+function fallbackCopy(text){
+  const ta=document.createElement('textarea');
+  ta.value=text;
+  ta.style.cssText='position:fixed;left:0;top:0;opacity:0;width:1px;height:1px;';
+  document.body.appendChild(ta);
+  if(isIOS){
+    const range=document.createRange();
+    range.selectNodeContents(ta);
+    const sel=window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    ta.setSelectionRange(0,ta.value.length);
+  }else{
+    ta.focus(); ta.select();
+  }
+  try{ document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
+}
+
+// iOS: テキストエリアの内容を全選択してコピーメニュー表示
+function selectAllText(){
+  const el=document.getElementById('currentText');
+  const range=document.createRange();
+  range.selectNodeContents(el);
+  const sel=window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function handleResult(event){
+  interimTranscript='';
+  for(let i=event.resultIndex;i<event.results.length;i++){
+    const t=event.results[i][0].transcript;
+    if(event.results[i].isFinal){
+      if(settings.smartCorrection){
+        const cleaned=basicClean(t);
+        // 直前の文と比較して言い直しを検出
+        if(sentences.length>0){
+          const lastIdx=sentences.length-1;
+          // 完全一致 or 類似 → 置換（言い直し）
+          if(isSimilar(sentences[lastIdx],cleaned)){
+            sentences[lastIdx]=cleaned; // 新しい方を採用
+          }
+          // 直前2文まで遡って類似チェック
+          else if(sentences.length>1 && isSimilar(sentences[lastIdx-1],cleaned)){
+            sentences[lastIdx-1]=cleaned;
+            sentences.splice(lastIdx,1); // 間の文も削除
+          }
+          else{ sentences.push(cleaned); }
+        }else{ sentences.push(cleaned); }
+        finalTranscript=sentences.join('');
+      }else{ finalTranscript+=t; }
+    }else{ interimTranscript+=t; }
+  }
+  // 録音中はリアルタイム表示を優先（重い処理は後回し）
+  const el=document.getElementById('currentText');
+  if(interimTranscript){
+    // interim中は軽量表示
+    el.innerHTML=escapeHtml(finalTranscript)+'<span class="interim">'+escapeHtml(interimTranscript)+'</span>';
+  }else{
+    // final確定時のみフル処理
+    el.innerHTML=escapeHtml(processText(finalTranscript));
+  }
+  el.scrollTop=el.scrollHeight;
+  document.getElementById('charCount').textContent=(finalTranscript.length+interimTranscript.length)+'文字';
+}
+let errorRetryCount=0;
+function handleError(e){
+  console.log('SpeechRecognition error:', e.error, e.message);
+  if(e.error==='no-speech'){
+    setStatus('recording','音声待ち...');
+  }else if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+    setStatus('error','マイク/音声認識の許可が必要です');
+    document.getElementById('currentText').textContent='設定 > Safari > マイク・音声認識を許可してください';
+    isRecording=false;
+    document.getElementById('recBtn').classList.remove('recording');
+  }else if(e.error==='network'){
+    setStatus('error','ネットワーク接続を確認');
+    // ネットワークエラーは自動リトライ
+    if(isRecording && errorRetryCount<3){
+      errorRetryCount++;
+      setTimeout(()=>{
+        recognition=null; initRecognition();
+        if(recognition) try{recognition.start();}catch(ex){}
+      },1000);
+    }
+  }else if(e.error==='aborted'){
+    // iOS: バックグラウンド移行等で中断 → 自動リカバリー
+    if(isRecording && errorRetryCount<3){
+      errorRetryCount++;
+      setTimeout(()=>{
+        recognition=null; initRecognition();
+        if(recognition) try{recognition.start();}catch(ex){}
+      },500);
+    }
+  }else{
+    setStatus('error','エラー: '+e.error);
+    // 自動リカバリー試行
+    if(isRecording && errorRetryCount<3){
+      errorRetryCount++;
+      setTimeout(()=>{
+        recognition=null; initRecognition();
+        if(recognition) try{recognition.start();}catch(ex){}
+      },1000);
+    }
+  }
+}
+function handleEnd(){
+  // iOS(continuous=false)またはChrome(無音タイムアウト)で自動再開
+  if(isRecording){
+    if(isIOS){
+      // iOS: 新しいインスタンスで再開
+      const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+      recognition=new SR();
+      recognition.continuous=false;
+      recognition.interimResults=true;
+      recognition.lang=currentLang;
+      recognition.onresult=handleResult;
+      recognition.onerror=handleError;
+      recognition.onend=handleEnd;
+    }
+    try{recognition.start();}catch(e){}
+  }
+}
+
+function isSimilar(a,b){
+  if(!a||!b)return false;
+  const na=a.replace(/[。、！？\s]/g,''), nb=b.replace(/[。、！？\s]/g,'');
+  if(na.length<2||nb.length<2)return false;
+  // 完全一致
+  if(na===nb)return true;
+  // 一方が他方を含む（言い直しで少し変わるパターン）
+  if(na.includes(nb)||nb.includes(na))return true;
+  // 先頭の共通部分が長い（同じ文を言い直し）
+  let prefixMatch=0;
+  for(let i=0;i<Math.min(na.length,nb.length);i++){
+    if(na[i]===nb[i]) prefixMatch++; else break;
+  }
+  if(prefixMatch>=3 && prefixMatch/Math.max(na.length,nb.length)>0.4)return true;
+  // 文字の重複率
+  let common=0;
+  const shorter=na.length<=nb.length?na:nb, longer=na.length>nb.length?na:nb;
+  const used=new Set();
+  for(let i=0;i<shorter.length;i++){
+    const idx=longer.indexOf(shorter[i],0);
+    if(idx!==-1&&!used.has(idx)){common++;used.add(idx);}
+  }
+  return common/Math.max(na.length,nb.length)>0.5;
+}
+
+function basicClean(text){
+  let r=text;
+  if(settings.removeFiller){
+    const fillers=currentLang.startsWith('ja')?FILLERS_JA:FILLERS_EN;
+    fillers.forEach(f=>{ r=currentLang.startsWith('ja')?r.replace(new RegExp(escapeRegex(f),'gi'),''):r.replace(new RegExp(`\\b${escapeRegex(f)}\\b[,]?\\s*`,'gi'),''); });
+  }
+  return r.replace(/\s{2,}/g,' ').trim();
+}
+
+function processText(text){
+  if(outputMode==='raw')return text;
+  let r=text;
+  const dict=document.getElementById('customDict')?.value||'';
+  if(dict.trim()) dict.split('\n').forEach(l=>{ const p=l.split('→'); if(p.length===2&&p[0].trim()&&p[1].trim()) r=r.replace(new RegExp(escapeRegex(p[0].trim()),'gi'),p[1].trim()); });
+  if(!settings.smartCorrection&&settings.removeFiller) r=basicClean(r);
+  r=r.replace(/(.{2,10})\1+/g,'$1').replace(/\s{2,}/g,' ').trim();
+  if(settings.autoPunctuation&&currentLang.startsWith('ja')) r=r.replace(/([^。、！？\n])$/g,'$1。');
+  if(outputMode==='bullets'){ const s=r.split(/[。．.！!？?]+/).filter(s=>s.trim()); r=s.map(s=>'- '+s.trim()).join('\n'); }
+  else if(outputMode==='prompt'){ const s=r.split(/[。．.！!？?]+/).filter(s=>s.trim()); if(s.length>1) r=s.map((s,i)=>i===0?s.trim():'- '+s.trim()).join('\n'); }
+  return r;
+}
+
+// ─── History ───
+function saveToHistory(text){
+  if(!text||!text.trim()) return;
+  // 声の状態チェック
+  const vc=checkVoiceCondition();
+  if(vc&&vc.status!=='normal') showToast(vc.icon+' '+vc.msg);
+  // 履歴に保存
+  const entry={ text, time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}), lang: currentLang, voice: vc?vc.status:'unknown' };
+  history.unshift(entry);
+  if(history.length>50) history=history.slice(0,50);
+  localStorage.setItem('vt_history',JSON.stringify(history));
+  renderHistory();
+  syncToCloud();
+  // クリア
+  if(isIOS) document.getElementById('iosCopyBanner').classList.add('show');
+  const el=document.getElementById('currentText');
+  el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
+  document.getElementById('charCount').textContent='';
+  finalTranscript=''; interimTranscript=''; sentences=[];
+}
+
+function sendToHistory(){
+  const el=document.getElementById('currentText');
+  const text=el.textContent||'';
+  if(!text.trim()||document.getElementById('currentText').querySelector('.placeholder'))return;
+  const entry={ text, time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}), lang: currentLang };
+  history.unshift(entry);
+  if(history.length>50) history=history.slice(0,50);
+  localStorage.setItem('vt_history',JSON.stringify(history));
+  renderHistory();
+  // Clear current
+  el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
+  document.getElementById('charCount').textContent='';
+  finalTranscript=''; interimTranscript=''; sentences=[];
+  showToast('履歴に保存しました');
+}
+
+function renderHistory(){
+  const container=document.getElementById('historyContent');
+  if(history.length===0){ container.innerHTML='<div class="history-empty">テキストを選択してコピー、または Save で履歴に保存</div>'; return; }
+  container.innerHTML=history.map((h,i)=>`<div class="history-item" onclick="copyHistory(${i})" style="cursor:pointer;"><div class="history-time">${h.time} — ${(h.lang||'').split('-')[0].toUpperCase()}</div>${escapeHtml(h.text)}</div>`).join('');
+}
+
+function iosCopyTap(){
+  const el=document.getElementById('currentText');
+  const text=el.textContent||'';
+  if(!text.trim()) return;
+  // ユーザータップ内なのでclipboard APIが動作する
+  copyToClipboard(text);
+  showToast(t('copied'));
+  document.getElementById('iosCopyBanner').classList.remove('show');
+  // クリア
+  setTimeout(()=>{
+    el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
+    document.getElementById('charCount').textContent='';
+    finalTranscript=''; interimTranscript=''; sentences=[];
+    setStatus('ready',t('ready'));
+  }, 500);
+}
+
+function copyHistory(i){
+  if(!history[i]) return;
+  const text=history[i].text;
+  // 確実にコピー: clipboard API + fallback両方試行
+  let copied=false;
+  try{
+    const ta=document.createElement('textarea');
+    ta.value=text;
+    ta.style.cssText='position:fixed;left:0;top:0;opacity:0;width:1px;height:1px;';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select(); ta.setSelectionRange(0,ta.value.length);
+    copied=document.execCommand('copy');
+    document.body.removeChild(ta);
+  }catch(e){}
+  // clipboard APIも試行
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(()=>{});
+  }
+  // ハイライト
+  const items=document.querySelectorAll('.history-item');
+  if(items[i]){
+    items[i].style.borderColor='var(--accent)';
+    items[i].style.background='rgba(108,92,231,0.15)';
+    setTimeout(()=>{items[i].style.borderColor='';items[i].style.background='';},800);
+  }
+  showToast(t('copied'));
+}
+
+function clearHistory(){
+  history=[]; localStorage.removeItem('vt_history');
+  renderHistory();
+}
+
+function backspace(){
+  if(sentences.length>0){
+    sentences.pop();
+    finalTranscript=sentences.join('');
+  }else if(finalTranscript.length>0){
+    // 文単位で削除（。で区切る）
+    const parts=finalTranscript.split(/(?<=[。.！？!?\n])/);
+    parts.pop();
+    finalTranscript=parts.join('');
+  }
+  const el=document.getElementById('currentText');
+  if(finalTranscript){
+    el.innerHTML=escapeHtml(processText(finalTranscript));
+    document.getElementById('charCount').textContent=finalTranscript.length+'文字';
+  }else{
+    el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
+    document.getElementById('charCount').textContent='';
+    sentences=[];
+  }
+}
+
+function clearCurrent(){
+  document.getElementById('currentText').innerHTML='<span class="placeholder">録音ボタンで開始</span>';
+  document.getElementById('charCount').textContent='';
+  finalTranscript=''; interimTranscript=''; sentences=[];
+}
+
+// ─── Voice Print Live ───
+let sessionPitchData=[];
+function collectVoicePrint(){
+  if(!analyser||!isRecording) return;
+  const d=new Float32Array(analyser.fftSize); analyser.getFloatTimeDomainData(d);
+  let c=0; for(let i=1;i<d.length;i++) if((d[i]>=0&&d[i-1]<0)||(d[i]<0&&d[i-1]>=0)) c++;
+  const f=(c/2)*(audioContext.sampleRate/analyser.fftSize);
+  if(f>50&&f<500) sessionPitchData.push(f);
+  setTimeout(collectVoicePrint,200);
+}
+
+function checkVoiceCondition(){
+  if(!voiceProfile||!voiceProfile.avgPitch||sessionPitchData.length<5) return null;
+  const avg=sessionPitchData.reduce((a,b)=>a+b,0)/sessionPitchData.length;
+  const diff=avg-voiceProfile.avgPitch;
+  const pctChange=Math.abs(diff)/voiceProfile.avgPitch*100;
+  // 声の状態判定
+  if(pctChange<5) return {status:'normal',msg:'声の調子は通常です',icon:'🟢'};
+  if(diff>0&&pctChange>15) return {status:'tense',msg:'少し緊張気味かもしれません',icon:'🟡'};
+  if(diff<0&&pctChange>15) return {status:'tired',msg:'お疲れかもしれません。少し休憩しましょう',icon:'🟠'};
+  if(pctChange>10) return {status:'changed',msg:'声のトーンがいつもと少し違います',icon:'🔵'};
+  return {status:'normal',msg:'声の調子は良好です',icon:'🟢'};
+}
+
+// ─── Volume ───
+function updateVolumeMeter(){
+  if(!analyser||!isRecording)return;
+  const d=new Uint8Array(analyser.frequencyBinCount); analyser.getByteFrequencyData(d);
+  const bars=document.querySelectorAll('.volume-bar'), step=Math.floor(d.length/bars.length);
+  bars.forEach((b,i)=>{b.style.height=Math.max(4,(d[i*step]||0)/255*28)+'px';});
+  requestAnimationFrame(updateVolumeMeter);
+}
+
+// ─── UI ───
+function setStatus(t,txt){ document.getElementById('statusDot').className='status-dot '+t; document.getElementById('statusText').textContent=txt; }
+function changeMode(){ outputMode=document.getElementById('outputMode').value; localStorage.setItem('vt_mode',outputMode); document.getElementById('modePill').textContent=MODE_LABELS[outputMode]; if(finalTranscript) document.getElementById('currentText').textContent=processText(finalTranscript); }
+function changeHotkey(){ selectedHotkey=document.getElementById('hotkeySelect').value; localStorage.setItem('vt_hotkey',selectedHotkey); document.getElementById('hotkeyDisplay').textContent=HOTKEY_LABELS[selectedHotkey]; }
+function toggleTheme(){
+  const root=document.documentElement;
+  const isLight=root.classList.toggle('light');
+  localStorage.setItem('vt_theme',isLight?'light':'dark');
+  document.getElementById('themeBtn').innerHTML=isLight?'&#9790;':'&#9788;';
+}
+
+function toggleSettings(){ const o=document.getElementById('settingsOverlay'); o.classList.toggle('open'); if(!o.classList.contains('open')) localStorage.setItem('vt_customDict',document.getElementById('customDict')?.value||''); }
+function toggleSetting(btn,key){ settings[key]=!settings[key]; btn.classList.toggle('on',settings[key]); }
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000); }
+function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+
+// ─── Keys ───
+document.addEventListener('keydown',(e)=>{
+  if(document.getElementById('settingsOverlay').classList.contains('open')){if(e.key==='Escape')toggleSettings();return;}
+  if(e.key===selectedHotkey||e.code===selectedHotkey){e.preventDefault();toggleRecording();return;}
+  if(e.key==='F2'&&selectedHotkey!=='F2'){e.preventDefault();toggleRecording();return;}
+});
+document.addEventListener('touchstart',(e)=>{if(e.target.closest('.rec-btn')){e.preventDefault();toggleRecording();}},{passive:false});
+
+// ─── Init ───
+(function(){
+  const m=document.getElementById('volumeMeter');
+  for(let i=0;i<10;i++){const b=document.createElement('div');b.className='volume-bar';m.appendChild(b);}
+  const d=localStorage.getItem('vt_customDict'); if(d) document.getElementById('customDict').value=d;
+  document.getElementById('hotkeySelect').value=selectedHotkey;
+  document.getElementById('hotkeyDisplay').textContent=HOTKEY_LABELS[selectedHotkey];
+  document.getElementById('outputMode').value=outputMode;
+  document.getElementById('modePill').textContent=MODE_LABELS[outputMode];
+  if(voiceProfile){ currentLang=voiceProfile.lang; document.getElementById('langSelect').value=currentLang; }
+  // テーマ復元
+  const savedTheme=localStorage.getItem('vt_theme');
+  if(savedTheme==='light'){ document.documentElement.classList.add('light'); document.getElementById('themeBtn').innerHTML='&#9790;'; }
+  renderHistory();
+  applyUILang();
+  checkSetup();
+  if(voiceProfile) initRecognition();
+
+  // iOS: 画面復帰時に再初期化（バックグラウンドから戻ると認識が壊れる）
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='visible'){
+      // 録音中だった場合は停止
+      if(isRecording){
+        isRecording=false;
+        document.getElementById('recBtn').classList.remove('recording');
+        try{recognition.stop();}catch(e){}
+      }
+      // リソースをクリーンアップ
+      if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+      if(audioContext){try{audioContext.close();}catch(e){} audioContext=null;}
+      analyser=null;
+      // 認識エンジンを完全に再作成
+      recognition=null;
+      stopDone=false;
+      initRecognition();
+      setStatus('ready',t('ready'));
+      document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
+      // COPYバナーを消す
+      document.getElementById('iosCopyBanner').classList.remove('show');
+    }
+  });
+
+  // iOS: pageshow（bfcacheから復帰時）
+  window.addEventListener('pageshow', (e)=>{
+    if(e.persisted){
+      recognition=null;
+      initRecognition();
+    }
+  });
+})();
+</script>
+</body>
+</html>
