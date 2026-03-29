@@ -583,7 +583,7 @@ function startSetupRec() {
       rem--; document.getElementById('setupTimer').textContent=rem;
       document.getElementById('setupProgress').style.width=((10-rem)/10*100)+'%';
       if(rem<=0){
-        clearInterval(ti); clearInterval(pi); try{sr.stop();}catch(e){} stream.getTracks().forEach(t=>t.stop()); ac.close();
+        clearInterval(ti); clearInterval(pi); try{sr.stop();}catch(e){} stream.getTracks().forEach(tr=>tr.stop()); ac.close();
         document.getElementById('voiceCircle').classList.remove('listening');
         document.getElementById('voiceCircle').classList.add('done');
         document.getElementById('voiceCircle').innerHTML='&#10003;';
@@ -657,7 +657,7 @@ function toggleRecording(){ isRecording ? stopRecording() : startRecording(); }
 let lastSavedPitch=0;
 function cleanup(){
   try{ if(recognition) recognition.abort(); }catch(e){}
-  if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+  if(mediaStream){mediaStream.getTracks().forEach(tr=>tr.stop());mediaStream=null;}
   if(audioContext&&audioContext.state!=='closed'){try{audioContext.close();}catch(e){}}
   audioContext=null; analyser=null; recognition=null;
 }
@@ -1177,7 +1177,7 @@ document.addEventListener('keydown',(e)=>{
         try{recognition.stop();}catch(e){}
       }
       // リソースをクリーンアップ
-      if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+      if(mediaStream){mediaStream.getTracks().forEach(tr=>tr.stop());mediaStream=null;}
       if(audioContext){try{audioContext.close();}catch(e){} audioContext=null;}
       analyser=null;
       // 認識エンジンを完全に再作成
