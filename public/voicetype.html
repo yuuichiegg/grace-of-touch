@@ -465,16 +465,29 @@ async function startRecording(){
     return;
   }
 
+  // iOS: recognitionを毎回新しく作成（再利用で不安定になるため）
+  if(isIOS){
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    recognition=new SR();
+    recognition.continuous=false;
+    recognition.interimResults=true;
+    recognition.lang=currentLang;
+    recognition.onresult=handleResult;
+    recognition.onerror=handleError;
+    recognition.onend=handleEnd;
+  }
+
   try{
     recognition.start();
   }catch(e){
-    setStatus('error','音声認識を開始できません');
+    setStatus('error','認識開始失敗: '+e.message);
+    document.getElementById('currentText').textContent='エラー: '+e.message;
     return;
   }
   isRecording=true;
   document.getElementById('recBtn').classList.add('recording');
   document.getElementById('currentLabel').textContent='Recording...';
-  setStatus('recording','録音中...');
+  setStatus('recording','録音中... ('+currentLang+')');
   if(navigator.vibrate) navigator.vibrate(50);
 }
 
@@ -559,10 +572,38 @@ function handleResult(event){
   el.scrollTop=el.scrollHeight;
   document.getElementById('charCount').textContent=(finalTranscript.length+interimTranscript.length)+'文字';
 }
-function handleError(e){ if(e.error==='no-speech')setStatus('recording','音声待ち...'); else if(e.error==='not-allowed'){setStatus('error','マイク許可が必要');isRecording=false;document.getElementById('recBtn').classList.remove('recording');} }
+function handleError(e){
+  console.log('SpeechRecognition error:', e.error, e.message);
+  if(e.error==='no-speech'){
+    setStatus('recording','音声待ち...');
+  }else if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+    setStatus('error','マイク/音声認識の許可が必要です');
+    document.getElementById('currentText').textContent='エラー: '+e.error+' — 設定 > Safari > マイクを確認してください';
+    isRecording=false;
+    document.getElementById('recBtn').classList.remove('recording');
+  }else if(e.error==='network'){
+    setStatus('error','ネットワーク接続を確認してください');
+  }else{
+    setStatus('error','エラー: '+e.error);
+    document.getElementById('currentText').textContent='認識エラー: '+e.error;
+  }
+}
 function handleEnd(){
-  // iOS(continuous=false)またはChrome(無音タイムアウト)で再開
-  if(isRecording){try{recognition.start();}catch(e){}}
+  // iOS(continuous=false)またはChrome(無音タイムアウト)で自動再開
+  if(isRecording){
+    if(isIOS){
+      // iOS: 新しいインスタンスで再開
+      const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+      recognition=new SR();
+      recognition.continuous=false;
+      recognition.interimResults=true;
+      recognition.lang=currentLang;
+      recognition.onresult=handleResult;
+      recognition.onerror=handleError;
+      recognition.onend=handleEnd;
+    }
+    try{recognition.start();}catch(e){}
+  }
 }
 
 function isSimilar(a,b){
