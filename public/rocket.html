@@ -4723,6 +4723,12 @@ async function vtStartRec(){
   vtRecognition.onerror=(e)=>{ if(e.error==='no-speech') return; };
   vtRecognition.onend=()=>{ if(vtIsRecording){try{vtRecognition.start();}catch(e){}} };
   try{ await navigator.mediaDevices.getUserMedia({audio:true}); }catch(e){ return; }
+  // BGM完全停止
+  if(typeof MusicEngine!=='undefined'&&MusicEngine.audio){
+    MusicEngine._vtWasPlaying=!MusicEngine.audio.paused;
+    MusicEngine._vtPrevVol=MusicEngine.audio.volume;
+    MusicEngine.audio.pause();
+  }
   vtRecognition.start();
   vtIsRecording=true;
   document.getElementById('vt-rec').style.borderColor='#e74c3c';
@@ -4736,7 +4742,7 @@ function vtStopRec(){
   document.getElementById('vt-rec-inner').style.cssText='width:16px;height:16px;background:var(--term-color);border-radius:50%;';
   // まず今あるテキストを即コピー（ユーザータップ内）
   if(vtTranscript.trim()) vtCopyToClipboard(vtTranscript);
-  // 停止→onendで最終テキスト確定後に再コピー＆クリア
+  // 停止→onendで最終テキスト確定後に再コピー＆クリア＆BGM再開
   vtRecognition.onend=function(){
     setTimeout(()=>{
       if(vtTranscript.trim()){
@@ -4746,6 +4752,11 @@ function vtStopRec(){
         vtRenderHistory();
         vtTranscript=''; vtSentences=[];
         document.getElementById('vt-text').innerHTML='<span style="color:var(--term-dim);font-style:italic;">&#127908; マイクボタンで音声入力</span>';
+      }
+      // BGM再開
+      if(typeof MusicEngine!=='undefined'&&MusicEngine.audio&&MusicEngine._vtWasPlaying){
+        MusicEngine.audio.volume=MusicEngine._vtPrevVol||0.5;
+        MusicEngine.audio.play().catch(()=>{});
       }
     },300);
   };
