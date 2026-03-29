@@ -768,37 +768,21 @@ function stopRecording(){
   setTimeout(finalize, 1500);
 }
 
-// クリップボードコピー（iOS ClipboardItem方式対応）
+// クリップボードコピー（ターミナル版と同じ方式）
 function copyToClipboard(text){
   if(!text||!text.trim()) return;
-  // 方式1: ClipboardItem + write（iOS Safari推奨方式）
-  try{
-    if(navigator.clipboard&&navigator.clipboard.write&&typeof ClipboardItem!=='undefined'){
-      const blob=new Blob([text],{type:'text/plain'});
-      const item=new ClipboardItem({'text/plain':blob});
-      navigator.clipboard.write([item]).catch(()=>{});
-      return;
-    }
-  }catch(e){}
-  // 方式2: writeText
-  try{
-    if(navigator.clipboard&&navigator.clipboard.writeText){
-      navigator.clipboard.writeText(text).catch(()=>{});
-      return;
-    }
-  }catch(e){}
-  // 方式3: execCommand（最終フォールバック）
-  try{
-    const ta=document.createElement('textarea');
-    ta.value=text;
-    ta.setAttribute('readonly','');
-    ta.style.cssText='position:fixed;left:-9999px;top:-9999px;opacity:0;';
-    document.body.appendChild(ta);
-    ta.select();
-    ta.setSelectionRange(0,ta.value.length);
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-  }catch(e){}
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(()=>fallbackCopy(text));
+  }else{
+    fallbackCopy(text);
+  }
+}
+function fallbackCopy(text){
+  const ta=document.createElement('textarea');ta.value=text;
+  ta.style.cssText='position:fixed;left:0;top:0;opacity:0;width:1px;height:1px;';
+  document.body.appendChild(ta);ta.select();
+  try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
 }
 
 // iOS: テキストエリアの内容を全選択してコピーメニュー表示
