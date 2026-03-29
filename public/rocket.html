@@ -30,28 +30,28 @@
   .header{display:flex;justify-content:space-between;font-size:13px;text-shadow:0 0 8px var(--term-color);opacity:0.9;}
   .blink{animation:blinker 1.2s ease-in-out infinite;}
   @keyframes blinker{50%{opacity:0.1}}
-  #log-container{width:320px;max-height:160px;overflow:hidden;font-size:11px;color:var(--term-dim);display:flex;flex-direction:column;justify-content:flex-end;}
+  #log-container{width:280px;max-height:120px;overflow:hidden;font-size:10px;color:var(--term-dim);display:flex;flex-direction:column;justify-content:flex-end;}
   .log-line{margin:2px 0;line-height:1.3;}
   #joystick-layer{position:absolute;top:0;left:0;width:100%;height:100%;z-index:15;pointer-events:none;}
 
   /* Launch Start Panel */
-  #launch-start-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:50;text-align:center;pointer-events:auto;}
-  #launch-start-panel.hidden{display:none;}
-  #mission-title{font-size:20px;letter-spacing:0.2em;text-shadow:0 0 12px var(--term-color);margin-bottom:8px;color:var(--term-color);}
-  #mission-sub{font-size:11px;color:var(--term-dim);letter-spacing:0.15em;margin-bottom:30px;}
-  #launch-btn{background:rgba(0,216,255,0.08);border:2px solid var(--term-color);color:var(--term-color);font-family:"Courier New",monospace;font-size:18px;letter-spacing:0.2em;padding:18px 50px;border-radius:6px;cursor:pointer;text-shadow:0 0 8px var(--term-color);box-shadow:0 0 25px rgba(0,216,255,0.3),inset 0 0 15px rgba(0,216,255,0.05);transition:all 0.3s;pointer-events:auto;animation:btnPulse 2s ease-in-out infinite;}
-  @keyframes btnPulse{0%,100%{box-shadow:0 0 25px rgba(0,216,255,0.3),inset 0 0 15px rgba(0,216,255,0.05);}50%{box-shadow:0 0 40px rgba(0,216,255,0.5),inset 0 0 20px rgba(0,216,255,0.1);}}
-  #launch-btn:hover{background:rgba(0,216,255,0.15);box-shadow:0 0 35px rgba(0,216,255,0.5);animation:none;}
-  #launch-btn:disabled{opacity:0.4;cursor:not-allowed;}
+  #launch-start-panel{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:50;text-align:center;pointer-events:none;}
+  #launch-start-panel.hidden{display:none!important;opacity:0;pointer-events:none;}
+  #mission-title{display:none;}
+  #mission-sub{display:none;}
+  #launch-btn{background:rgba(0,216,255,0.06);border:1px solid rgba(0,216,255,0.4);color:var(--term-color);font-family:"Courier New",monospace;font-size:11px;letter-spacing:0.15em;padding:10px 24px;border-radius:20px;cursor:pointer;text-shadow:0 0 6px var(--term-color);box-shadow:0 0 15px rgba(0,216,255,0.15);transition:all 0.3s;pointer-events:auto;animation:btnPulse 3s ease-in-out infinite;opacity:0.7;}
+  @keyframes btnPulse{0%,100%{box-shadow:0 0 15px rgba(0,216,255,0.15);}50%{box-shadow:0 0 25px rgba(0,216,255,0.3);}}
+  #launch-btn:hover{background:rgba(0,216,255,0.12);box-shadow:0 0 30px rgba(0,216,255,0.4);opacity:1;animation:none;}
+  #launch-btn:disabled{opacity:0.3;cursor:not-allowed;}
 
   /* Countdown HUD */
-  #countdown-hud{position:absolute;top:30%;left:50%;transform:translate(-50%,-50%);z-index:25;text-align:center;pointer-events:none;opacity:0;transition:opacity 0.5s;}
+  #countdown-hud{position:absolute;top:15%;left:50%;transform:translate(-50%,-50%);z-index:55;text-align:center;pointer-events:none;opacity:0;transition:opacity 0.5s;}
   #countdown-hud.visible{opacity:1;}
-  #cd-number{font-size:80px;font-weight:bold;color:var(--term-color);text-shadow:0 0 40px var(--term-color),0 0 80px rgba(0,216,255,0.3);letter-spacing:0.1em;}
+  #cd-number{font-size:48px;font-weight:bold;color:var(--term-color);text-shadow:0 0 30px var(--term-color),0 0 60px rgba(0,216,255,0.3);letter-spacing:0.1em;}
   #cd-status{font-size:14px;color:var(--term-dim);letter-spacing:0.2em;margin-top:10px;}
 
   /* Flight HUD */
-  #flight-hud{position:absolute;top:20px;left:50%;transform:translateX(-50%);z-index:30;font-size:12px;text-align:center;color:var(--term-color);text-shadow:0 0 5px var(--term-color);pointer-events:none;opacity:0;transition:opacity 1s;}
+  #flight-hud{position:absolute;top:45px;left:20px;z-index:30;font-size:11px;text-align:left;color:var(--term-color);text-shadow:0 0 5px var(--term-color);pointer-events:none;opacity:0;transition:opacity 1s;}
   #flight-hud.visible{opacity:1;}
   #altitude-bar-wrap{position:absolute;right:20px;top:50%;transform:translateY(-50%);z-index:30;pointer-events:none;opacity:0;transition:opacity 1s;display:flex;flex-direction:column;align-items:center;gap:5px;}
   #altitude-bar-wrap.visible{opacity:1;}
@@ -67,10 +67,10 @@
   #chat-send{background:transparent;border:1px solid var(--term-color);color:var(--term-color);font-family:"Courier New",monospace;padding:6px 12px;border-radius:4px;cursor:pointer;}
 
   /* Settings */
-  #settings-toggle{position:absolute;bottom:70px;right:20px;z-index:31;pointer-events:auto;cursor:pointer;font-size:22px;color:var(--term-dim);width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:rgba(2,5,16,0.5);border:1px solid rgba(0,216,255,0.2);border-radius:8px;transition:all 0.3s;}
+  #settings-toggle{position:absolute;bottom:60px;right:20px;z-index:31;pointer-events:auto;cursor:pointer;font-size:18px;color:var(--term-dim);width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:rgba(2,5,16,0.6);border:1px solid rgba(0,216,255,0.2);border-radius:6px;transition:all 0.3s;}
   #settings-toggle:hover{color:var(--term-color);border-color:var(--term-color);box-shadow:0 0 10px rgba(0,216,255,0.3);}
   #settings-toggle.open{color:var(--term-color);border-color:var(--term-color);}
-  #settings-panel{position:absolute;bottom:70px;right:20px;background:rgba(2,5,16,0.75);border:1px solid var(--term-dim);padding:10px 15px;border-radius:8px;backdrop-filter:blur(8px);pointer-events:auto;z-index:30;font-size:11px;display:flex;flex-direction:column;gap:8px;transition:opacity 0.3s,transform 0.3s;}
+  #settings-panel{position:absolute;bottom:100px;right:20px;background:rgba(2,5,16,0.85);border:1px solid var(--term-dim);padding:10px 15px;border-radius:8px;backdrop-filter:blur(8px);pointer-events:auto;z-index:30;font-size:11px;display:flex;flex-direction:column;gap:8px;transition:opacity 0.3s,transform 0.3s;max-height:60vh;overflow-y:auto;}
   #settings-panel.collapsed{opacity:0;pointer-events:none;transform:translateX(10px);}
   .setting-row{display:flex;justify-content:space-between;align-items:center;gap:15px;}
   .setting-row label{color:var(--term-color);opacity:0.8;}
@@ -83,7 +83,7 @@
   .vital-row{display:flex;justify-content:space-between;gap:15px;}
   #center-msg{position:absolute;bottom:120px;left:50%;transform:translateX(-50%);background:rgba(0,216,255,0.04);backdrop-filter:blur(10px);padding:10px 22px;border-radius:30px;border:1px solid rgba(0,216,255,0.15);color:rgba(0,216,255,0.7);font-family:"Courier New",monospace;font-size:13px;letter-spacing:0.08em;pointer-events:none;z-index:25;text-align:center;white-space:nowrap;animation:fadeHint 8s ease forwards;}
   @keyframes fadeHint{0%{opacity:0}8%{opacity:0.8}75%{opacity:0.8}100%{opacity:0}}
-  #speed-indicator{position:absolute;bottom:60px;right:20px;z-index:25;font-size:10px;color:var(--term-dim);letter-spacing:0.1em;pointer-events:none;opacity:0;transition:opacity 0.5s;}
+  #speed-indicator{position:absolute;bottom:60px;left:20px;z-index:25;font-size:10px;color:var(--term-dim);letter-spacing:0.1em;pointer-events:none;opacity:0;transition:opacity 0.5s;}
   #speed-indicator.visible{opacity:1;}
   #cam-mode{position:absolute;top:20px;left:20px;z-index:25;font-size:10px;color:var(--term-dim);letter-spacing:0.12em;pointer-events:none;opacity:0;transition:opacity 0.5s;}
   #cam-mode.visible{opacity:1;}
@@ -175,7 +175,7 @@
 <div id="launch-start-panel">
   <div id="mission-title">MEGA ROCKET EXPLORER</div>
   <div id="mission-sub">DESTINATION: DEEP SPACE // GRACE OF TOUCH</div>
-  <button id="launch-btn">[ INITIATE LAUNCH SEQUENCE ]</button>
+  <button id="launch-btn">LAUNCH</button>
 </div>
 
 <!-- Countdown HUD -->
@@ -200,7 +200,7 @@
 <!-- UI Layer -->
 <div id="ui-layer">
   <div class="header">
-    <div>GRACE_OF_TOUCH // MEGA ROCKET v70<br>STATUS: <span id="net-status" style="color:#ffcc00;">SOLO</span></div>
+    <div style="font-size:10px;opacity:0.5;">MEGA ROCKET v70<br>STATUS: <span id="net-status" style="color:#ffcc00;">SOLO</span></div>
     <div id="vitals">
       <div class="vital-row"><span>ID:</span><span id="my-name-val">AWAITING</span></div>
       <div class="vital-row"><span>PEERS:</span><span id="peer-val">0</span></div>
@@ -378,65 +378,90 @@ float sn(vec2 p){vec2 i=floor(p);vec2 f=fract(p);f=f*f*(3.0-2.0*f);return mix(mi
 float fbm(vec2 p){float v=0.0;float a=0.5;for(int i=0;i<6;i++){v+=a*sn(p);p*=2.1;a*=0.48;}return v;}
 void main(){
   float y=vUv.y;float x=abs(vUv.x-0.5)*2.0;
-  // Heavy turbulent noise — 4 layers for violent flame motion
-  float n1=fbm(vec2(x*4.0+0.3,y*7.0-time*20.0));
-  float n2=fbm(vec2(x*7.0-0.7,y*12.0-time*28.0));
-  float n3=sn(vec2(x*16.0,y*32.0-time*42.0))*0.5;
-  float n4=fbm(vec2(x*2.5+time*3.0,y*4.0-time*15.0))*0.3;
-  float n=(n1*0.4+n2*0.3+n3*0.15+n4*0.15)*2.0-1.0;
-  // Wide conical taper
-  float taper=pow(max(0.0,1.0-y),0.3);
-  // ── Savage flame tip: extreme noise breakup ──
-  float tipN1=fbm(vec2(x*8.0+time*5.0,y*14.0-time*22.0));
-  float tipN2=sn(vec2(x*12.0-time*3.5,y*24.0-time*30.0))*0.6;
-  float tipN3=fbm(vec2((x+0.5)*5.0+time*2.0,y*10.0-time*12.0));
-  float tipN4=sn(vec2(x*20.0+time*7.0,y*30.0-time*40.0))*0.35;
-  float cutoff=0.50+tipN1*0.28+tipN2*0.18+tipN3*0.12+tipN4*0.08;
-  float tipFade=smoothstep(cutoff+0.12,cutoff-0.15,y);
-  // Long tendrils — violent flame licks extending far beyond main plume
-  float tendril=fbm(vec2(x*2.5+time*2.5,y*4.0-time*16.0));
-  float tendril2=fbm(vec2((x+0.3)*4.0-time*1.8,y*6.0-time*20.0));
-  float tendrilMask=smoothstep(0.6,0.15,x)*pow(tendril,1.3)*smoothstep(cutoff+0.35,cutoff,y)*0.7;
-  tendrilMask+=smoothstep(0.5,0.2,x)*pow(tendril2,1.6)*smoothstep(cutoff+0.4,cutoff+0.1,y)*0.4;
+  // Turbulent noise layers
+  float n1=fbm(vec2(x*4.0+0.3,y*7.0-time*18.0));
+  float n2=fbm(vec2(x*6.0-0.7,y*10.0-time*24.0));
+  float n3=sn(vec2(x*14.0,y*28.0-time*36.0))*0.5;
+  float n=(n1*0.45+n2*0.35+n3*0.2)*2.0-1.0;
+
+  // ── Realistic plume shape: narrow nozzle → bell expansion → shock contraction → diffuse ──
+  // Nozzle exit (y≈0): narrow. Expands to y≈0.15, contracts at shock diamonds, expands again
+  float nozzleW=0.15; // narrow at exit
+  float bellW=0.42;   // bell expansion peak
+  float shockW=0.28;  // contraction at first shock
+  float plumeW=0.50;  // wide diffuse plume
+  float w;
+  if(y<0.08){w=mix(nozzleW,bellW,y/0.08);} // rapid bell expansion
+  else if(y<0.2){w=mix(bellW,shockW,smoothstep(0.08,0.2,y));} // shock contraction
+  else if(y<0.35){w=mix(shockW,plumeW*0.7,smoothstep(0.2,0.35,y));} // re-expansion
+  else{w=mix(plumeW*0.7,plumeW,(y-0.35)/0.65);} // gradual widening
+
+  // Turbulent edge distortion — increases with distance from nozzle
+  float edgeTurb=fbm(vec2(x*6.0+time*3.0,y*8.0-time*14.0))*0.12*y;
+  edgeTurb+=sn(vec2(x*12.0-time*2.0,y*16.0-time*22.0))*0.06*y;
+  float baseW=w+n*0.05+edgeTurb;
+
+  // Overall taper — flame fades toward tip
+  float taper=1.0-pow(y,1.8);
+
+  // ── Flame tip breakup — chaotic, wispy dissolution ──
+  float tipN1=fbm(vec2(x*6.0+time*4.0,y*12.0-time*18.0));
+  float tipN2=sn(vec2(x*10.0-time*3.0,y*20.0-time*26.0))*0.5;
+  float tipN3=fbm(vec2((x+0.3)*4.0+time*1.5,y*8.0-time*10.0));
+  float cutoff=0.45+tipN1*0.25+tipN2*0.15+tipN3*0.1;
+  float tipFade=smoothstep(cutoff+0.1,cutoff-0.12,y);
+
+  // Wispy tendrils breaking off from main plume
+  float tendril=fbm(vec2(x*2.0+time*2.0,y*3.5-time*14.0));
+  float tendrilMask=smoothstep(0.55,0.15,x)*pow(tendril,1.5)*smoothstep(cutoff+0.3,cutoff,y)*0.5;
   tipFade=max(tipFade,tendrilMask);
-  float baseW=(0.48+n*0.08)*taper;
-  // Billowing edge with heavy turbulence
-  float edgeNoise=sn(vec2(y*10.0-time*15.0,x*8.0))*0.06;
-  float edge=smoothstep(baseW+0.08+edgeNoise,baseW-0.15,x);
-  // Aggressive flickering — rapid chaotic pulsing
-  float flick=0.70+0.30*sin(time*55.0+y*13.0+n1*8.0);
-  flick*=0.80+0.20*sin(time*37.0-y*7.0+n2*5.0);
-  flick*=0.90+0.10*sin(time*73.0+y*20.0); // ultra-high freq shimmer
+
+  // Edge falloff — soft, turbulent edges
+  float edgeN=sn(vec2(y*8.0-time*12.0,x*6.0+time*2.0))*0.05;
+  float edge=smoothstep(baseW+0.06+edgeN,baseW-0.1,x);
+
+  // Natural flickering — organic, not mechanical
+  float flick=0.80+0.20*sin(time*12.0+y*8.0+n1*6.0);
+  flick*=0.85+0.15*sin(time*19.0-y*5.0+n2*4.0);
   float shape=edge*taper*flick*tipFade;
-  // Intense bright core (wide blue-white column)
-  float core=smoothstep(baseW*0.55+0.03,0.0,x)*taper*tipFade;
-  core*=0.82+0.18*sin(time*65.0+y*16.0);
-  // Dense inner core (super bright)
-  float innerCore=smoothstep(baseW*0.25+0.01,0.0,x)*taper*tipFade*0.7;
-  // Mach diamonds (SpaceX Raptor-style shock patterns)
-  float cell=fract(y*6.0-time*4.0);
-  float diamond=pow(max(0.0,sin(cell*3.14159)),4.0)*smoothstep(baseW*0.6,0.0,x)*(1.0-y*0.35)*tipFade;
-  // Secondary shock layer
-  float cell2=fract(y*4.5-time*2.8+0.3);
-  float diamond2=pow(max(0.0,sin(cell2*3.14159)),5.0)*smoothstep(baseW*0.4,0.0,x)*(1.0-y*0.5)*tipFade*0.5;
-  // ── Color ramp: Raptor engine — deep blue core → white → intense yellow → orange → crimson ──
-  vec3 cDeepBlue=vec3(0.4,0.6,2.0);  // methane-blue inner core
-  vec3 cBlue=vec3(0.7,0.95,1.8);     // blue-white
-  vec3 cWhite=vec3(1.8,1.7,1.5);     // blazing white
-  vec3 cYel=vec3(1.7,1.15,0.15);     // intense yellow
-  vec3 cOra=vec3(1.5,0.6,0.06);      // deep orange
-  vec3 cRed=vec3(0.8,0.15,0.02);     // crimson tip
-  vec3 cSmoke=vec3(0.5,0.25,0.08);   // exhaust smoke at very tip
+
+  // Bright core — narrow, intense
+  float coreW=baseW*0.35;
+  float core=smoothstep(coreW+0.02,0.0,x)*taper*tipFade;
+  core*=0.85+0.15*sin(time*25.0+y*10.0);
+  float innerCore=smoothstep(coreW*0.4,0.0,x)*taper*tipFade*0.6;
+
+  // Mach diamonds — stationary bright bands (real shock diamonds don't move much)
+  float md1=pow(max(0.0,sin(y*22.0)),8.0)*smoothstep(baseW*0.5,0.0,x)*(1.0-y*0.4)*tipFade;
+  float md2=pow(max(0.0,sin(y*22.0+1.57)),8.0)*smoothstep(baseW*0.3,0.0,x)*(1.0-y*0.6)*tipFade*0.4;
+  float diamond=md1+md2;
+  // ── Color ramp: realistic multi-color — deep blue/purple core → white → yellow → orange → crimson → violet tips ──
+  vec3 cDeepBlue=vec3(0.3,0.4,2.2);  // methane-blue inner core
+  vec3 cPurple=vec3(0.6,0.2,1.5);    // purple transition zone
+  vec3 cBlue=vec3(0.5,0.8,1.8);      // blue-white
+  vec3 cWhite=vec3(1.8,1.7,1.6);     // blazing white
+  vec3 cYel=vec3(1.6,1.1,0.15);      // intense yellow
+  vec3 cOra=vec3(1.4,0.55,0.06);     // deep orange
+  vec3 cRed=vec3(0.9,0.12,0.04);     // crimson
+  vec3 cViolet=vec3(0.5,0.08,0.25);  // violet-red tips
+  vec3 cSmoke=vec3(0.35,0.18,0.12);  // exhaust smoke at very tip
   vec3 col=cWhite;
-  col=mix(col,cYel,smoothstep(0.04,0.20,y));
-  col=mix(col,cOra,smoothstep(0.20,0.45,y));
-  col=mix(col,cRed,smoothstep(0.45,0.70,y));
-  col=mix(col,cSmoke,smoothstep(0.70,0.95,y));
+  col=mix(col,cYel,smoothstep(0.03,0.15,y));
+  col=mix(col,cOra,smoothstep(0.15,0.35,y));
+  col=mix(col,cRed,smoothstep(0.35,0.55,y));
+  col=mix(col,cViolet,smoothstep(0.55,0.72,y));
+  col=mix(col,cSmoke,smoothstep(0.72,0.92,y));
+  // Turbulent color variation — patches of purple/blue in mid-flame
+  float colorNoise=fbm(vec2(x*5.0+time*2.0,y*8.0-time*10.0));
+  col=mix(col,cPurple*1.3,colorNoise*0.25*smoothstep(0.1,0.4,y)*smoothstep(0.7,0.3,y));
   col+=color*0.03;
   // Blue-white core glow (Raptor methane blue)
   col=mix(col,cBlue*2.0,core*0.6);
   col=mix(col,cDeepBlue*2.5,innerCore*0.8);
   col+=cWhite*innerCore*0.5;
+  // Purple shimmer at outer edge
+  float edgePurple=smoothstep(baseW-0.05,baseW+0.15,x)*taper*tipFade*0.3;
+  col+=cPurple*edgePurple;
   // Shock diamond glow (white-hot)
   col+=vec3(1.8,1.6,1.2)*diamond*1.6;
   col+=vec3(1.4,1.2,1.0)*diamond2*1.2;
@@ -481,21 +506,36 @@ const SKY_FS=`uniform vec3 uEarthCenter;uniform float uEarthR;uniform vec3 uCamP
 varying vec3 vWorldPos;
 void main(){
   float camAlt=length(uCamPos-uEarthCenter)-uEarthR;
-  // Sky transitions: 0=surface(blue), 50=upper atmo(dark blue), 200+=space(transparent)
-  float altFactor=clamp(camAlt/200.0,0.0,1.0);
+  // Realistic atmosphere layers (proportional to Earth R=3000)
+  // Real Earth: troposphere~12km, stratosphere~50km, mesosphere~85km, thermosphere~500km
+  // Scale: multiply by ~0.08 → tropo=1, strato=4, meso=7, thermo=40
+  // Visual transition: gradual over 600 units (20% of Earth radius)
+  float altNorm=camAlt/600.0;
+  float altFactor=clamp(altNorm,0.0,1.0);
+  altFactor=altFactor*altFactor; // quadratic — slow start, fast finish
   // Direction from center to fragment
   vec3 dir=normalize(vWorldPos-uEarthCenter);
   vec3 camDir=normalize(uCamPos-uEarthCenter);
   float up=dot(dir,camDir); // 1=overhead, 0=horizon, -1=below
-  // Ground-level sky gradient
-  vec3 zenith=vec3(0.1,0.2,0.6);   // deep blue overhead
-  vec3 horizon=vec3(0.5,0.7,1.0);   // light blue at horizon
-  vec3 ground=vec3(0.02,0.04,0.08); // dark below
+  // Multi-layer sky gradient
+  vec3 zenithLow=vec3(0.15,0.3,0.75);   // bright blue (troposphere)
+  vec3 zenithMid=vec3(0.06,0.12,0.5);   // darker blue (stratosphere)
+  vec3 zenithHigh=vec3(0.02,0.04,0.2);  // very dark blue (mesosphere)
+  vec3 horizon=vec3(0.55,0.75,1.0);     // bright horizon haze
+  vec3 ground=vec3(0.02,0.04,0.08);     // dark below
+  // Zenith color changes with altitude
+  vec3 zenith=mix(zenithLow,zenithMid,clamp(altNorm*2.0,0.0,1.0));
+  zenith=mix(zenith,zenithHigh,clamp(altNorm*1.2-0.3,0.0,1.0));
   vec3 col;
-  if(up>0.0){col=mix(horizon,zenith,pow(up,0.6));}
-  else{col=mix(horizon,ground,pow(-up,0.4));}
-  float alpha=(1.0-altFactor)*0.85;
-  // Fade sky near ground for better surface visibility
+  if(up>0.0){
+    float upPow=pow(up,0.5+altNorm*0.5); // horizon glow wider at low alt
+    col=mix(horizon,zenith,upPow);
+  }else{
+    col=mix(horizon,ground,pow(-up,0.4));
+  }
+  // Stronger atmosphere at low altitude, gradual fade
+  float alpha=(1.0-altFactor)*0.9;
+  // Fade sky near ground for surface visibility
   if(camAlt<5.0)alpha*=clamp(camAlt/5.0,0.0,1.0);
   gl_FragColor=vec4(col,alpha);
 }`;
@@ -623,8 +663,8 @@ const Rocket3D = {
     this.flameUniforms=flameMat.uniforms;
     this._flameGroup=new THREE.Group();
     // 10 cross-planes with VARIED heights — violent, staggered flame plume
-    const fw=9*2.2;
-    const flameHeights=[65,55,62,50,68,53,60,47,58,52]; // more variation
+    const fw=9*1.8;
+    const flameHeights=[55,45,52,42,58,44,50,40,48,43];
     for(let i=0;i<10;i++){
       const fh=flameHeights[i];
       const fm=new THREE.Mesh(new THREE.PlaneGeometry(fw,fh),flameMat);
@@ -634,38 +674,58 @@ const Rocket3D = {
     }
     // Large exhaust glow (nozzle exit bloom)
     const glowMat=new THREE.ShaderMaterial({uniforms:{thrust:flameMat.uniforms.thrust,glowColor:{value:new THREE.Color(1.0,0.7,0.2)}},vertexShader:GLOW_VS,fragmentShader:GLOW_FS,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
-    const glowPlane=new THREE.Mesh(new THREE.PlaneGeometry(30,30),glowMat);
+    const glowPlane=new THREE.Mesh(new THREE.PlaneGeometry(22,22),glowMat);
     glowPlane.position.y=-3;glowPlane.rotation.x=-Math.PI/2;
     this._flameGroup.add(glowPlane);
     // Second glow plane angled for depth
-    const glowPlane2=new THREE.Mesh(new THREE.PlaneGeometry(26,26),glowMat);
+    const glowPlane2=new THREE.Mesh(new THREE.PlaneGeometry(18,18),glowMat);
     glowPlane2.position.y=-6;glowPlane2.rotation.x=-Math.PI/2;glowPlane2.rotation.z=Math.PI/4;
     this._flameGroup.add(glowPlane2);
     // Inner exhaust cone (bright white-blue core)
     const coneMatInner=new THREE.MeshBasicMaterial({color:0xccddff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
-    this._exhaustConeInner=new THREE.Mesh(new THREE.ConeGeometry(4,25,12,1,true),coneMatInner);
-    this._exhaustConeInner.rotation.x=Math.PI;this._exhaustConeInner.position.y=-14;
+    this._exhaustConeInner=new THREE.Mesh(new THREE.ConeGeometry(3.5,20,12,1,true),coneMatInner);
+    this._exhaustConeInner.rotation.x=Math.PI;this._exhaustConeInner.position.y=-10;
     this._flameGroup.add(this._exhaustConeInner);
     // Mid exhaust cone (orange-yellow)
     const coneMat=new THREE.MeshBasicMaterial({color:0xffcc66,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
-    this._exhaustCone=new THREE.Mesh(new THREE.ConeGeometry(8,35,12,1,true),coneMat);
-    this._exhaustCone.rotation.x=Math.PI;this._exhaustCone.position.y=-18;
+    this._exhaustCone=new THREE.Mesh(new THREE.ConeGeometry(7,28,12,1,true),coneMat);
+    this._exhaustCone.rotation.x=Math.PI;this._exhaustCone.position.y=-12;
     this._flameGroup.add(this._exhaustCone);
     // Outer exhaust haze (wide red-orange)
     const hazeMat=new THREE.MeshBasicMaterial({color:0xff6633,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
-    this._exhaustHaze=new THREE.Mesh(new THREE.ConeGeometry(14,22,12,1,true),hazeMat);
-    this._exhaustHaze.rotation.x=Math.PI;this._exhaustHaze.position.y=-12;
+    this._exhaustHaze=new THREE.Mesh(new THREE.ConeGeometry(11,18,12,1,true),hazeMat);
+    this._exhaustHaze.rotation.x=Math.PI;this._exhaustHaze.position.y=-8;
     this._flameGroup.add(this._exhaustHaze);
     this.boosterGroup.add(this._flameGroup);
+
+    // Smoke particle system — 20 small spheres drifting down from nozzle
+    this._smokeParticles=[];
+    this._smokeGroup=new THREE.Group();
+    for(let i=0;i<20;i++){
+      const sMat=new THREE.MeshBasicMaterial({color:0x888888,transparent:true,opacity:0,depthWrite:false});
+      const sp=new THREE.Mesh(new THREE.SphereGeometry(1.5+Math.random(),6,6),sMat);
+      sp.userData={
+        vel:new THREE.Vector3((Math.random()-0.5)*0.3,-0.8-Math.random()*0.5,(Math.random()-0.5)*0.3),
+        life:Math.random()*2, maxLife:1.5+Math.random()*1.5,
+        baseScale:0.8+Math.random()*0.6,
+        turbFreq:2+Math.random()*3, turbAmp:0.02+Math.random()*0.02
+      };
+      sp.position.set((Math.random()-0.5)*8,-8-Math.random()*6,(Math.random()-0.5)*8);
+      sp.scale.setScalar(sp.userData.baseScale*0.5);
+      this._smokeGroup.add(sp);
+      this._smokeParticles.push(sp);
+    }
+    this.boosterGroup.add(this._smokeGroup);
+
     // Engine glow light (brighter, longer range)
-    this._flameLight=new THREE.PointLight(0xff7733,0,350);
+    this._flameLight=new THREE.PointLight(0xff7733,0,180);
     this._flameLight.position.set(0,-12,0);
     this.boosterGroup.add(this._flameLight);
 
     // v70: Enhanced Mach diamond exhaust cones (layered for depth)
     // Inner bright shock cone (blue-white)
     const machInnerMat=new THREE.MeshBasicMaterial({color:0xaaccff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
-    this._machInnerCone=new THREE.Mesh(new THREE.ConeGeometry(3,18,8,4,true),machInnerMat);
+    this._machInnerCone=new THREE.Mesh(new THREE.ConeGeometry(2,12,8,4,true),machInnerMat);
     this._machInnerCone.rotation.x=Math.PI;this._machInnerCone.position.y=-10;
     this._flameGroup.add(this._machInnerCone);
     // Mach diamond ring markers (bright rings inside plume)
@@ -791,34 +851,47 @@ const Mechazilla = {
     const mzMat=this._bloomMats.arm;
     const tipMat=this._bloomMats.tip;
 
-    // Columns (4)
-    [[-1.2,1.2],[1.2,1.2],[-1.2,-1.2],[1.2,-1.2]].forEach(([ox,oz])=>{
-      const col=new THREE.Mesh(new THREE.BoxGeometry(0.4,28,0.4),tMat);
+    // Columns (4) — thicker for visibility
+    [[-1.5,1.5],[1.5,1.5],[-1.5,-1.5],[1.5,-1.5]].forEach(([ox,oz])=>{
+      const col=new THREE.Mesh(new THREE.BoxGeometry(0.8,28,0.8),tMat);
       col.position.set(ox,14,oz);this.group.add(col);
     });
-    // Braces
-    for(let h=3;h<28;h+=4){const br=new THREE.Mesh(new THREE.BoxGeometry(3,0.2,3),tMat);br.position.y=h;this.group.add(br);}
-    // Support arm
-    const arm=new THREE.Mesh(new THREE.BoxGeometry(14,0.5,0.5),tMat);
-    arm.position.set(7,5,0);this.group.add(arm);
+    // Braces — thicker horizontal + diagonal cross-braces for structure
+    for(let h=3;h<28;h+=4){
+      const br=new THREE.Mesh(new THREE.BoxGeometry(4,0.4,4),tMat);br.position.y=h;this.group.add(br);
+      // Diagonal cross-braces on front/back faces
+      if(h<24){
+        const diagL=new THREE.Mesh(new THREE.BoxGeometry(0.2,5.5,0.2),tMat);
+        diagL.position.set(0,h+2,1.5);diagL.rotation.z=0.6;this.group.add(diagL);
+        const diagR=new THREE.Mesh(new THREE.BoxGeometry(0.2,5.5,0.2),tMat);
+        diagR.position.set(0,h+2,-1.5);diagR.rotation.z=-0.6;this.group.add(diagR);
+      }
+    }
+    // Support arm removed — was penetrating through rocket body
 
-    // Chopstick arms (orange) — two horizontal beams on ±Z sides, slide inward to catch
+    // Chopstick arms (orange) — mounted on tower, slide inward on Z to catch
+    // Arm mounting brackets — connect tower columns to arm pivot
+    const bracketL=new THREE.Mesh(new THREE.BoxGeometry(0.6,1.2,3),tMat);
+    bracketL.position.set(0,24,2.5);this.group.add(bracketL);
+    const bracketR=new THREE.Mesh(new THREE.BoxGeometry(0.6,1.2,3),tMat);
+    bracketR.position.set(0,24,-2.5);this.group.add(bracketR);
+
     // Left chopstick: +Z side, extends along +X toward booster
     const armL=new THREE.Group();
-    armL.position.set(0,24,4.0); // near top — grid fin catch level
-    const armMeshL=new THREE.Mesh(new THREE.BoxGeometry(12,0.6,0.5),mzMat);
+    armL.position.set(0,24,4.0); // pivot point at end of bracket
+    const armMeshL=new THREE.Mesh(new THREE.BoxGeometry(12,1.0,0.8),mzMat);
     armMeshL.position.set(6,0,0); // extends along +X
-    const tipL=new THREE.Mesh(new THREE.SphereGeometry(0.4,6,4),tipMat);
+    const tipL=new THREE.Mesh(new THREE.SphereGeometry(0.6,6,4),tipMat);
     tipL.position.set(6,0,0);armMeshL.add(tipL);
     armL.add(armMeshL);
     this.group.add(armL);this.armL=armL;
 
     // Right chopstick: -Z side, extends along +X toward booster
     const armR=new THREE.Group();
-    armR.position.set(0,24,-4.0); // near top — grid fin catch level
-    const armMeshR=new THREE.Mesh(new THREE.BoxGeometry(12,0.6,0.5),mzMat);
+    armR.position.set(0,24,-4.0); // pivot point at end of bracket
+    const armMeshR=new THREE.Mesh(new THREE.BoxGeometry(12,1.0,0.8),mzMat);
     armMeshR.position.set(6,0,0);
-    const tipR=new THREE.Mesh(new THREE.SphereGeometry(0.4,6,4),tipMat);
+    const tipR=new THREE.Mesh(new THREE.SphereGeometry(0.6,6,4),tipMat);
     tipR.position.set(6,0,0);armMeshR.add(tipR);
     armR.add(armMeshR);
     this.group.add(armR);this.armR=armR;
@@ -828,7 +901,7 @@ const Mechazilla = {
     rod.position.y=31;this.group.add(rod);
 
     this.group.position.set(-3,-30,0);
-    this.group.scale.setScalar(0.35);
+    this.group.scale.setScalar(0.5);
     scene.add(this.group);
   },
   animateCatch(dt) {
@@ -859,7 +932,7 @@ const LaunchSequence = {
   boosterY:0, boosterVelY:0, separated:false,
   boosterReturnX:0, _mechaCatchLogged:false,
   _boosterFlipStartY:undefined,
-  _cycleTimer:0, _cycleCount:0, _musicStarted:false,
+  _cycleTimer:0, _cycleCount:0, _musicStarted:false, _readyMsgShown:false,
   _dummyCam:null,
 
   PHASES:[
@@ -957,18 +1030,12 @@ const LaunchSequence = {
           Logger.log("UPPER STAGE MATED — VEHICLE STACKING COMPLETE");
         }
       }
-      // Phase 3 (25-30s): Countdown to next launch
+      // Phase 3 (25-30s): Ready for manual relaunch
       else{
-        const remain=Math.max(0,Math.ceil(30-t));
-        if(remain>0){
-          document.getElementById('cd-number').textContent=remain;
-          document.getElementById('cd-status').textContent='NEXT LAUNCH';
-          document.getElementById('countdown-hud').classList.add('visible');
-        }
-        if(t>=30){
-          document.getElementById('countdown-hud').classList.remove('visible');
-          this.phase='standby';
-          this.startCountdown();
+        if(!this._readyMsgShown){
+          this._readyMsgShown=true;
+          Logger.log("VEHICLE READY — PRESS LAUNCH TO FLY AGAIN");
+          document.getElementById('launch-start-panel').classList.remove('hidden');
         }
       }
       return;
@@ -996,7 +1063,8 @@ const LaunchSequence = {
         Rocket3D.flameUniforms.thrust.value=1.0;
         this.rocketVelY+=dt*8;
         this.rocketY+=this.rocketVelY*dt;
-        if(progress<0.1){SFXSystem.playLiftoff();document.getElementById('countdown-hud').classList.remove('visible');
+        document.getElementById('countdown-hud').classList.remove('visible');
+        if(progress<0.1){SFXSystem.playLiftoff();
           if(window.parent!==window)window.parent.postMessage({type:'ROCKET_PHASE',phase:'LIFTOFF',cycle:this._cycleCount},'*');
         }
         break;
@@ -1067,7 +1135,7 @@ const LaunchSequence = {
         Rocket3D.steerFins(dt,lbSteer);
         // Stabilize flip wobble — fins + engine correcting attitude
         if(Rocket3D.fullStack)Rocket3D.fullStack.rotation.z*=0.93;
-        if(progress>0.6)Rocket3D.deployLegs(dt);
+        // No leg deploy — Mechazilla catches by grid fins (SpaceX style)
         // Drift toward arm catch position (not tower center)
         const lbCatchX=Mechazilla.group.position.x+1.75;
         this.boosterReturnX+=(lbCatchX-this.boosterReturnX)*dt*0.5;
@@ -1077,8 +1145,13 @@ const LaunchSequence = {
         this.upperVelY+=dt*4;this.upperY+=this.upperVelY*dt;
         // Engine off gradually
         Rocket3D.flameUniforms.thrust.value=Math.max(0,0.3*(1.0-progress*1.5));
-        // Smoothstep approach: 8 → grid fin catch height (4.06)
-        const tgtCatchY=4.06;
+        // Smoothstep approach: 8 → grid fin catch height
+        // Grid fins at boosterGroup Y=65, fullStack scale S=0.07 → 65*0.07=4.55
+        // Mechazilla arms at internal Y=24, group scale 0.5 → world Y=-30+24*0.5=-18
+        // So boosterY needs to be: (-18 - (-30)) = 12 for grid fins to meet arms
+        // Adjustment: gridFinLocalY(65)*S(0.07)=4.55, arm worldY=-18, padY=-30
+        // boosterY so that -30+boosterY+65*0.07 = -18 → boosterY = 12-4.55 = 7.45
+        const tgtCatchY=7.45;
         const cp=Math.min(1,progress*1.3);
         const cs=cp*cp*(3-2*cp);
         this.boosterY=THREE.MathUtils.lerp(8,tgtCatchY,cs);
@@ -1213,6 +1286,7 @@ const LaunchSequence = {
     this._stackMsgShown=false;
     this._stackingStarted=false;
     this._stackAttached=false;
+    this._readyMsgShown=false;
     document.getElementById('countdown-hud').classList.remove('visible');
     document.getElementById('launch-start-panel').classList.add('hidden');
     document.getElementById('chat-container').style.display='flex';
@@ -1662,7 +1736,7 @@ const SolarSystem={
       }else{
         const texSize=name==='Jupiter'||name==='Saturn'?512:256;
         const tex=this._generateTexture(name,texSize,texSize);
-        mat=new THREE.MeshStandardMaterial({map:tex,roughness:0.85,metalness:0.05});
+        mat=new THREE.MeshStandardMaterial({map:tex,roughness:0.95,metalness:0.02});
       }
       const mesh=new THREE.Mesh(geo,mat);
       group.add(mesh);
@@ -1683,7 +1757,7 @@ const SolarSystem={
         });
         group.add(new THREE.Mesh(corona,coronaMat));
         // Sunlight
-        const sunLight=new THREE.PointLight(0xfffff0,2.0,600000);
+        const sunLight=new THREE.PointLight(0xfffff0,1.0,600000);
         group.add(sunLight);
       }
 
@@ -1719,8 +1793,8 @@ const SolarSystem={
         bandData.forEach(b=>{
           const phi1=(90-b.lat-b.w/2)*Math.PI/180;
           const phi2=(90-b.lat+b.w/2)*Math.PI/180;
-          const bandGeo=new THREE.SphereGeometry(d.radius+2,48,4,0,Math.PI*2,phi1,phi2-phi1);
-          const bandMat=new THREE.MeshBasicMaterial({color:b.color,transparent:true,opacity:0.5});
+          const bandGeo=new THREE.SphereGeometry(d.radius*1.005,48,4,0,Math.PI*2,phi1,phi2-phi1);
+          const bandMat=new THREE.MeshBasicMaterial({color:b.color,transparent:true,opacity:0.5,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1});
           group.add(new THREE.Mesh(bandGeo,bandMat));
         });
       }
@@ -1739,7 +1813,7 @@ const SolarSystem={
           const craterR=d.radius*c.size;
           const rimGeo=new THREE.RingGeometry(craterR*0.7,craterR,16);
           const rimMat=new THREE.MeshBasicMaterial({
-            color:0x888888,side:THREE.DoubleSide,transparent:true,opacity:0.6});
+            color:0x888888,side:THREE.DoubleSide,transparent:true,opacity:0.6,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1});
           const rim=new THREE.Mesh(rimGeo,rimMat);
           // Position on sphere surface
           const phi=(90-c.lat)*Math.PI/180;
@@ -1753,7 +1827,7 @@ const SolarSystem={
           // Dark floor
           const floorGeo=new THREE.CircleGeometry(craterR*0.65,12);
           const floorMat=new THREE.MeshBasicMaterial({
-            color:0x555555,side:THREE.DoubleSide,transparent:true,opacity:0.5});
+            color:0x555555,side:THREE.DoubleSide,transparent:true,opacity:0.5,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2});
           const floor=new THREE.Mesh(floorGeo,floorMat);
           floor.position.set(x*0.995,y*0.995,z*0.995);
           floor.lookAt(0,0,0);
@@ -1919,12 +1993,12 @@ const EarthquakeLayer={
   },
 
   _magToSize(mag){
-    if(mag>=7) return 40;
-    if(mag>=6) return 25;
-    if(mag>=5) return 16;
-    if(mag>=4) return 10;
-    if(mag>=3) return 6;
-    return 3;
+    if(mag>=7) return 8;
+    if(mag>=6) return 5;
+    if(mag>=5) return 3.5;
+    if(mag>=4) return 2.5;
+    if(mag>=3) return 1.5;
+    return 0.8;
   },
 
   async _fetch(){
@@ -2053,65 +2127,65 @@ const PandaZones={
         // Scatter slightly around zone center
         const lat=zone.lat+(Math.random()-0.5)*1.5;
         const lng=zone.lng+(Math.random()-0.5)*1.5;
-        const pos=this._latLngToPos(lat,lng,8);
+        const pos=this._latLngToPos(lat,lng,0.5);
         const normal=pos.clone().sub(this.earthCenter.clone()).normalize();
 
         // Panda — cute round proportions, visible from moderate distance
         const panda=new THREE.Group();
-        const S=0.3; // balanced: visible but not giant
+        const S=0.12; // small and cute, proportional to Earth
 
         const whiteMat=new THREE.MeshStandardMaterial({color:0xf5f5f0,roughness:0.9,metalness:0});
         const blackMat=new THREE.MeshStandardMaterial({color:0x1a1a1a,roughness:0.85,metalness:0});
 
         // Body — big round belly (panda's signature round shape)
         const body=new THREE.Mesh(new THREE.SphereGeometry(5*S,12,12),whiteMat);
-        body.scale.set(1,1.1,0.9); // slightly tall, slightly flat
+        body.scale.set(1,1.1,0.9);
         panda.add(body);
 
-        // Head — large and round, sitting on body
-        const head=new THREE.Mesh(new THREE.SphereGeometry(4*S,12,12),whiteMat);
-        head.position.set(0,7*S,0.5*S);
+        // Head — large and round, slightly forward so face is visible
+        const headR=5*S;
+        const headY=7*S, headZ=1*S;
+        const head=new THREE.Mesh(new THREE.SphereGeometry(headR,12,12),whiteMat);
+        head.position.set(0,headY,headZ);
         panda.add(head);
 
         // Ears — round black ears on top of head
         const earGeo=new THREE.SphereGeometry(1.5*S,8,8);
-        const earL=new THREE.Mesh(earGeo,blackMat);earL.position.set(-2.8*S,10.5*S,0);
-        const earR=new THREE.Mesh(earGeo,blackMat);earR.position.set(2.8*S,10.5*S,0);
+        const earL=new THREE.Mesh(earGeo,blackMat);earL.position.set(-3*S,headY+headR*0.85,headZ);
+        const earR=new THREE.Mesh(earGeo,blackMat);earR.position.set(3*S,headY+headR*0.85,headZ);
         panda.add(earL,earR);
 
-        // Eye patches — signature panda black patches (oval)
-        const patchGeo=new THREE.SphereGeometry(1.6*S,8,8);
+        // Eye patches — positioned on the front hemisphere of head
+        const fz=headZ+headR*0.75; // face Z stays within head sphere
+        const patchGeo=new THREE.SphereGeometry(1.4*S,8,8);
         const patchL=new THREE.Mesh(patchGeo,blackMat);
-        patchL.position.set(-1.5*S,7.5*S,3*S);patchL.scale.set(1.2,1.4,0.5);
+        patchL.position.set(-1.3*S,headY+0.5*S,fz);patchL.scale.set(1.0,1.2,0.4);
         const patchR=new THREE.Mesh(patchGeo,blackMat);
-        patchR.position.set(1.5*S,7.5*S,3*S);patchR.scale.set(1.2,1.4,0.5);
+        patchR.position.set(1.3*S,headY+0.5*S,fz);patchR.scale.set(1.0,1.2,0.4);
         panda.add(patchL,patchR);
 
-        // Eyes — small white dots inside patches
+        // Eyes — white dots on patches
         const eyeMat=new THREE.MeshBasicMaterial({color:0xffffff});
-        const eyeGeo=new THREE.SphereGeometry(0.5*S,6,6);
-        const eyeL=new THREE.Mesh(eyeGeo,eyeMat);eyeL.position.set(-1.4*S,7.8*S,3.8*S);
-        const eyeR=new THREE.Mesh(eyeGeo,eyeMat);eyeR.position.set(1.4*S,7.8*S,3.8*S);
+        const eyeGeo=new THREE.SphereGeometry(0.5*S,8,8);
+        const eyeZ=headZ+headR*0.82;
+        const eyeL=new THREE.Mesh(eyeGeo,eyeMat);eyeL.position.set(-1.2*S,headY+0.7*S,eyeZ);
+        const eyeR=new THREE.Mesh(eyeGeo,eyeMat);eyeR.position.set(1.2*S,headY+0.7*S,eyeZ);
         panda.add(eyeL,eyeR);
         // Pupils
         const pupilMat=new THREE.MeshBasicMaterial({color:0x111111});
-        const pupilGeo=new THREE.SphereGeometry(0.25*S,4,4);
-        const pupilL=new THREE.Mesh(pupilGeo,pupilMat);pupilL.position.set(-1.3*S,7.8*S,4.1*S);
-        const pupilR=new THREE.Mesh(pupilGeo,pupilMat);pupilR.position.set(1.3*S,7.8*S,4.1*S);
+        const pupilGeo=new THREE.SphereGeometry(0.3*S,4,4);
+        const pupilZ=headZ+headR*0.88;
+        const pupilL=new THREE.Mesh(pupilGeo,pupilMat);pupilL.position.set(-1.1*S,headY+0.7*S,pupilZ);
+        const pupilR=new THREE.Mesh(pupilGeo,pupilMat);pupilR.position.set(1.1*S,headY+0.7*S,pupilZ);
         panda.add(pupilL,pupilR);
 
-        // Nose — small black triangle
-        const nose=new THREE.Mesh(new THREE.SphereGeometry(0.5*S,4,4),blackMat);
-        nose.position.set(0,6.5*S,4*S);nose.scale.set(1.2,0.8,0.6);
+        // Nose — on front of face
+        const noseZ=headZ+headR*0.9;
+        const nose=new THREE.Mesh(new THREE.SphereGeometry(0.5*S,6,6),blackMat);
+        nose.position.set(0,headY-0.5*S,noseZ);nose.scale.set(1.2,0.8,0.6);
         panda.add(nose);
 
-        // Mouth hint
-        const mouthMat=new THREE.MeshBasicMaterial({color:0x333333});
-        const mouth=new THREE.Mesh(new THREE.TorusGeometry(0.4*S,0.1*S,4,8,Math.PI),mouthMat);
-        mouth.position.set(0,5.8*S,3.8*S);mouth.rotation.x=0.3;
-        panda.add(mouth);
-
-        // Arms — thick round black limbs (spheres, not cylinders)
+        // Arms — thick round black limbs (spheres)
         const armGeo=new THREE.SphereGeometry(2*S,8,8);
         const armL=new THREE.Mesh(armGeo,blackMat);
         armL.position.set(-4.5*S,1*S,1*S);armL.scale.set(0.8,1.3,0.8);
@@ -3527,28 +3601,29 @@ const MoonMission={
   },
 
   _createMissionRocket(){
-    // Simple upper stage representation
+    // Compact upper stage representation
+    const ms=S*4; // mission scale — small and proportional
     const g=new THREE.Group();
-    const bodyGeo=new THREE.CylinderGeometry(1.5*S*15,2*S*15,48*S*15,12);
-    const bodyMat=new THREE.MeshPhongMaterial({color:0xcccccc,metalness:0.5});
+    const bodyGeo=new THREE.CylinderGeometry(1.5*ms,2*ms,48*ms,12);
+    const bodyMat=new THREE.MeshStandardMaterial({color:0xcccccc,metalness:0.4,roughness:0.5});
     const body=new THREE.Mesh(bodyGeo,bodyMat);
     g.add(body);
     // Nose cone
-    const noseGeo=new THREE.ConeGeometry(1.5*S*15,10*S*15,12);
-    const noseMat=new THREE.MeshPhongMaterial({color:0xdddddd});
+    const noseGeo=new THREE.ConeGeometry(1.5*ms,10*ms,12);
+    const noseMat=new THREE.MeshStandardMaterial({color:0xdddddd,roughness:0.4});
     const nose=new THREE.Mesh(noseGeo,noseMat);
-    nose.position.y=29*S*15;
+    nose.position.y=29*ms;
     g.add(nose);
     // Engine glow
-    const engineGlow=new THREE.PointLight(0x4488ff,0,100);
-    engineGlow.position.y=-25*S*15;
+    const engineGlow=new THREE.PointLight(0x4488ff,0,50);
+    engineGlow.position.y=-25*ms;
     g.add(engineGlow);
     g.userData.engineLight=engineGlow;
     // Engine flame (simple cone)
-    const flameGeo=new THREE.ConeGeometry(1.2*S*15,15*S*15,8);
+    const flameGeo=new THREE.ConeGeometry(1.2*ms,15*ms,8);
     const flameMat=new THREE.MeshBasicMaterial({color:0x4488ff,transparent:true,opacity:0,blending:THREE.AdditiveBlending});
     const flame=new THREE.Mesh(flameGeo,flameMat);
-    flame.position.y=-32*S*15;
+    flame.position.y=-32*ms;
     flame.rotation.x=Math.PI;
     g.add(flame);
     g.userData.flame=flame;
@@ -3559,8 +3634,9 @@ const MoonMission={
 
     // Booster separation group (will appear during TLI)
     const bg=new THREE.Group();
-    const boosterGeo=new THREE.CylinderGeometry(2.5*S*15,3*S*15,60*S*15,12);
-    const boosterMat=new THREE.MeshPhongMaterial({color:0xaaaaaa});
+    const ms2=S*4;
+    const boosterGeo=new THREE.CylinderGeometry(2.5*ms2,3*ms2,60*ms2,12);
+    const boosterMat=new THREE.MeshStandardMaterial({color:0xaaaaaa,roughness:0.5});
     bg.add(new THREE.Mesh(boosterGeo,boosterMat));
     bg.visible=false;
     App.scene.add(bg);
@@ -4236,19 +4312,19 @@ const App={
       tex=>{earthMat.map=tex;earthMat.color.set(0xffffff);earthMat.needsUpdate=true;Logger.log("EARTH: BLUE MARBLE LOADED");},
       undefined,()=>Logger.log("EARTH: TEXTURE UNAVAILABLE"));
     // Atmosphere glow shell (Fresnel rim — visible from space)
-    const atmoGeo=new THREE.SphereGeometry(R+120,96,96);
+    const atmoGeo=new THREE.SphereGeometry(R+350,96,96);
     const atmoMat=new THREE.ShaderMaterial({vertexShader:ATMO_VS,fragmentShader:ATMO_FS,transparent:true,blending:THREE.AdditiveBlending,side:THREE.FrontSide,depthWrite:false});
     this._atmosphere=new THREE.Mesh(atmoGeo,atmoMat);
     this._atmosphere.position.set(0,cY,0);
     this.scene.add(this._atmosphere);
     // Troposphere haze (thin blue layer near surface)
-    const hazeGeo=new THREE.SphereGeometry(R+15,48,48);
-    const hazeMat2=new THREE.MeshBasicMaterial({color:0x88bbff,transparent:true,opacity:0.08,blending:THREE.AdditiveBlending,depthWrite:false});
+    const hazeGeo=new THREE.SphereGeometry(R+60,48,48);
+    const hazeMat2=new THREE.MeshBasicMaterial({color:0x88bbff,transparent:true,opacity:0.12,blending:THREE.AdditiveBlending,depthWrite:false});
     this._haze=new THREE.Mesh(hazeGeo,hazeMat2);
     this._haze.position.set(0,cY,0);
     this.scene.add(this._haze);
     // Sky dome — altitude-reactive blue sky (inside-visible sphere)
-    const skyGeo=new THREE.SphereGeometry(R+350,64,64);
+    const skyGeo=new THREE.SphereGeometry(R+700,64,64);
     this._skyUniforms={uEarthCenter:{value:new THREE.Vector3(0,cY,0)},uEarthR:{value:R},uCamPos:{value:new THREE.Vector3()}};
     const skyMat=new THREE.ShaderMaterial({vertexShader:SKY_VS,fragmentShader:SKY_FS,uniforms:this._skyUniforms,transparent:true,side:THREE.BackSide,depthWrite:false});
     this._skyDome=new THREE.Mesh(skyGeo,skyMat);

@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>VoiceType — Grace of Touch</title>
+<!-- © 2024-2026 Grace of Touch Co. All rights reserved. Unauthorized copying prohibited. -->
+<script>
+(function(){
+  document.addEventListener('contextmenu',function(e){e.preventDefault();});
+  document.addEventListener('keydown',function(e){
+    if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&(e.key==='I'||e.key==='J'))||(e.ctrlKey&&e.key==='u')){e.preventDefault();}
+  });
+  console.log('%c⚠ WARNING','color:red;font-size:24px;font-weight:bold;');
+  console.log('%c© 2024-2026 Grace of Touch Co. Unauthorized access prohibited.','color:red;font-size:14px;');
+})();
+</script>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --text: #e0e0e8;
+    --text-dim: #6b6b80;
+    --accent: #6c5ce7;
+    --accent-glow: rgba(108,92,231,0.3);
+    --recording: #e74c3c;
+    --recording-glow: rgba(231,76,60,0.4);
+    --success: #2ecc71;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    background: var(--bg); color: var(--text);
+    height: 100vh; height: 100dvh;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* Header */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .logo { font-size: 16px; font-weight: 700; letter-spacing: 1px; }
+  .logo span { color: var(--accent); }
+  .header-right { display: flex; gap: 8px; align-items: center; }
+  .lang-toggle {
+    display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; font-size: 11px;
+  }
+  .lang-toggle button {
+    background: transparent; border: none; color: var(--text-dim); padding: 5px 10px;
+    cursor: pointer; transition: all 0.2s; font-family: inherit;
+  }
+  .lang-toggle button.active { background: var(--accent); color: #fff; }
+  .mode-pill {
+    font-size: 10px; color: var(--accent); border: 1px solid rgba(108,92,231,0.4);
+    padding: 3px 10px; border-radius: 12px;
+  }
+  .icon-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-dim);
+    width: 32px; height: 32px; border-radius: 6px; cursor: pointer; font-size: 16px;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+  }
+  .icon-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  /* Main */
+  main {
+    flex: 1; display: flex; flex-direction: column;
+    padding: 12px; gap: 8px; min-height: 0; overflow: hidden;
+  }
+
+  /* Current panel */
+  .current-panel {
+    flex: 1; display: flex; flex-direction: column;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; min-height: 80px; position: relative;
+  }
+  .current-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .current-label { font-size: 10px; color: var(--text-dim); letter-spacing: 0.5px; text-transform: uppercase; }
+  .current-actions { display: flex; gap: 6px; align-items: center; }
+  .action-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-dim);
+    padding: 3px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; transition: all 0.2s;
+  }
+  .action-btn:hover { border-color: var(--accent); color: var(--text); }
+  .action-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .action-btn.primary:hover { background: #7c6cf0; }
+  .char-count { font-size: 10px; color: var(--text-dim); }
+
+  .current-text {
+    flex: 1; padding: 12px; font-size: 15px; line-height: 1.8;
+    overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; min-height: 0;
+    -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text;
+  }
+  .current-text:focus { outline: none; }
+  .interim { color: var(--text-dim); font-style: italic; }
+  .placeholder { color: var(--text-dim); font-style: italic; font-size: 13px; }
+
+  /* History panel */
+  .history-panel {
+    flex: 1; display: flex; flex-direction: column;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; min-height: 60px;
+  }
+  .history-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .history-label { font-size: 10px; color: var(--text-dim); letter-spacing: 0.5px; text-transform: uppercase; }
+  .history-content {
+    flex: 1; overflow-y: auto; padding: 8px 12px; min-height: 0;
+    -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text;
+  }
+  .history-item {
+    padding: 8px 10px; margin-bottom: 6px;
+    background: rgba(108,92,231,0.05); border: 1px solid rgba(108,92,231,0.1);
+    border-radius: 6px; font-size: 13px; line-height: 1.6;
+    position: relative; cursor: text; transition: border-color 0.2s;
+  }
+  .history-item:hover { border-color: rgba(108,92,231,0.3); }
+  .history-time {
+    font-size: 9px; color: var(--text-dim); margin-bottom: 4px; letter-spacing: 0.5px;
+  }
+  .history-empty { font-size: 12px; color: var(--text-dim); font-style: italic; padding: 12px 0; text-align: center; }
+
+  /* Controls */
+  .controls {
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0;
+  }
+  .rec-btn {
+    width: 56px; height: 56px; border-radius: 50%; border: 3px solid var(--accent);
+    background: transparent; cursor: pointer; transition: all 0.3s;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  .rec-btn:hover { box-shadow: 0 0 20px var(--accent-glow); }
+  .rec-btn .inner { width: 24px; height: 24px; background: var(--accent); border-radius: 50%; transition: all 0.3s; }
+  .rec-btn.recording { border-color: var(--recording); box-shadow: 0 0 24px var(--recording-glow); animation: pulse 1.5s ease-in-out infinite; }
+  .rec-btn.recording .inner { background: var(--recording); border-radius: 4px; width: 20px; height: 20px; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 20px var(--recording-glow)} 50%{box-shadow:0 0 44px var(--recording-glow)} }
+
+  .controls-info { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 70px; }
+  .status-bar { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); white-space: nowrap; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+  .status-dot.ready { background: var(--success); }
+  .status-dot.recording { background: var(--recording); animation: blink 1s infinite; }
+  .status-dot.error { background: var(--recording); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .hotkey-hint { font-size: 10px; color: var(--text-dim); }
+  .hotkey-hint kbd { background: var(--bg); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-family: monospace; font-size: 10px; color: var(--text); }
+  .volume-meter { display: flex; align-items: center; gap: 3px; height: 20px; }
+  .volume-bar { width: 3px; height: 4px; background: var(--accent); border-radius: 2px; transition: height 0.05s; }
+
+  /* Setup */
+  .setup-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .setup-overlay.hidden { display: none; }
+  .setup-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 100%; max-width: 400px; text-align: center; }
+  .setup-card h2 { font-size: 18px; margin-bottom: 8px; }
+  .setup-card p { font-size: 13px; color: var(--text-dim); margin-bottom: 20px; line-height: 1.6; }
+  .setup-step { display: none; }
+  .setup-step.active { display: block; }
+  .voice-circle { width: 100px; height: 100px; border-radius: 50%; margin: 20px auto; border: 3px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 32px; transition: all 0.5s; }
+  .voice-circle.listening { border-color: var(--recording); box-shadow: 0 0 30px var(--recording-glow); animation: pulse 1.5s ease-in-out infinite; }
+  .voice-circle.done { border-color: var(--success); }
+  .setup-btn { background: var(--accent); color: #fff; border: none; padding: 12px 32px; border-radius: 8px; font-size: 14px; cursor: pointer; margin-top: 16px; }
+  .setup-btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--text-dim); margin-top: 8px; }
+  .detected-lang { font-size: 24px; font-weight: 700; color: var(--accent); margin: 12px 0; }
+  .lang-options { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 16px 0; }
+  .lang-chip { padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px; font-size: 12px; cursor: pointer; background: transparent; color: var(--text-dim); transition: all 0.2s; }
+  .lang-chip:hover, .lang-chip.selected { border-color: var(--accent); color: var(--accent); background: rgba(108,92,231,0.1); }
+  .progress-bar { width: 100%; height: 4px; background: var(--border); border-radius: 2px; margin: 12px 0; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; width: 0%; }
+
+  /* Settings */
+  .settings-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; padding: 16px; }
+  .settings-overlay.open { display: flex; }
+  .settings-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; width: 100%; max-width: 420px; max-height: 80dvh; overflow-y: auto; }
+  .settings-panel h2 { font-size: 16px; margin-bottom: 16px; }
+  .setting-group { margin-bottom: 14px; }
+  .setting-group label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 6px; }
+  .setting-group select, .setting-group textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; font-size: 14px; font-family: inherit; }
+  .setting-group textarea { height: 70px; resize: vertical; }
+  .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 13px; }
+  .toggle { width: 44px; height: 24px; background: var(--border); border-radius: 12px; border: none; cursor: pointer; position: relative; transition: background 0.3s; flex-shrink: 0; }
+  .toggle::after { content:''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: var(--text); border-radius: 50%; transition: transform 0.3s; }
+  .toggle.on { background: var(--accent); }
+  .toggle.on::after { transform: translateX(20px); }
+  .sep { border-top: 1px solid var(--border); margin: 14px 0; }
+  .panel-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); padding: 8px; border-radius: 6px; font-size: 12px; cursor: pointer; width: 100%; }
+  .settings-close { margin-top: 12px; width: 100%; padding: 10px; background: var(--accent); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
+
+  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--accent); color: #fff; padding: 8px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 200; white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 600px) {
+    header { padding: 8px 12px; }
+    main { padding: 8px; gap: 6px; }
+    .current-text { padding: 10px; font-size: 14px; }
+    .controls { padding: 10px 12px; }
+    .hotkey-hint { display: none; }
+    .volume-meter { display: none; }
+  }
+  @supports (padding: env(safe-area-inset-bottom)) {
+    .controls { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<!-- Setup -->
+<div class="setup-overlay" id="setupOverlay">
+  <div class="setup-card">
+    <div class="setup-step active" id="setup-step-1">
+      <h2>VoiceType Setup</h2>
+      <p>声のサンプルを録音して<br>言語と声質を自動判定します</p>
+      <button class="setup-btn" onclick="setupNext(2)">セットアップ開始</button>
+      <br><button class="setup-btn secondary" onclick="skipSetup()">スキップ</button>
+    </div>
+    <div class="setup-step" id="setup-step-2">
+      <h2>声のサンプル録音</h2>
+      <p>普段の話し方で10秒ほど話してください</p>
+      <div class="voice-circle" id="voiceCircle">&#127908;</div>
+      <div class="progress-bar"><div class="progress-fill" id="setupProgress"></div></div>
+      <p id="setupTimer" style="font-size:20px;font-weight:700;color:var(--accent);">10</p>
+      <button class="setup-btn" id="setupRecBtn" onclick="startSetupRec()">録音開始</button>
+    </div>
+    <div class="setup-step" id="setup-step-3">
+      <h2>検出結果</h2>
+      <div class="detected-lang" id="detectedLang">日本語</div>
+      <div class="lang-options">
+        <button class="lang-chip selected" data-lang="ja-JP" onclick="selectLang(this)">日本語</button>
+        <button class="lang-chip" data-lang="en-US" onclick="selectLang(this)">English</button>
+        <button class="lang-chip" data-lang="zh-CN" onclick="selectLang(this)">中文</button>
+        <button class="lang-chip" data-lang="ko-KR" onclick="selectLang(this)">한국어</button>
+      </div>
+      <button class="setup-btn" onclick="finishSetup()">完了</button>
+    </div>
+  </div>
+</div>
+
+<!-- App -->
+<header>
+  <div class="logo">Voice<span>Type</span></div>
+  <div class="header-right">
+    <div class="lang-toggle" id="langToggle">
+      <button class="active" data-lang="ja-JP" onclick="switchLang(this)">JP</button>
+      <button data-lang="en-US" onclick="switchLang(this)">EN</button>
+    </div>
+    <div class="mode-pill" id="modePill">テキスト整形</div>
+    <button class="icon-btn" onclick="toggleSettings()">&#9881;</button>
+  </div>
+</header>
+
+<main>
+  <!-- Current recording -->
+  <div class="current-panel">
+    <div class="current-header">
+      <span class="current-label" id="currentLabel">Now</span>
+      <div class="current-actions">
+        <span class="char-count" id="charCount"></span>
+        <button class="action-btn" onclick="clearCurrent()">Clear</button>
+      </div>
+    </div>
+    <div class="current-text" id="currentText">
+      <span class="placeholder">録音ボタンで開始</span>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="history-panel">
+    <div class="history-header">
+      <span class="history-label">History</span>
+      <button class="action-btn" onclick="clearHistory()" style="font-size:10px;padding:2px 8px;">Clear All</button>
+    </div>
+    <div class="history-content" id="historyContent">
+      <div class="history-empty">テキストを選択してコピー、または Save で履歴に保存</div>
+    </div>
+  </div>
+</main>
+
+<div class="controls">
+  <div class="controls-info">
+    <div class="status-bar">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">準備完了</span>
+    </div>
+    <div class="volume-meter" id="volumeMeter"></div>
+  </div>
+  <button class="rec-btn" id="recBtn" onclick="toggleRecording()">
+    <div class="inner"></div>
+  </button>
+  <div class="controls-info">
+    <div class="hotkey-hint"><kbd id="hotkeyDisplay">変換</kbd> or <kbd>F2</kbd></div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="settings-overlay" id="settingsOverlay">
+  <div class="settings-panel">
+    <h2>Settings</h2>
+    <div class="setting-group">
+      <label>出力モード</label>
+      <select id="outputMode" onchange="changeMode()">
+        <option value="clean">テキスト整形</option>
+        <option value="bullets">箇条書き</option>
+        <option value="prompt">プロンプト整形</option>
+        <option value="raw">そのまま</option>
+      </select>
+    </div>
+    <div class="sep"></div>
+    <div class="setting-group">
+      <div class="setting-row"><span>フィラーワード除去</span><button class="toggle on" onclick="toggleSetting(this,'removeFiller')"></button></div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-row"><span>句読点の自動挿入</span><button class="toggle on" onclick="toggleSetting(this,'autoPunctuation')"></button></div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-row"><span>言い直し自動検出</span><button class="toggle on" onclick="toggleSetting(this,'smartCorrection')"></button></div>
+    </div>
+    <div class="sep"></div>
+    <div class="setting-group">
+      <label>録音ホットキー</label>
+      <select id="hotkeySelect" onchange="changeHotkey()">
+        <option value="Convert">変換キー</option>
+        <option value="NonConvert">無変換キー</option>
+        <option value="F2">F2</option>
+        <option value="F4">F4</option>
+      </select>
+    </div>
+    <div class="setting-group">
+      <label>カスタム辞書（from→to）</label>
+      <textarea id="customDict" placeholder="クロード→Claude&#10;ファイヤーベース→Firebase"></textarea>
+    </div>
+    <div class="sep"></div>
+    <div class="setting-group"><button class="panel-btn" onclick="resetSetup()">声の再セットアップ</button></div>
+    <button class="settings-close" onclick="toggleSettings()">閉じる</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let isRecording = false, recognition = null, audioContext = null, analyser = null, mediaStream = null;
+let finalTranscript = '', interimTranscript = '', sentences = [];
+let currentLang = 'ja-JP';
+let selectedHotkey = localStorage.getItem('vt_hotkey') || 'Convert';
+let outputMode = localStorage.getItem('vt_mode') || 'clean';
+let voiceProfile = JSON.parse(localStorage.getItem('vt_voiceProfile') || 'null');
+let history = JSON.parse(localStorage.getItem('vt_history') || '[]');
+
+const settings = { removeFiller: true, autoPunctuation: true, smartCorrection: true };
+const FILLERS_JA = ['えーと','えっと','えー','あー','あのー','あの','まあ','まぁ','なんか','こう','そのー','その','ええと','うーん','うん','なんていうか','なんというか','えーっと','あのですね','そうですね','まあその'];
+const FILLERS_EN = ['uh','um','uhm','like','you know','i mean','basically','actually','literally','sort of','kind of','well'];
+const HOTKEY_LABELS = {'Convert':'変換','NonConvert':'無変換','F2':'F2','F4':'F4'};
+const MODE_LABELS = {'clean':'テキスト整形','bullets':'箇条書き','prompt':'プロンプト整形','raw':'そのまま'};
+
+// ─── Language Toggle ───
+function switchLang(btn) {
+  document.querySelectorAll('.lang-toggle button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentLang = btn.dataset.lang;
+  if (isRecording) { stopRecording(); setTimeout(startRecording, 300); }
+}
+
+// ─── Setup ───
+function checkSetup() { document.getElementById('setupOverlay').classList.toggle('hidden', !!voiceProfile); }
+function setupNext(s) { document.querySelectorAll('.setup-step').forEach(e=>e.classList.remove('active')); document.getElementById('setup-step-'+s).classList.add('active'); }
+function skipSetup() {
+  voiceProfile = { lang:'ja-JP', setupDone:true };
+  localStorage.setItem('vt_voiceProfile', JSON.stringify(voiceProfile));
+  currentLang = 'ja-JP';
+  document.getElementById('setupOverlay').classList.add('hidden');
+  initRecognition();
+}
+function startSetupRec() {
+  const btn=document.getElementById('setupRecBtn'); btn.disabled=true; btn.textContent='録音中...';
+  document.getElementById('voiceCircle').classList.add('listening');
+  let samples=[];
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const sr=new SR(); sr.continuous=true; sr.interimResults=true; sr.lang='';
+  sr.onresult=(e)=>{ for(let i=e.resultIndex;i<e.results.length;i++) if(e.results[i].isFinal) samples.push(e.results[i][0].transcript); };
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    const ac=new AudioContext(),an=ac.createAnalyser(); an.fftSize=2048;
+    ac.createMediaStreamSource(stream).connect(an);
+    const pd=[]; const pi=setInterval(()=>{ const d=new Float32Array(an.fftSize); an.getFloatTimeDomainData(d); let c=0; for(let i=1;i<d.length;i++) if((d[i]>=0&&d[i-1]<0)||(d[i]<0&&d[i-1]>=0)) c++; const f=(c/2)*(ac.sampleRate/an.fftSize); if(f>50&&f<500) pd.push(f); },100);
+    sr.start(); let rem=10;
+    const ti=setInterval(()=>{
+      rem--; document.getElementById('setupTimer').textContent=rem;
+      document.getElementById('setupProgress').style.width=((10-rem)/10*100)+'%';
+      if(rem<=0){
+        clearInterval(ti); clearInterval(pi); try{sr.stop();}catch(e){} stream.getTracks().forEach(t=>t.stop()); ac.close();
+        document.getElementById('voiceCircle').classList.remove('listening');
+        document.getElementById('voiceCircle').classList.add('done');
+        document.getElementById('voiceCircle').innerHTML='&#10003;';
+        const text=samples.join(' '), lang=detectLang(text);
+        const avg=pd.length?pd.reduce((a,b)=>a+b,0)/pd.length:0;
+        voiceProfile={lang,avgPitch:Math.round(avg),setupDone:true};
+        localStorage.setItem('vt_voiceProfile',JSON.stringify(voiceProfile));
+        currentLang=lang;
+        const names={'ja-JP':'日本語','en-US':'English','zh-CN':'中文','ko-KR':'한국어'};
+        document.getElementById('detectedLang').textContent=names[lang]||lang;
+        document.querySelectorAll('.lang-chip').forEach(c=>c.classList.toggle('selected',c.dataset.lang===lang));
+        // Update header toggle
+        document.querySelectorAll('.lang-toggle button').forEach(b=>b.classList.toggle('active',b.dataset.lang===lang));
+        setTimeout(()=>setupNext(3),800);
+      }
+    },1000);
+  });
+}
+function detectLang(t){ if(!t)return'ja-JP'; const ja=(t.match(/[\u3040-\u30FF]/g)||[]).length+(t.match(/[\u4E00-\u9FFF]/g)||[]).length; const ko=(t.match(/[\uAC00-\uD7AF]/g)||[]).length; if(ja>ko)return'ja-JP'; if(ko>ja)return'ko-KR'; return'en-US'; }
+function selectLang(c){ document.querySelectorAll('.lang-chip').forEach(e=>e.classList.remove('selected')); c.classList.add('selected'); if(voiceProfile){voiceProfile.lang=c.dataset.lang; currentLang=c.dataset.lang; localStorage.setItem('vt_voiceProfile',JSON.stringify(voiceProfile));} }
+function finishSetup(){ document.getElementById('setupOverlay').classList.add('hidden'); initRecognition(); }
+function resetSetup(){ voiceProfile=null; localStorage.removeItem('vt_voiceProfile'); toggleSettings(); document.querySelectorAll('.setup-step').forEach(s=>s.classList.remove('active')); document.getElementById('setup-step-1').classList.add('active'); document.getElementById('voiceCircle').className='voice-circle'; document.getElementById('voiceCircle').innerHTML='&#127908;'; document.getElementById('setupTimer').textContent='10'; document.getElementById('setupProgress').style.width='0%'; document.getElementById('setupRecBtn').disabled=false; document.getElementById('setupRecBtn').textContent='録音開始'; document.getElementById('setupOverlay').classList.remove('hidden'); }
+
+// ─── Recognition ───
+function initRecognition(){
+  if(!('webkitSpeechRecognition' in window)&&!('SpeechRecognition' in window)){setStatus('error','Chrome推奨');return;}
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  recognition=new SR(); recognition.continuous=true; recognition.interimResults=true;
+  recognition.lang=currentLang;
+  recognition.onresult=handleResult; recognition.onerror=handleError; recognition.onend=handleEnd;
+  setStatus('ready','準備完了');
+}
+
+function toggleRecording(){ isRecording ? stopRecording() : startRecording(); }
+
+async function startRecording(){
+  if(isRecording) return;
+  if(!recognition) initRecognition();
+  const el=document.getElementById('currentText');
+  if(el.querySelector('.placeholder')) el.innerHTML='';
+  // Reset for new recording
+  finalTranscript=''; interimTranscript=''; sentences=[];
+  recognition.lang=currentLang;
+  try{
+    mediaStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    audioContext=new AudioContext(); analyser=audioContext.createAnalyser(); analyser.fftSize=256;
+    audioContext.createMediaStreamSource(mediaStream).connect(analyser);
+    updateVolumeMeter();
+  }catch(e){setStatus('error','マイク許可が必要');return;}
+  recognition.start(); isRecording=true;
+  document.getElementById('recBtn').classList.add('recording');
+  document.getElementById('currentLabel').textContent='Recording...';
+  setStatus('recording','録音中...');
+  if(navigator.vibrate) navigator.vibrate(50);
+}
+
+function stopRecording(){
+  if(!isRecording) return;
+  isRecording=false;
+  document.getElementById('recBtn').classList.remove('recording');
+  document.getElementById('currentLabel').textContent='処理中...';
+  setStatus('ready','最終処理中...');
+  // 停止後、最後の音声が確定するのを待ってからコピー・保存
+  recognition.onend=function(){
+    if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+    if(audioContext){audioContext.close();audioContext=null;}
+    document.getElementById('currentLabel').textContent='Now';
+    document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
+    setStatus('ready','停止');
+    if(navigator.vibrate) navigator.vibrate([30,30,30]);
+    // 最終結果が確定してからコピー・保存
+    setTimeout(()=> autoSaveToHistory(), 300);
+    // onendを元に戻す
+    recognition.onend=handleEnd;
+  };
+  recognition.stop();
+}
+
+function handleResult(event){
+  interimTranscript='';
+  for(let i=event.resultIndex;i<event.results.length;i++){
+    const t=event.results[i][0].transcript;
+    if(event.results[i].isFinal){
+      if(settings.smartCorrection){
+        const cleaned=basicClean(t);
+        // 直前の文と比較して言い直しを検出
+        if(sentences.length>0){
+          const lastIdx=sentences.length-1;
+          // 完全一致 or 類似 → 置換（言い直し）
+          if(isSimilar(sentences[lastIdx],cleaned)){
+            sentences[lastIdx]=cleaned; // 新しい方を採用
+          }
+          // 直前2文まで遡って類似チェック
+          else if(sentences.length>1 && isSimilar(sentences[lastIdx-1],cleaned)){
+            sentences[lastIdx-1]=cleaned;
+            sentences.splice(lastIdx,1); // 間の文も削除
+          }
+          else{ sentences.push(cleaned); }
+        }else{ sentences.push(cleaned); }
+        finalTranscript=sentences.join('');
+      }else{ finalTranscript+=t; }
+    }else{ interimTranscript+=t; }
+  }
+  // 録音中はリアルタイム表示を優先（重い処理は後回し）
+  const el=document.getElementById('currentText');
+  if(interimTranscript){
+    // interim中は軽量表示
+    el.innerHTML=escapeHtml(finalTranscript)+'<span class="interim">'+escapeHtml(interimTranscript)+'</span>';
+  }else{
+    // final確定時のみフル処理
+    el.innerHTML=escapeHtml(processText(finalTranscript));
+  }
+  el.scrollTop=el.scrollHeight;
+  document.getElementById('charCount').textContent=(finalTranscript.length+interimTranscript.length)+'文字';
+}
+function handleError(e){ if(e.error==='no-speech')setStatus('recording','音声待ち...'); else if(e.error==='not-allowed'){setStatus('error','マイク許可が必要');isRecording=false;document.getElementById('recBtn').classList.remove('recording');} }
+function handleEnd(){ if(isRecording){try{recognition.start();}catch(e){}} }
+
+function isSimilar(a,b){
+  if(!a||!b)return false;
+  const na=a.replace(/[。、！？\s]/g,''), nb=b.replace(/[。、！？\s]/g,'');
+  if(na.length<2||nb.length<2)return false;
+  // 完全一致
+  if(na===nb)return true;
+  // 一方が他方を含む（言い直しで少し変わるパターン）
+  if(na.includes(nb)||nb.includes(na))return true;
+  // 先頭の共通部分が長い（同じ文を言い直し）
+  let prefixMatch=0;
+  for(let i=0;i<Math.min(na.length,nb.length);i++){
+    if(na[i]===nb[i]) prefixMatch++; else break;
+  }
+  if(prefixMatch>=3 && prefixMatch/Math.max(na.length,nb.length)>0.4)return true;
+  // 文字の重複率
+  let common=0;
+  const shorter=na.length<=nb.length?na:nb, longer=na.length>nb.length?na:nb;
+  const used=new Set();
+  for(let i=0;i<shorter.length;i++){
+    const idx=longer.indexOf(shorter[i],0);
+    if(idx!==-1&&!used.has(idx)){common++;used.add(idx);}
+  }
+  return common/Math.max(na.length,nb.length)>0.5;
+}
+
+function basicClean(text){
+  let r=text;
+  if(settings.removeFiller){
+    const fillers=currentLang.startsWith('ja')?FILLERS_JA:FILLERS_EN;
+    fillers.forEach(f=>{ r=currentLang.startsWith('ja')?r.replace(new RegExp(escapeRegex(f),'gi'),''):r.replace(new RegExp(`\\b${escapeRegex(f)}\\b[,]?\\s*`,'gi'),''); });
+  }
+  return r.replace(/\s{2,}/g,' ').trim();
+}
+
+function processText(text){
+  if(outputMode==='raw')return text;
+  let r=text;
+  const dict=document.getElementById('customDict')?.value||'';
+  if(dict.trim()) dict.split('\n').forEach(l=>{ const p=l.split('→'); if(p.length===2&&p[0].trim()&&p[1].trim()) r=r.replace(new RegExp(escapeRegex(p[0].trim()),'gi'),p[1].trim()); });
+  if(!settings.smartCorrection&&settings.removeFiller) r=basicClean(r);
+  r=r.replace(/(.{2,10})\1+/g,'$1').replace(/\s{2,}/g,' ').trim();
+  if(settings.autoPunctuation&&currentLang.startsWith('ja')) r=r.replace(/([^。、！？\n])$/g,'$1。');
+  if(outputMode==='bullets'){ const s=r.split(/[。．.！!？?]+/).filter(s=>s.trim()); r=s.map(s=>'- '+s.trim()).join('\n'); }
+  else if(outputMode==='prompt'){ const s=r.split(/[。．.！!？?]+/).filter(s=>s.trim()); if(s.length>1) r=s.map((s,i)=>i===0?s.trim():'- '+s.trim()).join('\n'); }
+  return r;
+}
+
+// ─── History ───
+function autoSaveToHistory(){
+  const el=document.getElementById('currentText');
+  const text=el.textContent||'';
+  if(!text.trim()||text.includes('録音ボタンで開始'))return;
+  // 自動コピー（トースト不要 — 履歴に表示されるため）
+  navigator.clipboard.writeText(text);
+  // 履歴に保存
+  const entry={ text, time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}), lang: currentLang };
+  history.unshift(entry);
+  if(history.length>50) history=history.slice(0,50);
+  localStorage.setItem('vt_history',JSON.stringify(history));
+  renderHistory();
+  // 現在のテキストエリアをクリア
+  setTimeout(()=>{
+    el.innerHTML='<span class="placeholder">録音ボタンで開始</span>';
+    document.getElementById('charCount').textContent='';
+    finalTranscript=''; interimTranscript=''; sentences=[];
+  }, 1500);
+}
+
+function sendToHistory(){
+  const el=document.getElementById('currentText');
+  const text=el.textContent||'';
+  if(!text.trim()||text.includes('録音ボタンで開始'))return;
+  const entry={ text, time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}), lang: currentLang };
+  history.unshift(entry);
+  if(history.length>50) history=history.slice(0,50);
+  localStorage.setItem('vt_history',JSON.stringify(history));
+  renderHistory();
+  // Clear current
+  el.innerHTML='<span class="placeholder">録音ボタンで開始</span>';
+  document.getElementById('charCount').textContent='';
+  finalTranscript=''; interimTranscript=''; sentences=[];
+  showToast('履歴に保存しました');
+}
+
+function renderHistory(){
+  const container=document.getElementById('historyContent');
+  if(history.length===0){ container.innerHTML='<div class="history-empty">テキストを選択してコピー、または Save で履歴に保存</div>'; return; }
+  container.innerHTML=history.map((h,i)=>`<div class="history-item"><div class="history-time">${h.time} — ${h.lang==='ja-JP'?'JP':'EN'} <button onclick="copyHistory(${i})" style="background:var(--accent);color:#fff;border:none;padding:2px 8px;border-radius:3px;font-size:10px;cursor:pointer;margin-left:6px;">Copy</button></div>${escapeHtml(h.text)}</div>`).join('');
+}
+
+function copyHistory(i){
+  if(history[i]) navigator.clipboard.writeText(history[i].text).then(()=>showToast('コピーしました'));
+}
+
+function clearHistory(){
+  history=[]; localStorage.removeItem('vt_history');
+  renderHistory();
+}
+
+function clearCurrent(){
+  document.getElementById('currentText').innerHTML='<span class="placeholder">録音ボタンで開始</span>';
+  document.getElementById('charCount').textContent='';
+  finalTranscript=''; interimTranscript=''; sentences=[];
+}
+
+// ─── Volume ───
+function updateVolumeMeter(){
+  if(!analyser||!isRecording)return;
+  const d=new Uint8Array(analyser.frequencyBinCount); analyser.getByteFrequencyData(d);
+  const bars=document.querySelectorAll('.volume-bar'), step=Math.floor(d.length/bars.length);
+  bars.forEach((b,i)=>{b.style.height=Math.max(4,(d[i*step]||0)/255*28)+'px';});
+  requestAnimationFrame(updateVolumeMeter);
+}
+
+// ─── UI ───
+function setStatus(t,txt){ document.getElementById('statusDot').className='status-dot '+t; document.getElementById('statusText').textContent=txt; }
+function changeMode(){ outputMode=document.getElementById('outputMode').value; localStorage.setItem('vt_mode',outputMode); document.getElementById('modePill').textContent=MODE_LABELS[outputMode]; if(finalTranscript) document.getElementById('currentText').textContent=processText(finalTranscript); }
+function changeHotkey(){ selectedHotkey=document.getElementById('hotkeySelect').value; localStorage.setItem('vt_hotkey',selectedHotkey); document.getElementById('hotkeyDisplay').textContent=HOTKEY_LABELS[selectedHotkey]; }
+function toggleSettings(){ const o=document.getElementById('settingsOverlay'); o.classList.toggle('open'); if(!o.classList.contains('open')) localStorage.setItem('vt_customDict',document.getElementById('customDict')?.value||''); }
+function toggleSetting(btn,key){ settings[key]=!settings[key]; btn.classList.toggle('on',settings[key]); }
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000); }
+function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+
+// ─── Keys ───
+document.addEventListener('keydown',(e)=>{
+  if(document.getElementById('settingsOverlay').classList.contains('open')){if(e.key==='Escape')toggleSettings();return;}
+  if(e.key===selectedHotkey||e.code===selectedHotkey){e.preventDefault();toggleRecording();return;}
+  if(e.key==='F2'&&selectedHotkey!=='F2'){e.preventDefault();toggleRecording();return;}
+});
+document.addEventListener('touchstart',(e)=>{if(e.target.closest('.rec-btn')){e.preventDefault();toggleRecording();}},{passive:false});
+
+// ─── Init ───
+(function(){
+  const m=document.getElementById('volumeMeter');
+  for(let i=0;i<10;i++){const b=document.createElement('div');b.className='volume-bar';m.appendChild(b);}
+  const d=localStorage.getItem('vt_customDict'); if(d) document.getElementById('customDict').value=d;
+  document.getElementById('hotkeySelect').value=selectedHotkey;
+  document.getElementById('hotkeyDisplay').textContent=HOTKEY_LABELS[selectedHotkey];
+  document.getElementById('outputMode').value=outputMode;
+  document.getElementById('modePill').textContent=MODE_LABELS[outputMode];
+  if(voiceProfile){ currentLang=voiceProfile.lang; document.querySelectorAll('.lang-toggle button').forEach(b=>b.classList.toggle('active',b.dataset.lang===currentLang)); }
+  renderHistory();
+  checkSetup();
+  if(voiceProfile) initRecognition();
+})();
+</script>
+</body>
+</html>
