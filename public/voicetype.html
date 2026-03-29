@@ -696,27 +696,16 @@ function stopRecording(){
   if(!isRecording) return;
   isRecording=false;
   document.getElementById('recBtn').classList.remove('recording');
-  document.getElementById('currentLabel').textContent='処理中...';
   setStatus('ready',t('processing'));
 
-  // コピー処理
+  // 即座にコピー（ユーザータップ内）
   const currentText=processText(finalTranscript);
-  if(currentText.trim()){
-    if(isIOS){
-      // iOS: コピーバナーを表示（タップでコピー実行）
-      // 直接コピーも試みる
-      copyToClipboard(currentText);
-    }else{
-      copyToClipboard(currentText);
-    }
-  }
+  if(currentText.trim()) copyToClipboard(currentText);
 
   recognition.onend=function(){
     if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
     if(audioContext){audioContext.close();audioContext=null;}
-    document.getElementById('currentLabel').textContent='Now';
     document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
-    setStatus('ready',t('stop'));
     if(navigator.vibrate) navigator.vibrate([30,30,30]);
     setTimeout(()=> autoSaveToHistory(), 300);
     recognition.onend=handleEnd;
@@ -913,26 +902,23 @@ function autoSaveToHistory(){
   const vc=checkVoiceCondition();
   if(vc&&vc.status!=='normal') showToast(vc.icon+' '+vc.msg);
   // 自動コピー（iOS以外）
-  if(!isIOS) copyToClipboard(text);
+  // 最終テキストで再コピー（onend後の確定版）
+  copyToClipboard(text);
   // 履歴に保存（声の状態も記録）
   const entry={ text, time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}), lang: currentLang, voice: vc?vc.status:'unknown' };
   history.unshift(entry);
   if(history.length>50) history=history.slice(0,50);
   localStorage.setItem('vt_history',JSON.stringify(history));
   renderHistory();
-  syncToCloud(); // クラウド同期
-  if(isIOS){
-    // iOS: コピーバナーを表示
-    document.getElementById('iosCopyBanner').classList.add('show');
-    setStatus('ready',t('iosCopy'));
-  }else{
-    // PC: 自動クリア
-    setTimeout(()=>{
-      el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
-      document.getElementById('charCount').textContent='';
-      finalTranscript=''; interimTranscript=''; sentences=[];
-    }, 1500);
-  }
+  syncToCloud();
+  // 即座にクリア（iOSはコピーバナーも表示）
+  if(isIOS) document.getElementById('iosCopyBanner').classList.add('show');
+  setStatus('ready',t('stop'));
+  setTimeout(()=>{
+    el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
+    document.getElementById('charCount').textContent='';
+    finalTranscript=''; interimTranscript=''; sentences=[];
+  }, isIOS?500:1000);
 }
 
 function sendToHistory(){
