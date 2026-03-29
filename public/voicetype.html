@@ -692,40 +692,54 @@ async function startRecording(){
   if(navigator.vibrate) navigator.vibrate(50);
 }
 
+let stopDone=false;
 function stopRecording(){
   if(!isRecording) return;
   isRecording=false;
+  stopDone=false;
   document.getElementById('recBtn').classList.remove('recording');
 
-  // interimテキストが残っていたらfinalに含める（薄い文字→確定）
+  // interimテキストが残っていたらfinalに含める
   if(interimTranscript.trim()){
     finalTranscript+=interimTranscript;
     if(settings.smartCorrection) sentences.push(basicClean(interimTranscript));
     interimTranscript='';
   }
-  // まずクリップボードをクリア（前のコピーが残る問題を防止）
-  copyToClipboard(' ');
-  // 即座にコピー（ユーザータップ内 — ジェスチャーコンテキスト有効）
+
+  // 即座にコピー（ユーザータップ内）
   const textNow=processText(finalTranscript);
   if(textNow.trim()) copyToClipboard(textNow);
 
-  // recognition.stop()後にonendで最終テキストを取得して再コピー
-  const onEndHandler=function(){
+  // 完了処理（コピー＆保存＆クリア）
+  function finalize(){
+    if(stopDone) return;
+    stopDone=true;
     if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
     if(audioContext){try{audioContext.close();}catch(e){} audioContext=null;}
     document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
     if(navigator.vibrate) navigator.vibrate([30,30,30]);
-    // 最終確定テキストでコピー＆保存
+    // 最終テキストでコピー＆保存
+    if(interimTranscript.trim()) finalTranscript+=interimTranscript;
     const finalText=processText(finalTranscript);
     if(finalText.trim()){
       copyToClipboard(finalText);
       saveToHistory(finalText);
+    } else {
+      // テキストがなくても画面クリア
+      const el=document.getElementById('currentText');
+      el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
+      document.getElementById('charCount').textContent='';
+      finalTranscript=''; interimTranscript=''; sentences=[];
     }
     setStatus('ready',t('stop'));
     recognition.onend=handleEnd;
-  };
-  recognition.onend=onEndHandler;
-  recognition.stop();
+  }
+
+  recognition.onend=finalize;
+  try{recognition.stop();}catch(e){}
+
+  // フォールバック: onendが2秒以内に発火しなかった場合に強制実行
+  setTimeout(finalize, 2000);
 }
 
 // クリップボードコピー（iOS対応フォールバック付き）
