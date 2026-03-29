@@ -519,11 +519,12 @@ function toggleRecording(){ isRecording ? stopRecording() : startRecording(); }
 
 async function startRecording(){
   if(isRecording) return;
-  if(!recognition) initRecognition();
-  if(!recognition) return; // initRecognition failed
+  // 常に新しい認識インスタンスを作成（iOS対応: 古いインスタンスは壊れている可能性）
+  if(isIOS || !recognition) initRecognition();
+  if(!recognition) return;
   const el=document.getElementById('currentText');
   if(el.querySelector('.placeholder')) el.innerHTML='';
-  finalTranscript=''; interimTranscript=''; sentences=[];
+  finalTranscript=''; interimTranscript=''; sentences=[]; errorRetryCount=0;
   recognition.lang=currentLang;
 
   // iOS Safari: getUserMediaを先に呼んでマイク許可を得る
@@ -672,20 +673,45 @@ function handleResult(event){
   el.scrollTop=el.scrollHeight;
   document.getElementById('charCount').textContent=(finalTranscript.length+interimTranscript.length)+'文字';
 }
+let errorRetryCount=0;
 function handleError(e){
   console.log('SpeechRecognition error:', e.error, e.message);
   if(e.error==='no-speech'){
     setStatus('recording','音声待ち...');
   }else if(e.error==='not-allowed'||e.error==='service-not-allowed'){
     setStatus('error','マイク/音声認識の許可が必要です');
-    document.getElementById('currentText').textContent='エラー: '+e.error+' — 設定 > Safari > マイクを確認してください';
+    document.getElementById('currentText').textContent='設定 > Safari > マイク・音声認識を許可してください';
     isRecording=false;
     document.getElementById('recBtn').classList.remove('recording');
   }else if(e.error==='network'){
-    setStatus('error','ネットワーク接続を確認してください');
+    setStatus('error','ネットワーク接続を確認');
+    // ネットワークエラーは自動リトライ
+    if(isRecording && errorRetryCount<3){
+      errorRetryCount++;
+      setTimeout(()=>{
+        recognition=null; initRecognition();
+        if(recognition) try{recognition.start();}catch(ex){}
+      },1000);
+    }
+  }else if(e.error==='aborted'){
+    // iOS: バックグラウンド移行等で中断 → 自動リカバリー
+    if(isRecording && errorRetryCount<3){
+      errorRetryCount++;
+      setTimeout(()=>{
+        recognition=null; initRecognition();
+        if(recognition) try{recognition.start();}catch(ex){}
+      },500);
+    }
   }else{
     setStatus('error','エラー: '+e.error);
-    document.getElementById('currentText').textContent='認識エラー: '+e.error;
+    // 自動リカバリー試行
+    if(isRecording && errorRetryCount<3){
+      errorRetryCount++;
+      setTimeout(()=>{
+        recognition=null; initRecognition();
+        if(recognition) try{recognition.start();}catch(ex){}
+      },1000);
+    }
   }
 }
 function handleEnd(){
@@ -885,6 +911,35 @@ document.addEventListener('touchstart',(e)=>{if(e.target.closest('.rec-btn')){e.
   applyUILang();
   checkSetup();
   if(voiceProfile) initRecognition();
+
+  // iOS: 画面復帰時に再初期化（バックグラウンドから戻ると認識が壊れる）
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='visible'){
+      // 録音中だった場合は停止
+      if(isRecording){
+        isRecording=false;
+        document.getElementById('recBtn').classList.remove('recording');
+        try{recognition.stop();}catch(e){}
+      }
+      // リソースをクリーンアップ
+      if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+      if(audioContext){try{audioContext.close();}catch(e){} audioContext=null;}
+      analyser=null;
+      // 認識エンジンを完全に再作成
+      recognition=null;
+      initRecognition();
+      setStatus('ready',t('ready'));
+      document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
+    }
+  });
+
+  // iOS: pageshow（bfcacheから復帰時）
+  window.addEventListener('pageshow', (e)=>{
+    if(e.persisted){
+      recognition=null;
+      initRecognition();
+    }
+  });
 })();
 </script>
 </body>
