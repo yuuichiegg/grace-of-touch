@@ -232,6 +232,7 @@
       <div id="vt-rec-inner" style="width:16px;height:16px;background:var(--term-color);border-radius:50%;transition:all 0.3s;"></div>
     </button>
     <button onclick="vtBackspace()" style="background:none;border:1px solid var(--term-dim);color:var(--term-dim);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:14px;">&#9003;</button>
+    <button onclick="vtCopy()" style="background:rgba(0,216,255,0.08);border:1px solid var(--term-dim);color:var(--term-color);padding:6px 12px;border-radius:4px;cursor:pointer;font-family:'Courier New',monospace;font-size:11px;">COPY</button>
     <button onclick="vtSendToChat()" style="background:rgba(0,216,255,0.15);border:1px solid var(--term-color);color:var(--term-color);padding:6px 14px;border-radius:4px;cursor:pointer;font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.05em;">SEND</button>
   </div>
 </div>
@@ -4750,6 +4751,23 @@ function vtSendToChat(){
   toggleVoicePopup();
   // 自動送信
   if(typeof MultiUser!=='undefined') MultiUser.sendChat();
+}
+
+function vtCopy(){
+  if(!vtTranscript.trim()) return;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(vtTranscript).catch(()=>{});
+  }else{
+    const ta=document.createElement('textarea');ta.value=vtTranscript;
+    ta.style.cssText='position:fixed;left:0;top:0;opacity:0;';
+    document.body.appendChild(ta);ta.select();
+    try{document.execCommand('copy');}catch(e){}
+    document.body.removeChild(ta);
+  }
+  document.getElementById('vt-text').innerHTML='<span style="color:var(--term-color);">&#10003; Copied</span>';
+  setTimeout(()=>{
+    document.getElementById('vt-text').innerHTML=vtTranscript?vtEsc(vtTranscript):'<span style="color:var(--term-dim);font-style:italic;">&#127908; マイクボタンで音声入力</span>';
+  },1000);
 }
 
 function vtEsc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }

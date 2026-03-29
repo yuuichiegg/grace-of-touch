@@ -265,6 +265,7 @@
     <div class="setup-step" id="setup-step-3">
       <h2>検出結果</h2>
       <div class="detected-lang" id="detectedLang">日本語</div>
+      <div id="voicePrintInfo" style="text-align:left;background:rgba(108,92,231,0.08);border-radius:8px;padding:10px 14px;margin:12px 0;font-size:12px;line-height:1.8;color:var(--text-dim);"></div>
       <div class="lang-options">
         <button class="lang-chip selected" data-lang="ja-JP" onclick="selectLang(this)">日本語</button>
         <button class="lang-chip" data-lang="en-US" onclick="selectLang(this)">English</button>
@@ -548,7 +549,21 @@ function startSetupRec() {
   navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
     const ac=new AudioContext(),an=ac.createAnalyser(); an.fftSize=2048;
     ac.createMediaStreamSource(stream).connect(an);
-    const pd=[]; const pi=setInterval(()=>{ const d=new Float32Array(an.fftSize); an.getFloatTimeDomainData(d); let c=0; for(let i=1;i<d.length;i++) if((d[i]>=0&&d[i-1]<0)||(d[i]<0&&d[i-1]>=0)) c++; const f=(c/2)*(ac.sampleRate/an.fftSize); if(f>50&&f<500) pd.push(f); },100);
+    const pd=[],volData=[],spectralData=[];
+    const pi=setInterval(()=>{
+      // ピッチ（ゼロクロッシング法）
+      const td=new Float32Array(an.fftSize); an.getFloatTimeDomainData(td);
+      let c=0; for(let i=1;i<td.length;i++) if((td[i]>=0&&td[i-1]<0)||(td[i]<0&&td[i-1]>=0)) c++;
+      const f=(c/2)*(ac.sampleRate/an.fftSize); if(f>50&&f<500) pd.push(f);
+      // 音量（RMS）
+      let sum=0; for(let i=0;i<td.length;i++) sum+=td[i]*td[i];
+      const rms=Math.sqrt(sum/td.length); volData.push(rms);
+      // スペクトル重心（声の明るさ指標）
+      const fd=new Uint8Array(an.frequencyBinCount); an.getByteFrequencyData(fd);
+      let wSum=0,tSum=0;
+      for(let i=0;i<fd.length;i++){wSum+=i*fd[i];tSum+=fd[i];}
+      if(tSum>0) spectralData.push(wSum/tSum*(ac.sampleRate/an.fftSize));
+    },100);
     sr.start(); let rem=10;
     const ti=setInterval(()=>{
       rem--; document.getElementById('setupTimer').textContent=rem;
@@ -559,8 +574,22 @@ function startSetupRec() {
         document.getElementById('voiceCircle').classList.add('done');
         document.getElementById('voiceCircle').innerHTML='&#10003;';
         const text=samples.join(' '), lang=detectLang(text);
-        const avg=pd.length?pd.reduce((a,b)=>a+b,0)/pd.length:0;
-        voiceProfile={lang,avgPitch:Math.round(avg),setupDone:true};
+        // 声紋プロファイル計算
+        const avgPitch=pd.length?pd.reduce((a,b)=>a+b,0)/pd.length:0;
+        const pitchStd=pd.length>1?Math.sqrt(pd.reduce((s,v)=>s+(v-avgPitch)**2,0)/(pd.length-1)):0;
+        const avgVol=volData.length?volData.reduce((a,b)=>a+b,0)/volData.length:0;
+        const avgSpectral=spectralData.length?spectralData.reduce((a,b)=>a+b,0)/spectralData.length:0;
+        const speakingRate=text.length/10; // 文字/秒
+        voiceProfile={
+          lang,
+          avgPitch:Math.round(avgPitch),        // 基本周波数（Hz）
+          pitchRange:Math.round(pitchStd),       // ピッチ変動幅
+          avgVolume:Math.round(avgVol*1000)/1000, // 平均音量
+          spectralCentroid:Math.round(avgSpectral), // 声の明るさ
+          speakingRate:Math.round(speakingRate*10)/10, // 話速
+          setupDone:true,
+          setupDate:new Date().toISOString()
+        };
         localStorage.setItem('vt_voiceProfile',JSON.stringify(voiceProfile));
         currentLang=lang;
         const names={'ja-JP':'日本語','en-US':'English','zh-CN':'中文','ko-KR':'한국어'};
@@ -568,6 +597,18 @@ function startSetupRec() {
         document.querySelectorAll('.lang-chip').forEach(c=>c.classList.toggle('selected',c.dataset.lang===lang));
         // Update header select
         document.getElementById('langSelect').value=lang;
+        // 声紋プロファイル表示
+        const vpInfo=document.getElementById('voicePrintInfo');
+        const pitchLabel=avgPitch<150?'低め':avgPitch<250?'標準':'高め';
+        const brightLabel=avgSpectral<500?'落ち着いた':avgSpectral<1000?'標準':'明るい';
+        vpInfo.innerHTML=`
+          <div style="font-weight:600;color:var(--accent);margin-bottom:4px;">Voice Print</div>
+          <div>🎵 ピッチ: <strong>${Math.round(avgPitch)} Hz</strong> (${pitchLabel})</div>
+          <div>📊 変動幅: <strong>±${Math.round(pitchStd)} Hz</strong></div>
+          <div>🔊 音量: <strong>${(avgVol*100).toFixed(1)}%</strong></div>
+          <div>✨ 声質: <strong>${brightLabel}トーン</strong> (${Math.round(avgSpectral)} Hz)</div>
+          <div>⚡ 話速: <strong>${speakingRate.toFixed(1)} 文字/秒</strong></div>
+        `;
         setTimeout(()=>setupNext(3),800);
       }
     },1000);
@@ -614,8 +655,10 @@ async function startRecording(){
     mediaStream=await navigator.mediaDevices.getUserMedia({audio:true});
     // AudioContextはユーザージェスチャー内で作成（iOS要件）
     audioContext=new (window.AudioContext||window.webkitAudioContext)();
-    analyser=audioContext.createAnalyser(); analyser.fftSize=256;
+    analyser=audioContext.createAnalyser(); analyser.fftSize=2048;
     audioContext.createMediaStreamSource(mediaStream).connect(analyser);
+    sessionPitchData=[];
+    collectVoicePrint();
     updateVolumeMeter();
   }catch(e){
     setStatus('error','マイクへのアクセスを許可してください');
@@ -866,10 +909,13 @@ function autoSaveToHistory(){
   const el=document.getElementById('currentText');
   const text=el.textContent||'';
   if(!text.trim()||document.getElementById('currentText').querySelector('.placeholder'))return;
-  // 自動コピー（iOS以外。iOSはstopRecording内でタップ時にコピー済み）
+  // 声の状態チェック
+  const vc=checkVoiceCondition();
+  if(vc&&vc.status!=='normal') showToast(vc.icon+' '+vc.msg);
+  // 自動コピー（iOS以外）
   if(!isIOS) copyToClipboard(text);
-  // 履歴に保存
-  const entry={ text, time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}), lang: currentLang };
+  // 履歴に保存（声の状態も記録）
+  const entry={ text, time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}), lang: currentLang, voice: vc?vc.status:'unknown' };
   history.unshift(entry);
   if(history.length>50) history=history.slice(0,50);
   localStorage.setItem('vt_history',JSON.stringify(history));
@@ -962,6 +1008,30 @@ function clearCurrent(){
   document.getElementById('currentText').innerHTML='<span class="placeholder">録音ボタンで開始</span>';
   document.getElementById('charCount').textContent='';
   finalTranscript=''; interimTranscript=''; sentences=[];
+}
+
+// ─── Voice Print Live ───
+let sessionPitchData=[];
+function collectVoicePrint(){
+  if(!analyser||!isRecording) return;
+  const d=new Float32Array(analyser.fftSize); analyser.getFloatTimeDomainData(d);
+  let c=0; for(let i=1;i<d.length;i++) if((d[i]>=0&&d[i-1]<0)||(d[i]<0&&d[i-1]>=0)) c++;
+  const f=(c/2)*(audioContext.sampleRate/analyser.fftSize);
+  if(f>50&&f<500) sessionPitchData.push(f);
+  setTimeout(collectVoicePrint,200);
+}
+
+function checkVoiceCondition(){
+  if(!voiceProfile||!voiceProfile.avgPitch||sessionPitchData.length<5) return null;
+  const avg=sessionPitchData.reduce((a,b)=>a+b,0)/sessionPitchData.length;
+  const diff=avg-voiceProfile.avgPitch;
+  const pctChange=Math.abs(diff)/voiceProfile.avgPitch*100;
+  // 声の状態判定
+  if(pctChange<5) return {status:'normal',msg:'声の調子は通常です',icon:'🟢'};
+  if(diff>0&&pctChange>15) return {status:'tense',msg:'少し緊張気味かもしれません',icon:'🟡'};
+  if(diff<0&&pctChange>15) return {status:'tired',msg:'お疲れかもしれません。少し休憩しましょう',icon:'🟠'};
+  if(pctChange>10) return {status:'changed',msg:'声のトーンがいつもと少し違います',icon:'🔵'};
+  return {status:'normal',msg:'声の調子は良好です',icon:'🟢'};
 }
 
 // ─── Volume ───
