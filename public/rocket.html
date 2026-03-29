@@ -4733,6 +4733,10 @@ function vtStopRec(){
   try{vtRecognition.stop();}catch(e){}
   document.getElementById('vt-rec').style.borderColor='var(--term-color)';
   document.getElementById('vt-rec-inner').style.cssText='width:16px;height:16px;background:var(--term-color);border-radius:50%;';
+  // 自動コピー＆クリア
+  if(vtTranscript.trim()){
+    vtCopy();
+  }
 }
 
 function vtBackspace(){
@@ -4747,27 +4751,30 @@ function vtSendToChat(){
   const input=document.getElementById('chat-input');
   input.value=vtTranscript.trim();
   vtTranscript=''; vtSentences=[];
-  document.getElementById('vt-text').innerHTML='<span style="color:var(--term-dim);font-style:italic;">&#127908; 送信済み</span>';
+  document.getElementById('vt-text').innerHTML='<span style="color:var(--term-dim);font-style:italic;">&#127908; チャットに入力済み</span>';
   toggleVoicePopup();
-  // 自動送信
-  if(typeof MultiUser!=='undefined') MultiUser.sendChat();
+  // チャット入力欄にフォーカス（ユーザーがEnterで送信）
+  input.focus();
 }
 
 function vtCopy(){
   if(!vtTranscript.trim()) return;
+  const text=vtTranscript;
   if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(vtTranscript).catch(()=>{});
+    navigator.clipboard.writeText(text).catch(()=>{});
   }else{
-    const ta=document.createElement('textarea');ta.value=vtTranscript;
+    const ta=document.createElement('textarea');ta.value=text;
     ta.style.cssText='position:fixed;left:0;top:0;opacity:0;';
     document.body.appendChild(ta);ta.select();
     try{document.execCommand('copy');}catch(e){}
     document.body.removeChild(ta);
   }
+  // コピー後クリア
+  vtTranscript=''; vtSentences=[];
   document.getElementById('vt-text').innerHTML='<span style="color:var(--term-color);">&#10003; Copied</span>';
   setTimeout(()=>{
-    document.getElementById('vt-text').innerHTML=vtTranscript?vtEsc(vtTranscript):'<span style="color:var(--term-dim);font-style:italic;">&#127908; マイクボタンで音声入力</span>';
-  },1000);
+    document.getElementById('vt-text').innerHTML='<span style="color:var(--term-dim);font-style:italic;">&#127908; マイクボタンで音声入力</span>';
+  },1200);
 }
 
 function vtEsc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
