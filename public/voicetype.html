@@ -58,14 +58,10 @@
   .logo { font-size: 16px; font-weight: 700; letter-spacing: 1px; }
   .logo span { color: var(--accent); }
   .header-right { display: flex; gap: 8px; align-items: center; }
-  .lang-toggle {
-    display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; font-size: 11px;
+  .lang-select {
+    background: var(--bg); color: var(--text); border: 1px solid var(--border);
+    padding: 4px 6px; border-radius: 6px; font-size: 11px; cursor: pointer; font-family: inherit;
   }
-  .lang-toggle button {
-    background: transparent; border: none; color: var(--text-dim); padding: 5px 10px;
-    cursor: pointer; transition: all 0.2s; font-family: inherit;
-  }
-  .lang-toggle button.active { background: var(--accent); color: #fff; }
   .mode-pill {
     font-size: 10px; color: var(--accent); border: 1px solid rgba(108,92,231,0.4);
     padding: 3px 10px; border-radius: 12px;
@@ -263,10 +259,28 @@
 <header>
   <div class="logo">Voice<span>Type</span></div>
   <div class="header-right">
-    <div class="lang-toggle" id="langToggle">
-      <button class="active" data-lang="ja-JP" onclick="switchLang(this)">JP</button>
-      <button data-lang="en-US" onclick="switchLang(this)">EN</button>
-    </div>
+    <select class="lang-select" id="langSelect" onchange="switchLang(this.value)">
+      <option value="ja-JP">JP 日本語</option>
+      <option value="en-US">EN English</option>
+      <option value="zh-CN">CN 中文</option>
+      <option value="zh-TW">TW 繁體中文</option>
+      <option value="ko-KR">KR 한국어</option>
+      <option value="fr-FR">FR Français</option>
+      <option value="de-DE">DE Deutsch</option>
+      <option value="es-ES">ES Español</option>
+      <option value="pt-BR">PT Português</option>
+      <option value="it-IT">IT Italiano</option>
+      <option value="ru-RU">RU Русский</option>
+      <option value="ar-SA">AR العربية</option>
+      <option value="hi-IN">HI हिन्दी</option>
+      <option value="th-TH">TH ไทย</option>
+      <option value="vi-VN">VI Tiếng Việt</option>
+      <option value="id-ID">ID Bahasa</option>
+      <option value="ms-MY">MS Malay</option>
+      <option value="nl-NL">NL Nederlands</option>
+      <option value="pl-PL">PL Polski</option>
+      <option value="tr-TR">TR Türkçe</option>
+    </select>
     <div class="mode-pill" id="modePill">テキスト整形</div>
     <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="テーマ切替">&#9788;</button>
     <button class="icon-btn" onclick="toggleSettings()">&#9881;</button>
@@ -377,10 +391,8 @@ const HOTKEY_LABELS = {'Convert':'変換','NonConvert':'無変換','F2':'F2','F4
 const MODE_LABELS = {'clean':'テキスト整形','bullets':'箇条書き','prompt':'プロンプト整形','raw':'そのまま'};
 
 // ─── Language Toggle ───
-function switchLang(btn) {
-  document.querySelectorAll('.lang-toggle button').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  currentLang = btn.dataset.lang;
+function switchLang(lang) {
+  currentLang = lang;
   if (isRecording) { stopRecording(); setTimeout(startRecording, 300); }
 }
 
@@ -422,8 +434,8 @@ function startSetupRec() {
         const names={'ja-JP':'日本語','en-US':'English','zh-CN':'中文','ko-KR':'한국어'};
         document.getElementById('detectedLang').textContent=names[lang]||lang;
         document.querySelectorAll('.lang-chip').forEach(c=>c.classList.toggle('selected',c.dataset.lang===lang));
-        // Update header toggle
-        document.querySelectorAll('.lang-toggle button').forEach(b=>b.classList.toggle('active',b.dataset.lang===lang));
+        // Update header select
+        document.getElementById('langSelect').value=lang;
         setTimeout(()=>setupNext(3),800);
       }
     },1000);
@@ -732,7 +744,7 @@ function sendToHistory(){
 function renderHistory(){
   const container=document.getElementById('historyContent');
   if(history.length===0){ container.innerHTML='<div class="history-empty">テキストを選択してコピー、または Save で履歴に保存</div>'; return; }
-  container.innerHTML=history.map((h,i)=>`<div class="history-item"><div class="history-time">${h.time} — ${h.lang==='ja-JP'?'JP':'EN'} <button onclick="copyHistory(${i})" style="background:var(--accent);color:#fff;border:none;padding:2px 8px;border-radius:3px;font-size:10px;cursor:pointer;margin-left:6px;">Copy</button></div>${escapeHtml(h.text)}</div>`).join('');
+  container.innerHTML=history.map((h,i)=>`<div class="history-item"><div class="history-time">${h.time} — ${(h.lang||'').split('-')[0].toUpperCase()} <button onclick="copyHistory(${i})" style="background:var(--accent);color:#fff;border:none;padding:2px 8px;border-radius:3px;font-size:10px;cursor:pointer;margin-left:6px;">Copy</button></div>${escapeHtml(h.text)}</div>`).join('');
 }
 
 function copyHistory(i){
@@ -793,7 +805,7 @@ document.addEventListener('touchstart',(e)=>{if(e.target.closest('.rec-btn')){e.
   document.getElementById('hotkeyDisplay').textContent=HOTKEY_LABELS[selectedHotkey];
   document.getElementById('outputMode').value=outputMode;
   document.getElementById('modePill').textContent=MODE_LABELS[outputMode];
-  if(voiceProfile){ currentLang=voiceProfile.lang; document.querySelectorAll('.lang-toggle button').forEach(b=>b.classList.toggle('active',b.dataset.lang===currentLang)); }
+  if(voiceProfile){ currentLang=voiceProfile.lang; document.getElementById('langSelect').value=currentLang; }
   // テーマ復元
   const savedTheme=localStorage.getItem('vt_theme');
   if(savedTheme==='light'){ document.documentElement.classList.add('light'); document.getElementById('themeBtn').innerHTML='&#9790;'; }
