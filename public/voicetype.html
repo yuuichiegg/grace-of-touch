@@ -165,6 +165,18 @@
   .volume-meter { display: flex; align-items: center; gap: 3px; height: 20px; }
   .volume-bar { width: 3px; height: 4px; background: var(--accent); border-radius: 2px; transition: height 0.05s; }
 
+  /* iOS Copy Banner */
+  .ios-copy-banner {
+    display: none; position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    z-index: 300; background: var(--accent); color: #fff; border: none;
+    padding: 14px 40px; border-radius: 30px; font-size: 16px; font-weight: 700;
+    cursor: pointer; box-shadow: 0 4px 20px var(--accent-glow);
+    animation: bannerPulse 1.5s ease-in-out infinite;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .ios-copy-banner.show { display: block; }
+  @keyframes bannerPulse { 0%,100%{transform:translateX(-50%) scale(1)} 50%{transform:translateX(-50%) scale(1.05)} }
+
   /* Setup */
   .setup-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px; }
   .setup-overlay.hidden { display: none; }
@@ -373,6 +385,7 @@
   </div>
 </div>
 
+<button class="ios-copy-banner" id="iosCopyBanner" onclick="iosCopyTap()">COPY</button>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -560,13 +573,16 @@ function stopRecording(){
   document.getElementById('currentLabel').textContent='処理中...';
   setStatus('ready',t('processing'));
 
-  // ユーザータップ内で即座にコピー
+  // コピー処理
   const currentText=processText(finalTranscript);
   if(currentText.trim()){
-    // まずclipboard APIを試行（タップ直後なので成功する可能性あり）
-    copyToClipboard(currentText);
-    // iOS: さらにテキストを自動選択してコピーメニューを表示
-    if(isIOS) setTimeout(()=>selectAllText(), 200);
+    if(isIOS){
+      // iOS: コピーバナーを表示（タップでコピー実行）
+      // 直接コピーも試みる
+      copyToClipboard(currentText);
+    }else{
+      copyToClipboard(currentText);
+    }
   }
 
   recognition.onend=function(){
@@ -750,10 +766,12 @@ function autoSaveToHistory(){
   if(history.length>50) history=history.slice(0,50);
   localStorage.setItem('vt_history',JSON.stringify(history));
   renderHistory();
-  // 現在のテキストエリアをクリア（iOSは手動コピー用にテキストを残す）
   if(isIOS){
+    // iOS: コピーバナーを表示
+    document.getElementById('iosCopyBanner').classList.add('show');
     setStatus('ready',t('iosCopy'));
   }else{
+    // PC: 自動クリア
     setTimeout(()=>{
       el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
       document.getElementById('charCount').textContent='';
@@ -782,6 +800,23 @@ function renderHistory(){
   const container=document.getElementById('historyContent');
   if(history.length===0){ container.innerHTML='<div class="history-empty">テキストを選択してコピー、または Save で履歴に保存</div>'; return; }
   container.innerHTML=history.map((h,i)=>`<div class="history-item"><div class="history-time">${h.time} — ${(h.lang||'').split('-')[0].toUpperCase()} <button onclick="copyHistory(${i})" style="background:var(--accent);color:#fff;border:none;padding:2px 8px;border-radius:3px;font-size:10px;cursor:pointer;margin-left:6px;">Copy</button></div>${escapeHtml(h.text)}</div>`).join('');
+}
+
+function iosCopyTap(){
+  const el=document.getElementById('currentText');
+  const text=el.textContent||'';
+  if(!text.trim()) return;
+  // ユーザータップ内なのでclipboard APIが動作する
+  copyToClipboard(text);
+  showToast(t('copied'));
+  document.getElementById('iosCopyBanner').classList.remove('show');
+  // クリア
+  setTimeout(()=>{
+    el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
+    document.getElementById('charCount').textContent='';
+    finalTranscript=''; interimTranscript=''; sentences=[];
+    setStatus('ready',t('ready'));
+  }, 500);
 }
 
 function copyHistory(i){
