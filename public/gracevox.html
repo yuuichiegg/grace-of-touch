@@ -701,7 +701,9 @@ function stopRecording(){
   document.getElementById('recBtn').classList.remove('recording');
   setStatus('ready','処理中...');
 
-  // 完了処理（全テキスト確定後にコピー＆保存＆クリア）
+  // 停止の瞬間に画面テキストを保存（interim含む全テキスト）
+  const snapshotText=document.getElementById('currentText').textContent||'';
+
   function finalize(){
     if(stopDone) return;
     stopDone=true;
@@ -709,22 +711,24 @@ function stopRecording(){
     if(audioContext){try{audioContext.close();}catch(e){} audioContext=null;}
     document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
     if(navigator.vibrate) navigator.vibrate([30,30,30]);
+
     // interimが残っていたらfinalに含める
     if(interimTranscript.trim()){
       finalTranscript+=interimTranscript;
       interimTranscript='';
     }
-    // finalTranscriptが空でもDOMにテキストがあればそれを使う
-    let finalText=processText(finalTranscript);
-    if(!finalText.trim()){
-      const domText=document.getElementById('currentText').textContent||'';
-      if(domText.trim()&&!document.getElementById('currentText').querySelector('.placeholder')){
-        finalText=domText.trim();
-      }
-    }
-    if(finalText.trim()){
-      copyToClipboard(finalText);
-      saveToHistory(finalText);
+
+    // 3つのソースから最も長いテキストを採用
+    const processed=processText(finalTranscript);
+    const domNow=document.getElementById('currentText').textContent||'';
+    const candidates=[processed, snapshotText, domNow].filter(s=>s.trim()&&s.length>1);
+    // 最も長いものを採用（最も完全なテキスト）
+    let bestText='';
+    candidates.forEach(c=>{ if(c.length>bestText.length) bestText=c; });
+
+    if(bestText.trim()){
+      copyToClipboard(bestText.trim());
+      saveToHistory(bestText.trim());
       showToast('コピー完了');
     } else {
       const el=document.getElementById('currentText');
@@ -739,8 +743,8 @@ function stopRecording(){
   recognition.onend=finalize;
   try{recognition.stop();}catch(e){}
 
-  // フォールバック: onendが3秒以内に発火しなかった場合に強制実行
-  setTimeout(finalize, 3000);
+  // フォールバック: onendが2秒以内に発火しなかった場合に強制実行
+  setTimeout(finalize, 2000);
 }
 
 // クリップボードコピー — 常に2つの方法を両方実行
