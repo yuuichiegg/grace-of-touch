@@ -9,12 +9,24 @@
 <!-- © 2024-2026 Grace of Touch Co. All rights reserved. Unauthorized copying prohibited. -->
 <script>
 (function(){
+  // Source protection
   document.addEventListener('contextmenu',function(e){e.preventDefault();});
   document.addEventListener('keydown',function(e){
-    if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&(e.key==='I'||e.key==='J'))||(e.ctrlKey&&e.key==='u')){e.preventDefault();}
+    if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&(e.key==='I'||e.key==='J'||e.key==='C'))||(e.ctrlKey&&e.key==='u')||(e.ctrlKey&&e.key==='s')){e.preventDefault();}
   });
+  // Anti-debug
+  (function a(){try{(function(){}).constructor('debugger')();setTimeout(a,100);}catch(e){}})();
+  // Console warning
   console.log('%c⚠ WARNING','color:red;font-size:24px;font-weight:bold;');
-  console.log('%c© 2024-2026 Grace of Touch Co. Unauthorized access prohibited.','color:red;font-size:14px;');
+  console.log('%c© 2024-2026 Grace of Touch Co. All rights reserved.','color:red;font-size:14px;');
+  console.log('%cUnauthorized copying, reverse engineering, or redistribution is strictly prohibited.','color:red;font-size:12px;');
+  console.log('%cThis application contains patented technology (Interim Copy).','color:orange;font-size:12px;');
+  // Prevent iframe embedding
+  if(window.top!==window.self&&!document.referrer.includes('grace-of-touch')){document.body.innerHTML='';}
+  // Prevent selection of source
+  document.addEventListener('selectstart',function(e){
+    if(!e.target.closest('.text-content,.history-item,.current-text,#currentText,#vt-text')) e.preventDefault();
+  });
 })();
 </script>
 <style>
@@ -748,8 +760,8 @@ function stopRecording(){
   recognition.onend=finalize;
   try{recognition.stop();}catch(e){}
 
-  // フォールバック: onendが2秒以内に発火しなかった場合に強制実行
-  setTimeout(finalize, 2000);
+  // フォールバック: onendが1.5秒以内に発火しなかった場合に強制実行
+  setTimeout(finalize, 1500);
 }
 
 // クリップボードコピー — 常に2つの方法を両方実行
