@@ -498,10 +498,13 @@ function stopRecording(){
   document.getElementById('currentLabel').textContent='処理中...';
   setStatus('ready','最終処理中...');
 
-  // iOS: ユーザータップ内で即座にコピー（後でonendで最終版を再コピー試行）
-  if(isIOS){
-    const currentText=processText(finalTranscript);
-    if(currentText.trim()) copyToClipboard(currentText);
+  // ユーザータップ内で即座にコピー
+  const currentText=processText(finalTranscript);
+  if(currentText.trim()){
+    // まずclipboard APIを試行（タップ直後なので成功する可能性あり）
+    copyToClipboard(currentText);
+    // iOS: さらにテキストを自動選択してコピーメニューを表示
+    if(isIOS) setTimeout(()=>selectAllText(), 200);
   }
 
   recognition.onend=function(){
@@ -528,11 +531,30 @@ function copyToClipboard(text){
 function fallbackCopy(text){
   const ta=document.createElement('textarea');
   ta.value=text;
-  ta.style.cssText='position:fixed;left:-9999px;top:-9999px;opacity:0;';
+  ta.style.cssText='position:fixed;left:0;top:0;opacity:0;width:1px;height:1px;';
   document.body.appendChild(ta);
-  ta.focus(); ta.select();
+  if(isIOS){
+    const range=document.createRange();
+    range.selectNodeContents(ta);
+    const sel=window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    ta.setSelectionRange(0,ta.value.length);
+  }else{
+    ta.focus(); ta.select();
+  }
   try{ document.execCommand('copy'); }catch(e){}
   document.body.removeChild(ta);
+}
+
+// iOS: テキストエリアの内容を全選択してコピーメニュー表示
+function selectAllText(){
+  const el=document.getElementById('currentText');
+  const range=document.createRange();
+  range.selectNodeContents(el);
+  const sel=window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
 function handleResult(event){
@@ -666,12 +688,16 @@ function autoSaveToHistory(){
   if(history.length>50) history=history.slice(0,50);
   localStorage.setItem('vt_history',JSON.stringify(history));
   renderHistory();
-  // 現在のテキストエリアをクリア
-  setTimeout(()=>{
-    el.innerHTML='<span class="placeholder">録音ボタンで開始</span>';
-    document.getElementById('charCount').textContent='';
-    finalTranscript=''; interimTranscript=''; sentences=[];
-  }, 1500);
+  // 現在のテキストエリアをクリア（iOSは手動コピー用にテキストを残す）
+  if(isIOS){
+    setStatus('ready','テキストを長押しでコピーしてください');
+  }else{
+    setTimeout(()=>{
+      el.innerHTML='<span class="placeholder">録音ボタンで開始</span>';
+      document.getElementById('charCount').textContent='';
+      finalTranscript=''; interimTranscript=''; sentences=[];
+    }, 1500);
+  }
 }
 
 function sendToHistory(){
