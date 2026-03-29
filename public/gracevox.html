@@ -129,9 +129,14 @@
     padding: 8px 10px; margin-bottom: 6px;
     background: rgba(108,92,231,0.05); border: 1px solid rgba(108,92,231,0.1);
     border-radius: 6px; font-size: 13px; line-height: 1.6;
-    position: relative; cursor: text; transition: border-color 0.2s;
+    position: relative; cursor: pointer; transition: all 0.3s;
   }
-  .history-item:hover { border-color: rgba(108,92,231,0.3); }
+  .history-item:hover, .history-item:active { border-color: rgba(108,92,231,0.3); background: rgba(108,92,231,0.1); }
+  .history-item.new-entry {
+    border-color: var(--accent); background: rgba(108,92,231,0.15);
+    animation: newEntryPulse 2s ease-in-out 3;
+  }
+  @keyframes newEntryPulse { 0%,100%{border-color:var(--accent)} 50%{border-color:rgba(108,92,231,0.5)} }
   .history-time {
     font-size: 9px; color: var(--text-dim); margin-bottom: 4px; letter-spacing: 0.5px;
   }
@@ -942,8 +947,16 @@ function saveToHistory(text){
   localStorage.setItem('vt_history',JSON.stringify(history));
   renderHistory();
   syncToCloud();
+  // 最新エントリをハイライト（タップでコピー促し）
+  const items=document.querySelectorAll('.history-item');
+  if(items[0]){
+    items[0].classList.add('new-entry');
+    setTimeout(()=>items[0].classList.remove('new-entry'),6000);
+  }
+  // スクロールして履歴を見せる
+  document.getElementById('historyContent').scrollTop=0;
+  setStatus('ready','↓ タップでコピー');
   // クリア
-  // 自動コピー完了（バナー不要）
   const el=document.getElementById('currentText');
   el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
   document.getElementById('charCount').textContent='';
