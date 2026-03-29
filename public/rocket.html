@@ -229,13 +229,13 @@
   <div id="vt-text" style="min-height:50px;max-height:120px;overflow-y:auto;padding:8px;background:rgba(0,0,0,0.4);border:1px solid rgba(0,216,255,0.15);border-radius:6px;font-size:13px;color:var(--term-color);line-height:1.6;margin-bottom:8px;user-select:text;-webkit-user-select:text;">
     <span style="color:var(--term-dim);font-style:italic;">&#127908; マイクボタンで音声入力</span>
   </div>
-  <div style="display:flex;gap:8px;align-items:center;justify-content:center;">
-    <button id="vt-rec" onclick="vtToggleRec()" style="width:40px;height:40px;border-radius:50%;border:2px solid var(--term-color);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;">
-      <div id="vt-rec-inner" style="width:16px;height:16px;background:var(--term-color);border-radius:50%;transition:all 0.3s;"></div>
+  <div style="display:flex;gap:12px;align-items:center;justify-content:center;">
+    <button id="vt-rec" onclick="vtToggleRec()" style="width:44px;height:44px;border-radius:50%;border:2px solid var(--term-color);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+      <div id="vt-rec-inner" style="width:18px;height:18px;background:var(--term-color);border-radius:50%;transition:all 0.3s;"></div>
     </button>
-    <button onclick="vtBackspace()" style="background:none;border:1px solid var(--term-dim);color:var(--term-dim);width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:14px;">&#9003;</button>
-    <button onclick="vtCopy()" style="background:rgba(0,216,255,0.08);border:1px solid var(--term-dim);color:var(--term-color);padding:6px 12px;border-radius:4px;cursor:pointer;font-family:'Courier New',monospace;font-size:11px;">COPY</button>
-    <button onclick="vtSendToChat()" style="background:rgba(0,216,255,0.15);border:1px solid var(--term-color);color:var(--term-color);padding:6px 14px;border-radius:4px;cursor:pointer;font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.05em;">SEND</button>
+    <button onclick="vtBackspace()" style="background:none;border:1px solid var(--term-dim);color:var(--term-dim);width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:14px;">&#9003;</button>
+    <div style="width:16px;"></div>
+    <button onclick="vtSendToChat()" style="background:rgba(0,216,255,0.12);border:1px solid var(--term-color);color:var(--term-color);padding:8px 18px;border-radius:6px;cursor:pointer;font-family:'Courier New',monospace;font-size:12px;letter-spacing:0.1em;">SEND</button>
   </div>
   <div id="vt-history" style="max-height:80px;overflow-y:auto;margin-top:8px;border-top:1px solid rgba(0,216,255,0.1);padding-top:6px;font-size:11px;color:var(--term-dim);"></div>
 </div>

@@ -401,7 +401,8 @@
   </div>
 </div>
 
-<button class="ios-copy-banner" id="iosCopyBanner" onclick="iosCopyTap()">COPY</button>
+<!-- COPYバナー廃止: 自動コピーに統一 -->
+<div id="iosCopyBanner" style="display:none;"></div>
 <div class="toast" id="toast"></div>
 
 <!-- Firebase SDK -->
@@ -936,7 +937,7 @@ function saveToHistory(text){
   renderHistory();
   syncToCloud();
   // クリア
-  if(isIOS) document.getElementById('iosCopyBanner').classList.add('show');
+  // 自動コピー完了（バナー不要）
   const el=document.getElementById('currentText');
   el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
   document.getElementById('charCount').textContent='';
