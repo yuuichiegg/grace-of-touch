@@ -260,7 +260,7 @@
 <div class="setup-overlay" id="setupOverlay">
   <div class="setup-card">
     <div class="setup-step active" id="setup-step-1">
-      <h2>VoiceType Setup</h2>
+      <h2>GraceVox Setup</h2>
       <p>声のサンプルを録音して<br>言語と声質を自動判定します</p>
       <button class="setup-btn" onclick="setupNext(2)">セットアップ開始</button>
       <br><button class="setup-btn secondary" onclick="skipSetup()">スキップ</button>
@@ -502,8 +502,8 @@ const MODE_LABELS = {'clean':'テキスト整形','bullets':'箇条書き','prom
 
 // ─── UI Localization ───
 const UI_STRINGS = {
-  'ja-JP': { ready:'準備完了', recording:'録音中...', stop:'停止', processing:'処理中...', placeholder:'録音ボタンで開始', now:'Now', history:'History', clear:'Clear', clearAll:'Clear All', copy:'Copy', settings:'Settings', close:'閉じる', outputMode:'出力モード', clean:'テキスト整形', bullets:'箇条書き', prompt:'プロンプト整形', raw:'そのまま', filler:'フィラーワード除去', punct:'句読点の自動挿入', smart:'言い直し自動検出', hotkey:'録音ホットキー', dict:'カスタム辞書（from→to）', resetVoice:'声の再セットアップ', iosCopy:'テキストを長押しでコピーしてください', historyEmpty:'録音を開始してください', setupTitle:'VoiceType Setup', setupDesc:'声のサンプルを録音して言語と声質を自動判定します', setupStart:'セットアップ開始', skip:'スキップ', sampleTitle:'声のサンプル録音', sampleDesc:'普段の話し方で10秒ほど話してください', startRec:'録音開始', result:'検出結果', done:'完了', noText:'テキストがありません', copied:'コピーしました' },
-  'en-US': { ready:'Ready', recording:'Recording...', stop:'Stopped', processing:'Processing...', placeholder:'Tap record to start', now:'Now', history:'History', clear:'Clear', clearAll:'Clear All', copy:'Copy', settings:'Settings', close:'Close', outputMode:'Output Mode', clean:'Text cleanup', bullets:'Bullet points', prompt:'Prompt format', raw:'Raw', filler:'Remove filler words', punct:'Auto punctuation', smart:'Smart correction', hotkey:'Record hotkey', dict:'Custom dictionary (from→to)', resetVoice:'Re-setup voice', iosCopy:'Long-press text to copy', historyEmpty:'Start recording', setupTitle:'VoiceType Setup', setupDesc:'Record a voice sample to detect language and voice profile', setupStart:'Start setup', skip:'Skip', sampleTitle:'Voice Sample', sampleDesc:'Speak naturally for about 10 seconds', startRec:'Start recording', result:'Result', done:'Done', noText:'No text', copied:'Copied' },
+  'ja-JP': { ready:'準備完了', recording:'録音中...', stop:'停止', processing:'処理中...', placeholder:'録音ボタンで開始', now:'Now', history:'History', clear:'Clear', clearAll:'Clear All', copy:'Copy', settings:'Settings', close:'閉じる', outputMode:'出力モード', clean:'テキスト整形', bullets:'箇条書き', prompt:'プロンプト整形', raw:'そのまま', filler:'フィラーワード除去', punct:'句読点の自動挿入', smart:'言い直し自動検出', hotkey:'録音ホットキー', dict:'カスタム辞書（from→to）', resetVoice:'声の再セットアップ', iosCopy:'テキストを長押しでコピーしてください', historyEmpty:'録音を開始してください', setupTitle:'GraceVox Setup', setupDesc:'声のサンプルを録音して言語と声質を自動判定します', setupStart:'セットアップ開始', skip:'スキップ', sampleTitle:'声のサンプル録音', sampleDesc:'普段の話し方で10秒ほど話してください', startRec:'録音開始', result:'検出結果', done:'完了', noText:'テキストがありません', copied:'コピーしました' },
+  'en-US': { ready:'Ready', recording:'Recording...', stop:'Stopped', processing:'Processing...', placeholder:'Tap record to start', now:'Now', history:'History', clear:'Clear', clearAll:'Clear All', copy:'Copy', settings:'Settings', close:'Close', outputMode:'Output Mode', clean:'Text cleanup', bullets:'Bullet points', prompt:'Prompt format', raw:'Raw', filler:'Remove filler words', punct:'Auto punctuation', smart:'Smart correction', hotkey:'Record hotkey', dict:'Custom dictionary (from→to)', resetVoice:'Re-setup voice', iosCopy:'Long-press text to copy', historyEmpty:'Start recording', setupTitle:'GraceVox Setup', setupDesc:'Record a voice sample to detect language and voice profile', setupStart:'Start setup', skip:'Skip', sampleTitle:'Voice Sample', sampleDesc:'Speak naturally for about 10 seconds', startRec:'Start recording', result:'Result', done:'Done', noText:'No text', copied:'Copied' },
   'zh-CN': { ready:'准备就绪', recording:'录音中...', stop:'已停止', processing:'处理中...', placeholder:'点击录音按钮开始', now:'当前', history:'历史', clear:'清除', clearAll:'清除全部', copy:'复制', settings:'设置', close:'关闭', outputMode:'输出模式', clean:'文本整理', bullets:'要点列表', prompt:'提示词格式', raw:'原始', filler:'去除填充词', punct:'自动标点', smart:'智能纠正', hotkey:'录音快捷键', dict:'自定义词典（从→到）', resetVoice:'重新设置语音', iosCopy:'长按文本复制', historyEmpty:'开始录音', setupTitle:'VoiceType 设置', setupDesc:'录制语音样本以检测语言和语音特征', setupStart:'开始设置', skip:'跳过', sampleTitle:'语音采样', sampleDesc:'用自然的方式说话约10秒', startRec:'开始录音', result:'检测结果', done:'完成', noText:'没有文本', copied:'已复制' },
   'ko-KR': { ready:'준비 완료', recording:'녹음 중...', stop:'중지됨', processing:'처리 중...', placeholder:'녹음 버튼을 눌러 시작', now:'현재', history:'기록', clear:'지우기', clearAll:'전체 삭제', copy:'복사', settings:'설정', close:'닫기', outputMode:'출력 모드', clean:'텍스트 정리', bullets:'글머리 기호', prompt:'프롬프트 형식', raw:'원본', filler:'추임새 제거', punct:'자동 구두점', smart:'자동 교정', hotkey:'녹음 단축키', dict:'사용자 사전（from→to）', resetVoice:'음성 재설정', iosCopy:'텍스트를 길게 눌러 복사하세요', historyEmpty:'녹음을 시작하세요', setupTitle:'VoiceType 설정', setupDesc:'음성 샘플을 녹음하여 언어와 음성을 감지합니다', setupStart:'설정 시작', skip:'건너뛰기', sampleTitle:'음성 샘플', sampleDesc:'자연스럽게 10초 정도 말하세요', startRec:'녹음 시작', result:'감지 결과', done:'완료', noText:'텍스트 없음', copied:'복사됨' },
   'fr-FR': { ready:'Prêt', recording:'Enregistrement...', stop:'Arrêté', processing:'Traitement...', placeholder:'Appuyez pour enregistrer', now:'Actuel', history:'Historique', clear:'Effacer', clearAll:'Tout effacer', copy:'Copier', settings:'Paramètres', close:'Fermer', outputMode:'Mode de sortie', clean:'Mise en forme', bullets:'Liste à puces', prompt:'Format prompt', raw:'Brut', filler:'Supprimer les mots de remplissage', punct:'Ponctuation auto', smart:'Correction intelligente', hotkey:'Raccourci', dict:'Dictionnaire (de→à)', resetVoice:'Reconfigurer la voix', iosCopy:'Appui long pour copier', historyEmpty:'Commencez l\'enregistrement', setupTitle:'Configuration', setupDesc:'Enregistrez un échantillon vocal', setupStart:'Commencer', skip:'Passer', sampleTitle:'Échantillon vocal', sampleDesc:'Parlez naturellement pendant 10 secondes', startRec:'Enregistrer', result:'Résultat', done:'Terminé', noText:'Pas de texte', copied:'Copié' },
@@ -724,8 +724,11 @@ function stopRecording(){
     if(text){
       copyToClipboard(text);
       saveToHistory(text);
+      showToast('P:'+lastSavedPitch+'Hz T:'+text.length+'字');
+    }else{
+      showToast('テキスト空 P:'+sessionPitchData.length+'件');
     }
-  }catch(e){}
+  }catch(e){ showToast('Error:'+e.message); }
 
   // 4. 必ず画面クリア（エラーがあっても）
   document.getElementById('currentText').innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
