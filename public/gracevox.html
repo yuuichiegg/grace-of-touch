@@ -710,59 +710,41 @@ let stopDone=false;
 function stopRecording(){
   if(!isRecording) return;
   isRecording=false;
-  stopDone=false;
   document.getElementById('recBtn').classList.remove('recording');
-  setStatus('ready','処理中...');
 
-  // ピッチデータを保存（finalize前に確保）
+  // 1. ピッチ確保
   collectPitchNow();
   lastSavedPitch=sessionPitchData.length?Math.round(sessionPitchData.reduce((a,b)=>a+b,0)/sessionPitchData.length):0;
 
-  // interimを含めた全テキストを取得＆即コピー
-  if(interimTranscript.trim()){
-    finalTranscript+=interimTranscript;
-    interimTranscript='';
-  }
-  const snapshotText=document.getElementById('currentText').textContent||'';
-  const copyText=snapshotText.trim()||processText(finalTranscript).trim();
-  if(copyText) copyToClipboard(copyText);
+  // 2. テキスト確保（interim含む）
+  if(interimTranscript.trim()){ finalTranscript+=interimTranscript; interimTranscript=''; }
+  const text=(document.getElementById('currentText').textContent||'').trim();
 
-  function finalize(){
-    if(stopDone) return;
-    stopDone=true;
-    document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
-    document.getElementById('vpCanvas').style.display='none';
-    if(navigator.vibrate) navigator.vibrate([30,30,30]);
+  // 3. 即コピー（ユーザージェスチャー内）
+  if(text) copyToClipboard(text);
 
-    // 最終テキスト（停止後に追加された分も含む）
-    if(interimTranscript.trim()){ finalTranscript+=interimTranscript; interimTranscript=''; }
-    const domNow=document.getElementById('currentText').textContent||'';
-    const best=[processText(finalTranscript),snapshotText,domNow,copyText]
-      .filter(s=>s&&s.trim()&&s.length>1)
-      .sort((a,b)=>b.length-a.length)[0]||'';
-
-    if(best.trim()){
-      copyToClipboard(best.trim());
-      saveToHistory(best.trim());
-      showToast('コピー完了');
-    } else {
-      document.getElementById('currentText').innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
-      document.getElementById('charCount').textContent='';
-      finalTranscript=''; interimTranscript=''; sentences=[];
-    }
-    // クリーンアップ（認識エンジン以外）
-    if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
-    if(audioContext&&audioContext.state!=='closed'){try{audioContext.close();}catch(e){}}
-    audioContext=null; analyser=null;
-    setStatus('ready',t('stop'));
-    recognition.onend=handleEnd;
+  // 4. 即保存＆クリア
+  if(text){
+    saveToHistory(text);
+    showToast('コピー完了');
+  }else{
+    document.getElementById('currentText').innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
+    document.getElementById('charCount').textContent='';
   }
 
-  recognition.onend=finalize;
+  // 5. UI更新
+  document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
+  document.getElementById('vpCanvas').style.display='none';
+  if(navigator.vibrate) navigator.vibrate([30,30,30]);
+  setStatus('ready',t('stop'));
+
+  // 6. リソース停止（非同期でOK）
   try{recognition.stop();}catch(e){}
-
-  // フォールバック: onendが1.5秒以内に発火しなかった場合に強制実行
-  setTimeout(finalize, 1500);
+  recognition.onend=function(){
+    cleanup();
+    recognition=null;
+  };
+  setTimeout(()=>{ cleanup(); },2000);
 }
 
 // クリップボードコピー（ターミナル版と同じ方式）
