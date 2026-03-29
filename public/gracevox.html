@@ -701,8 +701,13 @@ function stopRecording(){
   document.getElementById('recBtn').classList.remove('recording');
   setStatus('ready','処理中...');
 
-  // 停止の瞬間に画面テキストを保存（interim含む全テキスト）
-  const snapshotText=document.getElementById('currentText').textContent||'';
+  // 停止の瞬間に画面テキストを保存＆即コピー（ユーザージェスチャー内）
+  if(interimTranscript.trim()){
+    finalTranscript+=interimTranscript;
+    interimTranscript='';
+  }
+  const snapshotText=processText(finalTranscript)||document.getElementById('currentText').textContent||'';
+  if(snapshotText.trim()) copyToClipboard(snapshotText.trim());
 
   function finalize(){
     if(stopDone) return;
