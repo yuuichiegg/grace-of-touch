@@ -338,7 +338,7 @@
       <span class="placeholder">録音ボタンで開始</span>
     </div>
     <!-- Voice Print Visualizer -->
-    <canvas id="vpCanvas" style="width:100%;height:40px;border-top:1px solid var(--border);display:none;"></canvas>
+    <canvas id="vpCanvas" style="width:100%;height:60px;border-top:1px solid var(--border);display:none;"></canvas>
   </div>
 
   <!-- History -->
@@ -702,6 +702,7 @@ async function startRecording(){
   isRecording=true;
   document.getElementById('recBtn').classList.add('recording');
   document.getElementById('currentLabel').textContent='Recording...';
+  vpCanvasCtx=null; vpImageData=null;
   document.getElementById('vpCanvas').style.display='block';
   drawVoicePrint();
   setStatus('recording',t('recording'));
@@ -716,12 +717,12 @@ function stopRecording(){
   document.getElementById('recBtn').classList.remove('recording');
   setStatus('ready','処理中...');
 
-  // 停止の瞬間に画面テキストを保存＆即コピー（ユーザージェスチャー内）
+  // 停止の瞬間にDOMテキストをそのままコピー（ターミナル版と同じ）
   if(interimTranscript.trim()){
     finalTranscript+=interimTranscript;
     interimTranscript='';
   }
-  const snapshotText=processText(finalTranscript)||document.getElementById('currentText').textContent||'';
+  const snapshotText=document.getElementById('currentText').textContent||'';
   if(snapshotText.trim()) copyToClipboard(snapshotText.trim());
 
   function finalize(){
@@ -1050,46 +1051,52 @@ function clearCurrent(){
   finalTranscript=''; interimTranscript=''; sentences=[];
 }
 
-// ─── Voice Print Visualizer ───
+// ─── Voice Print Visualizer (Spectrogram) ───
+let vpCanvasCtx=null, vpImageData=null;
 function drawVoicePrint(){
   if(!analyser||!isRecording) return;
   const canvas=document.getElementById('vpCanvas');
   if(!canvas) return;
-  const ctx=canvas.getContext('2d');
-  const w=canvas.width=canvas.offsetWidth*2;
-  const h=canvas.height=canvas.offsetHeight*2;
-  ctx.clearRect(0,0,w,h);
+  if(!vpCanvasCtx){
+    canvas.width=canvas.offsetWidth*2;
+    canvas.height=80;
+    vpCanvasCtx=canvas.getContext('2d');
+    vpImageData=null;
+  }
+  const ctx=vpCanvasCtx;
+  const w=canvas.width, h=canvas.height;
 
   // 周波数データ
   const fd=new Uint8Array(analyser.frequencyBinCount);
   analyser.getByteFrequencyData(fd);
 
-  // 波形描画（声紋スペクトル）
-  const barW=w/fd.length*2;
-  const accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#6c5ce7';
-  for(let i=0;i<fd.length/2;i++){
+  // スペクトログラム: 左にスクロール、右端に新しいデータを描画
+  if(vpImageData){
+    ctx.putImageData(vpImageData,-2,0);
+  }
+  vpImageData=ctx.getImageData(0,0,w,h);
+
+  // 右端に新しい列を描画
+  const sliceH=h/128;
+  for(let i=0;i<128;i++){
     const v=fd[i]/255;
-    const bh=v*h;
-    const alpha=0.3+v*0.7;
-    ctx.fillStyle=accent.replace(')',`,${alpha})`).replace('rgb','rgba');
-    ctx.fillRect(i*barW,h-bh,barW-1,bh);
+    // 声紋カラーマップ（暗い→紫→シアン→白）
+    let r,g,b;
+    if(v<0.2){ r=v*5*30; g=0; b=v*5*60; }
+    else if(v<0.5){ const t=(v-0.2)/0.3; r=30+t*78; g=t*92; b=60+t*171; }
+    else if(v<0.8){ const t=(v-0.5)/0.3; r=108-t*108; g=92+t*124; b=231-t*31; }
+    else{ const t=(v-0.8)/0.2; r=t*200; g=216+t*39; b=200+t*55; }
+    ctx.fillStyle=`rgb(${r|0},${g|0},${b|0})`;
+    ctx.fillRect(w-2,h-(i+1)*sliceH,2,sliceH);
   }
 
-  // ピッチライン
+  // ピッチ表示
   if(sessionPitchData.length>0){
-    const latestPitch=sessionPitchData[sessionPitchData.length-1];
-    const baseP=voiceProfile?.avgPitch||200;
-    const y=h-(latestPitch/baseP/2)*h;
-    ctx.strokeStyle=accent;
-    ctx.lineWidth=2;
-    ctx.setLineDash([4,4]);
-    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();
-    ctx.setLineDash([]);
-    // ピッチ値表示
-    ctx.fillStyle=accent;
-    ctx.font='bold '+(h*0.3)+'px sans-serif';
+    const p=sessionPitchData[sessionPitchData.length-1];
+    ctx.fillStyle='rgba(255,255,255,0.8)';
+    ctx.font='bold 11px sans-serif';
     ctx.textAlign='right';
-    ctx.fillText(Math.round(latestPitch)+'Hz',w-8,h*0.35);
+    ctx.fillText(Math.round(p)+'Hz',w-4,12);
   }
 
   requestAnimationFrame(drawVoicePrint);
