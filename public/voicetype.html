@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
 <meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
-<title>VoiceType — Grace of Touch</title>
+<title>GraceVox — Grace of Touch</title>
 <!-- © 2024-2026 Grace of Touch Co. All rights reserved. Unauthorized copying prohibited. -->
 <script>
 (function(){
@@ -281,7 +281,7 @@
 <header>
   <div style="display:flex;align-items:center;gap:8px;">
     <a href="/" class="icon-btn" title="Terminal" style="text-decoration:none;font-size:14px;">&#9664;</a>
-    <div class="logo">Voice<span>Type</span></div>
+    <div class="logo">Grace<span>Vox</span></div>
   </div>
   <div class="header-right">
     <select class="lang-select" id="langSelect" onchange="switchLang(this.value)">
@@ -697,6 +697,14 @@ function stopRecording(){
   isRecording=false;
   document.getElementById('recBtn').classList.remove('recording');
 
+  // interimテキストが残っていたらfinalに含める（薄い文字→確定）
+  if(interimTranscript.trim()){
+    finalTranscript+=interimTranscript;
+    if(settings.smartCorrection) sentences.push(basicClean(interimTranscript));
+    interimTranscript='';
+  }
+  // まずクリップボードをクリア（前のコピーが残る問題を防止）
+  copyToClipboard(' ');
   // 即座にコピー（ユーザータップ内 — ジェスチャーコンテキスト有効）
   const textNow=processText(finalTranscript);
   if(textNow.trim()) copyToClipboard(textNow);
