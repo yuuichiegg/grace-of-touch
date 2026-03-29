@@ -743,31 +743,27 @@ function stopRecording(){
   setTimeout(finalize, 2000);
 }
 
-// クリップボードコピー（iOS対応フォールバック付き）
+// クリップボードコピー — 常に2つの方法を両方実行
 function copyToClipboard(text){
-  if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).catch(()=>fallbackCopy(text));
-  }else{
-    fallbackCopy(text);
-  }
-}
-function fallbackCopy(text){
-  const ta=document.createElement('textarea');
-  ta.value=text;
-  ta.style.cssText='position:fixed;left:0;top:0;opacity:0;width:1px;height:1px;';
-  document.body.appendChild(ta);
-  if(isIOS){
-    const range=document.createRange();
-    range.selectNodeContents(ta);
-    const sel=window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
+  if(!text||!text.trim()) return;
+  // 方法1: execCommand（同期、確実、ユーザージェスチャー内で動作）
+  try{
+    const ta=document.createElement('textarea');
+    ta.value=text;
+    ta.setAttribute('readonly','');
+    ta.style.cssText='position:fixed;left:0;top:0;opacity:0;width:1px;height:1px;pointer-events:none;';
+    document.body.appendChild(ta);
+    ta.focus();
     ta.setSelectionRange(0,ta.value.length);
-  }else{
-    ta.focus(); ta.select();
-  }
-  try{ document.execCommand('copy'); }catch(e){}
-  document.body.removeChild(ta);
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }catch(e){}
+  // 方法2: Clipboard API（非同期、モダン）
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).catch(()=>{});
+    }
+  }catch(e){}
 }
 
 // iOS: テキストエリアの内容を全選択してコピーメニュー表示
@@ -985,23 +981,7 @@ function iosCopyTap(){
 
 function copyHistory(i){
   if(!history[i]) return;
-  const text=history[i].text;
-  // 確実にコピー: clipboard API + fallback両方試行
-  let copied=false;
-  try{
-    const ta=document.createElement('textarea');
-    ta.value=text;
-    ta.style.cssText='position:fixed;left:0;top:0;opacity:0;width:1px;height:1px;';
-    document.body.appendChild(ta);
-    ta.focus(); ta.select(); ta.setSelectionRange(0,ta.value.length);
-    copied=document.execCommand('copy');
-    document.body.removeChild(ta);
-  }catch(e){}
-  // clipboard APIも試行
-  if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).catch(()=>{});
-  }
-  // ハイライト
+  copyToClipboard(history[i].text);
   const items=document.querySelectorAll('.history-item');
   if(items[i]){
     items[i].style.borderColor='var(--accent)';
