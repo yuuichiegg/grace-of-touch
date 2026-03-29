@@ -4696,8 +4696,8 @@ function toggleVoicePopup(){
   popup.style.display=show?'block':'none';
   // BGMミュート/復元
   if(typeof MusicEngine!=='undefined'&&MusicEngine.audio){
-    if(show){ MusicEngine._vtPrevVol=MusicEngine.audio.volume; MusicEngine.audio.volume=0; }
-    else{ MusicEngine.audio.volume=MusicEngine._vtPrevVol||0.5; }
+    if(show){ MusicEngine._vtPrevVol=MusicEngine.audio.volume; MusicEngine.audio.pause(); }
+    else{ MusicEngine.audio.volume=MusicEngine._vtPrevVol||0.5; MusicEngine.audio.play().catch(()=>{}); }
   }
   if(!show&&vtIsRecording) vtStopRec();
 }
