@@ -102,7 +102,8 @@
   .mc-btn{background:transparent;border:1px solid rgba(0,216,255,0.3);color:var(--term-color);font-size:14px;width:32px;height:32px;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
   .mc-btn:hover{background:rgba(0,216,255,0.1);border-color:rgba(0,216,255,0.6);box-shadow:0 0 10px rgba(0,216,255,0.2);}
   .mc-btn.active{background:rgba(0,216,255,0.15);border-color:var(--term-color);}
-  #vol-music{width:60px;}
+  #vol-music{width:80px;}
+  #vol-label{font-family:"Courier New",monospace;font-size:9px;color:var(--term-color);letter-spacing:0.1em;opacity:0.7;}
   #mood-glow{position:absolute;bottom:48px;left:0;right:0;height:3px;z-index:34;background:linear-gradient(90deg,transparent,var(--term-color),transparent);opacity:0.4;transition:background 3s ease;pointer-events:none;}
   .planet-label{color:var(--term-color);font-family:"Courier New",monospace;font-size:10px;letter-spacing:0.15em;text-shadow:0 0 6px rgba(0,216,255,0.6);pointer-events:none;white-space:nowrap;opacity:0.85;}
   .planet-label .dist-info{font-size:8px;color:var(--term-dim);display:block;letter-spacing:0.1em;}
@@ -343,6 +344,7 @@
     <button class="mc-btn" id="mc-play" title="Play/Pause">&#9654;</button>
     <button class="mc-btn" id="mc-next" title="Next">&#9197;</button>
     <button class="mc-btn" id="mc-shuffle" title="Shuffle">&#128256;</button>
+    <span id="vol-label">VOL</span>
     <input type="range" id="vol-music" min="0" max="1" step="0.01" value="0.5" title="BGM Volume">
   </div>
 </div>
@@ -4696,8 +4698,7 @@ function toggleVoicePopup(){
   popup.style.display=show?'block':'none';
   // BGMミュート/復元
   if(typeof MusicEngine!=='undefined'&&MusicEngine.audio){
-    if(show){ MusicEngine._vtPrevVol=MusicEngine.audio.volume; MusicEngine.audio.pause(); }
-    else{ MusicEngine.audio.volume=MusicEngine._vtPrevVol||0.5; MusicEngine.audio.play().catch(()=>{}); }
+    // BGMは音量バーで手動調整（VoiceType開閉で自動制御しない）
   }
   if(!show&&vtIsRecording) vtStopRec();
 }
@@ -4723,12 +4724,7 @@ async function vtStartRec(){
   vtRecognition.onerror=(e)=>{ if(e.error==='no-speech') return; };
   vtRecognition.onend=()=>{ if(vtIsRecording){try{vtRecognition.start();}catch(e){}} };
   try{ await navigator.mediaDevices.getUserMedia({audio:true}); }catch(e){ return; }
-  // BGM完全停止
-  if(typeof MusicEngine!=='undefined'&&MusicEngine.audio){
-    MusicEngine._vtWasPlaying=!MusicEngine.audio.paused;
-    MusicEngine._vtPrevVol=MusicEngine.audio.volume;
-    MusicEngine.audio.pause();
-  }
+  // BGMは停止しない（音量バーで調整可能）
   vtRecognition.start();
   vtIsRecording=true;
   document.getElementById('vt-rec').style.borderColor='#e74c3c';
@@ -4753,11 +4749,7 @@ function vtStopRec(){
         vtTranscript=''; vtSentences=[];
         document.getElementById('vt-text').innerHTML='<span style="color:var(--term-dim);font-style:italic;">&#127908; マイクボタンで音声入力</span>';
       }
-      // BGM再開
-      if(typeof MusicEngine!=='undefined'&&MusicEngine.audio&&MusicEngine._vtWasPlaying){
-        MusicEngine.audio.volume=MusicEngine._vtPrevVol||0.5;
-        MusicEngine.audio.play().catch(()=>{});
-      }
+      // BGMは音量バーで調整（自動停止/再開しない）
     },300);
   };
   try{vtRecognition.stop();}catch(e){}
