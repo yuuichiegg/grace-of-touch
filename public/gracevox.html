@@ -699,19 +699,9 @@ function stopRecording(){
   isRecording=false;
   stopDone=false;
   document.getElementById('recBtn').classList.remove('recording');
+  setStatus('ready','処理中...');
 
-  // interimテキストが残っていたらfinalに含める
-  if(interimTranscript.trim()){
-    finalTranscript+=interimTranscript;
-    if(settings.smartCorrection) sentences.push(basicClean(interimTranscript));
-    interimTranscript='';
-  }
-
-  // 即座にコピー（ユーザータップ内）
-  const textNow=processText(finalTranscript);
-  if(textNow.trim()) copyToClipboard(textNow);
-
-  // 完了処理（コピー＆保存＆クリア）
+  // 完了処理（全テキスト確定後にコピー＆保存＆クリア）
   function finalize(){
     if(stopDone) return;
     stopDone=true;
@@ -719,14 +709,17 @@ function stopRecording(){
     if(audioContext){try{audioContext.close();}catch(e){} audioContext=null;}
     document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
     if(navigator.vibrate) navigator.vibrate([30,30,30]);
-    // 最終テキストでコピー＆保存
-    if(interimTranscript.trim()) finalTranscript+=interimTranscript;
+    // interimが残っていたらfinalに含める
+    if(interimTranscript.trim()){
+      finalTranscript+=interimTranscript;
+      interimTranscript='';
+    }
     const finalText=processText(finalTranscript);
     if(finalText.trim()){
       copyToClipboard(finalText);
       saveToHistory(finalText);
+      showToast('コピー完了');
     } else {
-      // テキストがなくても画面クリア
       const el=document.getElementById('currentText');
       el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
       document.getElementById('charCount').textContent='';
@@ -739,8 +732,8 @@ function stopRecording(){
   recognition.onend=finalize;
   try{recognition.stop();}catch(e){}
 
-  // フォールバック: onendが2秒以内に発火しなかった場合に強制実行
-  setTimeout(finalize, 2000);
+  // フォールバック: onendが3秒以内に発火しなかった場合に強制実行
+  setTimeout(finalize, 3000);
 }
 
 // クリップボードコピー — 常に2つの方法を両方実行
@@ -968,7 +961,7 @@ function iosCopyTap(){
   if(!text.trim()) return;
   // ユーザータップ内なのでclipboard APIが動作する
   copyToClipboard(text);
-  showToast(t('copied'));
+  showToast('コピー完了');
   document.getElementById('iosCopyBanner').classList.remove('show');
   // クリア
   setTimeout(()=>{
@@ -988,7 +981,7 @@ function copyHistory(i){
     items[i].style.background='rgba(108,92,231,0.15)';
     setTimeout(()=>{items[i].style.borderColor='';items[i].style.background='';},800);
   }
-  showToast(t('copied'));
+  showToast('コピー完了');
 }
 
 function clearHistory(){
