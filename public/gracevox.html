@@ -126,17 +126,22 @@
     -webkit-overflow-scrolling: touch; user-select: text; -webkit-user-select: text;
   }
   .history-item {
-    padding: 8px 10px; margin-bottom: 6px;
+    padding: 10px 12px; margin-bottom: 6px;
     background: rgba(108,92,231,0.05); border: 1px solid rgba(108,92,231,0.1);
-    border-radius: 6px; font-size: 13px; line-height: 1.6;
+    border-radius: 8px; font-size: 13px; line-height: 1.6;
     position: relative; cursor: pointer; transition: all 0.3s;
+    -webkit-tap-highlight-color: transparent;
   }
-  .history-item:hover, .history-item:active { border-color: rgba(108,92,231,0.3); background: rgba(108,92,231,0.1); }
+  .history-item:hover, .history-item:active { border-color: rgba(108,92,231,0.4); background: rgba(108,92,231,0.12); }
   .history-item.new-entry {
-    border-color: var(--accent); background: rgba(108,92,231,0.15);
-    animation: newEntryPulse 2s ease-in-out 3;
+    border-color: var(--accent); background: rgba(108,92,231,0.2);
+    animation: newEntryPulse 1s ease-in-out 5;
   }
-  @keyframes newEntryPulse { 0%,100%{border-color:var(--accent)} 50%{border-color:rgba(108,92,231,0.5)} }
+  .history-item.new-entry::after {
+    content: '← tap to copy'; font-size: 10px; color: var(--accent);
+    position: absolute; right: 10px; top: 8px; letter-spacing: 0.5px;
+  }
+  @keyframes newEntryPulse { 0%,100%{border-color:var(--accent)} 50%{border-color:rgba(108,92,231,0.3)} }
   .history-time {
     font-size: 9px; color: var(--text-dim); margin-bottom: 4px; letter-spacing: 0.5px;
   }
@@ -332,6 +337,8 @@
     <div class="current-text" id="currentText">
       <span class="placeholder">録音ボタンで開始</span>
     </div>
+    <!-- Voice Print Visualizer -->
+    <canvas id="vpCanvas" style="width:100%;height:40px;border-top:1px solid var(--border);display:none;"></canvas>
   </div>
 
   <!-- History -->
@@ -695,6 +702,8 @@ async function startRecording(){
   isRecording=true;
   document.getElementById('recBtn').classList.add('recording');
   document.getElementById('currentLabel').textContent='Recording...';
+  document.getElementById('vpCanvas').style.display='block';
+  drawVoicePrint();
   setStatus('recording',t('recording'));
   if(navigator.vibrate) navigator.vibrate(50);
 }
@@ -721,6 +730,7 @@ function stopRecording(){
     if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
     if(audioContext){try{audioContext.close();}catch(e){} audioContext=null;}
     document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
+    document.getElementById('vpCanvas').style.display='none';
     if(navigator.vibrate) navigator.vibrate([30,30,30]);
 
     // interimが残っていたらfinalに含める
@@ -1054,6 +1064,51 @@ function clearCurrent(){
   document.getElementById('currentText').innerHTML='<span class="placeholder">録音ボタンで開始</span>';
   document.getElementById('charCount').textContent='';
   finalTranscript=''; interimTranscript=''; sentences=[];
+}
+
+// ─── Voice Print Visualizer ───
+function drawVoicePrint(){
+  if(!analyser||!isRecording) return;
+  const canvas=document.getElementById('vpCanvas');
+  if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  const w=canvas.width=canvas.offsetWidth*2;
+  const h=canvas.height=canvas.offsetHeight*2;
+  ctx.clearRect(0,0,w,h);
+
+  // 周波数データ
+  const fd=new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(fd);
+
+  // 波形描画（声紋スペクトル）
+  const barW=w/fd.length*2;
+  const accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#6c5ce7';
+  for(let i=0;i<fd.length/2;i++){
+    const v=fd[i]/255;
+    const bh=v*h;
+    const alpha=0.3+v*0.7;
+    ctx.fillStyle=accent.replace(')',`,${alpha})`).replace('rgb','rgba');
+    ctx.fillRect(i*barW,h-bh,barW-1,bh);
+  }
+
+  // ピッチライン
+  if(sessionPitchData.length>0){
+    const latestPitch=sessionPitchData[sessionPitchData.length-1];
+    const baseP=voiceProfile?.avgPitch||200;
+    const y=h-(latestPitch/baseP/2)*h;
+    ctx.strokeStyle=accent;
+    ctx.lineWidth=2;
+    ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke();
+    ctx.setLineDash([]);
+    // ピッチ値表示
+    ctx.fillStyle=accent;
+    ctx.font='bold '+(h*0.3)+'px sans-serif';
+    ctx.textAlign='right';
+    ctx.fillText(Math.round(latestPitch)+'Hz',w-8,h*0.35);
+  }
+
+  requestAnimationFrame(drawVoicePrint);
 }
 
 // ─── Voice Print Live ───
