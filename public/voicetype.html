@@ -165,6 +165,15 @@
   .volume-meter { display: flex; align-items: center; gap: 3px; height: 20px; }
   .volume-bar { width: 3px; height: 4px; background: var(--accent); border-radius: 2px; transition: height 0.05s; }
 
+  /* Backspace Button */
+  .bs-btn {
+    width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border);
+    background: transparent; color: var(--text-dim); font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation; flex-shrink: 0;
+  }
+  .bs-btn:hover, .bs-btn:active { border-color: var(--accent); color: var(--text); }
+
   /* iOS Copy Banner */
   .ios-copy-banner {
     display: none; position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
@@ -337,6 +346,7 @@
   <button class="rec-btn" id="recBtn" onclick="toggleRecording()">
     <div class="inner"></div>
   </button>
+  <button class="bs-btn" id="bsBtn" onclick="backspace()" title="Backspace">&#9003;</button>
   <div class="controls-info">
     <div class="hotkey-hint"><kbd id="hotkeyDisplay">変換</kbd> or <kbd>F2</kbd></div>
   </div>
@@ -852,6 +862,27 @@ function copyHistory(i){
 function clearHistory(){
   history=[]; localStorage.removeItem('vt_history');
   renderHistory();
+}
+
+function backspace(){
+  if(sentences.length>0){
+    sentences.pop();
+    finalTranscript=sentences.join('');
+  }else if(finalTranscript.length>0){
+    // 文単位で削除（。で区切る）
+    const parts=finalTranscript.split(/(?<=[。.！？!?\n])/);
+    parts.pop();
+    finalTranscript=parts.join('');
+  }
+  const el=document.getElementById('currentText');
+  if(finalTranscript){
+    el.innerHTML=escapeHtml(processText(finalTranscript));
+    document.getElementById('charCount').textContent=finalTranscript.length+'文字';
+  }else{
+    el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
+    document.getElementById('charCount').textContent='';
+    sentences=[];
+  }
 }
 
 function clearCurrent(){
