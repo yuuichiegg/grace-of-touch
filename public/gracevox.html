@@ -1124,27 +1124,30 @@ let sessionPitchData=[];
 function getPitch(){
   if(!analyser||!audioContext) return 0;
   try{
-    // getByteTimeDomainData（iOS互換）
-    const buf=new Uint8Array(analyser.fftSize);
-    analyser.getByteTimeDomainData(buf);
-    // ゼロクロッシング（128が中心値）
-    let crossings=0;
-    for(let i=1;i<buf.length;i++){
-      if((buf[i]>=128&&buf[i-1]<128)||(buf[i]<128&&buf[i-1]>=128)) crossings++;
+    // 周波数ドメインでピーク検出（iOS安定）
+    const fd=new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(fd);
+    // 人声の範囲(80-500Hz)でピークを探す
+    const binHz=audioContext.sampleRate/analyser.fftSize;
+    const minBin=Math.floor(80/binHz);
+    const maxBin=Math.min(Math.ceil(500/binHz),fd.length-1);
+    let peakVal=0, peakBin=0;
+    for(let i=minBin;i<=maxBin;i++){
+      if(fd[i]>peakVal){peakVal=fd[i];peakBin=i;}
     }
-    const freq=(crossings/2)*(audioContext.sampleRate/analyser.fftSize);
-    return freq;
+    if(peakVal>30) return Math.round(peakBin*binHz);
+    return 0;
   }catch(e){ return 0; }
 }
 function collectVoicePrint(){
   if(!analyser) return;
   const f=getPitch();
-  if(f>80&&f<500) sessionPitchData.push(f);
+  if(f>0) sessionPitchData.push(f);
   if(isRecording) setTimeout(collectVoicePrint,100);
 }
 function collectPitchNow(){
   const f=getPitch();
-  if(f>80&&f<500) sessionPitchData.push(f);
+  if(f>0) sessionPitchData.push(f);
 }
 
 function checkVoiceCondition(){
