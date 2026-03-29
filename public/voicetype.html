@@ -707,7 +707,7 @@ function stopRecording(){
     if(audioContext){audioContext.close();audioContext=null;}
     document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
     if(navigator.vibrate) navigator.vibrate([30,30,30]);
-    setTimeout(()=> autoSaveToHistory(), 300);
+    autoSaveToHistory();
     recognition.onend=handleEnd;
   };
   recognition.stop();
@@ -911,14 +911,12 @@ function autoSaveToHistory(){
   localStorage.setItem('vt_history',JSON.stringify(history));
   renderHistory();
   syncToCloud();
-  // 即座にクリア（iOSはコピーバナーも表示）
+  // 即座にクリア
   if(isIOS) document.getElementById('iosCopyBanner').classList.add('show');
   setStatus('ready',t('stop'));
-  setTimeout(()=>{
-    el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
-    document.getElementById('charCount').textContent='';
-    finalTranscript=''; interimTranscript=''; sentences=[];
-  }, isIOS?500:1000);
+  el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
+  document.getElementById('charCount').textContent='';
+  finalTranscript=''; interimTranscript=''; sentences=[];
 }
 
 function sendToHistory(){
@@ -940,7 +938,7 @@ function sendToHistory(){
 function renderHistory(){
   const container=document.getElementById('historyContent');
   if(history.length===0){ container.innerHTML='<div class="history-empty">テキストを選択してコピー、または Save で履歴に保存</div>'; return; }
-  container.innerHTML=history.map((h,i)=>`<div class="history-item"><div class="history-time">${h.time} — ${(h.lang||'').split('-')[0].toUpperCase()} <button onclick="copyHistory(${i})" style="background:var(--accent);color:#fff;border:none;padding:2px 8px;border-radius:3px;font-size:10px;cursor:pointer;margin-left:6px;">Copy</button></div>${escapeHtml(h.text)}</div>`).join('');
+  container.innerHTML=history.map((h,i)=>`<div class="history-item" onclick="copyHistory(${i})" style="cursor:pointer;"><div class="history-time">${h.time} — ${(h.lang||'').split('-')[0].toUpperCase()}</div>${escapeHtml(h.text)}</div>`).join('');
 }
 
 function iosCopyTap(){
@@ -961,7 +959,16 @@ function iosCopyTap(){
 }
 
 function copyHistory(i){
-  if(history[i]){ copyToClipboard(history[i].text); showToast(t('copied')); }
+  if(!history[i]) return;
+  copyToClipboard(history[i].text);
+  // タップしたアイテムをハイライト
+  const items=document.querySelectorAll('.history-item');
+  if(items[i]){
+    items[i].style.borderColor='var(--accent)';
+    items[i].style.background='rgba(108,92,231,0.15)';
+    setTimeout(()=>{items[i].style.borderColor='';items[i].style.background='';},800);
+  }
+  showToast(t('copied'));
 }
 
 function clearHistory(){
