@@ -215,6 +215,7 @@
 <div id="chat-container">
   <input type="text" id="chat-input" placeholder="Broadcast message..." maxlength="40" autocomplete="off">
   <button id="chat-send">TX</button>
+  <button id="chat-clear-btn" onclick="clearChatInput()" title="Clear" style="background:transparent;border:1px solid var(--term-dim);color:var(--term-dim);font-family:'Courier New',monospace;padding:6px 8px;border-radius:4px;cursor:pointer;font-size:11px;display:none;">&#10005;</button>
   <button id="voice-btn" onclick="toggleVoicePopup()" title="VoiceType" style="background:transparent;border:1px solid var(--term-color);color:var(--term-color);font-family:'Courier New',monospace;padding:6px 10px;border-radius:4px;cursor:pointer;font-size:14px;">&#127908;</button>
 </div>
 
@@ -4753,8 +4754,18 @@ function vtSendToChat(){
   vtTranscript=''; vtSentences=[];
   document.getElementById('vt-text').innerHTML='<span style="color:var(--term-dim);font-style:italic;">&#127908; チャットに入力済み</span>';
   toggleVoicePopup();
-  // チャット入力欄にフォーカス（ユーザーがEnterで送信）
+  document.getElementById('chat-clear-btn').style.display='block';
   input.focus();
+}
+
+function clearChatInput(){
+  document.getElementById('chat-input').value='';
+  document.getElementById('chat-clear-btn').style.display='none';
+}
+
+function showChatClear(){
+  const btn=document.getElementById('chat-clear-btn');
+  btn.style.display=document.getElementById('chat-input').value?'block':'none';
 }
 
 function vtCopy(){
