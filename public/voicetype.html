@@ -30,6 +30,18 @@
     --recording-glow: rgba(231,76,60,0.4);
     --success: #2ecc71;
   }
+  :root.light {
+    --bg: #f5f5f7;
+    --surface: #ffffff;
+    --border: #e0e0e6;
+    --text: #1a1a2e;
+    --text-dim: #8888a0;
+    --accent: #6c5ce7;
+    --accent-glow: rgba(108,92,231,0.2);
+    --recording: #e74c3c;
+    --recording-glow: rgba(231,76,60,0.3);
+    --success: #2ecc71;
+  }
   * { margin:0; padding:0; box-sizing:border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
@@ -256,6 +268,7 @@
       <button data-lang="en-US" onclick="switchLang(this)">EN</button>
     </div>
     <div class="mode-pill" id="modePill">テキスト整形</div>
+    <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="テーマ切替">&#9788;</button>
     <button class="icon-btn" onclick="toggleSettings()">&#9881;</button>
   </div>
 </header>
@@ -750,6 +763,13 @@ function updateVolumeMeter(){
 function setStatus(t,txt){ document.getElementById('statusDot').className='status-dot '+t; document.getElementById('statusText').textContent=txt; }
 function changeMode(){ outputMode=document.getElementById('outputMode').value; localStorage.setItem('vt_mode',outputMode); document.getElementById('modePill').textContent=MODE_LABELS[outputMode]; if(finalTranscript) document.getElementById('currentText').textContent=processText(finalTranscript); }
 function changeHotkey(){ selectedHotkey=document.getElementById('hotkeySelect').value; localStorage.setItem('vt_hotkey',selectedHotkey); document.getElementById('hotkeyDisplay').textContent=HOTKEY_LABELS[selectedHotkey]; }
+function toggleTheme(){
+  const root=document.documentElement;
+  const isLight=root.classList.toggle('light');
+  localStorage.setItem('vt_theme',isLight?'light':'dark');
+  document.getElementById('themeBtn').innerHTML=isLight?'&#9790;':'&#9788;';
+}
+
 function toggleSettings(){ const o=document.getElementById('settingsOverlay'); o.classList.toggle('open'); if(!o.classList.contains('open')) localStorage.setItem('vt_customDict',document.getElementById('customDict')?.value||''); }
 function toggleSetting(btn,key){ settings[key]=!settings[key]; btn.classList.toggle('on',settings[key]); }
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000); }
@@ -774,6 +794,9 @@ document.addEventListener('touchstart',(e)=>{if(e.target.closest('.rec-btn')){e.
   document.getElementById('outputMode').value=outputMode;
   document.getElementById('modePill').textContent=MODE_LABELS[outputMode];
   if(voiceProfile){ currentLang=voiceProfile.lang; document.querySelectorAll('.lang-toggle button').forEach(b=>b.classList.toggle('active',b.dataset.lang===currentLang)); }
+  // テーマ復元
+  const savedTheme=localStorage.getItem('vt_theme');
+  if(savedTheme==='light'){ document.documentElement.classList.add('light'); document.getElementById('themeBtn').innerHTML='&#9790;'; }
   renderHistory();
   checkSetup();
   if(voiceProfile) initRecognition();
