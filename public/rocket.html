@@ -4732,13 +4732,39 @@ async function vtStartRec(){
 function vtStopRec(){
   if(!vtIsRecording) return;
   vtIsRecording=false;
-  try{vtRecognition.stop();}catch(e){}
   document.getElementById('vt-rec').style.borderColor='var(--term-color)';
   document.getElementById('vt-rec-inner').style.cssText='width:16px;height:16px;background:var(--term-color);border-radius:50%;';
-  // 自動コピー＆クリア
-  if(vtTranscript.trim()){
-    vtCopy();
+  // まず今あるテキストを即コピー（ユーザータップ内）
+  if(vtTranscript.trim()) vtCopyToClipboard(vtTranscript);
+  // 停止→onendで最終テキスト確定後に再コピー＆クリア
+  vtRecognition.onend=function(){
+    setTimeout(()=>{
+      if(vtTranscript.trim()){
+        vtCopyToClipboard(vtTranscript);
+        vtHistory.unshift({text:vtTranscript,time:new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})});
+        if(vtHistory.length>20) vtHistory=vtHistory.slice(0,20);
+        vtRenderHistory();
+        vtTranscript=''; vtSentences=[];
+        document.getElementById('vt-text').innerHTML='<span style="color:var(--term-dim);font-style:italic;">&#127908; マイクボタンで音声入力</span>';
+      }
+    },300);
+  };
+  try{vtRecognition.stop();}catch(e){}
+}
+
+function vtCopyToClipboard(text){
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(()=>vtFallbackCopy(text));
+  }else{
+    vtFallbackCopy(text);
   }
+}
+function vtFallbackCopy(text){
+  const ta=document.createElement('textarea');ta.value=text;
+  ta.style.cssText='position:fixed;left:0;top:0;opacity:0;width:1px;height:1px;';
+  document.body.appendChild(ta);ta.select();
+  try{document.execCommand('copy');}catch(e){}
+  document.body.removeChild(ta);
 }
 
 function vtBackspace(){
@@ -4771,18 +4797,8 @@ function showChatClear(){
 
 function vtCopy(){
   if(!vtTranscript.trim()) return;
-  const text=vtTranscript;
-  if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).catch(()=>{});
-  }else{
-    const ta=document.createElement('textarea');ta.value=text;
-    ta.style.cssText='position:fixed;left:0;top:0;opacity:0;';
-    document.body.appendChild(ta);ta.select();
-    try{document.execCommand('copy');}catch(e){}
-    document.body.removeChild(ta);
-  }
-  // コピー後即クリア＆履歴に追加
-  vtHistory.unshift({text,time:new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})});
+  vtCopyToClipboard(vtTranscript);
+  vtHistory.unshift({text:vtTranscript,time:new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})});
   if(vtHistory.length>20) vtHistory=vtHistory.slice(0,20);
   vtRenderHistory();
   vtTranscript=''; vtSentences=[];
