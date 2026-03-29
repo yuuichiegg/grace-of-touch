@@ -712,23 +712,21 @@ function stopRecording(){
   isRecording=false;
   document.getElementById('recBtn').classList.remove('recording');
 
+  // 1. ピッチ
+  try{ lastSavedPitch=sessionPitchData.length?Math.round(sessionPitchData.reduce((a,b)=>a+b,0)/sessionPitchData.length):0; }catch(e){}
+
+  // 2. テキスト
+  var stopText='';
   try{
-    // 1. ピッチ確保
-    lastSavedPitch=sessionPitchData.length?Math.round(sessionPitchData.reduce((a,b)=>a+b,0)/sessionPitchData.length):0;
+    if(interimTranscript&&interimTranscript.trim()){ finalTranscript+=interimTranscript; interimTranscript=''; }
+    stopText=(document.getElementById('currentText').textContent||'').trim();
+  }catch(e){}
 
-    // 2. テキスト確保
-    if(interimTranscript.trim()){ finalTranscript+=interimTranscript; interimTranscript=''; }
-    const text=(document.getElementById('currentText').textContent||'').trim();
+  // 3. コピー
+  try{ if(stopText) copyToClipboard(stopText); }catch(e){}
 
-    // 3. コピー＆保存
-    if(text){
-      copyToClipboard(text);
-      saveToHistory(text);
-      showToast('P:'+lastSavedPitch+'Hz T:'+text.length+'字');
-    }else{
-      showToast('テキスト空 P:'+sessionPitchData.length+'件');
-    }
-  }catch(e){ showToast('Error:'+e.message); }
+  // 4. 履歴保存
+  try{ if(stopText) saveToHistory(stopText); }catch(e){}
 
   // 4. 必ず画面クリア（エラーがあっても）
   document.getElementById('currentText').innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
@@ -918,9 +916,8 @@ function processText(text){
 function saveToHistory(text){
   if(!text||!text.trim()) return;
   // 声紋データ — シンプルにピッチのみ
-  const avgP=lastSavedPitch||0;
-  const vprint={ pitch:avgP, icon:avgP>0?'🟢':'🎤' };
-  if(vc&&vc.status!=='normal') showToast(vc.icon+' '+vc.msg);
+  var avgP=lastSavedPitch||0;
+  var vprint={ pitch:avgP, icon:avgP>0?'🟢':'🎤' };
   // 履歴に声紋付きで保存
   const entry={ text, time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}), lang: currentLang, vprint };
   history.unshift(entry);
