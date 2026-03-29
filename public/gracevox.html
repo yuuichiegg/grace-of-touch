@@ -654,51 +654,48 @@ function initRecognition(){
 
 function toggleRecording(){ isRecording ? stopRecording() : startRecording(); }
 
+let lastSavedPitch=0;
+function cleanup(){
+  try{ if(recognition) recognition.abort(); }catch(e){}
+  if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+  if(audioContext&&audioContext.state!=='closed'){try{audioContext.close();}catch(e){}}
+  audioContext=null; analyser=null; recognition=null;
+}
+
 async function startRecording(){
   if(isRecording) return;
-  // 常に新しい認識インスタンスを作成（iOS対応: 古いインスタンスは壊れている可能性）
-  if(isIOS || !recognition) initRecognition();
-  if(!recognition) return;
+
+  // 前回のリソースを確実にクリーンアップ
+  cleanup();
+
+  // 状態リセット
+  finalTranscript=''; interimTranscript=''; sentences=[];
+  errorRetryCount=0; stopDone=false; sessionPitchData=[];
+  lastSavedPitch=0;
+
   const el=document.getElementById('currentText');
   if(el.querySelector('.placeholder')) el.innerHTML='';
-  finalTranscript=''; interimTranscript=''; sentences=[]; errorRetryCount=0;
+
+  // 認識エンジンを常に新規作成
+  initRecognition();
+  if(!recognition) return;
   recognition.lang=currentLang;
 
-  // iOS Safari: getUserMediaを先に呼んでマイク許可を得る
+  // マイク取得
   try{
     mediaStream=await navigator.mediaDevices.getUserMedia({audio:true});
-    // AudioContextはユーザージェスチャー内で作成（iOS要件）
     audioContext=new (window.AudioContext||window.webkitAudioContext)();
     analyser=audioContext.createAnalyser(); analyser.fftSize=2048;
     audioContext.createMediaStreamSource(mediaStream).connect(analyser);
-    sessionPitchData=[];
     collectVoicePrint();
     updateVolumeMeter();
   }catch(e){
-    setStatus('error','マイクへのアクセスを許可してください');
-    showToast(isIOS?'設定 > Safari > マイクを確認':'マイク許可が必要です');
+    setStatus('error','マイク許可が必要です');
     return;
   }
 
-  // iOS: recognitionを毎回新しく作成（再利用で不安定になるため）
-  if(isIOS){
-    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    recognition=new SR();
-    recognition.continuous=false;
-    recognition.interimResults=true;
-    recognition.lang=currentLang;
-    recognition.onresult=handleResult;
-    recognition.onerror=handleError;
-    recognition.onend=handleEnd;
-  }
+  try{ recognition.start(); }catch(e){ setStatus('error','認識開始失敗'); return; }
 
-  try{
-    recognition.start();
-  }catch(e){
-    setStatus('error','認識開始失敗: '+e.message);
-    document.getElementById('currentText').textContent='エラー: '+e.message;
-    return;
-  }
   isRecording=true;
   document.getElementById('recBtn').classList.add('recording');
   document.getElementById('currentLabel').textContent='Recording...';
@@ -717,49 +714,46 @@ function stopRecording(){
   document.getElementById('recBtn').classList.remove('recording');
   setStatus('ready','処理中...');
 
-  // 最後のピッチデータを取得
+  // ピッチデータを保存（finalize前に確保）
   collectPitchNow();
-  // 停止の瞬間にDOMテキストをそのままコピー（ターミナル版と同じ）
+  lastSavedPitch=sessionPitchData.length?Math.round(sessionPitchData.reduce((a,b)=>a+b,0)/sessionPitchData.length):0;
+
+  // interimを含めた全テキストを取得＆即コピー
   if(interimTranscript.trim()){
     finalTranscript+=interimTranscript;
     interimTranscript='';
   }
   const snapshotText=document.getElementById('currentText').textContent||'';
-  if(snapshotText.trim()) copyToClipboard(snapshotText.trim());
+  const copyText=snapshotText.trim()||processText(finalTranscript).trim();
+  if(copyText) copyToClipboard(copyText);
 
   function finalize(){
     if(stopDone) return;
     stopDone=true;
-    if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
-    if(audioContext){try{audioContext.close();}catch(e){} audioContext=null;}
     document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
     document.getElementById('vpCanvas').style.display='none';
     if(navigator.vibrate) navigator.vibrate([30,30,30]);
 
-    // interimが残っていたらfinalに含める
-    if(interimTranscript.trim()){
-      finalTranscript+=interimTranscript;
-      interimTranscript='';
-    }
-
-    // 3つのソースから最も長いテキストを採用
-    const processed=processText(finalTranscript);
+    // 最終テキスト（停止後に追加された分も含む）
+    if(interimTranscript.trim()){ finalTranscript+=interimTranscript; interimTranscript=''; }
     const domNow=document.getElementById('currentText').textContent||'';
-    const candidates=[processed, snapshotText, domNow].filter(s=>s.trim()&&s.length>1);
-    // 最も長いものを採用（最も完全なテキスト）
-    let bestText='';
-    candidates.forEach(c=>{ if(c.length>bestText.length) bestText=c; });
+    const best=[processText(finalTranscript),snapshotText,domNow,copyText]
+      .filter(s=>s&&s.trim()&&s.length>1)
+      .sort((a,b)=>b.length-a.length)[0]||'';
 
-    if(bestText.trim()){
-      copyToClipboard(bestText.trim());
-      saveToHistory(bestText.trim());
+    if(best.trim()){
+      copyToClipboard(best.trim());
+      saveToHistory(best.trim());
       showToast('コピー完了');
     } else {
-      const el=document.getElementById('currentText');
-      el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
+      document.getElementById('currentText').innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
       document.getElementById('charCount').textContent='';
       finalTranscript=''; interimTranscript=''; sentences=[];
     }
+    // クリーンアップ（認識エンジン以外）
+    if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
+    if(audioContext&&audioContext.state!=='closed'){try{audioContext.close();}catch(e){}}
+    audioContext=null; analyser=null;
     setStatus('ready',t('stop'));
     recognition.onend=handleEnd;
   }
@@ -944,8 +938,9 @@ function processText(text){
 // ─── History ───
 function saveToHistory(text){
   if(!text||!text.trim()) return;
-  // 声紋データ取得（sessionPitchDataから直接計算）
-  const avgP=sessionPitchData.length?Math.round(sessionPitchData.reduce((a,b)=>a+b,0)/sessionPitchData.length):0;
+  // 声紋データ取得（stopRecordingで保存済みのpitchを使用）
+  const avgP=lastSavedPitch||
+    (sessionPitchData.length?Math.round(sessionPitchData.reduce((a,b)=>a+b,0)/sessionPitchData.length):0);
   let vpIcon='🎤', vpStatus='normal', vpMsg='';
   if(avgP>0&&voiceProfile&&voiceProfile.avgPitch>0){
     const diff=avgP-voiceProfile.avgPitch;
