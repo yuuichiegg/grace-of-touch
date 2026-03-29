@@ -278,7 +278,10 @@
 
 <!-- App -->
 <header>
-  <div class="logo">Voice<span>Type</span></div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <a href="/" class="icon-btn" title="Terminal" style="text-decoration:none;font-size:14px;">&#9664;</a>
+    <div class="logo">Voice<span>Type</span></div>
+  </div>
   <div class="header-right">
     <select class="lang-select" id="langSelect" onchange="switchLang(this.value)">
       <option value="ja-JP">JP 日本語</option>
@@ -303,6 +306,7 @@
       <option value="tr-TR">TR Türkçe</option>
     </select>
     <div class="mode-pill" id="modePill">テキスト整形</div>
+    <button class="icon-btn" id="loginBtn" onclick="toggleLogin()" title="Login" style="font-size:12px;">&#128100;</button>
     <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="テーマ切替">&#9788;</button>
     <button class="icon-btn" onclick="toggleSettings()">&#9881;</button>
   </div>
@@ -397,6 +401,73 @@
 
 <button class="ios-copy-banner" id="iosCopyBanner" onclick="iosCopyTap()">COPY</button>
 <div class="toast" id="toast"></div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+const FIREBASE_CONFIG={apiKey:"AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",authDomain:"grace-of-touch.firebaseapp.com",projectId:"grace-of-touch",storageBucket:"grace-of-touch.firebasestorage.app",messagingSenderId:"505078300866",appId:"1:505078300866:web:adad2a27b163c3b0f1bb5b"};
+firebase.initializeApp(FIREBASE_CONFIG);
+const fbAuth=firebase.auth();
+const fbDb=firebase.firestore();
+let fbUser=null;
+
+// Auth state
+fbAuth.onAuthStateChanged((user)=>{
+  fbUser=user;
+  const btn=document.getElementById('loginBtn');
+  if(user){
+    btn.innerHTML='&#128994;'; // green dot = logged in
+    btn.title=user.displayName||user.email||'Logged in';
+    syncFromCloud();
+  }else{
+    btn.innerHTML='&#128100;';
+    btn.title='Login';
+  }
+});
+
+function toggleLogin(){
+  if(fbUser){
+    if(confirm('ログアウトしますか？')) fbAuth.signOut();
+  }else{
+    const provider=new firebase.auth.GoogleAuthProvider();
+    fbAuth.signInWithPopup(provider).catch(e=>showToast('Login: '+e.message));
+  }
+}
+
+// Cloud sync
+async function syncToCloud(){
+  if(!fbUser) return;
+  try{
+    await fbDb.collection('voicetype_history').doc(fbUser.uid).set({
+      history: history.slice(0,100),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    },{merge:true});
+  }catch(e){ console.log('sync error:', e); }
+}
+
+async function syncFromCloud(){
+  if(!fbUser) return;
+  try{
+    const doc=await fbDb.collection('voicetype_history').doc(fbUser.uid).get();
+    if(doc.exists){
+      const cloudHistory=doc.data().history||[];
+      // Merge: cloud + local, dedupe by time+text
+      const merged=[...history];
+      const existing=new Set(history.map(h=>h.time+h.text));
+      cloudHistory.forEach(h=>{
+        if(!existing.has(h.time+h.text)){ merged.push(h); existing.add(h.time+h.text); }
+      });
+      // Sort by time descending
+      merged.sort((a,b)=>(b.time||'').localeCompare(a.time||''));
+      history=merged.slice(0,100);
+      localStorage.setItem('vt_history',JSON.stringify(history));
+      renderHistory();
+    }
+  }catch(e){ console.log('sync read error:', e); }
+}
+</script>
 
 <script>
 let isRecording = false, recognition = null, audioContext = null, analyser = null, mediaStream = null;
@@ -802,6 +873,7 @@ function autoSaveToHistory(){
   if(history.length>50) history=history.slice(0,50);
   localStorage.setItem('vt_history',JSON.stringify(history));
   renderHistory();
+  syncToCloud(); // クラウド同期
   if(isIOS){
     // iOS: コピーバナーを表示
     document.getElementById('iosCopyBanner').classList.add('show');
