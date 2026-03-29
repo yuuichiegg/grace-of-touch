@@ -712,38 +712,33 @@ function stopRecording(){
   isRecording=false;
   document.getElementById('recBtn').classList.remove('recording');
 
-  // 1. ピッチ確保
-  lastSavedPitch=sessionPitchData.length?Math.round(sessionPitchData.reduce((a,b)=>a+b,0)/sessionPitchData.length):0;
+  try{
+    // 1. ピッチ確保
+    lastSavedPitch=sessionPitchData.length?Math.round(sessionPitchData.reduce((a,b)=>a+b,0)/sessionPitchData.length):0;
 
-  // 2. テキスト確保（interim含む）
-  if(interimTranscript.trim()){ finalTranscript+=interimTranscript; interimTranscript=''; }
-  const text=(document.getElementById('currentText').textContent||'').trim();
+    // 2. テキスト確保
+    if(interimTranscript.trim()){ finalTranscript+=interimTranscript; interimTranscript=''; }
+    const text=(document.getElementById('currentText').textContent||'').trim();
 
-  // 3. 即コピー（ユーザージェスチャー内）
-  if(text) copyToClipboard(text);
+    // 3. コピー＆保存
+    if(text){
+      copyToClipboard(text);
+      saveToHistory(text);
+    }
+  }catch(e){}
 
-  // 4. 即保存＆クリア
-  if(text){
-    saveToHistory(text);
-    showToast('コピー完了');
-  }else{
-    document.getElementById('currentText').innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
-    document.getElementById('charCount').textContent='';
-  }
-
-  // 5. UI更新
+  // 4. 必ず画面クリア（エラーがあっても）
+  document.getElementById('currentText').innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
+  document.getElementById('charCount').textContent='';
   document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
   document.getElementById('vpCanvas').style.display='none';
+  finalTranscript=''; interimTranscript=''; sentences=[];
   if(navigator.vibrate) navigator.vibrate([30,30,30]);
   setStatus('ready',t('stop'));
 
-  // 6. リソース停止（非同期でOK）
+  // 5. リソース停止
   try{recognition.stop();}catch(e){}
-  recognition.onend=function(){
-    cleanup();
-    recognition=null;
-  };
-  setTimeout(()=>{ cleanup(); },2000);
+  setTimeout(cleanup,500);
 }
 
 // クリップボードコピー（ターミナル版と同じ方式）
@@ -919,20 +914,9 @@ function processText(text){
 // ─── History ───
 function saveToHistory(text){
   if(!text||!text.trim()) return;
-  // 声紋データ取得（stopRecordingで保存済みのpitchを使用）
-  const avgP=lastSavedPitch||
-    (sessionPitchData.length?Math.round(sessionPitchData.reduce((a,b)=>a+b,0)/sessionPitchData.length):0);
-  let vpIcon='🎤', vpStatus='normal', vpMsg='';
-  if(avgP>0&&voiceProfile&&voiceProfile.avgPitch>0){
-    const diff=avgP-voiceProfile.avgPitch;
-    const pct=Math.abs(diff)/voiceProfile.avgPitch*100;
-    if(pct<5){vpIcon='🟢';vpStatus='normal';vpMsg='声の調子は良好';}
-    else if(diff>0&&pct>15){vpIcon='🟡';vpStatus='tense';vpMsg='少し緊張気味';}
-    else if(diff<0&&pct>15){vpIcon='🟠';vpStatus='tired';vpMsg='お疲れかも';}
-    else if(pct>10){vpIcon='🔵';vpStatus='changed';vpMsg='トーンが違う';}
-    else{vpIcon='🟢';vpStatus='normal';vpMsg='';}
-  }else if(avgP>0){vpIcon='🟢';}
-  const vprint={ pitch:avgP, status:vpStatus, icon:vpIcon, msg:vpMsg };
+  // 声紋データ — シンプルにピッチのみ
+  const avgP=lastSavedPitch||0;
+  const vprint={ pitch:avgP, icon:avgP>0?'🟢':'🎤' };
   if(vc&&vc.status!=='normal') showToast(vc.icon+' '+vc.msg);
   // 履歴に声紋付きで保存
   const entry={ text, time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}), lang: currentLang, vprint };
@@ -949,12 +933,6 @@ function saveToHistory(text){
   }
   // スクロールして履歴を見せる
   document.getElementById('historyContent').scrollTop=0;
-  setStatus('ready','↓ タップでコピー');
-  // クリア
-  const el=document.getElementById('currentText');
-  el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
-  document.getElementById('charCount').textContent='';
-  finalTranscript=''; interimTranscript=''; sentences=[];
 }
 
 function sendToHistory(){
