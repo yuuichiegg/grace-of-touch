@@ -484,7 +484,13 @@ function stopRecording(){
   document.getElementById('recBtn').classList.remove('recording');
   document.getElementById('currentLabel').textContent='処理中...';
   setStatus('ready','最終処理中...');
-  // 停止後、最後の音声が確定するのを待ってからコピー・保存
+
+  // iOS: ユーザータップ内で即座にコピー（後でonendで最終版を再コピー試行）
+  if(isIOS){
+    const currentText=processText(finalTranscript);
+    if(currentText.trim()) copyToClipboard(currentText);
+  }
+
   recognition.onend=function(){
     if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
     if(audioContext){audioContext.close();audioContext=null;}
@@ -492,12 +498,28 @@ function stopRecording(){
     document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
     setStatus('ready','停止');
     if(navigator.vibrate) navigator.vibrate([30,30,30]);
-    // 最終結果が確定してからコピー・保存
     setTimeout(()=> autoSaveToHistory(), 300);
-    // onendを元に戻す
     recognition.onend=handleEnd;
   };
   recognition.stop();
+}
+
+// クリップボードコピー（iOS対応フォールバック付き）
+function copyToClipboard(text){
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(()=>fallbackCopy(text));
+  }else{
+    fallbackCopy(text);
+  }
+}
+function fallbackCopy(text){
+  const ta=document.createElement('textarea');
+  ta.value=text;
+  ta.style.cssText='position:fixed;left:-9999px;top:-9999px;opacity:0;';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try{ document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
 }
 
 function handleResult(event){
@@ -595,8 +617,8 @@ function autoSaveToHistory(){
   const el=document.getElementById('currentText');
   const text=el.textContent||'';
   if(!text.trim()||text.includes('録音ボタンで開始'))return;
-  // 自動コピー（トースト不要 — 履歴に表示されるため）
-  navigator.clipboard.writeText(text);
+  // 自動コピー（iOS以外。iOSはstopRecording内でタップ時にコピー済み）
+  if(!isIOS) copyToClipboard(text);
   // 履歴に保存
   const entry={ text, time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}), lang: currentLang };
   history.unshift(entry);
@@ -634,7 +656,7 @@ function renderHistory(){
 }
 
 function copyHistory(i){
-  if(history[i]) navigator.clipboard.writeText(history[i].text).then(()=>showToast('コピーしました'));
+  if(history[i]){ copyToClipboard(history[i].text); showToast('コピーしました'); }
 }
 
 function clearHistory(){
