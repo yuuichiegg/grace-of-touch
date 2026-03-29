@@ -1158,7 +1158,7 @@ document.addEventListener('keydown',(e)=>{
   if(e.key===selectedHotkey||e.code===selectedHotkey){e.preventDefault();toggleRecording();return;}
   if(e.key==='F2'&&selectedHotkey!=='F2'){e.preventDefault();toggleRecording();return;}
 });
-document.addEventListener('touchstart',(e)=>{if(e.target.closest('.rec-btn')){e.preventDefault();toggleRecording();}},{passive:false});
+// touchstartのpreventDefault削除（iOSクリップボードのジェスチャーコンテキストを壊すため）
 
 // ─── Init ───
 (function(){
