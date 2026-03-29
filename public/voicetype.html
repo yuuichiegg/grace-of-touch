@@ -696,20 +696,27 @@ function stopRecording(){
   if(!isRecording) return;
   isRecording=false;
   document.getElementById('recBtn').classList.remove('recording');
-  setStatus('ready',t('processing'));
 
-  // 即座にコピー（ユーザータップ内）
-  const currentText=processText(finalTranscript);
-  if(currentText.trim()) copyToClipboard(currentText);
+  // 即座にコピー（ユーザータップ内 — ジェスチャーコンテキスト有効）
+  const textNow=processText(finalTranscript);
+  if(textNow.trim()) copyToClipboard(textNow);
 
-  recognition.onend=function(){
+  // recognition.stop()後にonendで最終テキストを取得して再コピー
+  const onEndHandler=function(){
     if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop());mediaStream=null;}
-    if(audioContext){audioContext.close();audioContext=null;}
+    if(audioContext){try{audioContext.close();}catch(e){} audioContext=null;}
     document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
     if(navigator.vibrate) navigator.vibrate([30,30,30]);
-    autoSaveToHistory();
+    // 最終確定テキストでコピー＆保存
+    const finalText=processText(finalTranscript);
+    if(finalText.trim()){
+      copyToClipboard(finalText);
+      saveToHistory(finalText);
+    }
+    setStatus('ready',t('stop'));
     recognition.onend=handleEnd;
   };
+  recognition.onend=onEndHandler;
   recognition.stop();
 }
 
@@ -894,26 +901,21 @@ function processText(text){
 }
 
 // ─── History ───
-function autoSaveToHistory(){
-  const el=document.getElementById('currentText');
-  const text=el.textContent||'';
-  if(!text.trim()||document.getElementById('currentText').querySelector('.placeholder'))return;
+function saveToHistory(text){
+  if(!text||!text.trim()) return;
   // 声の状態チェック
   const vc=checkVoiceCondition();
   if(vc&&vc.status!=='normal') showToast(vc.icon+' '+vc.msg);
-  // 自動コピー（iOS以外）
-  // 最終テキストで再コピー（onend後の確定版）
-  copyToClipboard(text);
-  // 履歴に保存（声の状態も記録）
+  // 履歴に保存
   const entry={ text, time: new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}), lang: currentLang, voice: vc?vc.status:'unknown' };
   history.unshift(entry);
   if(history.length>50) history=history.slice(0,50);
   localStorage.setItem('vt_history',JSON.stringify(history));
   renderHistory();
   syncToCloud();
-  // 即座にクリア
+  // クリア
   if(isIOS) document.getElementById('iosCopyBanner').classList.add('show');
-  setStatus('ready',t('stop'));
+  const el=document.getElementById('currentText');
   el.innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
   document.getElementById('charCount').textContent='';
   finalTranscript=''; interimTranscript=''; sentences=[];
@@ -960,8 +962,23 @@ function iosCopyTap(){
 
 function copyHistory(i){
   if(!history[i]) return;
-  copyToClipboard(history[i].text);
-  // タップしたアイテムをハイライト
+  const text=history[i].text;
+  // 確実にコピー: clipboard API + fallback両方試行
+  let copied=false;
+  try{
+    const ta=document.createElement('textarea');
+    ta.value=text;
+    ta.style.cssText='position:fixed;left:0;top:0;opacity:0;width:1px;height:1px;';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select(); ta.setSelectionRange(0,ta.value.length);
+    copied=document.execCommand('copy');
+    document.body.removeChild(ta);
+  }catch(e){}
+  // clipboard APIも試行
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).catch(()=>{});
+  }
+  // ハイライト
   const items=document.querySelectorAll('.history-item');
   if(items[i]){
     items[i].style.borderColor='var(--accent)';
