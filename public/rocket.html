@@ -4736,22 +4736,18 @@ function vtStopRec(){
   vtIsRecording=false;
   document.getElementById('vt-rec').style.borderColor='var(--term-color)';
   document.getElementById('vt-rec-inner').style.cssText='width:16px;height:16px;background:var(--term-color);border-radius:50%;';
-  // まず今あるテキストを即コピー（ユーザータップ内）
-  if(vtTranscript.trim()) vtCopyToClipboard(vtTranscript);
-  // 停止→onendで最終テキスト確定後に再コピー＆クリア＆BGM再開
-  vtRecognition.onend=function(){
-    setTimeout(()=>{
-      if(vtTranscript.trim()){
-        vtCopyToClipboard(vtTranscript);
-        vtHistory.unshift({text:vtTranscript,time:new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})});
-        if(vtHistory.length>20) vtHistory=vtHistory.slice(0,20);
-        vtRenderHistory();
-        vtTranscript=''; vtSentences=[];
-        document.getElementById('vt-text').innerHTML='<span style="color:var(--term-dim);font-style:italic;">&#127908; マイクボタンで音声入力</span>';
-      }
-      // BGMは音量バーで調整（自動停止/再開しない）
-    },300);
-  };
+  // DOMテキスト（interim含む）を即コピー
+  var domText=(document.getElementById('vt-text').textContent||'').trim();
+  if(!domText||domText.includes('マイクボタン')) domText=vtTranscript.trim();
+  if(domText) vtCopyToClipboard(domText);
+  // 履歴保存＆クリア
+  if(domText){
+    vtHistory.unshift({text:domText,time:new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})});
+    if(vtHistory.length>20) vtHistory=vtHistory.slice(0,20);
+    vtRenderHistory();
+  }
+  vtTranscript=''; vtSentences=[];
+  document.getElementById('vt-text').innerHTML='<span style="color:var(--term-dim);font-style:italic;">&#127908; マイクボタンで音声入力</span>';
   try{vtRecognition.stop();}catch(e){}
 }
 
