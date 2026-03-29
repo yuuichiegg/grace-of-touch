@@ -236,6 +236,7 @@
     <button onclick="vtCopy()" style="background:rgba(0,216,255,0.08);border:1px solid var(--term-dim);color:var(--term-color);padding:6px 12px;border-radius:4px;cursor:pointer;font-family:'Courier New',monospace;font-size:11px;">COPY</button>
     <button onclick="vtSendToChat()" style="background:rgba(0,216,255,0.15);border:1px solid var(--term-color);color:var(--term-color);padding:6px 14px;border-radius:4px;cursor:pointer;font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.05em;">SEND</button>
   </div>
+  <div id="vt-history" style="max-height:80px;overflow-y:auto;margin-top:8px;border-top:1px solid rgba(0,216,255,0.1);padding-top:6px;font-size:11px;color:var(--term-dim);"></div>
 </div>
 
 <!-- Camera Mode Indicator -->
@@ -4686,7 +4687,7 @@ window.addEventListener('beforeunload',()=>{
 });
 
 // ─── VoiceType Integration ───
-let vtRecognition=null, vtIsRecording=false, vtTranscript='', vtSentences=[];
+let vtRecognition=null, vtIsRecording=false, vtTranscript='', vtSentences=[], vtHistory=[];
 const vtIsIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
 
 function toggleVoicePopup(){
@@ -4780,12 +4781,28 @@ function vtCopy(){
     try{document.execCommand('copy');}catch(e){}
     document.body.removeChild(ta);
   }
-  // コピー後クリア
+  // コピー後即クリア＆履歴に追加
+  vtHistory.unshift({text,time:new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})});
+  if(vtHistory.length>20) vtHistory=vtHistory.slice(0,20);
+  vtRenderHistory();
   vtTranscript=''; vtSentences=[];
-  document.getElementById('vt-text').innerHTML='<span style="color:var(--term-color);">&#10003; Copied</span>';
-  setTimeout(()=>{
-    document.getElementById('vt-text').innerHTML='<span style="color:var(--term-dim);font-style:italic;">&#127908; マイクボタンで音声入力</span>';
-  },1200);
+  document.getElementById('vt-text').innerHTML='<span style="color:var(--term-dim);font-style:italic;">&#127908; マイクボタンで音声入力</span>';
+}
+
+function vtRenderHistory(){
+  const el=document.getElementById('vt-history');
+  if(!vtHistory.length){el.innerHTML='';return;}
+  el.innerHTML=vtHistory.map((h,i)=>`<div style="padding:3px 0;border-bottom:1px solid rgba(0,216,255,0.05);cursor:pointer;" onclick="vtCopyHistoryItem(${i})"><span style="color:var(--term-dim);font-size:9px;">${h.time}</span> ${vtEsc(h.text).substring(0,60)}${h.text.length>60?'...':''}</div>`).join('');
+}
+
+function vtCopyHistoryItem(i){
+  if(!vtHistory[i]) return;
+  const text=vtHistory[i].text;
+  if(navigator.clipboard) navigator.clipboard.writeText(text).catch(()=>{});
+  // flash
+  const el=document.getElementById('vt-history');
+  const items=el.querySelectorAll('div');
+  if(items[i]){items[i].style.color='var(--term-color)';setTimeout(()=>{items[i].style.color='';},500);}
 }
 
 function vtEsc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
