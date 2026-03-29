@@ -146,10 +146,10 @@ body{margin:0;overflow:hidden;background:#020510;touch-action:none;}
 /* App Card */
 .app-card{background:rgba(0,255,255,0.02);border:1px solid rgba(0,255,255,0.08);
   border-radius:14px;padding:16px;cursor:pointer;transition:all 0.3s ease;
-  text-decoration:none;color:inherit;display:block;position:relative;overflow:hidden;}
+  text-decoration:none;color:inherit;display:block;position:relative;overflow:visible;}
 .app-card::after{content:'';position:absolute;inset:0;border-radius:14px;
   background:linear-gradient(135deg,rgba(0,255,255,0.04) 0%,transparent 60%);
-  opacity:0;transition:opacity 0.3s ease;}
+  opacity:0;transition:opacity 0.3s ease;pointer-events:none;overflow:hidden;}
 .app-card:hover{background:rgba(0,255,255,0.06);border-color:rgba(0,255,255,0.32);
   transform:translateX(-6px);box-shadow:6px 0 24px rgba(0,255,255,0.08);}
 .app-card:hover::after{opacity:1;}

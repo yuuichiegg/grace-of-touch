@@ -273,6 +273,7 @@
 </div>
 <!-- Moon Mission Button -->
 <button id="moon-mission-btn">&#127761; MOON MISSION</button>
+<button id="moon-abort-btn" style="position:absolute;top:80px;right:20px;z-index:35;pointer-events:auto;display:none;background:rgba(255,40,40,0.15);border:2px solid #ff4444;color:#ff4444;font-family:'Courier New',monospace;font-size:14px;font-weight:bold;letter-spacing:0.15em;padding:12px 24px;border-radius:6px;cursor:pointer;text-shadow:0 0 8px #ff4444;box-shadow:0 0 15px rgba(255,68,68,0.3);animation:btnPulse 2s ease-in-out infinite;">&#9888; ABORT MISSION</button>
 
 <!-- Moon Mission HUD -->
 <div id="moon-hud">
@@ -1229,6 +1230,7 @@ const LaunchSequence = {
 // ══════════════════════════════════════════════
 const MusicEngine={ctx:null,analyser:null,sourceNode:null,gainNode:null,audio:null,isPlaying:false,currentIndex:0,shuffled:false,_playOrder:[],_orderPos:0,_fftSize:64,_fftData:null,_smoothBass:0,_smoothMid:0,_smoothTreble:0,_smoothEnergy:0,_beatThreshold:0.6,_beatCooldown:0,_lastBeatTime:0,_beatDetected:false,_prevBassEnergy:0,_fftConnected:false,_syntheticMode:false,_audioDisabled:false,_synthCycleTimer:0,_synthCycleInterval:20,
 playlist:[
+  {file:'music/10_atodashi_janken.mp3',titleJa:'ATODASHI JANKEN',mood:'urban_pulse',hue:35,energy:0.9,warmth:0.7},
   {file:'music/01_distance.mp3',titleJa:'ディスタンスの向こう側',mood:'deep_space',hue:220,energy:0.4,warmth:0.2},
   {file:'music/02_run_this_down.mp3',titleJa:'Run This Down',mood:'urban_pulse',hue:30,energy:1.0,warmth:0.8},
   {file:'music/03_future_ocean.mp3',titleJa:'遥かな未来 輝く海辺の街',mood:'ocean_horizon',hue:190,energy:0.6,warmth:0.5},
@@ -1238,7 +1240,6 @@ playlist:[
   {file:'music/07_noel_elefolk.mp3',titleJa:'ノエル エレフォークVer.',mood:'forest',hue:120,energy:0.4,warmth:0.7},
   {file:'music/08_sorasido.mp3',titleJa:'ソラシド',mood:'sky_ascent',hue:200,energy:0.7,warmth:0.4},
   {file:'music/09_tankyu.mp3',titleJa:'探求',mood:'nebula',hue:280,energy:0.6,warmth:0.3},
-  {file:'music/10_atodashi_janken.mp3',titleJa:'後出しじゃんけん',mood:'urban_pulse',hue:35,energy:0.9,warmth:0.7},
 ],
 moodColors:{deep_space:{bg:[220,0.85,0.03],pt:[200,0.9,0.55],bloom:1.8},urban_pulse:{bg:[25,0.6,0.05],pt:[30,0.85,0.6],bloom:2.2},ocean_horizon:{bg:[195,0.7,0.04],pt:[180,0.8,0.5],bloom:1.6},void:{bg:[270,0.6,0.03],pt:[260,0.7,0.5],bloom:2.0},metro:{bg:[160,0.5,0.04],pt:[170,0.75,0.55],bloom:1.9},mountain:{bg:[140,0.4,0.04],pt:[130,0.6,0.5],bloom:1.4},forest:{bg:[120,0.5,0.04],pt:[110,0.65,0.45],bloom:1.5},sky_ascent:{bg:[210,0.7,0.04],pt:[200,0.85,0.55],bloom:1.7},nebula:{bg:[280,0.65,0.04],pt:[270,0.8,0.5],bloom:2.4}},
 currentMood:{hue:220,energy:0.4,warmth:0.2,bloom:1.8},targetMood:{hue:220,energy:0.4,warmth:0.2,bloom:1.8},
@@ -1577,6 +1578,75 @@ const SolarSystem={
              rings:true,desc:'SATURN'},
   },
 
+  // Generate procedural planet texture on canvas
+  _generateTexture(name,w,h){
+    const c=document.createElement('canvas');c.width=w;c.height=h;
+    const ctx=c.getContext('2d');
+    const rng=(s)=>{let x=s;return()=>{x=Math.sin(x*127.1+311.7)*43758.5453;return x-Math.floor(x);}};
+
+    if(name==='Moon'){
+      // Gray surface with craters
+      ctx.fillStyle='#aaaaaa';ctx.fillRect(0,0,w,h);
+      const rand=rng(42);
+      // Large maria (dark patches)
+      const maria=[{x:0.35,y:0.4,r:0.15,c:'#777777'},{x:0.55,y:0.35,r:0.12,c:'#808080'},{x:0.45,y:0.55,r:0.1,c:'#757575'},{x:0.7,y:0.45,r:0.08,c:'#7a7a7a'}];
+      maria.forEach(m=>{ctx.beginPath();ctx.arc(m.x*w,m.y*h,m.r*w,0,Math.PI*2);ctx.fillStyle=m.c;ctx.fill();});
+      // Craters — many sizes
+      for(let i=0;i<300;i++){
+        const x=rand()*w,y=rand()*h,r=1+rand()*Math.max(w*0.03,3);
+        ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);
+        ctx.fillStyle=`rgba(${80+rand()*40},${80+rand()*40},${80+rand()*40},0.6)`;ctx.fill();
+        // Crater rim highlight
+        ctx.beginPath();ctx.arc(x-r*0.2,y-r*0.2,r*0.9,0,Math.PI*2);
+        ctx.strokeStyle=`rgba(200,200,200,${0.15+rand()*0.15})`;ctx.lineWidth=0.5;ctx.stroke();
+      }
+      // Small detail noise
+      for(let i=0;i<2000;i++){const x=rand()*w,y=rand()*h;ctx.fillStyle=`rgba(${100+rand()*60},${100+rand()*60},${100+rand()*60},0.3)`;ctx.fillRect(x,y,1,1);}
+    }else if(name==='Mars'){
+      // Reddish-brown with darker regions and polar caps
+      const grad=ctx.createLinearGradient(0,0,0,h);
+      grad.addColorStop(0,'#ddccbb');grad.addColorStop(0.1,'#cc7755');grad.addColorStop(0.5,'#bb5533');grad.addColorStop(0.9,'#cc7755');grad.addColorStop(1,'#ddccbb');
+      ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
+      const rand=rng(77);
+      // Dark regions (Syrtis Major etc)
+      for(let i=0;i<15;i++){ctx.beginPath();ctx.arc(rand()*w,0.3*h+rand()*0.4*h,w*0.05+rand()*w*0.08,0,Math.PI*2);ctx.fillStyle=`rgba(100,40,20,${0.2+rand()*0.3})`;ctx.fill();}
+      // Valles Marineris hint
+      ctx.beginPath();ctx.moveTo(0.2*w,0.48*h);ctx.quadraticCurveTo(0.4*w,0.45*h,0.6*w,0.47*h);ctx.strokeStyle='rgba(80,30,15,0.4)';ctx.lineWidth=3;ctx.stroke();
+      // Surface noise
+      for(let i=0;i<3000;i++){const x=rand()*w,y=rand()*h;ctx.fillStyle=`rgba(${150+rand()*80},${60+rand()*50},${30+rand()*30},0.2)`;ctx.fillRect(x,y,1+rand()*2,1+rand()*2);}
+    }else if(name==='Jupiter'){
+      // Horizontal bands
+      const colors=['#ddaa77','#cc9966','#eebb88','#aa7744','#ddcc99','#bb8855','#eedd99','#cc8844'];
+      const bandH=h/colors.length;
+      colors.forEach((col,i)=>{ctx.fillStyle=col;ctx.fillRect(0,i*bandH,w,bandH+1);});
+      // Great Red Spot
+      ctx.beginPath();ctx.ellipse(0.65*w,0.6*h,w*0.06,h*0.035,0,0,Math.PI*2);ctx.fillStyle='#cc5533';ctx.fill();
+      ctx.beginPath();ctx.ellipse(0.65*w,0.6*h,w*0.04,h*0.02,0,0,Math.PI*2);ctx.fillStyle='#dd7755';ctx.fill();
+      // Turbulence
+      const rand=rng(99);
+      for(let i=0;i<5000;i++){const x=rand()*w,y=rand()*h;ctx.fillStyle=`rgba(${180+rand()*60},${140+rand()*60},${80+rand()*60},0.15)`;ctx.fillRect(x,y,2+rand()*4,1);}
+    }else if(name==='Saturn'){
+      // Pale gold with subtle bands
+      const grad=ctx.createLinearGradient(0,0,0,h);
+      grad.addColorStop(0,'#eeddaa');grad.addColorStop(0.3,'#ddcc88');grad.addColorStop(0.5,'#ccbb77');grad.addColorStop(0.7,'#ddcc88');grad.addColorStop(1,'#eeddaa');
+      ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);
+      const rand=rng(55);
+      for(let i=0;i<3000;i++){const x=rand()*w,y=rand()*h;ctx.fillStyle=`rgba(${200+rand()*50},${180+rand()*50},${100+rand()*50},0.1)`;ctx.fillRect(x,y,3+rand()*5,1);}
+    }else if(name==='Venus'){
+      // Thick cloudy yellowish atmosphere
+      ctx.fillStyle='#ddbb77';ctx.fillRect(0,0,w,h);
+      const rand=rng(33);
+      for(let i=0;i<4000;i++){const x=rand()*w,y=rand()*h,s=2+rand()*6;ctx.fillStyle=`rgba(${210+rand()*40},${190+rand()*40},${120+rand()*40},0.15)`;ctx.fillRect(x,y,s,s*0.5);}
+    }else if(name==='Mercury'){
+      // Gray cratered surface like Moon but darker
+      ctx.fillStyle='#887766';ctx.fillRect(0,0,w,h);
+      const rand=rng(11);
+      for(let i=0;i<200;i++){const x=rand()*w,y=rand()*h,r=1+rand()*w*0.025;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=`rgba(${60+rand()*40},${55+rand()*35},${50+rand()*30},0.5)`;ctx.fill();}
+      for(let i=0;i<2000;i++){const x=rand()*w,y=rand()*h;ctx.fillStyle=`rgba(${100+rand()*50},${90+rand()*45},${80+rand()*40},0.25)`;ctx.fillRect(x,y,1,1);}
+    }
+    return new THREE.CanvasTexture(c);
+  },
+
   init(scene){
     this._astronomyAvailable=(typeof Astronomy!=='undefined');
     if(!this._astronomyAvailable)Logger.log("SOLAR SYSTEM: Astronomy Engine unavailable — static positions");
@@ -1584,13 +1654,15 @@ const SolarSystem={
     for(const[name,d]of Object.entries(this.BODY_DATA)){
       const group=new THREE.Group();
 
-      // Main sphere (solid, opaque — for landing/collision)
+      // Main sphere with procedural texture
       const geo=new THREE.SphereGeometry(d.radius,d.segments,d.segments);
       let mat;
       if(d.emissive){
         mat=new THREE.MeshBasicMaterial({color:d.color});
       }else{
-        mat=new THREE.MeshPhongMaterial({color:d.color,shininess:30});
+        const texSize=name==='Jupiter'||name==='Saturn'?512:256;
+        const tex=this._generateTexture(name,texSize,texSize);
+        mat=new THREE.MeshStandardMaterial({map:tex,roughness:0.85,metalness:0.05});
       }
       const mesh=new THREE.Mesh(geo,mat);
       group.add(mesh);
@@ -1984,57 +2056,81 @@ const PandaZones={
         const pos=this._latLngToPos(lat,lng,8);
         const normal=pos.clone().sub(this.earthCenter.clone()).normalize();
 
-        // Panda body (simple white+black spheres) — scaled up for visibility from orbit
+        // Panda — cute round proportions, visible from moderate distance
         const panda=new THREE.Group();
-        const S=0.8; // visible from orbit but not giant
+        const S=0.3; // balanced: visible but not giant
 
-        // Body (white)
-        const bodyGeo=new THREE.SphereGeometry(6*S,8,8);
-        const bodyMat=new THREE.MeshBasicMaterial({color:0xfafafa});
-        panda.add(new THREE.Mesh(bodyGeo,bodyMat));
+        const whiteMat=new THREE.MeshStandardMaterial({color:0xf5f5f0,roughness:0.9,metalness:0});
+        const blackMat=new THREE.MeshStandardMaterial({color:0x1a1a1a,roughness:0.85,metalness:0});
 
-        // Head (white, on top)
-        const headGeo=new THREE.SphereGeometry(4.5*S,8,8);
-        panda.add(new THREE.Mesh(headGeo,bodyMat));
-        panda.children[1].position.set(0,7*S,0);
+        // Body — big round belly (panda's signature round shape)
+        const body=new THREE.Mesh(new THREE.SphereGeometry(5*S,12,12),whiteMat);
+        body.scale.set(1,1.1,0.9); // slightly tall, slightly flat
+        panda.add(body);
 
-        // Ears (black)
-        const earMat=new THREE.MeshBasicMaterial({color:0x111111});
-        const earGeo=new THREE.SphereGeometry(2*S,6,6);
-        const earL=new THREE.Mesh(earGeo,earMat);earL.position.set(-3*S,10*S,0);
-        const earR=new THREE.Mesh(earGeo,earMat);earR.position.set(3*S,10*S,0);
+        // Head — large and round, sitting on body
+        const head=new THREE.Mesh(new THREE.SphereGeometry(4*S,12,12),whiteMat);
+        head.position.set(0,7*S,0.5*S);
+        panda.add(head);
+
+        // Ears — round black ears on top of head
+        const earGeo=new THREE.SphereGeometry(1.5*S,8,8);
+        const earL=new THREE.Mesh(earGeo,blackMat);earL.position.set(-2.8*S,10.5*S,0);
+        const earR=new THREE.Mesh(earGeo,blackMat);earR.position.set(2.8*S,10.5*S,0);
         panda.add(earL,earR);
 
-        // Eye patches (black)
-        const patchGeo=new THREE.SphereGeometry(2*S,6,6);
-        const patchL=new THREE.Mesh(patchGeo,earMat);patchL.position.set(-2*S,7.5*S,3.5*S);patchL.scale.set(1,1.2,0.5);
-        const patchR=new THREE.Mesh(patchGeo,earMat);patchR.position.set(2*S,7.5*S,3.5*S);patchR.scale.set(1,1.2,0.5);
+        // Eye patches — signature panda black patches (oval)
+        const patchGeo=new THREE.SphereGeometry(1.6*S,8,8);
+        const patchL=new THREE.Mesh(patchGeo,blackMat);
+        patchL.position.set(-1.5*S,7.5*S,3*S);patchL.scale.set(1.2,1.4,0.5);
+        const patchR=new THREE.Mesh(patchGeo,blackMat);
+        patchR.position.set(1.5*S,7.5*S,3*S);patchR.scale.set(1.2,1.4,0.5);
         panda.add(patchL,patchR);
 
-        // Eyes (white dots)
+        // Eyes — small white dots inside patches
         const eyeMat=new THREE.MeshBasicMaterial({color:0xffffff});
-        const eyeGeo=new THREE.SphereGeometry(0.8*S,6,6);
-        const eyeL=new THREE.Mesh(eyeGeo,eyeMat);eyeL.position.set(-1.8*S,7.8*S,4.2*S);
-        const eyeR=new THREE.Mesh(eyeGeo,eyeMat);eyeR.position.set(1.8*S,7.8*S,4.2*S);
+        const eyeGeo=new THREE.SphereGeometry(0.5*S,6,6);
+        const eyeL=new THREE.Mesh(eyeGeo,eyeMat);eyeL.position.set(-1.4*S,7.8*S,3.8*S);
+        const eyeR=new THREE.Mesh(eyeGeo,eyeMat);eyeR.position.set(1.4*S,7.8*S,3.8*S);
         panda.add(eyeL,eyeR);
+        // Pupils
+        const pupilMat=new THREE.MeshBasicMaterial({color:0x111111});
+        const pupilGeo=new THREE.SphereGeometry(0.25*S,4,4);
+        const pupilL=new THREE.Mesh(pupilGeo,pupilMat);pupilL.position.set(-1.3*S,7.8*S,4.1*S);
+        const pupilR=new THREE.Mesh(pupilGeo,pupilMat);pupilR.position.set(1.3*S,7.8*S,4.1*S);
+        panda.add(pupilL,pupilR);
 
-        // Nose
-        const noseGeo=new THREE.SphereGeometry(0.6*S,4,4);
-        const noseMat=new THREE.MeshBasicMaterial({color:0x222222});
-        const nose=new THREE.Mesh(noseGeo,noseMat);nose.position.set(0,6.5*S,4.5*S);
+        // Nose — small black triangle
+        const nose=new THREE.Mesh(new THREE.SphereGeometry(0.5*S,4,4),blackMat);
+        nose.position.set(0,6.5*S,4*S);nose.scale.set(1.2,0.8,0.6);
         panda.add(nose);
 
-        // Arms (black)
-        const armGeo=new THREE.CylinderGeometry(2*S,4*S,4,4);
-        const armL=new THREE.Mesh(armGeo,earMat);armL.position.set(-6*S,2*S,0);armL.rotation.z=0.5;
-        const armR=new THREE.Mesh(armGeo,earMat);armR.position.set(6*S,2*S,0);armR.rotation.z=-0.5;
+        // Mouth hint
+        const mouthMat=new THREE.MeshBasicMaterial({color:0x333333});
+        const mouth=new THREE.Mesh(new THREE.TorusGeometry(0.4*S,0.1*S,4,8,Math.PI),mouthMat);
+        mouth.position.set(0,5.8*S,3.8*S);mouth.rotation.x=0.3;
+        panda.add(mouth);
+
+        // Arms — thick round black limbs (spheres, not cylinders)
+        const armGeo=new THREE.SphereGeometry(2*S,8,8);
+        const armL=new THREE.Mesh(armGeo,blackMat);
+        armL.position.set(-4.5*S,1*S,1*S);armL.scale.set(0.8,1.3,0.8);
+        const armR=new THREE.Mesh(armGeo,blackMat);
+        armR.position.set(4.5*S,1*S,1*S);armR.scale.set(0.8,1.3,0.8);
         panda.add(armL,armR);
 
-        // Legs (black)
-        const legGeo=new THREE.CylinderGeometry(2.5*S,3*S,4,4);
-        const legL=new THREE.Mesh(legGeo,earMat);legL.position.set(-3*S,-5*S,0);
-        const legR=new THREE.Mesh(legGeo,earMat);legR.position.set(3*S,-5*S,0);
+        // Legs — thick round black limbs
+        const legGeo=new THREE.SphereGeometry(2.2*S,8,8);
+        const legL=new THREE.Mesh(legGeo,blackMat);
+        legL.position.set(-2.5*S,-4.5*S,1.5*S);legL.scale.set(1,0.8,1.2);
+        const legR=new THREE.Mesh(legGeo,blackMat);
+        legR.position.set(2.5*S,-4.5*S,1.5*S);legR.scale.set(1,0.8,1.2);
         panda.add(legL,legR);
+
+        // Tail — small white nub
+        const tail=new THREE.Mesh(new THREE.SphereGeometry(0.8*S,6,6),whiteMat);
+        tail.position.set(0,-1*S,-4.5*S);
+        panda.add(tail);
 
         // Position on Earth surface, orient to stand upright
         panda.position.copy(pos);
@@ -2876,16 +2972,141 @@ const PlayerShip={
 // ══════════════════════════════════════════════
 const SpaceElevator={
   group:null,
-  _car:null,_carProgress:0,_carSpeed:0.02,_carDir:1,
-  _towerHeight:2000, // from Earth surface to GEO-like altitude
+  _carUp:null,_carDown:null, // Two cars: ascending and descending
+  _carUpProgress:0,_carDownProgress:0.5, // Start at opposite positions
+  _carSpeed:0.015,
+  _towerHeight:2000,
   _baseLat:0.0,_baseLng:131.0, // Pacific equator (near Palau)
+  _cableSpacing:8, // Distance between left/right cable pairs
+
+  _buildCabin(color,label){
+    const cabin=new THREE.Group();
+    const W=10,H=14,D=8; // cabin dimensions
+
+    // Glass material — transparent, slightly reflective
+    const glassMat=new THREE.MeshPhysicalMaterial({
+      color:0xaaddff,transparent:true,opacity:0.25,
+      metalness:0.1,roughness:0.05,
+      transmission:0.8,thickness:0.3,
+      side:THREE.DoubleSide
+    });
+    // Frame material — dark metal structural beams
+    const frameMat=new THREE.MeshStandardMaterial({color:0x333d4a,metalness:0.7,roughness:0.3});
+    const frameT=0.4; // frame thickness
+
+    // --- Structural frame (safety beams) ---
+    // 4 vertical corner pillars
+    const pillarGeo=new THREE.BoxGeometry(frameT*2,H,frameT*2);
+    for(let x of[-W/2,W/2]){for(let z of[-D/2,D/2]){
+      const p=new THREE.Mesh(pillarGeo,frameMat);
+      p.position.set(x,0,z);
+      cabin.add(p);
+    }}
+    // Horizontal frame rings (top, middle, bottom)
+    const hBeamX=new THREE.BoxGeometry(W,frameT*2,frameT*2);
+    const hBeamZ=new THREE.BoxGeometry(frameT*2,frameT*2,D);
+    for(let y of[-H/2,0,H/2]){
+      for(let z of[-D/2,D/2]){cabin.add(new THREE.Mesh(hBeamX,frameMat)).position.set(0,y,z);}
+      for(let x of[-W/2,W/2]){cabin.add(new THREE.Mesh(hBeamZ,frameMat)).position.set(x,y,0);}
+    }
+    // Mid-height safety rail on each side
+    const railGeo=new THREE.BoxGeometry(W-frameT*4,frameT,frameT);
+    for(let z of[-D/2,D/2]){
+      const rail=new THREE.Mesh(railGeo,frameMat);
+      rail.position.set(0,-H*0.15,z);
+      cabin.add(rail);
+    }
+    const railGeoZ=new THREE.BoxGeometry(frameT,frameT,D-frameT*4);
+    for(let x of[-W/2,W/2]){
+      const rail=new THREE.Mesh(railGeoZ,frameMat);
+      rail.position.set(x,-H*0.15,0);
+      cabin.add(rail);
+    }
+
+    // --- Glass panels (between frame beams) ---
+    // Upper glass panels (above safety rail — large panoramic view)
+    const upperH=H*0.55;
+    // Side panels (left/right)
+    for(let side of[-1,1]){
+      const g=new THREE.Mesh(new THREE.PlaneGeometry(W-frameT*4,upperH),glassMat);
+      g.position.set(side*(D/2+0.01),H*0.1,0);
+      g.rotation.y=Math.PI/2;
+      cabin.add(g);
+    }
+    // Front/back panels
+    for(let side of[-1,1]){
+      const g=new THREE.Mesh(new THREE.PlaneGeometry(D-frameT*4,upperH),glassMat);
+      g.position.set(0,H*0.1,side*(W/2+0.01));
+      cabin.add(g);
+    }
+    // Lower glass panels (below safety rail — smaller, kick panels)
+    const lowerH=H*0.25;
+    for(let side of[-1,1]){
+      const g=new THREE.Mesh(new THREE.PlaneGeometry(W-frameT*4,lowerH),glassMat);
+      g.position.set(side*(D/2+0.01),-H*0.32,0);
+      g.rotation.y=Math.PI/2;
+      cabin.add(g);
+    }
+    for(let side of[-1,1]){
+      const g=new THREE.Mesh(new THREE.PlaneGeometry(D-frameT*4,lowerH),glassMat);
+      g.position.set(0,-H*0.32,side*(W/2+0.01));
+      cabin.add(g);
+    }
+
+    // --- Roof (solid for structural integrity + solar panel) ---
+    const roofMat=new THREE.MeshStandardMaterial({color:0x334455,metalness:0.5,roughness:0.4});
+    const roof=new THREE.Mesh(new THREE.BoxGeometry(W+2,1,D+2),roofMat);
+    roof.position.y=H/2+0.5;
+    cabin.add(roof);
+    // Roof solar panel strip
+    const solarMat=new THREE.MeshStandardMaterial({color:0x224488,metalness:0.6,roughness:0.2,emissive:0x001122});
+    const solar=new THREE.Mesh(new THREE.BoxGeometry(W-2,0.3,D-2),solarMat);
+    solar.position.y=H/2+1.2;
+    cabin.add(solar);
+
+    // --- Floor (solid, with anti-slip texture look) ---
+    const floorMat=new THREE.MeshStandardMaterial({color:0x444444,metalness:0.2,roughness:0.8});
+    const floor=new THREE.Mesh(new THREE.BoxGeometry(W+2,1.5,D+2),floorMat);
+    floor.position.y=-H/2-0.75;
+    cabin.add(floor);
+
+    // --- Cable attachment structure (top) ---
+    const bracketMat=new THREE.MeshStandardMaterial({color:0x777777,metalness:0.7,roughness:0.2});
+    // A-frame cable guides on roof
+    for(let x of[-3.5,3.5]){for(let z of[-2.5,2.5]){
+      const arm=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.4,4,6),bracketMat);
+      arm.position.set(x,H/2+2.5,z);
+      cabin.add(arm);
+    }}
+    // Cross beam connecting cable guides
+    const crossBeam=new THREE.Mesh(new THREE.BoxGeometry(9,0.4,0.4),bracketMat);
+    crossBeam.position.y=H/2+4.5;
+    cabin.add(crossBeam);
+
+    // Interior warm light
+    const light=new THREE.PointLight(0xffeedd,2,50);
+    light.position.set(0,2,0);
+    cabin.add(light);
+    // Floor accent light
+    const floorLight=new THREE.PointLight(0x88aacc,0.5,15);
+    floorLight.position.set(0,-H/2+1,0);
+    cabin.add(floorLight);
+
+    // Status beacon on roof
+    const beaconMat=new THREE.MeshBasicMaterial({color:label==='UP'?0x00ff88:0xff8800});
+    const beacon=new THREE.Mesh(new THREE.SphereGeometry(0.8,8,8),beaconMat);
+    beacon.position.y=8.5;
+    cabin.add(beacon);
+    cabin.userData._beacon=beacon;
+    cabin.userData._label=label;
+    return cabin;
+  },
 
   init(scene,earthMesh){
     this.group=new THREE.Group();
     const earthR=3000,cY=-3030;
     const earthQuat=earthMesh.quaternion.clone();
 
-    // Calculate base position on Earth surface
     const phi=(90-this._baseLat)*Math.PI/180;
     const theta=(this._baseLng+180)*Math.PI/180;
     const basePos=new THREE.Vector3(
@@ -2897,109 +3118,274 @@ const SpaceElevator={
     const surfacePos=basePos.clone().add(new THREE.Vector3(0,cY,0));
     const normal=basePos.clone().normalize();
 
-    // Tether cable — glowing line from surface to station
-    const cablePoints=[];
-    const segments=80;
-    for(let i=0;i<=segments;i++){
-      const t=i/segments;
-      const p=surfacePos.clone().addScaledVector(normal,t*this._towerHeight);
-      cablePoints.push(p);
-    }
-    const cableGeo=new THREE.BufferGeometry().setFromPoints(cablePoints);
-    const cableMat=new THREE.LineBasicMaterial({color:0x00ddff,transparent:true,opacity:0.4,linewidth:1});
-    this.group.add(new THREE.Line(cableGeo,cableMat));
+    // Perpendicular vectors for cable spacing
+    const tangent=new THREE.Vector3(0,1,0).cross(normal).normalize();
+    if(tangent.length()<0.01)tangent.set(1,0,0);
+    const bitangent=normal.clone().cross(tangent).normalize();
+    const SP=this._cableSpacing;
 
-    // Second cable (slight offset for depth)
-    const cable2Points=cablePoints.map((p,i)=>{
-      const offset=new THREE.Vector3(Math.sin(i*0.5)*2,0,Math.cos(i*0.5)*2);
-      return p.clone().add(offset);
+    // 4 cables: 2 pairs (left/right) for each track (up/down)
+    const cableMat1=new THREE.LineBasicMaterial({color:0x00ddff,transparent:true,opacity:0.5});
+    const cableMat2=new THREE.LineBasicMaterial({color:0x00aacc,transparent:true,opacity:0.35});
+    const segments=100;
+
+    const cableOffsets=[
+      {dx:-SP,dz:-SP/2,mat:cableMat1}, // Up-track left
+      {dx:-SP,dz: SP/2,mat:cableMat1}, // Up-track right
+      {dx: SP,dz:-SP/2,mat:cableMat2}, // Down-track left
+      {dx: SP,dz: SP/2,mat:cableMat2}, // Down-track right
+    ];
+
+    cableOffsets.forEach(({dx,dz,mat})=>{
+      const pts=[];
+      for(let i=0;i<=segments;i++){
+        const t=i/segments;
+        const p=surfacePos.clone()
+          .addScaledVector(normal,t*this._towerHeight)
+          .addScaledVector(tangent,dx)
+          .addScaledVector(bitangent,dz);
+        pts.push(p);
+      }
+      this.group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),mat));
     });
-    const cable2Geo=new THREE.BufferGeometry().setFromPoints(cable2Points);
-    const cable2Mat=new THREE.LineBasicMaterial({color:0x0088aa,transparent:true,opacity:0.2});
-    this.group.add(new THREE.Line(cable2Geo,cable2Mat));
 
-    // Ground anchor — hexagonal platform
-    const anchorMat=new THREE.MeshPhongMaterial({color:0x445566,shininess:40});
-    const anchorGeo=new THREE.CylinderGeometry(20,25,8,6);
-    const anchor=new THREE.Mesh(anchorGeo,anchorMat);
-    anchor.position.copy(surfacePos);
-    // Orient to stand on surface
+    // Store cable track centers for car positioning
+    this._upTrackOffset=tangent.clone().multiplyScalar(-SP);
+    this._downTrackOffset=tangent.clone().multiplyScalar(SP);
+
+    // Ground city — floating island with buildings and people
     const upQ=new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),normal);
-    anchor.quaternion.copy(upQ);
-    this.group.add(anchor);
+    const cityGroup=new THREE.Group();
+    cityGroup.position.copy(surfacePos);
+    cityGroup.quaternion.copy(upQ);
 
-    // Orbital station — ring + hub at top
+    // Main platform (large circular island)
+    const platformMat=new THREE.MeshStandardMaterial({color:0x556666,metalness:0.3,roughness:0.6});
+    cityGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(80,90,6,12),platformMat));
+    // Ground surface (green park areas + gray roads)
+    const groundMat=new THREE.MeshStandardMaterial({color:0x668855,roughness:0.9,metalness:0});
+    const ground=new THREE.Mesh(new THREE.CylinderGeometry(78,78,0.5,12),groundMat);
+    ground.position.y=3.5;
+    cityGroup.add(ground);
+    // Roads (cross pattern)
+    const roadMat=new THREE.MeshStandardMaterial({color:0x444444,roughness:0.8});
+    const road1=new THREE.Mesh(new THREE.BoxGeometry(160,0.6,6),roadMat); road1.position.set(0,3.6,0); cityGroup.add(road1);
+    const road2=new THREE.Mesh(new THREE.BoxGeometry(6,0.6,160),roadMat); road2.position.set(0,3.6,0); cityGroup.add(road2);
+
+    // Elevator terminal (central, tallest)
+    const terminalMat=new THREE.MeshStandardMaterial({color:0x667788,metalness:0.6,roughness:0.2});
+    const terminal=new THREE.Mesh(new THREE.BoxGeometry(20,25,15),terminalMat);
+    terminal.position.set(0,16,0);
+    cityGroup.add(terminal);
+    // Terminal glass facade
+    const tGlass=new THREE.MeshPhysicalMaterial({color:0x88bbdd,transparent:true,opacity:0.3,metalness:0.2,roughness:0.05,side:THREE.DoubleSide});
+    const tFront=new THREE.Mesh(new THREE.PlaneGeometry(18,20),tGlass);
+    tFront.position.set(0,16,-7.6);
+    cityGroup.add(tFront);
+
+    // Buildings — varied sizes and colors
+    const rng=(s)=>{let x=s;return()=>{x=Math.sin(x*127.1+311.7)*43758.5453;return x-Math.floor(x);}};
+    const rand=rng(88);
+    const buildingColors=[0x778899,0x889988,0x998877,0x7788aa,0x88aa99,0xaa8877,0x6688aa,0x88aabb];
+    for(let i=0;i<35;i++){
+      const bw=4+rand()*8, bh=8+rand()*20, bd=4+rand()*8;
+      const bx=(rand()-0.5)*140, bz=(rand()-0.5)*140;
+      // Skip center (elevator terminal area)
+      if(Math.abs(bx)<15&&Math.abs(bz)<12)continue;
+      // Skip if outside platform radius
+      if(bx*bx+bz*bz>5500)continue;
+      const bMat=new THREE.MeshStandardMaterial({color:buildingColors[Math.floor(rand()*buildingColors.length)],metalness:0.3,roughness:0.5});
+      const building=new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd),bMat);
+      building.position.set(bx,3.5+bh/2,bz);
+      cityGroup.add(building);
+      // Building windows (lit at night — emissive dots)
+      const winRows=Math.floor(bh/3);
+      const winCols=Math.floor(bw/2.5);
+      const winEm=new THREE.MeshBasicMaterial({color:rand()>0.3?0xffeeaa:0x88ccff});
+      for(let r=0;r<winRows;r++){for(let c=0;c<winCols;c++){
+        if(rand()>0.6)continue; // some windows dark
+        const w=new THREE.Mesh(new THREE.PlaneGeometry(1,1.5),winEm);
+        w.position.set(bx-bw/2+1.5+c*2.5, 3.5+2+r*3, bz-bd/2-0.01);
+        cityGroup.add(w);
+      }}
+    }
+
+    // Shopping center (wider, low building with sign)
+    const shopMat=new THREE.MeshStandardMaterial({color:0x99aabb,metalness:0.2,roughness:0.6});
+    const shop=new THREE.Mesh(new THREE.BoxGeometry(25,8,18),shopMat);
+    shop.position.set(-35,7.5,20);
+    cityGroup.add(shop);
+    // Shop roof sign glow
+    const signMat=new THREE.MeshBasicMaterial({color:0xff6644});
+    const sign=new THREE.Mesh(new THREE.BoxGeometry(15,2,0.3),signMat);
+    sign.position.set(-35,12.5,11);
+    cityGroup.add(sign);
+
+    // Hospital (white with red cross)
+    const hospMat=new THREE.MeshStandardMaterial({color:0xeeeeff,metalness:0.1,roughness:0.7});
+    const hosp=new THREE.Mesh(new THREE.BoxGeometry(18,12,15),hospMat);
+    hosp.position.set(40,9.5,25);
+    cityGroup.add(hosp);
+    // Red cross
+    const crossMat=new THREE.MeshBasicMaterial({color:0xff2222});
+    const crossH=new THREE.Mesh(new THREE.BoxGeometry(6,1.5,0.3),crossMat);
+    crossH.position.set(40,14,17.6);
+    cityGroup.add(crossH);
+    const crossV=new THREE.Mesh(new THREE.BoxGeometry(1.5,6,0.3),crossMat);
+    crossV.position.set(40,14,17.6);
+    cityGroup.add(crossV);
+
+    // People (small colored dots moving on ground)
+    const peopleMat=new THREE.MeshBasicMaterial({color:0xffddbb});
+    const peopleGroup=new THREE.Group();
+    for(let i=0;i<60;i++){
+      const px=(rand()-0.5)*130, pz=(rand()-0.5)*130;
+      if(px*px+pz*pz>5000)continue;
+      const person=new THREE.Group();
+      // Body
+      person.add(new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,1.5,4),
+        new THREE.MeshBasicMaterial({color:[0x4466aa,0xaa4444,0x44aa66,0xaaaa44,0x8844aa,0xaa6644][Math.floor(rand()*6)]})));
+      // Head
+      const head=new THREE.Mesh(new THREE.SphereGeometry(0.35,4,4),peopleMat);
+      head.position.y=1.1;
+      person.add(head);
+      person.position.set(px,4.5,pz);
+      person.userData._walkAngle=rand()*Math.PI*2;
+      person.userData._walkSpeed=0.3+rand()*0.5;
+      peopleGroup.add(person);
+    }
+    cityGroup.add(peopleGroup);
+    this._peopleGroup=peopleGroup;
+    this._cityCenter=surfacePos.clone();
+    this._cityNormal=normal.clone();
+    this._cityUpQ=upQ.clone();
+
+    // Trees (green cones in park areas)
+    const treeMat=new THREE.MeshStandardMaterial({color:0x336633,roughness:0.8});
+    const trunkMat=new THREE.MeshStandardMaterial({color:0x664422,roughness:0.9});
+    for(let i=0;i<20;i++){
+      const tx=(rand()-0.5)*120, tz=(rand()-0.5)*120;
+      if(tx*tx+tz*tz>4500||Math.abs(tx)<20)continue;
+      const tree=new THREE.Group();
+      const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.4,3,4),trunkMat); trunk.position.set(0,1.5,0); tree.add(trunk);
+      const crown=new THREE.Mesh(new THREE.ConeGeometry(2,4,6),treeMat); crown.position.set(0,5,0); tree.add(crown);
+      tree.position.set(tx,3.5,tz);
+      cityGroup.add(tree);
+    }
+
+    // City lights
+    const cityLight=new THREE.PointLight(0xffeecc,3,200);
+    cityLight.position.set(0,30,0);
+    cityGroup.add(cityLight);
+
+    this.group.add(cityGroup);
+
+    // Docking bay markings
+    const bayMat=new THREE.MeshBasicMaterial({color:0x00ff88,transparent:true,opacity:0.4});
+    for(let side of[-1,1]){
+      const bay=new THREE.Mesh(new THREE.RingGeometry(5,8,6),bayMat);
+      bay.position.copy(surfacePos).addScaledVector(tangent,side*SP).addScaledVector(normal,5.5);
+      bay.quaternion.copy(upQ);
+      this.group.add(bay);
+    }
+
+    // Orbital station — larger ring + hub at top
     const stationPos=surfacePos.clone().addScaledVector(normal,this._towerHeight);
     const stationGroup=new THREE.Group();
     stationGroup.position.copy(stationPos);
-
-    // Hub (central cylinder)
-    const hubMat=new THREE.MeshPhongMaterial({color:0x556677,shininess:60});
-    const hubGeo=new THREE.CylinderGeometry(8,8,30,12);
-    stationGroup.add(new THREE.Mesh(hubGeo,hubMat));
-
-    // Ring (torus around hub)
-    const ringMat=new THREE.MeshPhongMaterial({color:0x667788,shininess:50});
-    const ringGeo=new THREE.TorusGeometry(40,4,8,24);
-    const ring=new THREE.Mesh(ringGeo,ringMat);
+    // Hub
+    const hubMat=new THREE.MeshStandardMaterial({color:0x556677,metalness:0.5,roughness:0.3});
+    stationGroup.add(new THREE.Mesh(new THREE.CylinderGeometry(12,12,40,12),hubMat));
+    // Habitat ring
+    const ringMat=new THREE.MeshStandardMaterial({color:0x667788,metalness:0.4,roughness:0.4});
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(50,6,12,32),ringMat);
     ring.rotation.x=Math.PI/2;
     stationGroup.add(ring);
-
-    // Solar panels (flat boxes extending from hub)
-    const panelMat=new THREE.MeshPhongMaterial({color:0x2244aa,shininess:80,emissive:0x001133});
+    // Solar panels
+    const panelMat=new THREE.MeshStandardMaterial({color:0x2244aa,metalness:0.6,roughness:0.2,emissive:0x001122});
     for(let a=0;a<4;a++){
-      const panelGeo=new THREE.BoxGeometry(60,0.5,15);
-      const panel=new THREE.Mesh(panelGeo,panelMat);
+      const panel=new THREE.Mesh(new THREE.BoxGeometry(70,0.5,18),panelMat);
       panel.rotation.y=a*Math.PI/2;
-      panel.position.set(Math.cos(a*Math.PI/2)*50,0,Math.sin(a*Math.PI/2)*50);
+      panel.position.set(Math.cos(a*Math.PI/2)*60,0,Math.sin(a*Math.PI/2)*60);
       stationGroup.add(panel);
     }
-
-    // Station lights
-    const stationLight=new THREE.PointLight(0x00ccff,2,200);
-    stationGroup.add(stationLight);
-
-    // Orient station to match surface normal
+    stationGroup.add(new THREE.PointLight(0x00ccff,2.5,300));
     stationGroup.quaternion.copy(upQ);
     this.group.add(stationGroup);
 
-    // Elevator car — small capsule that travels the cable
-    const carMat=new THREE.MeshPhongMaterial({color:0xccddee,emissive:0x224455,shininess:90});
-    const carGeo=new THREE.CylinderGeometry(3,6,6,8);
-    this._car=new THREE.Mesh(carGeo,carMat);
-    // Car light
-    const carLight=new THREE.PointLight(0xffffff,1,50);
-    this._car.add(carLight);
-    this.group.add(this._car);
+    // Two elevator cabins
+    this._carUp=this._buildCabin(0xccddee,'UP');
+    this._carDown=this._buildCabin(0xddccbb,'DOWN');
+    this.group.add(this._carUp);
+    this.group.add(this._carDown);
 
-    // Store for animation
     this._surfacePos=surfacePos;
     this._normal=normal;
+    this._upQ=upQ;
 
-    // CSS2D Label
+    // Label
     const labelDiv=document.createElement('div');
     labelDiv.className='planet-label';
-    labelDiv.innerHTML='SPACE ELEVATOR<span class="dist-info">EQUATORIAL TETHER</span>';
+    labelDiv.innerHTML='SPACE ELEVATOR<span class="dist-info">DUAL-TRACK TETHER SYSTEM</span>';
     const label=new THREE.CSS2DObject(labelDiv);
     label.position.copy(stationPos);
     this.group.add(label);
 
     scene.add(this.group);
-    Logger.log("SPACE ELEVATOR: EQUATORIAL TETHER ONLINE");
+    Logger.log("SPACE ELEVATOR: DUAL-TRACK TETHER ONLINE — 2 CABINS OPERATIONAL");
   },
 
   update(now){
-    if(!this._car)return;
-    // Animate elevator car up and down
-    this._carProgress+=this._carSpeed*this._carDir*0.016;
-    if(this._carProgress>=1){this._carProgress=1;this._carDir=-1;}
-    if(this._carProgress<=0){this._carProgress=0;this._carDir=1;}
-    // Ease in/out
-    const t=this._carProgress<0.5?2*this._carProgress*this._carProgress:1-Math.pow(-2*this._carProgress+2,2)/2;
-    const carPos=this._surfacePos.clone().addScaledVector(this._normal,t*this._towerHeight);
-    this._car.position.copy(carPos);
-    // Slow rotation
-    this._car.rotation.y=now*0.5;
+    if(!this._carUp||!this._carDown)return;
+    const dt=0.016;
+
+    // Up car: ascends then descends
+    this._carUpProgress+=this._carSpeed*dt;
+    if(this._carUpProgress>2)this._carUpProgress-=2;
+    // Down car: offset by half cycle
+    this._carDownProgress+=this._carSpeed*dt;
+    if(this._carDownProgress>2)this._carDownProgress-=2;
+
+    const easeProgress=(p)=>{
+      const t=p<=1?p:2-p; // 0→1→0 sawtooth
+      return t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+    };
+
+    // Position up-car on its track
+    const tUp=easeProgress(this._carUpProgress);
+    const posUp=this._surfacePos.clone()
+      .addScaledVector(this._normal,tUp*this._towerHeight)
+      .add(this._upTrackOffset);
+    this._carUp.position.copy(posUp);
+    this._carUp.quaternion.copy(this._upQ);
+
+    // Position down-car on its track
+    const tDown=easeProgress(this._carDownProgress);
+    const posDown=this._surfacePos.clone()
+      .addScaledVector(this._normal,tDown*this._towerHeight)
+      .add(this._downTrackOffset);
+    this._carDown.position.copy(posDown);
+    this._carDown.quaternion.copy(this._upQ);
+
+    // Blink beacons
+    const blink=Math.sin(now*3)>0?1:0.3;
+    if(this._carUp.userData._beacon)this._carUp.userData._beacon.material.opacity=blink;
+    if(this._carDown.userData._beacon)this._carDown.userData._beacon.material.opacity=1-blink+0.3;
+
+    // Animate people walking
+    if(this._peopleGroup){
+      this._peopleGroup.children.forEach(p=>{
+        const a=p.userData._walkAngle||0;
+        const s=p.userData._walkSpeed||0.3;
+        p.position.x+=Math.cos(a)*s*dt;
+        p.position.z+=Math.sin(a)*s*dt;
+        // Keep within city bounds
+        const d2=p.position.x*p.position.x+p.position.z*p.position.z;
+        if(d2>5000){p.userData._walkAngle=a+Math.PI+Math.random()*0.5;}
+        // Occasional direction change
+        if(Math.random()<0.005)p.userData._walkAngle+=Math.random()*1-0.5;
+      });
+    }
   }
 };
 
@@ -3043,12 +3429,42 @@ const MoonMission={
   init(){
     const btn=document.getElementById('moon-mission-btn');
     btn.addEventListener('click',()=>this.startMission());
+    // Abort button
+    const abortBtn=document.getElementById('moon-abort-btn');
+    abortBtn.addEventListener('click',()=>this.abortMission());
     // Listen for flag plant
     document.addEventListener('keydown',(e)=>{
       if(this.phase==='surface_eva'&&e.code==='Space'&&!this.flagPlanted){
         this._plantFlag();
       }
     });
+  },
+
+  abortMission(){
+    if(!this.active)return;
+    this.active=false;
+    this.phase='idle';
+    // Clean up visuals
+    if(this._upperStageRef){App.scene.remove(this._upperStageRef);this._upperStageRef=null;}
+    if(this.boosterSepGroup){App.scene.remove(this.boosterSepGroup);this.boosterSepGroup=null;}
+    if(this.trajectoryLine){App.scene.remove(this.trajectoryLine);this.trajectoryLine=null;}
+    if(this.landingMarker){App.scene.remove(this.landingMarker);this.landingMarker=null;}
+    if(this._flag){
+      if(this._flag.pole)App.scene.remove(this._flag.pole);
+      if(this._flag.flag)App.scene.remove(this._flag.flag);
+      this._flag=null;
+    }
+    this._descentStart=null;
+    this._trajectoryCurve=null;
+    // Reset UI
+    document.getElementById('moon-hud').classList.remove('visible');
+    document.getElementById('moon-abort-btn').style.display='none';
+    document.getElementById('moon-mission-btn').style.display='block';
+    // Return camera to Earth
+    const earthC=SolarSystem.earthCenter;
+    App.camera.position.set(earthC.x+4000,earthC.y+1500,earthC.z+3000);
+    App.velocity.set(0,0,0);
+    Logger.log("MOON MISSION: ABORTED — RETURNING TO EARTH VIEW");
   },
 
   show(){
@@ -3084,8 +3500,9 @@ const MoonMission={
     this.flagPlanted=false;
     this._footprints=[];
 
-    // Hide button, show HUD
+    // Hide start button, show abort button + HUD
     document.getElementById('moon-mission-btn').style.display='none';
+    document.getElementById('moon-abort-btn').style.display='block';
     document.getElementById('moon-hud').classList.add('visible');
 
     // Place rocket at LEO altitude above Earth
@@ -3151,17 +3568,27 @@ const MoonMission={
   },
 
   _createTrajectory(){
-    // Bezier curve from Earth orbit to Moon
+    // Bezier curve from LEO orbit to Moon — must stay OUTSIDE Earth
     const earthC=SolarSystem.earthCenter;
     const moonPos=this.getMoonWorldPos();
-    const mid=earthC.clone().add(moonPos).multiplyScalar(0.5);
-    mid.y+=2000; // arc above the ecliptic plane
+    const earthR=3000;
 
-    const curve=new THREE.QuadraticBezierCurve3(
-      earthC.clone().add(new THREE.Vector3(3500,0,0)),
-      mid,
-      moonPos
-    );
+    // Start point: LEO orbit position
+    const startP=earthC.clone().add(new THREE.Vector3(3500,0,0));
+
+    // Calculate a midpoint that arcs ABOVE Earth (perpendicular to Earth-Moon line)
+    const toMoon=moonPos.clone().sub(earthC).normalize();
+    const up=new THREE.Vector3(0,1,0);
+    const perpendicular=toMoon.clone().cross(up).normalize();
+    if(perpendicular.length()<0.01)perpendicular.set(0,0,1);
+
+    // Mid control point: far above Earth's surface, perpendicular to flight path
+    const midDist=earthC.clone().distanceTo(moonPos)*0.5;
+    const mid=earthC.clone().add(moonPos).multiplyScalar(0.5);
+    mid.addScaledVector(up,earthR*1.5); // Arc high above Earth
+
+    const curve=new THREE.QuadraticBezierCurve3(startP,mid,moonPos);
+    this._trajectoryCurve=curve; // store for coast phase
     const pts=curve.getPoints(120);
     const geo=new THREE.BufferGeometry().setFromPoints(pts);
     const mat=new THREE.LineDashedMaterial({color:0x00d8ff,dashSize:40,gapSize:20,transparent:true,opacity:0.4});
@@ -3328,21 +3755,24 @@ const MoonMission={
         break;
       }
       case 'coast':{
-        // Free flight toward Moon (lerp position along trajectory)
-        const startP=earthC.clone().add(new THREE.Vector3(5000,0,0));
-        const t=progress;
-        // Quadratic bezier interpolation
-        const mid=earthC.clone().add(moonPos).multiplyScalar(0.5);
-        mid.y+=2000;
-        const p0=startP,p1=mid,p2=moonPos.clone().add(
-          this.rocketPos.clone().sub(moonPos).normalize().multiplyScalar(moonR+200)
-        );
-        const invT=1-t;
-        this.rocketPos.set(
-          invT*invT*p0.x+2*invT*t*p1.x+t*t*p2.x,
-          invT*invT*p0.y+2*invT*t*p1.y+t*t*p2.y,
-          invT*invT*p0.z+2*invT*t*p1.z+t*t*p2.z
-        );
+        // Follow the pre-computed trajectory curve (stays outside Earth)
+        if(this._trajectoryCurve){
+          const t=progress;
+          const pos=this._trajectoryCurve.getPoint(t);
+          this.rocketPos.copy(pos);
+        }else{
+          // Fallback: simple lerp with high arc
+          const startP=earthC.clone().add(new THREE.Vector3(3500,0,0));
+          const t=progress;
+          this.rocketPos.lerpVectors(startP,moonPos,t);
+          // Push outward from Earth center to avoid penetration
+          const fromEarth=this.rocketPos.clone().sub(earthC);
+          const distFromEarth=fromEarth.length();
+          if(distFromEarth<3500){
+            fromEarth.normalize().multiplyScalar(3500);
+            this.rocketPos.copy(earthC).add(fromEarth);
+          }
+        }
         this._setEngineOn(false,0);
         // Velocity approximation for HUD
         this.rocketVel.copy(moonPos).sub(this.rocketPos).normalize().multiplyScalar(50+progress*100);
@@ -3608,6 +4038,7 @@ const MoonMission={
     this.active=false;
     this.phase='idle';
     document.getElementById('moon-hud').classList.remove('visible');
+    document.getElementById('moon-abort-btn').style.display='none';
     document.getElementById('moon-eva-hint').style.display='none';
 
     // Clean up mission objects
@@ -4142,7 +4573,16 @@ const App={
 window.addEventListener('DOMContentLoaded',()=>{
   Logger.log("DOM LOADED. INITIALIZING v70...");
   if(IS_FILE_PROTOCOL)Logger.log("NOTE: file:// mode. Music needs HTTP server.");
-  setTimeout(()=>App.init(),100);
+  setTimeout(()=>{
+    App.init();
+    // Auto-launch when inside iframe (portal background)
+    if(window.parent!==window){
+      setTimeout(()=>{
+        document.getElementById('launch-start-panel').classList.add('hidden');
+        if(LaunchSequence.phase==='standby')LaunchSequence.startCountdown();
+      },2000);
+    }
+  },100);
 });
 window.addEventListener('beforeunload',()=>{
   MultiUser.destroy();
