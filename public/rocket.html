@@ -1903,31 +1903,17 @@ keys:{w:false,a:false,s:false,d:false,e:false,q:false,c:false,Shift:false,ArrowU
 // Pinch zoom
 _pinchActive:false,_pinchDist0:0,pinchDelta:0,
 init(){window.addEventListener('keydown',e=>{const k=this._codeMap[e.code];if(k)this.keys[k]=true;if((e.code==='KeyV'||e.code==='KeyC')&&!e.repeat)App.toggleCamMode();if(e.code==='Digit1'&&!e.repeat){this._stickMode=1;this._lastNormalMode=1;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='MODE 1 (JP)');Logger.log('CONTROLLER: MODE 1 (JP)');}if(e.code==='Digit2'&&!e.repeat){this._stickMode=2;this._lastNormalMode=2;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='MODE 2 (US)');Logger.log('CONTROLLER: MODE 2 (US)');}if(e.code==='Digit3'&&!e.repeat){this._stickMode=3;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='ORBIT 360');Logger.log('CONTROLLER: ORBIT 360');if(!this._orbitTarget){const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(App.camera.quaternion);this._orbitTarget=App.camera.position.clone().addScaledVector(fwd,this._orbitDist);}}if(e.code==='Digit4'&&!e.repeat){this._stickMode=4;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='FPV');Logger.log('CONTROLLER: FPV');}});window.addEventListener('keyup',e=>{const k=this._codeMap[e.code];if(k)this.keys[k]=false;});const cv=document.getElementById('webgl-canvas');
-// Mouse — FPS-style pointer lock (click canvas to lock, ESC to unlock)
+// Mouse — Left-click drag to look around (cursor always visible)
 this._pointerLocked=false;
-cv.addEventListener('click',()=>{
-  if(!this._pointerLocked&&!document.getElementById('settings-panel').classList.contains('open')){
-    cv.requestPointerLock();
-  }
-});
-document.addEventListener('pointerlockchange',()=>{
-  this._pointerLocked=!!document.pointerLockElement;
-  if(this._pointerLocked){this.isPointerDown=true;}else{this.isPointerDown=false;}
-});
 window.addEventListener('mousemove',e=>{
-  if(this._pointerLocked){
-    // Pointer lock: movementX/Y gives raw delta
-    this.look.x+=e.movementX*0.35;
-    this.look.y+=e.movementY*0.35;
-  }else if(this.isPointerDown){
-    // Fallback: click+drag (touch devices, or before lock)
+  if(this.isPointerDown){
     this.look.x+=(e.clientX-this.pointerPos.x)*0.45;
     this.look.y+=(e.clientY-this.pointerPos.y)*0.45;
     this.pointerPos={x:e.clientX,y:e.clientY};
   }
 });
-cv.addEventListener('mousedown',e=>{if(!this._pointerLocked){this.isPointerDown=true;this.pointerPos={x:e.clientX,y:e.clientY};}});
-window.addEventListener('mouseup',()=>{if(!this._pointerLocked)this.isPointerDown=false;});
+cv.addEventListener('mousedown',e=>{if(e.button===0){this.isPointerDown=true;this.pointerPos={x:e.clientX,y:e.clientY};}});
+window.addEventListener('mouseup',e=>{if(e.button===0)this.isPointerDown=false;});
 // Wheel — always active (zoom during launch, boost in explore)
 cv.addEventListener('wheel',e=>{e.preventDefault();this.wheelBoost+=-e.deltaY*0.008;},{passive:false});
 // Touch

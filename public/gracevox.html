@@ -540,6 +540,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     <div class="inner"></div>
   </button>
   <button class="bs-btn" id="bsBtn" onclick="backspace()" title="Backspace">&#9003;</button>
+  <button class="bs-btn" id="audioRecBtn" onclick="toggleAudioRec()" title="音声録音" style="font-size:16px;">&#127908;</button>
+  <button class="bs-btn" id="shareBtn" onclick="shareResult()" title="SNS共有" style="font-size:16px;">&#128279;</button>
   <div class="controls-info">
     <div class="hotkey-hint"><kbd id="hotkeyDisplay">変換</kbd> or <kbd>F2</kbd></div>
     <a href="gracevox-terms.html" style="font-size:9px;color:var(--text-dim);text-decoration:none;">Terms</a>
@@ -658,6 +660,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
 <script>
 const FIREBASE_CONFIG={apiKey:"AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",authDomain:"grace-of-touch.firebaseapp.com",projectId:"grace-of-touch",storageBucket:"grace-of-touch.firebasestorage.app",messagingSenderId:"505078300866",appId:"1:505078300866:web:adad2a27b163c3b0f1bb5b"};
 firebase.initializeApp(FIREBASE_CONFIG);
@@ -740,17 +743,40 @@ async function checkProStatus(){
   updatePlanUI();
 }
 
-function upgradePro(){
+async function upgradePro(){
   if(!fbUser){
     showToast('先にログインしてください');
     toggleLogin();
     return;
   }
-  // Stripe Checkout placeholder — will be replaced with real Stripe link
-  showToast('決済ページ準備中です。もうしばらくお待ちください');
+  showToast('決済ページに移動中...');
+  try{
+    const createCheckoutSession=firebase.functions().httpsCallable('createCheckoutSession');
+    const result=await createCheckoutSession();
+    if(result.data&&result.data.url){
+      window.location.href=result.data.url;
+    }else{
+      showToast('決済セッション作成に失敗しました');
+    }
+  }catch(e){
+    console.error('Stripe checkout error:',e);
+    showToast('決済エラー: '+e.message);
+  }
 }
 
 loadUsage();
+
+// Handle Stripe redirect
+(function(){
+  const params=new URLSearchParams(window.location.search);
+  if(params.get('payment')==='success'){
+    setTimeout(()=>showToast('Pro プランが有効になりました！'),1000);
+    window.history.replaceState({},'',window.location.pathname);
+  }else if(params.get('payment')==='cancel'){
+    setTimeout(()=>showToast('決済がキャンセルされました'),1000);
+    window.history.replaceState({},'',window.location.pathname);
+  }
+})();
 
 // Auth state
 fbAuth.onAuthStateChanged((user)=>{
@@ -2789,6 +2815,145 @@ document.addEventListener('keydown',(e)=>{
     try{if(recognition){recognition.onend=null;recognition.abort();}}catch(e){}
   });
 })();
+
+// ═══════════════════════════════
+// AUDIO RECORDING (MediaRecorder)
+// ═══════════════════════════════
+let _audioRecording=false, _mediaRecorder=null, _audioChunks=[];
+const _audioRecBtn=()=>document.getElementById('audioRecBtn');
+
+function toggleAudioRec(){
+  if(_audioRecording) stopAudioRec();
+  else startAudioRec();
+}
+
+async function startAudioRec(){
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const mimeType=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':
+                   MediaRecorder.isTypeSupported('audio/mp4')?'audio/mp4':'';
+    _mediaRecorder=mimeType?new MediaRecorder(stream,{mimeType}):new MediaRecorder(stream);
+    _audioChunks=[];
+    _mediaRecorder.ondataavailable=e=>{if(e.data.size>0)_audioChunks.push(e.data);};
+    _mediaRecorder.onstop=()=>{
+      stream.getTracks().forEach(tr=>tr.stop());
+      if(_audioChunks.length===0) return;
+      const blob=new Blob(_audioChunks,{type:_mediaRecorder.mimeType});
+      const ext=_mediaRecorder.mimeType.includes('mp4')?'m4a':'webm';
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=url;
+      a.download='gracevox_'+new Date().toISOString().slice(0,19).replace(/[:-]/g,'')+ '.'+ext;
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url),5000);
+      showToast('録音を保存しました');
+    };
+    _mediaRecorder.start();
+    _audioRecording=true;
+    _audioRecBtn().style.borderColor='var(--recording)';
+    _audioRecBtn().style.color='var(--recording)';
+    showToast('音声録音開始');
+  }catch(e){
+    showToast('マイクアクセスに失敗: '+e.message);
+  }
+}
+
+function stopAudioRec(){
+  if(_mediaRecorder&&_mediaRecorder.state!=='inactive'){
+    _mediaRecorder.stop();
+  }
+  _audioRecording=false;
+  _audioRecBtn().style.borderColor='';
+  _audioRecBtn().style.color='';
+}
+
+// ═══════════════════════════════
+// SNS SHARE (Text + OGP Image)
+// ═══════════════════════════════
+function shareResult(){
+  const text=(document.getElementById('currentText').textContent||'').trim();
+  if(!text||text===t('placeholder')){showToast('共有するテキストがありません');return;}
+
+  // Web Share API (mobile-first)
+  if(navigator.share){
+    navigator.share({
+      title:'GraceVox — Voice Print Never Lies',
+      text: text.slice(0,280)+'\n\n#GraceVox #VoicePrint',
+      url:'https://grace-of-touch.web.app/gracevox.html'
+    }).catch(()=>{});
+    return;
+  }
+
+  // Fallback: generate shareable image + copy text
+  generateShareImage(text);
+}
+
+function generateShareImage(text){
+  const cv=document.createElement('canvas');
+  cv.width=1200;cv.height=630;
+  const ctx=cv.getContext('2d');
+
+  // Background gradient
+  const grad=ctx.createLinearGradient(0,0,1200,630);
+  grad.addColorStop(0,'#0a0a1a');
+  grad.addColorStop(1,'#1a1030');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,1200,630);
+
+  // Accent line
+  ctx.fillStyle='#6c5ce7';
+  ctx.fillRect(0,0,1200,4);
+
+  // Logo
+  ctx.font='bold 36px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.fillStyle='#e0e0e8';
+  ctx.fillText('Grace',40,60);
+  ctx.fillStyle='#6c5ce7';
+  ctx.fillText('Vox',170,60);
+
+  // Tagline
+  ctx.font='14px -apple-system, sans-serif';
+  ctx.fillStyle='#6b6b80';
+  ctx.fillText('Voice Print Never Lies',40,85);
+
+  // Main text (word-wrapped)
+  ctx.font='24px -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif';
+  ctx.fillStyle='#e0e0e8';
+  const maxW=1120,lineH=38;
+  const lines=[];
+  let line='';
+  for(const ch of text){
+    if(ctx.measureText(line+ch).width>maxW){lines.push(line);line=ch;}
+    else line+=ch;
+  }
+  if(line)lines.push(line);
+  const maxLines=Math.min(lines.length,12);
+  for(let i=0;i<maxLines;i++){
+    ctx.fillText(lines[i],40,140+i*lineH);
+  }
+  if(lines.length>12){
+    ctx.fillStyle='#6b6b80';
+    ctx.fillText('...',40,140+12*lineH);
+  }
+
+  // Footer
+  ctx.font='16px -apple-system, sans-serif';
+  ctx.fillStyle='#6b6b80';
+  ctx.fillText('grace-of-touch.web.app/gracevox',40,610);
+
+  // Download
+  cv.toBlob(blob=>{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download='gracevox_share.png';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
+    // Also copy text
+    copyToClipboard(text.slice(0,280)+'\n\n#GraceVox #VoicePrint\nhttps://grace-of-touch.web.app/gracevox.html');
+    showToast('共有画像をダウンロード＋テキストをコピーしました');
+  },'image/png');
+}
 
 // LiveCounter for GraceVox
 (function(){
