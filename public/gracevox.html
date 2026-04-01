@@ -394,6 +394,10 @@
   .trim-overlay {
     position:absolute; top:0; height:100%; background:rgba(0,0,0,0.45); pointer-events:none; z-index:1;
   }
+/* Pi-chan animations */
+@keyframes pichan-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@keyframes pichan-tilt{0%,100%{transform:rotate(0deg)}50%{transform:rotate(8deg)}}
+#pichanMini:hover #pichanBody{transform:scale(1.2);}
 </style>
 </head>
 <body>
@@ -535,17 +539,23 @@ document.addEventListener('DOMContentLoaded',()=>{
     <canvas id="vpCanvas" style="width:100%;height:90px;flex-shrink:0;border-top:1px solid var(--border);display:none;border-radius:0 0 10px 10px;"></canvas>
   </div>
 
-  <!-- AI Tsukkomi / Idea Bubble -->
+  <!-- Pi-chan Buddy Character -->
   <div class="ai-bubble-wrap" id="aiBubbleWrap">
     <div class="ai-bubble">
       <button class="ai-bubble-close" onclick="closeAiBubble()">&times;</button>
       <div class="ai-bubble-header">
-        <div class="ai-bubble-avatar">AI</div>
-        <span class="ai-bubble-name">GraceVox AI</span>
+        <div class="ai-bubble-avatar" id="pichanAvatar" style="background:linear-gradient(135deg,#FFD700,#FFA500);font-size:16px;">🐤</div>
+        <span class="ai-bubble-name">ぴーちゃん</span>
         <span class="ai-bubble-tag" id="aiBubbleTag">ツッコミ</span>
       </div>
       <div class="ai-bubble-text" id="aiBubbleText"></div>
     </div>
+  </div>
+
+  <!-- Pi-chan Mini (always visible in bottom corner) -->
+  <div id="pichanMini" style="position:fixed;bottom:90px;left:12px;z-index:55;cursor:pointer;user-select:none;transition:transform .3s ease;" onclick="pichanTap()">
+    <div id="pichanBody" style="font-size:32px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.3));transition:transform .2s ease;">🐤</div>
+    <div id="pichanMood" style="font-size:9px;text-align:center;color:var(--text-dim);font-family:'Courier New',monospace;margin-top:-2px;">♪</div>
   </div>
 
   <!-- History -->
@@ -560,10 +570,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   </div>
 
   <!-- Audio Track Library -->
-  <div class="history-panel" id="trackPanel" style="display:none;flex:1.2;min-height:0;">
+  <div class="history-panel" id="trackPanel" style="display:none;flex:1.2;min-height:0;position:relative;">
     <div class="history-header">
-      <span class="history-label">TRACKS</span>
+      <span class="history-label">🎵 TRACK LIBRARY</span>
       <span id="recTimer" style="font-size:11px;color:var(--recording);font-family:'Courier New',monospace;display:none;">● 00:00</span>
+      <button class="action-btn" onclick="toggleLibraryView()" style="font-size:10px;padding:2px 8px;color:var(--accent);">✕ 閉じる</button>
       <button class="action-btn" onclick="clearTracks()" style="font-size:10px;padding:2px 8px;">Clear All</button>
     </div>
     <!-- Recording visualizer (waveform + spectrogram) -->
@@ -617,6 +628,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   </button>
   <button class="bs-btn" id="bsBtn" onclick="backspace()" title="Backspace">&#9003;</button>
   <button class="bs-btn" id="audioRecBtn" onclick="toggleAudioRec()" title="音声録音" style="font-size:16px;">&#127908;</button>
+  <button class="bs-btn" id="libToggleBtn" onclick="toggleLibraryView()" title="トラックライブラリ" style="font-size:14px;">📂</button>
   <button class="bs-btn" id="shareBtn" onclick="shareResult()" title="SNS共有" style="font-size:16px;">&#128279;</button>
   <div class="controls-info">
     <div class="hotkey-hint"><kbd id="hotkeyDisplay">変換</kbd> or <kbd>F2</kbd></div>
@@ -1575,6 +1587,7 @@ async function startRecording(){
   // UI即座に録音状態
   isRecording=true;
   document.getElementById('recBtn').classList.add('recording');
+  updatePichanState('recording');
   document.getElementById('currentLabel').textContent='Recording...';
   setStatus('recording','準備中...');
   playRecSFX('start');
@@ -1675,6 +1688,7 @@ function stopRecording(){
   // まずrecognitionのイベントを即座に無効化（handleEnd再起動防止）
   if(recognition){try{recognition.onend=null;recognition.onresult=null;recognition.onerror=null;}catch(e){}}
   document.getElementById('recBtn').classList.remove('recording');
+  updatePichanState('idle');
 
   // 1. ピッチ
   try{ lastSavedPitch=sessionPitchData.length?Math.round(sessionPitchData.reduce((a,b)=>a+b,0)/sessionPitchData.length):0; }catch(e){}
@@ -2679,16 +2693,87 @@ function _analyzeAndRespond(text){
   // 8. ランダムツッコミ（上記に該当しない場合、50%の確率で表示）
   if(Math.random()>0.5){
     const general=[
-      '声、いい感じですね。この調子で。',
-      '録音メモ、習慣化してきましたね。',
-      '次は箇条書きモードも試してみては？',
-      'いい内容。Historyにしっかり残ってますよ。',
+      '声、いい感じだね！この調子この調子〜♪',
+      '録音メモの習慣、えらいえらい！',
+      '箇条書きモードも試してみて！便利だよ〜',
+      'いい内容！ちゃんとHistoryに残したよ〜',
     ];
     return { text:general[Math.floor(Math.random()*general.length)], tag:'ひとこと💬' };
   }
 
   return null; // 何も返さない
 }
+
+// ─── showAiBubble (used by Pi-chan) ───
+function showAiBubble(text, tag){
+  const wrap=document.getElementById('aiBubbleWrap');
+  document.getElementById('aiBubbleText').textContent=text;
+  document.getElementById('aiBubbleTag').textContent=tag||'ぴーちゃん🐤';
+  wrap.classList.remove('show');
+  requestAnimationFrame(()=>wrap.classList.add('show'));
+  clearTimeout(wrap._autoHide);
+  wrap._autoHide=setTimeout(()=>wrap.classList.remove('show'),15000);
+}
+
+// ─── Pi-chan Buddy System ───
+let _pichanState = 'idle'; // idle, listening, happy, sleepy, thinking
+let _pichanTapCount = 0;
+let _pichanLastActivity = Date.now();
+
+function updatePichanState(state) {
+  _pichanState = state;
+  const body = document.getElementById('pichanBody');
+  const mood = document.getElementById('pichanMood');
+  if (!body || !mood) return;
+
+  const states = {
+    idle: { emoji: '🐤', mood: '♪', anim: '' },
+    listening: { emoji: '🐥', mood: '🎤 聞いてるよ', anim: 'pichan-bounce' },
+    happy: { emoji: '🐤', mood: '✨ いいね！', anim: 'pichan-bounce' },
+    sleepy: { emoji: '🐣', mood: '💤 zzz...', anim: '' },
+    thinking: { emoji: '🐤', mood: '🤔 うーん...', anim: 'pichan-tilt' },
+    recording: { emoji: '🐥', mood: '● REC', anim: 'pichan-bounce' },
+  };
+  const s = states[state] || states.idle;
+  body.textContent = s.emoji;
+  mood.textContent = s.mood;
+  body.style.animation = s.anim ? s.anim + ' .6s ease infinite' : 'none';
+  _pichanLastActivity = Date.now();
+}
+
+function pichanTap() {
+  _pichanTapCount++;
+  const body = document.getElementById('pichanBody');
+  if (body) { body.style.transform = 'scale(1.3)'; setTimeout(() => body.style.transform = '', 200); }
+
+  if (_pichanTapCount >= 5) {
+    _pichanTapCount = 0;
+    const msgs = [
+      'そんなに突かないでよ〜',
+      'くすぐったい！',
+      '撫でてくれるの？嬉しい！',
+      '今日も一緒に頑張ろうね！',
+      'ぴぴっ！元気100倍！',
+    ];
+    showAiBubble(msgs[Math.floor(Math.random() * msgs.length)], 'ぴーちゃん🐤');
+  } else {
+    const tips = [
+      '録音ボタンを押すと、声をテキストに変換するよ！',
+      'Hold モードなら押してる間だけ録音できるよ',
+      '声紋は指紋と同じくらいユニークなんだって！',
+      'トラックライブラリで録音を管理できるよ',
+      '校正エンジンが漢字の間違いを直してくれるよ',
+    ];
+    showAiBubble(tips[Math.floor(Math.random() * tips.length)], 'Tips🐤');
+  }
+}
+
+// Pi-chan sleepy timer
+setInterval(() => {
+  if (Date.now() - _pichanLastActivity > 120000 && _pichanState === 'idle') {
+    updatePichanState('sleepy');
+  }
+}, 30000);
 
 // ─── Voice Print Visualizer (Spectrogram) ───
 let vpCanvasCtx=null, vpImageData=null, vpUseTimeDomain=false, vpCheckCount=0;
@@ -3191,6 +3276,33 @@ let _currentAudio=null, _playerTrackIdx=-1, _playerRafId=0;
 let _trimStart=0, _trimEnd=0, _seekPos=0; // seconds
 let _waveformCache={}; // idx -> Float32Array of peaks
 const _audioRecBtn=()=>document.getElementById('audioRecBtn');
+
+// ─── Track Library Toggle ───
+let _libraryExpanded = false;
+function toggleLibraryView() {
+  const panel = document.getElementById('trackPanel');
+  const histPanel = document.querySelector('.history-panel:not(#trackPanel)');
+  const currentPanel = document.querySelector('.current-panel');
+
+  _libraryExpanded = !_libraryExpanded;
+
+  if (_libraryExpanded) {
+    panel.style.display = 'flex';
+    panel.style.flex = '3';
+    panel.style.minHeight = '200px';
+    if (histPanel) histPanel.style.display = 'none';
+    if (currentPanel) currentPanel.style.flex = '0.5';
+    document.getElementById('libToggleBtn').style.color = 'var(--accent)';
+    updatePichanState('happy');
+  } else {
+    panel.style.display = 'none';
+    panel.style.flex = '1.2';
+    if (histPanel) histPanel.style.display = '';
+    if (currentPanel) currentPanel.style.flex = '';
+    document.getElementById('libToggleBtn').style.color = '';
+    updatePichanState('idle');
+  }
+}
 
 function toggleAudioRec(){
   if(_audioRecording) stopAudioRec();

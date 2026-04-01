@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
 <meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
-<title>Grace Browser — Web Navigator</title>
+<title>Grace Browser v2 — Web Navigator</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -256,6 +256,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
       <button id="voice-btn" title="音声検索 (Ctrl+Shift+V)">🎤</button>
       <button id="bookmark-btn" title="ブックマーク">☆</button>
     </div>
+    <button class="nav-btn" id="btn-terminal" title="Space Terminalに戻る" style="color:var(--accent);font-size:14px;">🚀</button>
     <button class="nav-btn" id="btn-download" title="ダウンロード">↓</button>
     <button class="nav-btn" id="panel-btn" title="サイドパネル">☰</button>
   </div>
@@ -331,6 +332,8 @@ let bookmarks = loadJSON('grace-bookmarks', [
   { title: 'GitHub', url: 'https://github.com/', icon: '🐙' },
   { title: 'MDN', url: 'https://developer.mozilla.org/', icon: '📖' },
   { title: 'Grace of Touch', url: '/index.html', icon: '🚀' },
+  { title: 'GraceVox', url: '/gracevox.html', icon: '🎤' },
+  { title: 'Records', url: '/records.html', icon: '🎵' },
 ]);
 
 let history = loadJSON('grace-history', []);
@@ -420,6 +423,22 @@ function buildNewTabPage() {
       <div class="ntp-shortcut-label">${escapeHTML(b.title)}</div>
     </div>`
   ).join('');
+
+  const graceApps = [
+    { icon:'🎤', title:'GraceVox', url:'gracevox.html' },
+    { icon:'🎵', title:'Records', url:'records.html' },
+    { icon:'🎛️', title:'TrackForge', url:'/trackforge/' },
+    { icon:'🚀', title:'Mega Rocket', url:'rocket.html' },
+    { icon:'🐼', title:'Panda World', url:'pandaworld.html' },
+    { icon:'🥁', title:'Resonance', url:'resonance-drum.html' },
+  ];
+  const graceShortcuts = graceApps.map(a =>
+    `<div class="ntp-shortcut" data-url="${escapeAttr(a.url)}">
+      <div class="ntp-shortcut-icon" style="border-color:rgba(0,229,255,.3);background:rgba(0,229,255,.05);">${a.icon}</div>
+      <div class="ntp-shortcut-label" style="color:var(--accent);">${escapeHTML(a.title)}</div>
+    </div>`
+  ).join('');
+
   return `
     <div class="new-tab-page">
       <div class="ntp-logo">GRACE BROWSER</div>
@@ -432,7 +451,18 @@ function buildNewTabPage() {
         <span class="ntp-search-icon">🔍</span>
         <input type="text" placeholder="検索またはURLを入力..." id="ntp-input">
       </div>
-      <div class="ntp-shortcuts">${shortcuts}</div>
+      <div style="width:min(500px,90%);margin-bottom:12px;">
+        <div style="font-family:'Orbitron',monospace;font-size:9px;color:var(--accent);letter-spacing:.2em;margin-bottom:10px;opacity:.6;">GRACE OF TOUCH APPS</div>
+        <div class="ntp-shortcuts">${graceShortcuts}</div>
+      </div>
+      <div style="width:min(500px,90%);margin-top:20px;">
+        <div style="font-family:'Orbitron',monospace;font-size:9px;color:var(--text2);letter-spacing:.2em;margin-bottom:10px;opacity:.6;">BOOKMARKS</div>
+        <div class="ntp-shortcuts">${shortcuts}</div>
+      </div>
+      <div style="margin-top:32px;">
+        <a href="index.html" style="font-family:'Orbitron',monospace;font-size:10px;color:var(--accent);text-decoration:none;letter-spacing:.15em;opacity:.5;transition:opacity .2s;"
+           onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.5'">🚀 BACK TO SPACE TERMINAL</a>
+      </div>
     </div>`;
 }
 
@@ -766,6 +796,7 @@ document.getElementById('btn-forward').addEventListener('click', goForward);
 document.getElementById('btn-reload').addEventListener('click', reload);
 document.getElementById('btn-home').addEventListener('click', goHome);
 document.getElementById('panel-btn').addEventListener('click', togglePanel);
+document.getElementById('btn-terminal').addEventListener('click', () => { window.location.href = 'index.html'; });
 bookmarkBtn.addEventListener('click', toggleBookmark);
 
 document.querySelector('.panel-close').addEventListener('click', () => {
@@ -1025,7 +1056,7 @@ function escapeAttr(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').r
 
 // ===== Init =====
 createTab();
-setStatus('Grace Browser — 準備完了');
+setStatus('Grace Browser v2 — 準備完了');
 
 // Tab bar container setup
 tabsContainer.style.display = 'flex';

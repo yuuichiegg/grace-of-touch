@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
 <meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
-<title>Grace of Touch — Space Terminal v9</title>
+<title>Grace of Touch — Space Terminal v10</title>
 <!-- © 2024-2026 Grace of Touch Co. / Yuuichi Onozaki. All rights reserved.
      Unauthorized copying, modification, or distribution is strictly prohibited. -->
 <script></script>
@@ -280,23 +280,39 @@ body{margin:0;overflow:hidden;background:#020510;touch-action:none;}
   </div>
   <div class="panel-scroll">
 
+    <!-- QUICK ACCESS -->
+    <div class="panel-section-label" style="color:rgba(255,200,0,0.7);border-top:none;margin-top:0;padding-top:0;">⚡ QUICK ACCESS</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+      <a href="gracevox.html" class="app-card" style="margin:0;">
+        <div class="app-card-top"><div class="app-icon">🎤</div><div class="app-info"><div class="app-title" style="font-size:11px;">GraceVox</div></div></div>
+      </a>
+      <a href="browser.html" class="app-card" style="margin:0;">
+        <div class="app-card-top"><div class="app-icon">🌐</div><div class="app-info"><div class="app-title" style="font-size:11px;">Browser</div></div></div>
+      </a>
+      <a href="records.html" class="app-card" style="margin:0;">
+        <div class="app-card-top"><div class="app-icon">🎵</div><div class="app-info"><div class="app-title" style="font-size:11px;">Records</div></div></div>
+      </a>
+      <a href="/trackforge/" class="app-card" style="margin:0;">
+        <div class="app-card-top"><div class="app-icon">🎛️</div><div class="app-info"><div class="app-title" style="font-size:11px;">TrackForge</div></div></div>
+      </a>
+    </div>
+
     <!-- UPDATE LOG -->
     <div class="panel-section-label" style="color:rgba(0,255,200,0.7);">📋 UPDATE LOG</div>
     <div id="update-log" style="background:rgba(0,255,200,0.03);border:1px solid rgba(0,255,200,0.12);
       border-radius:10px;padding:12px 14px;margin-bottom:14px;font-family:'Courier New',monospace;
       font-size:10px;line-height:1.9;color:rgba(255,255,255,0.65);position:relative;">
       <div style="font-size:9px;color:rgba(0,255,200,0.5);letter-spacing:0.1em;margin-bottom:6px;">UPDATE HISTORY</div>
-      <div class="update-copy-text">v69 — 2026-03-27
-- Rocket: 三人称視点(V切替) + 宇宙船モデル
-- Space Elevator: 赤道テザー + 軌道ステーション
-- 惑星: マントル削除、当たり判定追加
-- 音楽: 後出しじゃんけん追加(全10曲)
-- InfraScan AI: 招待制カード追加
-- Security: コード保護 + 著作権表示
-- GitHub: プライベートリポジトリ移行
+      <div class="update-copy-text">v10 — 2026-04-01
+- Grace Browser: 音声検索＋コンビニUI
+- Records: オリジナル楽曲14曲追加
+- Resonance Drum: 3D音響エンジン
+- GraceVox: マルチ認証＋録音ライブラリ
+- Terminal: FPS→左ドラッグカメラ
+- Quick Access: ランチャー上部に追加
 
 🌐 https://grace-of-touch.web.app
-#GraceOfTouch #WebApp #Tech</div>
+#GraceOfTouch #SpaceTerminal #v10</div>
     </div>
 
     <div class="panel-section-label">3D MODELING &amp; PRINT</div>
@@ -604,6 +620,20 @@ body{margin:0;overflow:hidden;background:#020510;touch-action:none;}
       <div class="app-launch">ENTER WORLD</div>
     </a>
 
+    <div class="panel-section-label">BROWSER &amp; NAVIGATION</div>
+
+    <a href="browser.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🌐</div>
+        <div class="app-info">
+          <div class="app-title">Grace Browser</div>
+          <div class="app-tags"><span class="app-tag">BROWSER</span><span class="app-tag">VOICE</span><span class="app-tag">PWA</span></div>
+        </div>
+      </div>
+      <div class="app-desc">GraceVox音声検索搭載ブラウザ。ブックマーク・タブ管理・コンビニUI</div>
+      <div class="app-launch">OPEN BROWSER</div>
+    </a>
+
     <div class="panel-section-label">CERTIFICATION &amp; MANAGEMENT</div>
 
     <a href="invest.html" class="app-card">
@@ -665,6 +695,30 @@ body{margin:0;overflow:hidden;background:#020510;touch-action:none;}
         </div>
       </div>
       <div class="app-desc">デジタルMTR × 音楽コラボ。録音・ミックス・マスタリング・貢献証明書</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <a href="records.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🎵</div>
+        <div class="app-info">
+          <div class="app-title">Grace Records</div>
+          <div class="app-tags"><span class="app-tag">MUSIC</span><span class="app-tag">CATALOG</span><span class="app-tag">3D</span></div>
+        </div>
+      </div>
+      <div class="app-desc">6フロア3Dビルの楽曲カタログ。オリジナル楽曲視聴・歌詞・マスタリング履歴</div>
+      <div class="app-launch">ENTER WORLD</div>
+    </a>
+
+    <a href="resonance-drum.html" class="app-card">
+      <div class="app-card-top">
+        <div class="app-icon">🥁</div>
+        <div class="app-info">
+          <div class="app-title">Resonance Drum</div>
+          <div class="app-tags"><span class="app-tag">3D</span><span class="app-tag">MUSIC</span><span class="app-tag">EXPORT</span></div>
+        </div>
+      </div>
+      <div class="app-desc">タングドラム3Dビューワー＆音響エンジン。glTF/OBJ/STLエクスポート対応</div>
       <div class="app-launch">ENTER WORLD</div>
     </a>
 
