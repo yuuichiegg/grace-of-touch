@@ -54,14 +54,14 @@ canvas{display:block}
 import*as THREE from"three";
 import{OrbitControls}from"three/addons/controls/OrbitControls.js";
 const FLOORS=[
-{id:"b1",floor:"B1",label:"Server Room / AI Office",y:-2,color:0x1a1a3a,apps:[{name:"AI Office",desc:"Pixel Art AI Agents",url:null},{name:"Server Room",desc:"Infrastructure Monitor",url:null}]},
+{id:"b1",floor:"B1",label:"AI Engine Room",y:-2,color:0x1a1a3a,apps:[{name:"AI Office",desc:"Pixel Art AI Agents",url:null},{name:"Server Room",desc:"Infrastructure Monitor",url:null}]},
 {id:"f1",floor:"1F",label:"Entrance / Portal",y:0,color:0x2a1a4a,apps:[{name:"Grace of Touch Portal",desc:"Main Reception & Guide",url:"index.html"}]},
-{id:"f5",floor:"5F",label:"Research Lab",y:6,color:0x1a2a4a,apps:[{name:"Phage Simulator",desc:"Virus Battle Simulation",url:null},{name:"Helix Horizon",desc:"DNA Visualization",url:null}]},
-{id:"f10",floor:"10F",label:"Game Floor",y:12,color:0x1a3a2a,apps:[{name:"Sound Shooter",desc:"Audio-Reactive FPS",url:"sound-shooter.html"},{name:"Panda World",desc:"Global Panda Explorer",url:null}]},
-{id:"f15",floor:"15F",label:"Infrastructure",y:18,color:0x3a2a1a,apps:[{name:"TunnelScan",desc:"Tunnel Inspection AI",url:null},{name:"WallGuard",desc:"Wall Crack Detection",url:null}]},
-{id:"f20",floor:"20F",label:"Drone Control",y:24,color:0x1a2a3a,apps:[{name:"DroneGuard",desc:"Drone Patrol System",url:null},{name:"TunnelDrone",desc:"Tunnel Drone Sim",url:"tunneldrone.html"}]},
-{id:"f25",floor:"25F",label:"Music Studio",y:30,color:0x2a1a3a,apps:[{name:"TrackForge",desc:"Music Production DAW",url:"trackforge/"},{name:"GraceVox",desc:"Voice Analysis Platform",url:"gracevox.html"},{name:"GoT Records",desc:"Record Label & Storage Bank",url:"records.html"},{name:"Podcast Studio",desc:"Podcast Recording",url:null},{name:"Resonance Drum",desc:"3D Instrument & Sound Engine",url:"resonance-drum.html"}]},
-{id:"f30",floor:"30F",label:"Space Observatory",y:36,color:0x0a1a3a,apps:[{name:"Mega Rocket Simulator",desc:"Space Exploration v71",url:"rocket.html"}]}];
+{id:"f5",floor:"5F",label:"Entertainment",y:6,color:0x1a3a2a,apps:[{name:"Sound Shooter",desc:"Audio-Reactive FPS",url:"sound-shooter.html"},{name:"Panda World",desc:"Living World Simulator",url:"pandaworld.html"}]},
+{id:"f10",floor:"10F",label:"Infrastructure",y:12,color:0x3a2a1a,apps:[{name:"TunnelDrone",desc:"Tunnel Drone Sim",url:"tunneldrone.html"},{name:"TunnelScan",desc:"Tunnel Inspection AI",url:null},{name:"DroneGuard",desc:"Drone Patrol System",url:null}]},
+{id:"f15",floor:"15F",label:"Voice & Media",y:18,color:0x1a2a4a,apps:[{name:"GraceVox",desc:"Voice Analysis Platform",url:"gracevox.html"},{name:"Podcast Studio",desc:"Podcast Recording & Chapters",url:null}]},
+{id:"f20",floor:"20F",label:"Music Studio",y:24,color:0x2a1a3a,apps:[{name:"TrackForge",desc:"Music Production DAW",url:"trackforge/"},{name:"GoT Records",desc:"Record Label & Storage Bank",url:"records.html"},{name:"Resonance Drum",desc:"3D Instrument & Sound Engine",url:"resonance-drum.html"}]},
+{id:"f25",floor:"25F",label:"Research Lab",y:30,color:0x1a2a3a,apps:[{name:"Phage Simulator",desc:"Virus Battle Simulation",url:null},{name:"Helix Horizon",desc:"DNA Visualization",url:null}]},
+{id:"f30",floor:"30F",label:"Space Observatory",y:36,color:0x0a1a3a,apps:[{name:"Mega Rocket Simulator",desc:"Space Exploration",url:"rocket.html"}]}];
 const BRAND_PURPLE=0x6c5ce7,BRAND_CYAN=0x22d3ee;
 const canvas=document.getElementById("three-canvas");
 const scene=new THREE.Scene();scene.fog=new THREE.FogExp2(0x0a0a1a,0.004);
