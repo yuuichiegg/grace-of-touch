@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>Grace Engine Demo — 3D Customizer</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Noto+Sans+JP:wght@300;400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;overflow:hidden;background:#0a0a1e;color:#e0e0e0;font-family:'Noto Sans JP',sans-serif;}
+#app{display:flex;height:100vh;}
+#viewport{flex:1;position:relative;}
+#viewport canvas{width:100%!important;height:100%!important;display:block;}
+#sidebar{width:280px;background:rgba(10,10,30,0.95);border-left:1px solid rgba(0,229,255,0.12);
+  overflow-y:auto;padding:16px;flex-shrink:0;backdrop-filter:blur(12px);}
+.section-title{font-family:'Orbitron',monospace;font-size:11px;color:#00e5ff;
+  letter-spacing:0.15em;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid rgba(0,229,255,0.1);}
+.section-title:first-child{margin-top:0;}
+.shape-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0;}
+.shape-btn{padding:8px 4px;border-radius:8px;border:1px solid rgba(0,229,255,0.15);
+  background:rgba(0,229,255,0.04);color:#aaa;cursor:pointer;font-size:10px;text-align:center;
+  transition:all .15s;font-family:'Courier New',monospace;}
+.shape-btn:hover,.shape-btn.active{border-color:#00e5ff;color:#00e5ff;background:rgba(0,229,255,0.1);}
+#info{position:absolute;bottom:12px;left:12px;font-family:'Courier New',monospace;font-size:10px;
+  color:rgba(0,229,255,0.5);pointer-events:none;}
+h1{font-family:'Orbitron',monospace;font-size:16px;color:#00e5ff;letter-spacing:0.08em;margin-bottom:4px;}
+.subtitle{font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:16px;}
+@media(max-width:700px){
+  #app{flex-direction:column-reverse;}
+  #sidebar{width:100%;max-height:40vh;border-left:none;border-top:1px solid rgba(0,229,255,0.12);}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="viewport">
+    <canvas id="canvas3d"></canvas>
+    <div id="info">Grace Engine v1.0 | Three.js r162</div>
+  </div>
+  <div id="sidebar">
+    <h1>GRACE ENGINE</h1>
+    <div class="subtitle">3D Customizer Demo</div>
+
+    <div class="section-title">SHAPE</div>
+    <div class="shape-grid" id="shapeGrid"></div>
+
+    <div class="section-title">COLOR</div>
+    <div id="colorArea"></div>
+
+    <div class="section-title">SIZE</div>
+    <div id="sizeArea"></div>
+
+    <div class="section-title">MATERIAL</div>
+    <div id="matArea"></div>
+
+    <div class="section-title">LIGHTING</div>
+    <div id="lightArea"></div>
+
+    <div class="section-title">EXPORT</div>
+    <div id="exportArea"></div>
+  </div>
+</div>
+
+<!-- Three.js r162 -->
+<script src="https://unpkg.com/three@0.162.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.162.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://unpkg.com/three@0.162.0/examples/js/exporters/STLExporter.js"></script>
+<script src="https://unpkg.com/three@0.162.0/examples/js/exporters/GLTFExporter.js"></script>
+<script src="https://unpkg.com/three@0.162.0/examples/js/exporters/OBJExporter.js"></script>
+
+<!-- Grace Engine -->
+<script src="js/grace-engine.js"></script>
+
+<script>
+// ─── Init Grace Engine ───
+const engine = new GraceEngine('#canvas3d', {
+  background: 0x0a0a1e,
+  grid: true,
+  shadows: true,
+  export: ['stl', 'gltf', 'obj'],
+});
+
+engine.setCameraPos(6, 5, 6);
+
+// ─── State ───
+let currentMesh = null;
+let currentColor = '#00e5ff';
+let currentShape = 'box';
+let currentScale = 1;
+let metalness = 0.3;
+let roughness = 0.5;
+
+// ─── Shapes ───
+const SHAPES = {
+  box:      () => new THREE.BoxGeometry(2, 2, 2),
+  sphere:   () => new THREE.SphereGeometry(1.2, 32, 32),
+  cylinder: () => new THREE.CylinderGeometry(1, 1, 2.5, 32),
+  cone:     () => new THREE.ConeGeometry(1.2, 2.5, 32),
+  torus:    () => new THREE.TorusGeometry(1, 0.4, 16, 48),
+  knot:     () => new THREE.TorusKnotGeometry(0.8, 0.3, 100, 16),
+  ring:     () => new THREE.TorusGeometry(1.2, 0.15, 8, 48),
+  capsule:  () => new THREE.CapsuleGeometry(0.8, 1.5, 16, 32),
+  octahedron: () => new THREE.OctahedronGeometry(1.3),
+};
+
+function createMesh(shape) {
+  if (currentMesh) engine.remove(currentMesh);
+  const geo = (SHAPES[shape] || SHAPES.box)();
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(currentColor),
+    metalness, roughness,
+  });
+  currentMesh = new THREE.Mesh(geo, mat);
+  currentMesh.castShadow = true;
+  currentMesh.receiveShadow = true;
+  currentMesh.position.y = 1.5;
+  currentMesh.scale.setScalar(currentScale);
+  engine.add(currentMesh);
+  currentShape = shape;
+
+  // Highlight active shape button
+  document.querySelectorAll('.shape-btn').forEach(b => b.classList.toggle('active', b.dataset.shape === shape));
+}
+
+// ─── Shape Grid ───
+const grid = document.getElementById('shapeGrid');
+Object.keys(SHAPES).forEach(s => {
+  const btn = document.createElement('button');
+  btn.className = 'shape-btn';
+  btn.dataset.shape = s;
+  btn.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+  btn.addEventListener('click', () => createMesh(s));
+  grid.appendChild(btn);
+});
+
+// ─── Color Swatches ───
+GraceUI.colorSwatches(document.getElementById('colorArea'), [
+  '#00e5ff', '#ff6b6b', '#ffd700', '#00ff88', '#ff44ff', '#ff8c00',
+  '#8888ff', '#ffffff', '#333333',
+], (color) => {
+  currentColor = color;
+  if (currentMesh) currentMesh.material.color.set(color);
+});
+
+// ─── Size Slider ───
+GraceUI.slider(document.getElementById('sizeArea'), {
+  label: 'Scale', min: 0.3, max: 3, value: 1, step: 0.1,
+  onChange: (v) => { currentScale = v; if (currentMesh) currentMesh.scale.setScalar(v); }
+});
+
+// ─── Material Sliders ───
+GraceUI.slider(document.getElementById('matArea'), {
+  label: 'Metal', min: 0, max: 1, value: 0.3, step: 0.05,
+  onChange: (v) => { metalness = v; if (currentMesh) currentMesh.material.metalness = v; }
+});
+GraceUI.slider(document.getElementById('matArea'), {
+  label: 'Rough', min: 0, max: 1, value: 0.5, step: 0.05,
+  onChange: (v) => { roughness = v; if (currentMesh) currentMesh.material.roughness = v; }
+});
+
+// ─── Lighting ───
+GraceUI.slider(document.getElementById('lightArea'), {
+  label: 'Ambient', min: 0, max: 2, value: 0.6, step: 0.1,
+  onChange: (v) => engine.setLighting({ ambient: v })
+});
+GraceUI.slider(document.getElementById('lightArea'), {
+  label: 'Direct', min: 0, max: 3, value: 0.8, step: 0.1,
+  onChange: (v) => engine.setLighting({ directional: v })
+});
+
+// ─── Export Toolbar ───
+GraceUI.exportToolbar(document.getElementById('exportArea'), {
+  stl: () => engine.exportSTL(currentMesh, `grace-${currentShape}.stl`),
+  gltf: () => engine.exportGLTF(currentMesh, `grace-${currentShape}.glb`),
+  obj: () => engine.exportOBJ(currentMesh, `grace-${currentShape}.obj`),
+  screenshot: () => engine.exportScreenshot(`grace-${currentShape}.png`),
+});
+
+// ─── Auto-rotate ───
+engine.onAnimate(() => {
+  if (currentMesh) currentMesh.rotation.y += 0.003;
+});
+
+// ─── Init with Box ───
+createMesh('box');
+
+// ─── Ground plane for shadow ───
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(20, 20),
+  new THREE.ShadowMaterial({ opacity: 0.3 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+engine.add(ground);
+</script>
+</body>
+</html>
