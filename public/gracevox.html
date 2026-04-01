@@ -3132,7 +3132,7 @@ let _audioRecording=false, _mediaRecorder=null, _audioChunks=[], _audioRecStartT
 let _recStream=null, _recAnalyser=null, _recAudioCtx=null, _recTimerInterval=null;
 let _tracks=JSON.parse(localStorage.getItem('gv_tracks')||'[]');
 let _currentAudio=null, _playerTrackIdx=-1, _playerRafId=0;
-let _trimStart=0, _trimEnd=0; // seconds
+let _trimStart=0, _trimEnd=0, _seekPos=0; // seconds
 let _waveformCache={}; // idx -> Float32Array of peaks
 const _audioRecBtn=()=>document.getElementById('audioRecBtn');
 
@@ -3378,11 +3378,24 @@ function _drawWaveform(ctx,w,h,peaks,maxPeak,currentTime,totalDur,trimEnd,trimSt
 document.addEventListener('DOMContentLoaded',()=>{
   const cv=document.getElementById('playerWaveCanvas');
   if(!cv) return;
+  _seekPos=0; // last tapped position in seconds (global)
   cv.addEventListener('click',e=>{
-    if(!_currentAudio||_playerTrackIdx<0) return;
+    if(_playerTrackIdx<0) return;
+    const tr=_tracks[_playerTrackIdx];
+    if(!tr) return;
     const rect=cv.getBoundingClientRect();
-    const pct=(e.clientX-rect.left)/rect.width;
-    _currentAudio.currentTime=pct*_currentAudio.duration;
+    const pct=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+    _seekPos=pct*tr.dur;
+    if(_currentAudio&&_currentAudio._trackIdx===_playerTrackIdx){
+      _currentAudio.currentTime=_seekPos;
+    }
+    // Update waveform with seek position even when paused
+    document.getElementById('playerTime').textContent=_fmtTime(_seekPos);
+    const cache=_waveformCache[_playerTrackIdx];
+    if(cache){
+      const ctx=cv.getContext('2d');
+      _drawWaveform(ctx,cv.width,cv.height,cache.peaks,cache.maxPeak,_seekPos,tr.dur,_trimEnd,_trimStart);
+    }
   });
 });
 
@@ -3434,17 +3447,32 @@ function _updatePlayerUI(){
 }
 
 // ─── Trim ───
+function _getCurrentPos(){
+  // Use audio position if playing, otherwise use last seek tap position
+  if(_currentAudio&&_currentAudio._trackIdx===_playerTrackIdx) return _currentAudio.currentTime;
+  return _seekPos||0;
+}
 function setTrimStart(){
-  if(!_currentAudio) return;
-  _trimStart=_currentAudio.currentTime;
+  if(_playerTrackIdx<0) return;
+  _trimStart=_getCurrentPos();
   _updateTrimLabel();
+  _redrawPlayerWave();
   showToast('開始点: '+_fmtTime(_trimStart));
 }
 function setTrimEnd(){
-  if(!_currentAudio) return;
-  _trimEnd=_currentAudio.currentTime;
+  if(_playerTrackIdx<0) return;
+  _trimEnd=_getCurrentPos();
   _updateTrimLabel();
+  _redrawPlayerWave();
   showToast('終了点: '+_fmtTime(_trimEnd));
+}
+function _redrawPlayerWave(){
+  const cache=_waveformCache[_playerTrackIdx];
+  if(!cache) return;
+  const tr=_tracks[_playerTrackIdx];if(!tr)return;
+  const cv=document.getElementById('playerWaveCanvas');
+  const ctx=cv.getContext('2d');
+  _drawWaveform(ctx,cv.width,cv.height,cache.peaks,cache.maxPeak,_getCurrentPos(),tr.dur,_trimEnd,_trimStart);
 }
 function _updateTrimLabel(){
   const el=document.getElementById('trimRange');
