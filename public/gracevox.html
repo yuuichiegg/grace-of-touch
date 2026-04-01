@@ -1004,13 +1004,28 @@ fbAuth.onAuthStateChanged((user)=>{
 
 function toggleLogin(){
   if(fbUser){
-    if(confirm('ログアウトしますか？')) {
-      fbAuth.signOut();
-      showToast('ログアウトしました');
-    }
+    showLogoutDialog();
   }else{
     openLogin();
   }
+}
+function showLogoutDialog(){
+  // Remove existing
+  document.getElementById('logoutDialog')?.remove();
+  const d=document.createElement('div');
+  d.id='logoutDialog';
+  d.style.cssText='position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;padding:20px;';
+  d.innerHTML=`
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:320px;width:100%;text-align:center;">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px;">ログアウトしますか？</div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:16px;">${fbUser.displayName||fbUser.email||''}</div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="document.getElementById('logoutDialog').remove()" style="flex:1;padding:10px;border:1px solid var(--border);background:none;color:var(--text-dim);border-radius:8px;cursor:pointer;font-size:13px;">キャンセル</button>
+        <button onclick="fbAuth.signOut();document.getElementById('logoutDialog').remove();showToast('ログアウトしました');" style="flex:1;padding:10px;border:none;background:var(--recording);color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;">ログアウト</button>
+      </div>
+    </div>`;
+  document.body.appendChild(d);
+  d.addEventListener('click',e=>{if(e.target===d)d.remove();});
 }
 
 function openLogin(){
