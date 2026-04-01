@@ -1004,7 +1004,10 @@ fbAuth.onAuthStateChanged((user)=>{
 
 function toggleLogin(){
   if(fbUser){
-    showToast('ログアウトは⚙設定→ログアウトボタンから');
+    if(confirm('ログアウトしますか？')) {
+      fbAuth.signOut();
+      showToast('ログアウトしました');
+    }
   }else{
     openLogin();
   }
