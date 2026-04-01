@@ -475,7 +475,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       <option value="tr-TR">TR Türkçe</option>
     </select>
     <div class="mode-pill" id="modePill">テキスト整形</div>
-    <div id="gv-live-counter" style="display:flex;gap:6px;font-family:'Courier New',monospace;font-size:9px;color:var(--accent);opacity:0.7;line-height:1;pointer-events:none;align-items:center;">
+    <div id="gv-live-counter" style="display:none;gap:6px;font-family:'Courier New',monospace;font-size:9px;color:var(--accent);opacity:0.7;line-height:1;pointer-events:none;align-items:center;">
       <span>ONLINE <span id="lc-online">-</span></span>
       <span style="opacity:0.6;">WEEK <span id="lc-week">-</span></span>
     </div>
@@ -723,9 +723,10 @@ function updatePlanUI(){
     nameEl.textContent='Free';
     nameEl.style.color='';
     const pct=Math.min(100,Math.round(monthlyUsage/FREE_MONTHLY_LIMIT*100));
-    usageEl.textContent=monthlyUsage+' / '+FREE_MONTHLY_LIMIT+'回（今月）';
-    barEl.style.width=pct+'%';
-    barEl.style.background=pct>=90?'var(--recording)':'var(--accent)';
+    const remaining=Math.max(0,FREE_MONTHLY_LIMIT-monthlyUsage);
+    usageEl.textContent=remaining>0?'あと'+remaining+'回使えます':'今月の無料枠を使い切りました';
+    barEl.style.width=(100-pct)+'%';
+    barEl.style.background=remaining<=2?'var(--recording)':'var(--accent)';
     promoEl.style.display='block';
   }
 }
@@ -779,6 +780,7 @@ loadUsage();
 })();
 
 // Auth state
+const OWNER_EMAILS=['yuuichiegg@gmail.com'];
 fbAuth.onAuthStateChanged((user)=>{
   fbUser=user;
   const btn=document.getElementById('loginBtn');
@@ -787,11 +789,16 @@ fbAuth.onAuthStateChanged((user)=>{
     btn.title=user.displayName||user.email||'Logged in';
     syncFromCloud();
     checkProStatus();
+    // Owner-only: show live counter
+    if(OWNER_EMAILS.includes(user.email)){
+      document.getElementById('gv-live-counter').style.display='flex';
+    }
   }else{
     btn.innerHTML='&#128100;';
     btn.title='Login';
     userPlan='free';
     updatePlanUI();
+    document.getElementById('gv-live-counter').style.display='none';
   }
 });
 
