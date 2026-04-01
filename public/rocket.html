@@ -6019,8 +6019,8 @@ const App={
       this.cameraEuler.x-=inp.look.y*this.lookSens;
       this.cameraEuler.x=Math.max(-Math.PI*0.499,Math.min(Math.PI*0.499,this.cameraEuler.x));
       // Roll (Q/E keys)
-      if(inp.roll)this.cameraEuler.z-=inp.roll*0.03;
-      if(!inp.roll)this.cameraEuler.z*=0.99; // gentle auto-level only when not rolling
+      if(inp.roll)this.cameraEuler.z-=inp.roll*0.05;
+      else this.cameraEuler.z*=0.93; // auto-level when Q/E not pressed
       this.camera.quaternion.setFromEuler(this.cameraEuler);
       this._fwd.set(0,0,-1).applyQuaternion(this.camera.quaternion);
       this._rgt.set(1,0,0).applyQuaternion(this.camera.quaternion);
