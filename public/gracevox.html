@@ -3358,13 +3358,16 @@ function renderTracks(){
     panel.style.display='none';return;
   }
   panel.style.display='flex';
-  list.innerHTML=_tracks.map((tr,i)=>`
+  // Newest first (reverse order)
+  const indices=[..._tracks.keys()].reverse();
+  list.innerHTML=indices.map(i=>{const tr=_tracks[i];return`
     <div class="track-item" id="track-${i}" onclick="openPlayer(${i})" style="cursor:pointer;">
       <span class="track-name">${escapeHtml(tr.name)}</span>
       <span class="track-dur">${_fmtTime(tr.dur)}</span>
       <button class="track-btn" onclick="event.stopPropagation();downloadTrack(${i})" title="DL">&#11015;</button>
       <button class="track-btn" onclick="event.stopPropagation();deleteTrack(${i})" title="削除" style="font-size:11px;">&#10005;</button>
-    </div>
+    </div>`}).join('');
+  list.scrollTop=0;
   `).join('');
 }
 
