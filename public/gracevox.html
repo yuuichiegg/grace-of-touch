@@ -560,7 +560,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   </div>
 
   <!-- Audio Track Library -->
-  <div class="history-panel" id="trackPanel" style="display:none;max-height:260px;">
+  <div class="history-panel" id="trackPanel" style="display:none;flex:1.2;min-height:0;">
     <div class="history-header">
       <span class="history-label">TRACKS</span>
       <span id="recTimer" style="font-size:11px;color:var(--recording);font-family:'Courier New',monospace;display:none;">● 00:00</span>
@@ -598,7 +598,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         <button class="track-btn" onclick="applyTrim()" title="トリミング実行" style="font-size:9px;width:auto;padding:0 8px;height:24px;border-radius:4px;color:var(--accent);border-color:var(--accent);">✂ 切出</button>
       </div>
     </div>
-    <div class="history-content" id="trackList" style="padding:6px 10px;">
+    <div class="history-content" id="trackList" style="padding:6px 10px;min-height:80px;">
       <div class="history-empty" id="trackEmpty">録音するとここにトラックが表示されます</div>
     </div>
   </div>
