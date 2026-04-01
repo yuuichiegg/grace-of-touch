@@ -1988,13 +1988,18 @@ update(){
   // Keyboard input: WASD=move, Arrows=up-down/yaw, Q/E=roll
   let roll=0;
   if(this._stickMode===3){
+    // Orbit mode: mouse drag also controls yaw/pitch
+    if(this.look.x!==0||this.look.y!==0){
+      this._orbitYaw+=this.look.x*0.005;
+      this._orbitPitch=Math.max(-Math.PI*0.35,Math.min(Math.PI*0.45,this._orbitPitch+this.look.y*0.005));
+    }
     // Orbit mode keyboard: arrows orbit around target
     if(this.keys.ArrowUp)this._orbitPitch=Math.min(Math.PI*0.45,this._orbitPitch+0.02); // look down (pitch up)
     if(this.keys.ArrowDown)this._orbitPitch=Math.max(-Math.PI*0.35,this._orbitPitch-0.02); // look up (pitch down)
     if(this.keys.ArrowLeft)this._orbitYaw-=0.03;  // orbit left
     if(this.keys.ArrowRight)this._orbitYaw+=0.03;  // orbit right
-    if(this.keys.w)this._orbitDist=Math.max(10,this._orbitDist-1); // zoom in
-    if(this.keys.s)this._orbitDist=Math.min(500,this._orbitDist+1); // zoom out
+    if(this.keys.w||wb<-0.01)this._orbitDist=Math.max(10,this._orbitDist-1-wb*20); // zoom in (key+wheel)
+    if(this.keys.s||wb>0.01)this._orbitDist=Math.min(500,this._orbitDist+1+wb*20); // zoom out (key+wheel)
     if(this.keys.a)u=1;   // raise target
     if(this.keys.d)u=-1;  // lower target
   }else{
@@ -5994,7 +5999,7 @@ const App={
       this.cameraEuler.x=Math.max(-Math.PI*0.499,Math.min(Math.PI*0.499,this.cameraEuler.x));
       // Roll (Q/E keys)
       if(inp.roll)this.cameraEuler.z-=inp.roll*0.03;
-      this.cameraEuler.z*=0.95; // auto-level roll
+      if(!inp.roll)this.cameraEuler.z*=0.99; // gentle auto-level only when not rolling
       this.camera.quaternion.setFromEuler(this.cameraEuler);
       this._fwd.set(0,0,-1).applyQuaternion(this.camera.quaternion);
       this._rgt.set(1,0,0).applyQuaternion(this.camera.quaternion);
