@@ -617,6 +617,31 @@ document.addEventListener('DOMContentLoaded',()=>{
     </div>
     <div class="sep"></div>
     <div class="setting-group"><button class="panel-btn" onclick="resetSetup()">声の再セットアップ</button></div>
+    <div class="sep"></div>
+    <!-- Plan section -->
+    <div class="setting-group" id="planSection">
+      <label style="font-size:14px;font-weight:700;color:var(--accent);">プラン</label>
+      <div id="planStatus" style="margin:8px 0;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span id="planName" style="font-weight:700;">Free</span>
+          <span id="planUsage" style="font-size:11px;color:var(--text-dim);">0 / 30回（今月）</span>
+        </div>
+        <div style="height:4px;background:var(--border);border-radius:2px;margin:8px 0;overflow:hidden;">
+          <div id="planBar" style="height:100%;background:var(--accent);border-radius:2px;width:0%;transition:width 0.3s;"></div>
+        </div>
+      </div>
+      <div id="proPromo" style="padding:12px;border-radius:10px;border:1px solid var(--accent);background:rgba(108,92,231,0.08);margin-top:8px;">
+        <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:6px;">GraceVox Pro — ¥980/月</div>
+        <ul style="font-size:11px;color:var(--text-dim);margin:0;padding-left:16px;line-height:1.6;">
+          <li>音声認識 <b>無制限</b></li>
+          <li>AI校正エンジン（固有名詞+同音異義語）</li>
+          <li>声紋スペクトログラム解析</li>
+          <li>エクスポート機能</li>
+          <li>カスタム辞書 無制限登録</li>
+        </ul>
+        <button class="panel-btn" onclick="upgradePro()" style="margin-top:10px;width:100%;background:var(--accent);color:#fff;border:none;padding:10px;font-weight:700;">Pro にアップグレード</button>
+      </div>
+    </div>
     <button class="settings-close" onclick="toggleSettings()">閉じる</button>
   </div>
 </div>
@@ -637,6 +662,93 @@ const fbAuth=firebase.auth();
 const fbDb=firebase.firestore();
 let fbUser=null;
 
+// ══════════════════════════════
+// FREEMIUM PLAN SYSTEM
+// ══════════════════════════════
+const FREE_MONTHLY_LIMIT=30;
+let userPlan='free'; // 'free' or 'pro'
+let monthlyUsage=0;
+
+function getPlanKey(){
+  const d=new Date();
+  return 'gv_usage_'+d.getFullYear()+'_'+(d.getMonth()+1);
+}
+
+function loadUsage(){
+  monthlyUsage=parseInt(localStorage.getItem(getPlanKey())||'0');
+  updatePlanUI();
+}
+
+function incrementUsage(){
+  if(userPlan==='pro')return true;
+  monthlyUsage++;
+  localStorage.setItem(getPlanKey(),String(monthlyUsage));
+  updatePlanUI();
+  if(monthlyUsage>FREE_MONTHLY_LIMIT){
+    showToast('今月の無料枠('+FREE_MONTHLY_LIMIT+'回)を超えました。Proプランをご検討ください');
+    return false;
+  }
+  return true;
+}
+
+function checkUsageLimit(){
+  if(userPlan==='pro')return true;
+  if(monthlyUsage>=FREE_MONTHLY_LIMIT){
+    showToast('無料枠('+FREE_MONTHLY_LIMIT+'回/月)に達しました');
+    return false;
+  }
+  return true;
+}
+
+function updatePlanUI(){
+  const nameEl=document.getElementById('planName');
+  const usageEl=document.getElementById('planUsage');
+  const barEl=document.getElementById('planBar');
+  const promoEl=document.getElementById('proPromo');
+  if(!nameEl)return;
+  if(userPlan==='pro'){
+    nameEl.textContent='Pro';
+    nameEl.style.color='var(--accent)';
+    usageEl.textContent='無制限';
+    barEl.style.width='100%';
+    barEl.style.background='var(--accent)';
+    promoEl.style.display='none';
+  }else{
+    nameEl.textContent='Free';
+    nameEl.style.color='';
+    const pct=Math.min(100,Math.round(monthlyUsage/FREE_MONTHLY_LIMIT*100));
+    usageEl.textContent=monthlyUsage+' / '+FREE_MONTHLY_LIMIT+'回（今月）';
+    barEl.style.width=pct+'%';
+    barEl.style.background=pct>=90?'var(--recording)':'var(--accent)';
+    promoEl.style.display='block';
+  }
+}
+
+async function checkProStatus(){
+  if(!fbUser)return;
+  try{
+    const doc=await fbDb.collection('subscriptions').doc(fbUser.uid).get();
+    if(doc.exists&&doc.data().plan==='pro'&&doc.data().expiresAt?.toDate()>new Date()){
+      userPlan='pro';
+    }else{
+      userPlan='free';
+    }
+  }catch(e){userPlan='free';}
+  updatePlanUI();
+}
+
+function upgradePro(){
+  if(!fbUser){
+    showToast('先にログインしてください');
+    toggleLogin();
+    return;
+  }
+  // Stripe Checkout placeholder — will be replaced with real Stripe link
+  showToast('決済ページ準備中です。もうしばらくお待ちください');
+}
+
+loadUsage();
+
 // Auth state
 fbAuth.onAuthStateChanged((user)=>{
   fbUser=user;
@@ -645,9 +757,12 @@ fbAuth.onAuthStateChanged((user)=>{
     btn.innerHTML='&#128994;'; // green dot = logged in
     btn.title=user.displayName||user.email||'Logged in';
     syncFromCloud();
+    checkProStatus();
   }else{
     btn.innerHTML='&#128100;';
     btn.title='Login';
+    userPlan='free';
+    updatePlanUI();
   }
 });
 
@@ -960,6 +1075,8 @@ function toggleRecording(){
     }
     stopRecording();
   }else{
+    // Freemium check
+    if(!checkUsageLimit())return;
     // 開始時にクリーンスタート（死んだセッションの復旧もここで行う）
     _appSwitchDirty=false;
     _mediaNeedsUserGesture=false;
@@ -1137,6 +1254,7 @@ function stopRecording(){
   if(!isRecording && !_stopping) return;
   _stopping=true;
   isRecording=false;
+  incrementUsage(); // Freemium usage count
   playRecSFX('stop');
   _stopWatchdog();
   // まずrecognitionのイベントを即座に無効化（handleEnd再起動防止）

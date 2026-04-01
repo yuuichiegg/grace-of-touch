@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Grace of Touch — 声の解析、インフラ点検AI、3Dデジタルオフィス。あなたの技術を、世界に届けるプラットフォーム。">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<title>Grace of Touch — Voice, Infrastructure, Digital Space</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Noto+Sans+JP:wght@100;300;400;500;700;900&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script>
+tailwind.config={theme:{extend:{colors:{void:'#0a0a1a',iris:'#6c5ce7',cyan:'#22d3ee',mint:'#00ffb3',coral:'#ff6b6b',surface:'#12122a',glow:'rgba(108,92,231,0.15)'},fontFamily:{display:['Orbitron','sans-serif'],body:['Noto Sans JP','sans-serif'],mono:['DM Mono','monospace']}}}}
+</script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+::selection{background:rgba(108,92,231,0.4);color:#fff}
+html{scroll-behavior:smooth;scrollbar-width:thin;scrollbar-color:#6c5ce7 #0a0a1a}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:#0a0a1a}
+::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#6c5ce7,#22d3ee);border-radius:3px}
+body{background:#0a0a1a;color:#e0e4f0;font-family:'Noto Sans JP',sans-serif;overflow-x:hidden}
+
+/* Hero gradient mesh */
+.hero-bg{position:absolute;inset:0;overflow:hidden;z-index:0}
+.hero-bg::before{content:'';position:absolute;top:-30%;left:-20%;width:80%;height:80%;background:radial-gradient(ellipse,rgba(108,92,231,0.12) 0%,transparent 70%);animation:drift1 20s ease-in-out infinite}
+.hero-bg::after{content:'';position:absolute;bottom:-20%;right:-15%;width:70%;height:70%;background:radial-gradient(ellipse,rgba(34,211,238,0.08) 0%,transparent 70%);animation:drift2 25s ease-in-out infinite}
+@keyframes drift1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(5%,8%) scale(1.1)}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-4%,-6%) scale(1.05)}}
+
+/* Grid noise overlay */
+.noise{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.03;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* Scan line */
+.scanline{position:fixed;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(34,211,238,0.3),transparent);z-index:50;pointer-events:none;animation:scandown 8s linear infinite}
+@keyframes scandown{0%{top:-2px}100%{top:100vh}}
+
+/* Stagger reveal */
+.reveal{opacity:0;transform:translateY(40px);transition:opacity 0.8s cubic-bezier(0.16,1,0.3,1),transform 0.8s cubic-bezier(0.16,1,0.3,1)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.reveal-d1{transition-delay:0.1s}
+.reveal-d2{transition-delay:0.2s}
+.reveal-d3{transition-delay:0.3s}
+.reveal-d4{transition-delay:0.4s}
+
+/* Glow card */
+.glow-card{position:relative;background:rgba(18,18,42,0.6);border:1px solid rgba(108,92,231,0.15);backdrop-filter:blur(16px);transition:all 0.4s cubic-bezier(0.16,1,0.3,1)}
+.glow-card::before{content:'';position:absolute;inset:-1px;border-radius:inherit;background:linear-gradient(135deg,rgba(108,92,231,0.2),transparent 50%,rgba(34,211,238,0.1));opacity:0;transition:opacity 0.4s;z-index:-1;pointer-events:none}
+.glow-card:hover::before{opacity:1}
+.glow-card:hover{border-color:rgba(108,92,231,0.35);transform:translateY(-4px);box-shadow:0 20px 60px rgba(108,92,231,0.08)}
+
+/* Pricing card highlight */
+.pricing-highlight{position:relative;border-color:rgba(108,92,231,0.5);box-shadow:0 0 40px rgba(108,92,231,0.1)}
+.pricing-highlight::after{content:'POPULAR';position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#6c5ce7,#22d3ee);color:#fff;font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;padding:4px 16px;border-radius:20px;letter-spacing:2px}
+
+/* CTA button */
+.cta-btn{position:relative;display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:linear-gradient(135deg,#6c5ce7,#4834d4);color:#fff;font-family:'Orbitron',sans-serif;font-weight:700;font-size:13px;letter-spacing:2px;border-radius:8px;text-decoration:none;overflow:hidden;transition:all 0.3s}
+.cta-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(34,211,238,0.3),transparent);opacity:0;transition:opacity 0.3s}
+.cta-btn:hover::before{opacity:1}
+.cta-btn:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(108,92,231,0.4)}
+.cta-btn-outline{background:transparent;border:1px solid rgba(108,92,231,0.4);color:#a78bfa}
+.cta-btn-outline:hover{border-color:#6c5ce7;background:rgba(108,92,231,0.1)}
+
+/* Feature icon */
+.feat-icon{width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;background:linear-gradient(135deg,rgba(108,92,231,0.15),rgba(34,211,238,0.08));border:1px solid rgba(108,92,231,0.2)}
+
+/* Divider */
+.section-divider{height:1px;background:linear-gradient(90deg,transparent,rgba(108,92,231,0.3),rgba(34,211,238,0.2),transparent);margin:0 auto;max-width:600px}
+
+/* Floating particles */
+.particle{position:absolute;width:2px;height:2px;background:#6c5ce7;border-radius:50%;opacity:0.4;animation:float-particle linear infinite}
+@keyframes float-particle{0%{transform:translateY(0) scale(1);opacity:0.4}50%{opacity:0.8}100%{transform:translateY(-100vh) scale(0);opacity:0}}
+
+/* Stats counter */
+.stat-num{font-variant-numeric:tabular-nums}
+
+/* Mobile touch */
+@media(max-width:640px){
+  .hero-title{font-size:2rem!important}
+  .hero-sub{font-size:0.85rem!important}
+}
+</style>
+</head>
+<body>
+
+<!-- Noise overlay -->
+<div class="noise"></div>
+<div class="scanline"></div>
+
+<!-- Navigation -->
+<nav class="fixed top-0 left-0 right-0 z-40 backdrop-blur-xl bg-void/70 border-b border-white/5">
+  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="#" class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-iris to-cyan flex items-center justify-center text-white font-display font-black text-xs">G</div>
+      <span class="font-display font-bold text-sm tracking-widest text-white">GRACE OF TOUCH</span>
+    </a>
+    <div class="hidden md:flex items-center gap-8 text-sm text-gray-400">
+      <a href="#services" class="hover:text-cyan transition-colors">サービス</a>
+      <a href="#pricing" class="hover:text-cyan transition-colors">料金</a>
+      <a href="#tech" class="hover:text-cyan transition-colors">技術</a>
+      <a href="tower.html" class="cta-btn !py-2 !px-5 !text-xs">TOWER</a>
+    </div>
+    <a href="tower.html" class="md:hidden cta-btn !py-2 !px-4 !text-[10px]">ENTER</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="relative min-h-screen flex items-center justify-center pt-16" id="hero">
+  <div class="hero-bg"></div>
+  <!-- Floating particles -->
+  <div id="particles" class="absolute inset-0 overflow-hidden pointer-events-none"></div>
+
+  <div class="relative z-10 text-center px-6 max-w-4xl mx-auto">
+    <div class="reveal">
+      <p class="font-mono text-xs tracking-[0.3em] text-iris/80 mb-6">VOICE × INFRASTRUCTURE × DIGITAL SPACE</p>
+    </div>
+    <h1 class="reveal reveal-d1 hero-title font-display font-black text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-tight">
+      <span class="bg-gradient-to-r from-white via-white to-gray-400 bg-clip-text text-transparent">あなたの技術を</span><br>
+      <span class="bg-gradient-to-r from-iris via-cyan to-mint bg-clip-text text-transparent">世界に届ける</span>
+    </h1>
+    <p class="reveal reveal-d2 hero-sub mt-8 text-base sm:text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed">
+      声の解析、インフラ点検AI、3Dデジタルオフィス。<br class="hidden sm:inline">
+      Grace of Touch は、テクノロジーの可能性を形にする<br class="hidden sm:inline">
+      プロダクトスイートです。
+    </p>
+    <div class="reveal reveal-d3 mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+      <a href="tower.html" class="cta-btn">TOWER に入る <span class="text-lg">→</span></a>
+      <a href="#services" class="cta-btn cta-btn-outline">サービスを見る</a>
+    </div>
+
+    <!-- Stats -->
+    <div class="reveal reveal-d4 mt-20 grid grid-cols-3 gap-8 max-w-lg mx-auto">
+      <div class="text-center">
+        <div class="stat-num font-display font-bold text-2xl sm:text-3xl text-white" data-count="13">0</div>
+        <div class="text-xs text-gray-500 mt-1 font-mono tracking-wider">APPS</div>
+      </div>
+      <div class="text-center">
+        <div class="stat-num font-display font-bold text-2xl sm:text-3xl text-white" data-count="30">0</div>
+        <div class="text-xs text-gray-500 mt-1 font-mono tracking-wider">TRACKS</div>
+      </div>
+      <div class="text-center">
+        <div class="stat-num font-display font-bold text-2xl sm:text-3xl text-white" data-count="8">0</div>
+        <div class="text-xs text-gray-500 mt-1 font-mono tracking-wider">FLOORS</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scroll indicator -->
+  <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-gray-600">
+    <span class="text-[10px] font-mono tracking-widest">SCROLL</span>
+    <div class="w-px h-8 bg-gradient-to-b from-iris/50 to-transparent animate-pulse"></div>
+  </div>
+</section>
+
+<!-- Services -->
+<section id="services" class="relative py-32 px-6">
+  <div class="max-w-6xl mx-auto">
+    <div class="reveal text-center mb-20">
+      <p class="font-mono text-xs tracking-[0.3em] text-cyan/60 mb-4">SERVICES</p>
+      <h2 class="font-display font-bold text-3xl sm:text-4xl text-white">3つのプロダクト</h2>
+    </div>
+
+    <!-- Service 1: GraceVox -->
+    <div class="reveal grid md:grid-cols-2 gap-12 items-center mb-32">
+      <div>
+        <div class="flex items-center gap-3 mb-6">
+          <div class="feat-icon">🎙️</div>
+          <div>
+            <h3 class="font-display font-bold text-xl text-white">GraceVox</h3>
+            <p class="text-xs text-iris font-mono tracking-wider">VOICE ANALYSIS PLATFORM</p>
+          </div>
+        </div>
+        <p class="text-gray-400 leading-relaxed mb-6">
+          "Voice Print Never Lies" — 声紋は嘘をつかない。<br>
+          音声認識、AI校正エンジン、声紋スペクトログラム解析を搭載した、声の総合プラットフォーム。
+          独自の固有名詞辞書と同音異義語判定により、日本語の音声入力を圧倒的な精度で整形します。
+        </p>
+        <ul class="space-y-2 text-sm text-gray-500 mb-8">
+          <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-iris"></span>リアルタイム音声認識＋AI自動校正</li>
+          <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-cyan"></span>声紋スペクトログラム可視化</li>
+          <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-mint"></span>iOS PWA 完全対応</li>
+        </ul>
+        <a href="gracevox.html" class="cta-btn !text-xs">GraceVox を開く</a>
+      </div>
+      <div class="glow-card rounded-2xl p-8 text-center">
+        <div class="text-6xl mb-4">🔊</div>
+        <div class="flex justify-center gap-1 mb-4">
+          <div class="w-1 rounded-full bg-iris animate-pulse" style="height:20px;animation-delay:0s"></div>
+          <div class="w-1 rounded-full bg-iris/80 animate-pulse" style="height:32px;animation-delay:0.1s"></div>
+          <div class="w-1 rounded-full bg-cyan animate-pulse" style="height:48px;animation-delay:0.2s"></div>
+          <div class="w-1 rounded-full bg-cyan/80 animate-pulse" style="height:36px;animation-delay:0.3s"></div>
+          <div class="w-1 rounded-full bg-iris animate-pulse" style="height:52px;animation-delay:0.15s"></div>
+          <div class="w-1 rounded-full bg-iris/60 animate-pulse" style="height:28px;animation-delay:0.25s"></div>
+          <div class="w-1 rounded-full bg-cyan animate-pulse" style="height:44px;animation-delay:0.05s"></div>
+          <div class="w-1 rounded-full bg-cyan/70 animate-pulse" style="height:24px;animation-delay:0.35s"></div>
+          <div class="w-1 rounded-full bg-iris animate-pulse" style="height:40px;animation-delay:0.2s"></div>
+          <div class="w-1 rounded-full bg-iris/50 animate-pulse" style="height:16px;animation-delay:0.3s"></div>
+        </div>
+        <p class="font-mono text-xs text-gray-600">SPECTROGRAM VISUALIZATION</p>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- Service 2: TunnelScan -->
+    <div class="reveal grid md:grid-cols-2 gap-12 items-center my-32">
+      <div class="order-2 md:order-1 glow-card rounded-2xl p-8 text-center">
+        <div class="relative w-full aspect-video rounded-lg bg-gradient-to-br from-surface to-void border border-white/5 overflow-hidden flex items-center justify-center">
+          <div class="absolute inset-0" style="background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(34,211,238,0.03) 3px,rgba(34,211,238,0.03) 4px)"></div>
+          <div class="relative">
+            <div class="text-5xl mb-2">🔍</div>
+            <div class="flex items-center gap-2 text-[10px] font-mono text-cyan/60">
+              <span class="w-2 h-2 rounded-full bg-cyan animate-pulse"></span>
+              SCANNING...
+            </div>
+          </div>
+          <!-- Crack detection overlay -->
+          <div class="absolute top-4 right-4 bg-coral/10 border border-coral/30 rounded px-2 py-1">
+            <span class="text-[9px] font-mono text-coral">CRACK DETECTED: 3</span>
+          </div>
+        </div>
+        <p class="font-mono text-xs text-gray-600 mt-4">HESSIAN RIDGE FILTER v4.2</p>
+      </div>
+      <div class="order-1 md:order-2">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="feat-icon">🏗️</div>
+          <div>
+            <h3 class="font-display font-bold text-xl text-white">TunnelScan AI</h3>
+            <p class="text-xs text-cyan font-mono tracking-wider">INFRASTRUCTURE INSPECTION</p>
+          </div>
+        </div>
+        <p class="text-gray-400 leading-relaxed mb-6">
+          ドローン撮影画像からトンネルのひび割れを自動検出。
+          独自開発の Hessian Ridge Filter v4.2 により、0.1mm単位の微細なクラックも逃しません。
+          検出結果はDXF/PDF/CSVで出力可能。経年比較で劣化の進行を可視化します。
+        </p>
+        <ul class="space-y-2 text-sm text-gray-500 mb-8">
+          <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-cyan"></span>AI画像解析（サーバーサイド処理）</li>
+          <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-iris"></span>DXF / PDF / CSV レポート出力</li>
+          <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-mint"></span>経年比較＆劣化トラッキング</li>
+        </ul>
+        <a href="mailto:contact@grace-of-touch.com" class="cta-btn !text-xs">お問い合わせ</a>
+      </div>
+    </div>
+
+    <div class="section-divider"></div>
+
+    <!-- Service 3: Tower -->
+    <div class="reveal grid md:grid-cols-2 gap-12 items-center mt-32">
+      <div>
+        <div class="flex items-center gap-3 mb-6">
+          <div class="feat-icon">🏢</div>
+          <div>
+            <h3 class="font-display font-bold text-xl text-white">Grace of Touch Tower</h3>
+            <p class="text-xs text-mint font-mono tracking-wider">3D DIGITAL OFFICE</p>
+          </div>
+        </div>
+        <p class="text-gray-400 leading-relaxed mb-6">
+          8フロアの3Dビルに13以上のアプリを格納。
+          音楽制作、宇宙シミュレーション、ドローン操縦、パンダの世界 —
+          すべてがブラウザで動く統合プラットフォームです。
+          AIエージェント（Claude / Gemini / GPT）が各フロアに常駐。
+        </p>
+        <div class="grid grid-cols-2 gap-2 text-xs text-gray-500 mb-8">
+          <div class="glow-card rounded-lg px-3 py-2">🚀 Mega Rocket</div>
+          <div class="glow-card rounded-lg px-3 py-2">🎵 TrackForge</div>
+          <div class="glow-card rounded-lg px-3 py-2">💿 Records</div>
+          <div class="glow-card rounded-lg px-3 py-2">🐼 Panda World</div>
+          <div class="glow-card rounded-lg px-3 py-2">🥁 Resonance Drum</div>
+          <div class="glow-card rounded-lg px-3 py-2">🚁 TunnelDrone</div>
+        </div>
+        <a href="tower.html" class="cta-btn !text-xs">TOWER に入る</a>
+      </div>
+      <div class="glow-card rounded-2xl p-8 text-center">
+        <div class="relative">
+          <!-- ASCII tower art -->
+          <pre class="font-mono text-[10px] leading-tight text-iris/40 select-none" aria-hidden="true">
+     ╔══════╗
+     ║ 30F  ║ 🚀
+     ╠══════╣
+     ║ 25F  ║ 🔬
+     ╠══════╣
+     ║ 20F  ║ 🎵
+     ╠══════╣
+     ║ 15F  ║ 🎙️
+     ╠══════╣
+     ║ 10F  ║ 🏗️
+     ╠══════╣
+     ║  5F  ║ 🎮
+     ╠══════╣
+     ║  1F  ║ 🚪
+     ╠══════╣
+     ║  B1  ║ 🤖
+     ╚══════╝
+          </pre>
+          <div class="absolute inset-0 bg-gradient-to-t from-surface/80 via-transparent to-surface/40 pointer-events-none"></div>
+        </div>
+        <p class="font-mono text-xs text-gray-600 mt-2">8 FLOORS × 13+ APPS</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section id="pricing" class="relative py-32 px-6">
+  <div class="absolute inset-0 bg-gradient-to-b from-transparent via-iris/[0.02] to-transparent"></div>
+  <div class="relative max-w-5xl mx-auto">
+    <div class="reveal text-center mb-16">
+      <p class="font-mono text-xs tracking-[0.3em] text-cyan/60 mb-4">PRICING</p>
+      <h2 class="font-display font-bold text-3xl sm:text-4xl text-white">料金プラン</h2>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-6">
+      <!-- GraceVox Free -->
+      <div class="reveal reveal-d1 glow-card rounded-2xl p-8">
+        <div class="font-mono text-xs text-gray-500 tracking-wider mb-2">GRACEVOX</div>
+        <h3 class="font-display font-bold text-lg text-white mb-1">Free</h3>
+        <div class="flex items-end gap-1 mb-6">
+          <span class="font-display font-black text-3xl text-white">¥0</span>
+          <span class="text-sm text-gray-500 mb-1">/月</span>
+        </div>
+        <div class="h-px bg-white/5 mb-6"></div>
+        <ul class="space-y-3 text-sm text-gray-400 mb-8">
+          <li class="flex items-start gap-2"><span class="text-iris mt-0.5">✓</span>月30回の音声認識</li>
+          <li class="flex items-start gap-2"><span class="text-iris mt-0.5">✓</span>テキスト整形</li>
+          <li class="flex items-start gap-2"><span class="text-gray-600 mt-0.5">—</span><span class="text-gray-600">AI校正エンジン</span></li>
+          <li class="flex items-start gap-2"><span class="text-gray-600 mt-0.5">—</span><span class="text-gray-600">声紋解析</span></li>
+          <li class="flex items-start gap-2"><span class="text-gray-600 mt-0.5">—</span><span class="text-gray-600">エクスポート</span></li>
+        </ul>
+        <a href="gracevox.html" class="cta-btn cta-btn-outline !w-full justify-center !text-xs">始める</a>
+      </div>
+
+      <!-- GraceVox Pro -->
+      <div class="reveal reveal-d2 glow-card pricing-highlight rounded-2xl p-8">
+        <div class="font-mono text-xs text-iris tracking-wider mb-2">GRACEVOX</div>
+        <h3 class="font-display font-bold text-lg text-white mb-1">Pro</h3>
+        <div class="flex items-end gap-1 mb-6">
+          <span class="font-display font-black text-3xl bg-gradient-to-r from-iris to-cyan bg-clip-text text-transparent">¥980</span>
+          <span class="text-sm text-gray-500 mb-1">/月</span>
+        </div>
+        <div class="h-px bg-iris/20 mb-6"></div>
+        <ul class="space-y-3 text-sm text-gray-300 mb-8">
+          <li class="flex items-start gap-2"><span class="text-cyan mt-0.5">✓</span>音声認識 <b>無制限</b></li>
+          <li class="flex items-start gap-2"><span class="text-cyan mt-0.5">✓</span>AI校正（固有名詞+同音異義語）</li>
+          <li class="flex items-start gap-2"><span class="text-cyan mt-0.5">✓</span>声紋スペクトログラム</li>
+          <li class="flex items-start gap-2"><span class="text-cyan mt-0.5">✓</span>エクスポート機能</li>
+          <li class="flex items-start gap-2"><span class="text-cyan mt-0.5">✓</span>カスタム辞書 無制限</li>
+        </ul>
+        <a href="gracevox.html" class="cta-btn !w-full justify-center !text-xs">Pro にアップグレード</a>
+      </div>
+
+      <!-- TunnelScan -->
+      <div class="reveal reveal-d3 glow-card rounded-2xl p-8">
+        <div class="font-mono text-xs text-cyan tracking-wider mb-2">TUNNELSCAN AI</div>
+        <h3 class="font-display font-bold text-lg text-white mb-1">Standard</h3>
+        <div class="flex items-end gap-1 mb-6">
+          <span class="font-display font-black text-3xl text-white">¥50,000</span>
+          <span class="text-sm text-gray-500 mb-1">/月〜</span>
+        </div>
+        <div class="h-px bg-white/5 mb-6"></div>
+        <ul class="space-y-3 text-sm text-gray-400 mb-8">
+          <li class="flex items-start gap-2"><span class="text-cyan mt-0.5">✓</span>月50回の画像解析</li>
+          <li class="flex items-start gap-2"><span class="text-cyan mt-0.5">✓</span>ひび割れ幅計測</li>
+          <li class="flex items-start gap-2"><span class="text-cyan mt-0.5">✓</span>DXF / PDF / CSV出力</li>
+          <li class="flex items-start gap-2"><span class="text-cyan mt-0.5">✓</span>経年比較</li>
+          <li class="flex items-start gap-2"><span class="text-cyan mt-0.5">✓</span>専用サポート</li>
+        </ul>
+        <a href="mailto:contact@grace-of-touch.com" class="cta-btn cta-btn-outline !w-full justify-center !text-xs">お問い合わせ</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Tech Stack -->
+<section id="tech" class="relative py-32 px-6">
+  <div class="max-w-4xl mx-auto">
+    <div class="reveal text-center mb-16">
+      <p class="font-mono text-xs tracking-[0.3em] text-cyan/60 mb-4">TECHNOLOGY</p>
+      <h2 class="font-display font-bold text-3xl sm:text-4xl text-white">技術スタック</h2>
+    </div>
+    <div class="reveal grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="glow-card rounded-xl p-4 text-center"><div class="text-2xl mb-2">⚡</div><div class="font-mono text-xs text-gray-400">Three.js</div></div>
+      <div class="glow-card rounded-xl p-4 text-center"><div class="text-2xl mb-2">🔥</div><div class="font-mono text-xs text-gray-400">Firebase</div></div>
+      <div class="glow-card rounded-xl p-4 text-center"><div class="text-2xl mb-2">⚛️</div><div class="font-mono text-xs text-gray-400">React</div></div>
+      <div class="glow-card rounded-xl p-4 text-center"><div class="text-2xl mb-2">🔊</div><div class="font-mono text-xs text-gray-400">Web Audio</div></div>
+      <div class="glow-card rounded-xl p-4 text-center"><div class="text-2xl mb-2">📱</div><div class="font-mono text-xs text-gray-400">PWA</div></div>
+      <div class="glow-card rounded-xl p-4 text-center"><div class="text-2xl mb-2">🤖</div><div class="font-mono text-xs text-gray-400">AI / ML</div></div>
+      <div class="glow-card rounded-xl p-4 text-center"><div class="text-2xl mb-2">🖨️</div><div class="font-mono text-xs text-gray-400">3D Print</div></div>
+      <div class="glow-card rounded-xl p-4 text-center"><div class="text-2xl mb-2">🚁</div><div class="font-mono text-xs text-gray-400">Drone Sim</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="relative py-32 px-6">
+  <div class="absolute inset-0 bg-gradient-to-t from-iris/[0.04] to-transparent"></div>
+  <div class="relative max-w-3xl mx-auto text-center">
+    <div class="reveal">
+      <h2 class="font-display font-bold text-3xl sm:text-4xl text-white mb-6">始めましょう</h2>
+      <p class="text-gray-400 mb-10 leading-relaxed">
+        すべてのアプリはブラウザで動作します。<br>
+        インストール不要。今すぐ体験できます。
+      </p>
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <a href="tower.html" class="cta-btn text-base">TOWER に入る <span class="text-xl">→</span></a>
+        <a href="gracevox.html" class="cta-btn cta-btn-outline">GraceVox を試す</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="border-t border-white/5 py-12 px-6">
+  <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
+    <div class="flex items-center gap-3">
+      <div class="w-6 h-6 rounded bg-gradient-to-br from-iris to-cyan flex items-center justify-center text-white font-display font-black text-[8px]">G</div>
+      <span class="font-display text-xs tracking-wider text-gray-500">GRACE OF TOUCH</span>
+    </div>
+    <div class="flex items-center gap-6 text-xs text-gray-600">
+      <a href="tower.html" class="hover:text-gray-400 transition-colors">Tower</a>
+      <a href="gracevox.html" class="hover:text-gray-400 transition-colors">GraceVox</a>
+      <a href="records.html" class="hover:text-gray-400 transition-colors">Records</a>
+      <a href="rocket.html" class="hover:text-gray-400 transition-colors">Terminal</a>
+    </div>
+    <p class="text-xs text-gray-700 font-mono">© 2024-2026 Grace of Touch Co.</p>
+  </div>
+</footer>
+
+<script>
+// Scroll reveal
+const observer=new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');observer.unobserve(e.target);}});
+},{threshold:0.1,rootMargin:'0px 0px -40px 0px'});
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+
+// Counter animation
+const countObserver=new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      const el=e.target;
+      const target=parseInt(el.dataset.count);
+      let current=0;
+      const step=Math.max(1,Math.floor(target/30));
+      const timer=setInterval(()=>{
+        current=Math.min(current+step,target);
+        el.textContent=current;
+        if(current>=target)clearInterval(timer);
+      },40);
+      countObserver.unobserve(el);
+    }
+  });
+},{threshold:0.5});
+document.querySelectorAll('[data-count]').forEach(el=>countObserver.observe(el));
+
+// Particles
+const pc=document.getElementById('particles');
+for(let i=0;i<20;i++){
+  const p=document.createElement('div');
+  p.className='particle';
+  p.style.left=Math.random()*100+'%';
+  p.style.top=Math.random()*100+'%';
+  p.style.animationDuration=(8+Math.random()*12)+'s';
+  p.style.animationDelay=Math.random()*8+'s';
+  p.style.background=Math.random()>0.5?'#6c5ce7':'#22d3ee';
+  pc.appendChild(p);
+}
+
+// Smooth nav background
+let lastScroll=0;
+window.addEventListener('scroll',()=>{
+  const nav=document.querySelector('nav');
+  const y=window.scrollY;
+  nav.style.borderColor=y>50?'rgba(108,92,231,0.1)':'rgba(255,255,255,0.05)';
+  lastScroll=y;
+},{passive:true});
+</script>
+</body>
+</html>
