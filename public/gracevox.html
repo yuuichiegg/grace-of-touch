@@ -789,53 +789,50 @@ document.addEventListener('DOMContentLoaded',()=>{
     <h2 style="text-align:center;margin-bottom:4px;">Grace<span style="color:var(--accent)">Vox</span> ログイン</h2>
     <p style="text-align:center;font-size:11px;color:var(--text-dim);margin-bottom:16px;">アカウント登録で履歴同期・Pro機能が使えます</p>
 
-    <!-- Email/Password -->
-    <div id="loginEmailSection">
-      <div class="setting-group">
-        <label>メールアドレス</label>
-        <input type="email" id="loginEmail" placeholder="you@example.com" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:6px;font-size:14px;font-family:inherit;">
-      </div>
-      <div class="setting-group">
-        <label>パスワード</label>
-        <input type="password" id="loginPassword" placeholder="6文字以上" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:6px;font-size:14px;font-family:inherit;">
-      </div>
-      <button onclick="emailLogin()" style="width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">ログイン / 新規登録</button>
-      <button onclick="resetPassword()" style="width:100%;padding:8px;background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:6px;font-size:11px;cursor:pointer;margin-bottom:12px;">パスワードを忘れた方</button>
-    </div>
+    <!-- Google Sign-In (メイン — 1ボタンのみ) -->
+    <div id="googleSignInBtn" style="display:flex;justify-content:center;margin-bottom:12px;"></div>
 
     <div style="display:flex;align-items:center;gap:10px;margin:12px 0;">
       <div style="flex:1;height:1px;background:var(--border);"></div>
-      <span style="font-size:11px;color:var(--text-dim);">または</span>
+      <span style="font-size:11px;color:var(--text-dim);">その他のログイン方法</span>
       <div style="flex:1;height:1px;background:var(--border);"></div>
     </div>
 
-    <!-- SNS Login -->
-    <div style="display:flex;flex-direction:column;gap:8px;">
-      <button onclick="snsLogin('google')" style="width:100%;padding:11px;background:#fff;color:#333;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-        Googleでログイン
-      </button>
-      <!-- Google One Tap fallback button -->
-      <div id="googleSignInBtn" style="display:none;justify-content:center;margin-top:8px;"></div>
-      <!-- Apple Sign-In: requires Apple Developer Program ($99/yr) — future -->
-
-    </div>
+    <!-- Email/Password (折りたたみ) -->
+    <details id="loginEmailDetails" style="margin-bottom:8px;">
+      <summary style="cursor:pointer;font-size:12px;color:var(--text-dim);padding:8px 0;user-select:none;">✉️ メールアドレスでログイン</summary>
+      <div id="loginEmailSection" style="padding-top:8px;">
+        <div class="setting-group">
+          <label>メールアドレス</label>
+          <input type="email" id="loginEmail" placeholder="you@example.com" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:6px;font-size:14px;font-family:inherit;">
+        </div>
+        <div class="setting-group">
+          <label>パスワード</label>
+          <input type="password" id="loginPassword" placeholder="6文字以上" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:6px;font-size:14px;font-family:inherit;">
+        </div>
+        <button onclick="emailLogin()" style="width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;">ログイン / 新規登録</button>
+        <button onclick="resetPassword()" style="width:100%;padding:8px;background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:6px;font-size:11px;cursor:pointer;">パスワードを忘れた方</button>
+      </div>
+    </details>
 
     <!-- Phone (future) -->
-    <div id="phoneLoginSection" style="display:none;margin-top:12px;">
-      <div class="setting-group">
-        <label>電話番号（SMS認証）</label>
-        <div style="display:flex;gap:6px;">
-          <input type="tel" id="loginPhone" placeholder="+81 90-1234-5678" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px;">
-          <button onclick="sendSmsCode()" id="smsBtn" style="padding:8px 14px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;">送信</button>
+    <details id="phoneLoginDetails" style="display:none;">
+      <summary style="cursor:pointer;font-size:12px;color:var(--text-dim);padding:8px 0;user-select:none;">📱 電話番号でログイン</summary>
+      <div id="phoneLoginSection" style="padding-top:8px;">
+        <div class="setting-group">
+          <label>電話番号（SMS認証）</label>
+          <div style="display:flex;gap:6px;">
+            <input type="tel" id="loginPhone" placeholder="+81 90-1234-5678" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px;">
+            <button onclick="sendSmsCode()" id="smsBtn" style="padding:8px 14px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:12px;cursor:pointer;white-space:nowrap;">送信</button>
+          </div>
+        </div>
+        <div class="setting-group" id="smsCodeGroup" style="display:none;">
+          <label>認証コード</label>
+          <input type="text" id="smsCode" placeholder="6桁のコード" maxlength="6" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:14px;text-align:center;letter-spacing:4px;">
+          <button onclick="verifySmsCode()" style="width:100%;margin-top:6px;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;">認証</button>
         </div>
       </div>
-      <div class="setting-group" id="smsCodeGroup" style="display:none;">
-        <label>認証コード</label>
-        <input type="text" id="smsCode" placeholder="6桁のコード" maxlength="6" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:14px;text-align:center;letter-spacing:4px;">
-        <button onclick="verifySmsCode()" style="width:100%;margin-top:6px;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer;">認証</button>
-      </div>
-    </div>
+    </details>
 
     <div style="margin-top:14px;text-align:center;">
       <p style="font-size:10px;color:var(--text-dim);line-height:1.6;">
@@ -1072,6 +1069,8 @@ function showLogoutDialog(){
 
 function openLogin(){
   document.getElementById('loginOverlay').classList.add('open');
+  // Chrome保存アカウントでの自動ログインを試行
+  setTimeout(_triggerGoogleOneTap, 300);
 }
 function closeLogin(){
   document.getElementById('loginOverlay').classList.remove('open');
@@ -1118,8 +1117,7 @@ async function resetPassword(){
   }
 }
 
-// SNS Login (Google / Apple)
-// Google One Tap / Sign In With Google (FedCM — no redirect URI needed)
+// Google Sign-In (GIS — One Tap + renderButton 統合)
 let _googleOneTapReady=false;
 function _initGoogleOneTap(){
   if(_googleOneTapReady||typeof google==='undefined'||!google.accounts) return;
@@ -1135,38 +1133,28 @@ function _initGoogleOneTap(){
         showToast('Firebase認証エラー: '+_authErrorMsg(e));
       }
     },
-    auto_select:false,
-    cancel_on_tap_outside:true
+    auto_select:true,
+    cancel_on_tap_outside:true,
+    use_fedcm_for_prompt:true
   });
+  // 常にrenderButtonを表示（1ボタンのみ）
+  const btnDiv=document.getElementById('googleSignInBtn');
+  if(btnDiv){
+    google.accounts.id.renderButton(btnDiv,{
+      type:'standard',size:'large',theme:'filled_blue',text:'signin_with',shape:'pill',width:320,locale:'ja'
+    });
+  }
   _googleOneTapReady=true;
 }
 // Init when GIS library loads
 if(typeof google!=='undefined'&&google.accounts) _initGoogleOneTap();
 else window.addEventListener('load',()=>setTimeout(_initGoogleOneTap,1000));
 
-function snsLogin(provider){
-  if(provider==='google'){
-    if(typeof google==='undefined'||!google.accounts||!google.accounts.id){
-      showToast('Googleライブラリ読み込み中...もう一度タップしてください');
-      setTimeout(_initGoogleOneTap,500);
-      return;
-    }
-    _initGoogleOneTap();
-    // Trigger the Google Sign-In prompt
-    google.accounts.id.prompt((notification)=>{
-      if(notification.isNotDisplayed()){
-        // FedCM not available — fallback: render button
-        const btnDiv=document.getElementById('googleSignInBtn');
-        if(btnDiv){
-          google.accounts.id.renderButton(btnDiv,{
-            type:'standard',size:'large',theme:'outline',text:'signin_with',width:320,locale:'ja'
-          });
-          btnDiv.style.display='flex';
-          showToast('下のGoogleボタンをタップしてください');
-        }
-      }
-    });
-  }
+// ログインモーダル表示時にOne Tapプロンプトも発火
+function _triggerGoogleOneTap(){
+  if(typeof google==='undefined'||!google.accounts||!google.accounts.id) return;
+  _initGoogleOneTap();
+  google.accounts.id.prompt();
 }
 
 // Phone SMS auth
