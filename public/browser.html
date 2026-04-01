@@ -421,11 +421,41 @@ function buildNewTabPage() {
     </div>`
   ).join('');
 
-  // Other Grace of Touch Apps
+  // 3D & Creative Tools
+  const creativeApps = [
+    { icon:'🚀', title:'Mega Rocket', desc:'宇宙探索SIM', url:'/rocket.html' },
+    { icon:'⚙️', title:'Grace Engine', desc:'3Dカスタマイザー', url:'/grace-engine-demo.html' },
+    { icon:'🔧', title:'RocketCAD', desc:'ロケット設計', url:'/rocketcad.html' },
+    { icon:'🐕', title:'WanCraft 3D', desc:'ペットフィギュア', url:'/gear.html' },
+  ];
+  const creativeHTML = creativeApps.map(a =>
+    `<div class="ntp-shortcut" data-url="${escapeAttr(a.url)}" style="gap:4px;">
+      <div class="ntp-shortcut-icon" style="border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.06);font-size:22px;">${a.icon}</div>
+      <div class="ntp-shortcut-label" style="color:#00ff88;font-size:10px;">${escapeHTML(a.title)}</div>
+      <div style="font-size:8px;color:var(--text2);opacity:.6;">${a.desc}</div>
+    </div>`
+  ).join('');
+
+  // Infrastructure & Simulation
+  const infraApps = [
+    { icon:'🚁', title:'TunnelDrone', desc:'トンネル点検', url:'/tunneldrone.html' },
+    { icon:'🛡️', title:'DroneGuard', desc:'ドローン警備', url:'/droneguard/' },
+    { icon:'🏗️', title:'PLATEAU', desc:'3D都市', url:'/plateau-city.html' },
+    { icon:'🚗', title:'Auto Taxi', desc:'自動運転', url:'/auto-taxi.html' },
+  ];
+  const infraHTML = infraApps.map(a =>
+    `<div class="ntp-shortcut" data-url="${escapeAttr(a.url)}" style="gap:4px;">
+      <div class="ntp-shortcut-icon" style="border-color:rgba(255,165,2,.3);background:rgba(255,165,2,.06);font-size:22px;">${a.icon}</div>
+      <div class="ntp-shortcut-label" style="color:#ffa502;font-size:10px;">${escapeHTML(a.title)}</div>
+      <div style="font-size:8px;color:var(--text2);opacity:.6;">${a.desc}</div>
+    </div>`
+  ).join('');
+
+  // Living World & Entertainment
   const otherApps = [
-    { icon:'🛰️', title:'Terminal', url:'/index.html' },
-    { icon:'🐼', title:'Panda', url:'/pandaworld.html' },
-    { icon:'⚙️', title:'Engine', url:'/grace-engine-demo.html' },
+    { icon:'🐼', title:'Panda World', desc:'リビングワールド', url:'/pandaworld.html' },
+    { icon:'🛰️', title:'Terminal', desc:'ホーム', url:'/index.html' },
+    { icon:'🏢', title:'Tower', desc:'AIオフィス', url:'/tower.html' },
   ];
   const otherHTML = otherApps.map(a =>
     `<div class="ntp-shortcut" data-url="${escapeAttr(a.url)}">
@@ -462,7 +492,15 @@ function buildNewTabPage() {
         <div class="ntp-shortcuts" style="gap:12px;">${studioHTML}</div>
       </div>
       <div style="width:min(540px,92%);margin-bottom:16px;">
-        <div style="font-family:'Orbitron',monospace;font-size:9px;color:var(--accent);letter-spacing:.15em;margin-bottom:8px;opacity:.5;">APPS</div>
+        <div style="font-family:'Orbitron',monospace;font-size:10px;color:#00ff88;letter-spacing:.15em;margin-bottom:10px;">🔧 3D & CREATIVE</div>
+        <div class="ntp-shortcuts" style="gap:12px;">${creativeHTML}</div>
+      </div>
+      <div style="width:min(540px,92%);margin-bottom:16px;">
+        <div style="font-family:'Orbitron',monospace;font-size:10px;color:#ffa502;letter-spacing:.15em;margin-bottom:10px;">🏗️ INFRA & SIM</div>
+        <div class="ntp-shortcuts" style="gap:12px;">${infraHTML}</div>
+      </div>
+      <div style="width:min(540px,92%);margin-bottom:16px;">
+        <div style="font-family:'Orbitron',monospace;font-size:9px;color:var(--accent);letter-spacing:.15em;margin-bottom:8px;opacity:.5;">WORLD</div>
         <div class="ntp-shortcuts">${otherHTML}</div>
       </div>
       <div style="width:min(540px,92%);margin-bottom:16px;">
