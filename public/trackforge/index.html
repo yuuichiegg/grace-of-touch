@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TrackForge — Digital MTR</title>
+<link rel="icon" type="image/svg+xml" href="../img/trackforge-icon.svg">
+<link rel="apple-touch-icon" href="../img/trackforge-icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TrackForge">
+<meta name="description" content="Music Production / Podcast / DTM — Forge your sound, prove your craft">
 <!--
   TrackForge v0.4 — Digital MTR & Music Collaboration
   Copyright (c) 2026 GRACE OF TOUCH. All rights reserved.
@@ -18,7 +23,7 @@
   --accent:#00ff41;--accent-dim:#00cc33;--accent-bg:#00ff4108;
   --rec:#ff2222;--rec-glow:rgba(255,34,34,.4);
   --solo:#ffd700;--mute:#ff8c00;
-  --vocal:#e040fb;--guitar:#ff5722;--bass:#2979ff;--drums:#ff9800;--keys:#66bb6a;
+  --vocal:#e040fb;--guitar:#ff5722;--bass:#2979ff;--drums:#ff9800;--keys:#66bb6a;--podcast:#22d3ee;--tuning:#fbbf24;
   --metal1:#3a3a3a;--metal2:#2a2a2a;--metal3:#1e1e1e;
   --knob-size:40px;
   --font:'Courier New','Lucida Console',monospace;
@@ -74,6 +79,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .mode-btn[data-mode="bass"].active{color:var(--bass);border-left-color:var(--bass)}
 .mode-btn[data-mode="drums"].active{color:var(--drums);border-left-color:var(--drums)}
 .mode-btn[data-mode="keys"].active{color:var(--keys);border-left-color:var(--keys)}
+.mode-btn[data-mode="podcast"].active{color:var(--podcast);border-left-color:var(--podcast)}
 .mode-icon{font-size:20px;filter:drop-shadow(0 0 2px currentColor)}
 .mode-led{width:4px;height:4px;border-radius:50%;background:var(--text3);transition:all .2s}
 .mode-btn.active .mode-led{background:currentColor;box-shadow:0 0 6px currentColor}
@@ -382,7 +388,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="mode-btn" data-mode="bass" onclick="setMode('bass')"><div class="mode-icon">🎸</div><div>BASS</div><div class="mode-led"></div></button>
     <button class="mode-btn" data-mode="drums" onclick="setMode('drums')"><div class="mode-icon">🥁</div><div>DRUMS</div><div class="mode-led"></div></button>
     <button class="mode-btn" data-mode="keys" onclick="setMode('keys')"><div class="mode-icon">🎹</div><div>KEYS</div><div class="mode-led"></div></button>
+    <button class="mode-btn" data-mode="podcast" onclick="setMode('podcast')"><div class="mode-icon">🎙</div><div>PODCAST</div><div class="mode-led"></div></button>
     <div class="sidebar-divider"></div>
+    <button class="mode-btn" onclick="openTunerPanel()" title="チューナー / 432Hz"><div class="mode-icon">🎵</div><div>TUNER</div></button>
     <button class="mode-btn" onclick="toggleFx()" title="エフェクト"><div class="mode-icon">⚙</div><div>FX</div></button>
     <button class="mode-btn" onclick="openLibrary()" title="曲ライブラリ"><div class="mode-icon">📚</div><div>LIBRARY</div><div class="mode-led"></div></button>
     <button class="mode-btn" id="lyricsToggleBtn" onclick="toggleLyricsPanel()" title="歌詞パネル"><div class="mode-icon">📝</div><div>LYRICS</div><div class="mode-led"></div></button>
@@ -677,7 +685,8 @@ const MODES = {
   guitar:{name:'GUITAR',color:'#ff5722',fx:['Drive','Mid Boost','Room Reverb']},
   bass:{name:'BASS',color:'#2979ff',fx:['HPF','Compressor','Low Shelf']},
   drums:{name:'DRUMS',color:'#ff9800',fx:['Compressor','Presence','Transient']},
-  keys:{name:'KEYS',color:'#66bb6a',fx:['LP Filter','Hall Reverb','Width']}
+  keys:{name:'KEYS',color:'#66bb6a',fx:['LP Filter','Hall Reverb','Width']},
+  podcast:{name:'PODCAST',color:'#22d3ee',fx:['HPF','Compressor','De-Esser','Noise Gate']}
 };
 
 // STATE
@@ -2155,6 +2164,274 @@ document.addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
   if(e.code==='KeyL'&&!e.ctrlKey){e.preventDefault();toggleLoop()}
 });
+
+// ======================================================================
+//  PODCAST MODE — チャプター管理、話者タグ、書き起こしメモ
+// ======================================================================
+let podcastChapters=[];
+let podcastSpeakers=['Host','Guest 1'];
+
+function addPodcastChapter(){
+  const time=curTime;
+  const m=Math.floor(time/60), s=Math.floor(time%60);
+  const label=prompt('チャプター名:',`Chapter ${podcastChapters.length+1}`);
+  if(!label)return;
+  podcastChapters.push({time, label, speaker:podcastSpeakers[0]||'Host'});
+  podcastChapters.sort((a,b)=>a.time-b.time);
+  notify(`📌 ${label} @ ${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`);
+  renderPodcastPanel();
+}
+
+function addPodcastSpeaker(){
+  const name=prompt('話者名を追加:','Guest '+(podcastSpeakers.length));
+  if(!name)return;
+  podcastSpeakers.push(name);
+  renderPodcastPanel();
+  notify(`🎙 ${name} を追加`);
+}
+
+function removePodcastChapter(i){
+  podcastChapters.splice(i,1);
+  renderPodcastPanel();
+}
+
+function setPodcastChapterSpeaker(i,speaker){
+  podcastChapters[i].speaker=speaker;
+}
+
+function renderPodcastPanel(){
+  const panel=document.getElementById('podcastPanel');
+  if(!panel)return;
+  const speakerOpts=podcastSpeakers.map(s=>`<option value="${s}">${s}</option>`).join('');
+  panel.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-size:10px;color:var(--podcast);letter-spacing:2px;font-weight:700">🎙 PODCAST</span>
+      <div style="display:flex;gap:4px">
+        <button class="rubber-btn" style="padding:3px 8px;font-size:9px;color:var(--podcast)" onclick="addPodcastSpeaker()">+ 話者</button>
+        <button class="rubber-btn" style="padding:3px 8px;font-size:9px;color:var(--podcast)" onclick="addPodcastChapter()">+ チャプター</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap">
+      ${podcastSpeakers.map((s,i)=>`<span style="font-size:9px;padding:2px 8px;background:${['#e040fb20','#22d3ee20','#ff572220','#66bb6a20'][i%4]};border:1px solid ${['#e040fb40','#22d3ee40','#ff572240','#66bb6a40'][i%4]};border-radius:10px;color:${['#e040fb','#22d3ee','#ff5722','#66bb6a'][i%4]}">${s}</span>`).join('')}
+    </div>
+    ${podcastChapters.length===0?'<div style="text-align:center;padding:12px;color:var(--text3);font-size:10px">再生位置でチャプターを追加<br>タイムラインにマーカーが表示されます</div>':''}
+    ${podcastChapters.map((c,i)=>{
+      const m=Math.floor(c.time/60), s=Math.floor(c.time%60);
+      const ts=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+      return`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border);font-size:10px">
+        <span style="color:var(--podcast);cursor:pointer;min-width:40px" onclick="seekTo(${c.time})">${ts}</span>
+        <select onchange="setPodcastChapterSpeaker(${i},this.value)" style="background:var(--bg);color:var(--text);border:1px solid var(--border);font-size:9px;padding:1px 4px;border-radius:3px;font-family:var(--font)">${speakerOpts.replace(`value="${c.speaker}"`,`value="${c.speaker}" selected`)}</select>
+        <span style="flex:1;color:var(--text)">${c.label}</span>
+        <span style="cursor:pointer;color:var(--text3)" onclick="removePodcastChapter(${i})">✕</span>
+      </div>`;
+    }).join('')}
+    ${podcastChapters.length>0?`<button class="rubber-btn" style="width:100%;margin-top:8px;padding:6px;font-size:9px;color:var(--podcast)" onclick="exportPodcastChapters()">📋 チャプターをコピー</button>`:''}
+  `;
+}
+
+function exportPodcastChapters(){
+  const txt=podcastChapters.map(c=>{
+    const m=Math.floor(c.time/60), s=Math.floor(c.time%60);
+    return`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')} [${c.speaker}] ${c.label}`;
+  }).join('\n');
+  navigator.clipboard.writeText(txt).then(()=>notify('チャプターリストをコピー')).catch(()=>notify('コピー失敗'));
+}
+
+// Podcast panel injection (after boot)
+function initPodcastPanel(){
+  const fxP=document.getElementById('fxPanel');
+  if(!fxP)return;
+  const pp=document.createElement('div');
+  pp.id='podcastPanel';
+  pp.style.cssText='padding:10px 12px;background:var(--bg2);border-bottom:1px solid var(--border);display:none';
+  fxP.parentElement.insertBefore(pp,fxP.nextSibling);
+}
+
+// Show/hide podcast panel based on mode
+const _origSetMode=setMode;
+window.setMode=function(m){
+  _origSetMode(m);
+  const pp=document.getElementById('podcastPanel');
+  if(pp){
+    pp.style.display=m==='podcast'?'block':'none';
+    if(m==='podcast')renderPodcastPanel();
+  }
+};
+
+// ======================================================================
+//  432Hz TUNER — チューナー/ピッチ検出/A=432Hz基準音
+// ======================================================================
+const TUNING_PRESETS={
+  standard:{name:'A=440Hz (標準)',baseA:440},
+  hz432:{name:'A=432Hz (ヒーリング)',baseA:432},
+  baroque:{name:'A=415Hz (バロック)',baseA:415},
+  concert:{name:'A=442Hz (コンサート)',baseA:442},
+  verdi:{name:'A=430.54Hz (ヴェルディ)',baseA:430.54},
+};
+let tunerBaseA=432;
+let tunerActive=false;
+let tunerAudioCtx=null, tunerAnalyser=null, tunerStream=null;
+let tunerRAF=null, tunerOsc=null;
+
+function openTunerPanel(){
+  let panel=document.getElementById('tunerOverlay');
+  if(panel){panel.classList.toggle('show');if(!panel.classList.contains('show'))stopTuner();return}
+
+  panel=document.createElement('div');
+  panel.id='tunerOverlay';
+  panel.classList.add('show');
+  panel.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:360px;background:#1a1a1a;border:1px solid var(--tuning);border-radius:12px;z-index:100;padding:20px;box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:12px';
+  panel.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:14px;color:var(--tuning);letter-spacing:2px;font-weight:700">🎵 TUNER</div>
+      <div onclick="closeTunerPanel()" style="cursor:pointer;color:var(--text3);font-size:18px">✕</div>
+    </div>
+    <div style="height:1px;background:var(--border)"></div>
+    <div style="text-align:center">
+      <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:4px">DETECTED NOTE</div>
+      <div id="tunerNote" style="font-size:48px;font-weight:900;color:var(--tuning);font-family:'Courier New',monospace;text-shadow:0 0 12px var(--tuning)">—</div>
+      <div id="tunerFreq" style="font-size:12px;color:var(--text2);margin-top:4px">— Hz</div>
+      <div style="position:relative;height:24px;margin:12px 0;background:var(--bg);border-radius:4px;overflow:hidden">
+        <div style="position:absolute;left:50%;top:0;bottom:0;width:2px;background:var(--tuning);opacity:.5"></div>
+        <div id="tunerNeedle" style="position:absolute;top:2px;bottom:2px;width:4px;background:var(--accent);border-radius:2px;left:50%;transition:left 0.1s"></div>
+      </div>
+      <div id="tunerCents" style="font-size:11px;color:var(--text2)">0 cents</div>
+    </div>
+    <div style="height:1px;background:var(--border)"></div>
+    <div style="font-size:9px;color:var(--text3);letter-spacing:1px;margin-bottom:2px">TUNING PRESET</div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px">
+      ${Object.entries(TUNING_PRESETS).map(([k,v])=>`
+        <button class="rubber-btn tuner-preset${k==='hz432'?' active':''}" data-tuning="${k}" onclick="selectTuning('${k}')" style="padding:4px 10px;font-size:9px;color:${k==='hz432'?'var(--tuning)':'var(--text2)'};font-family:var(--font);letter-spacing:.5px${k==='hz432'?';border-color:var(--tuning);background:rgba(251,191,36,.1)':''}">${v.name}</button>
+      `).join('')}
+    </div>
+    <div style="height:1px;background:var(--border)"></div>
+    <div style="display:flex;gap:8px">
+      <button class="rubber-btn" id="tunerListenBtn" onclick="toggleTuner()" style="flex:1;padding:8px;font-size:11px;color:var(--accent);font-family:var(--font)">🎤 LISTEN</button>
+      <button class="rubber-btn" id="tunerPlayBtn" onclick="playReferenceNote()" style="flex:1;padding:8px;font-size:11px;color:var(--tuning);font-family:var(--font)">🔊 基準音</button>
+    </div>
+    <div style="font-size:9px;color:var(--text3);text-align:center;line-height:1.6">
+      432Hzは「宇宙の自然な振動数」とされ、<br>リラックス効果が高いと言われるチューニングです。
+    </div>
+  `;
+  document.body.appendChild(panel);
+}
+
+function closeTunerPanel(){
+  stopTuner();
+  const p=document.getElementById('tunerOverlay');
+  if(p)p.classList.remove('show');
+  if(p)p.style.display='none';
+}
+
+function selectTuning(key){
+  const preset=TUNING_PRESETS[key];
+  if(!preset)return;
+  tunerBaseA=preset.baseA;
+  document.querySelectorAll('.tuner-preset').forEach(b=>{
+    const k=b.dataset.tuning;
+    b.style.color=k===key?'var(--tuning)':'var(--text2)';
+    b.style.borderColor=k===key?'var(--tuning)':'';
+    b.style.background=k===key?'rgba(251,191,36,.1)':'';
+    b.classList.toggle('active',k===key);
+  });
+  notify(`チューニング: ${preset.name}`);
+}
+
+function toggleTuner(){
+  if(tunerActive){stopTuner();return}
+  tunerActive=true;
+  document.getElementById('tunerListenBtn').style.color='var(--rec)';
+  document.getElementById('tunerListenBtn').textContent='⏹ STOP';
+  tunerAudioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    tunerStream=stream;
+    tunerAnalyser=tunerAudioCtx.createAnalyser();
+    tunerAnalyser.fftSize=4096;
+    tunerAudioCtx.createMediaStreamSource(stream).connect(tunerAnalyser);
+    tunerDetect();
+  }).catch(e=>{notify('マイクアクセス失敗');stopTuner()});
+}
+
+function stopTuner(){
+  tunerActive=false;
+  if(tunerRAF)cancelAnimationFrame(tunerRAF);
+  if(tunerStream)tunerStream.getTracks().forEach(t=>t.stop());
+  if(tunerAudioCtx&&tunerAudioCtx.state!=='closed')try{tunerAudioCtx.close()}catch(e){}
+  tunerStream=null;tunerAudioCtx=null;tunerAnalyser=null;tunerRAF=null;
+  if(tunerOsc){try{tunerOsc.stop()}catch(e){} tunerOsc=null}
+  const btn=document.getElementById('tunerListenBtn');
+  if(btn){btn.style.color='var(--accent)';btn.textContent='🎤 LISTEN';}
+}
+
+function tunerDetect(){
+  if(!tunerActive||!tunerAnalyser)return;
+  const buf=new Float32Array(tunerAnalyser.fftSize);
+  tunerAnalyser.getFloatTimeDomainData(buf);
+  const freq=autoCorrelate(buf,tunerAudioCtx.sampleRate);
+  if(freq>0){
+    const noteInfo=freqToNote(freq);
+    document.getElementById('tunerNote').textContent=noteInfo.name;
+    document.getElementById('tunerNote').style.color=Math.abs(noteInfo.cents)<5?'var(--accent)':'var(--tuning)';
+    document.getElementById('tunerFreq').textContent=freq.toFixed(1)+' Hz';
+    document.getElementById('tunerCents').textContent=(noteInfo.cents>0?'+':'')+noteInfo.cents.toFixed(0)+' cents';
+    // Needle position: -50 to +50 cents → 0% to 100%
+    const pct=50+noteInfo.cents;
+    document.getElementById('tunerNeedle').style.left=Math.max(2,Math.min(98,pct))+'%';
+  }
+  tunerRAF=requestAnimationFrame(tunerDetect);
+}
+
+// Autocorrelation pitch detection
+function autoCorrelate(buf,sr){
+  let rms=0;
+  for(let i=0;i<buf.length;i++)rms+=buf[i]*buf[i];
+  rms=Math.sqrt(rms/buf.length);
+  if(rms<0.01)return -1; // Too quiet
+  const SIZE=buf.length;
+  const c=new Float32Array(SIZE);
+  for(let i=0;i<SIZE;i++){let sum=0;for(let j=0;j<SIZE-i;j++)sum+=buf[j]*buf[j+i];c[i]=sum;}
+  let d=0;while(c[d]>c[d+1])d++;
+  let maxval=-1, maxpos=-1;
+  for(let i=d;i<SIZE;i++){if(c[i]>maxval){maxval=c[i];maxpos=i;}}
+  // Parabolic interpolation
+  const prev=c[maxpos-1]||0, next=c[maxpos+1]||0;
+  const shift=(prev-next)/(2*(2*maxval-prev-next));
+  return sr/(maxpos+shift);
+}
+
+function freqToNote(freq){
+  const noteNames=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const semitonesFromA=12*Math.log2(freq/tunerBaseA);
+  const rounded=Math.round(semitonesFromA);
+  const cents=(semitonesFromA-rounded)*100;
+  const noteIdx=((rounded%12)+12+9)%12; // A=index 9 in noteNames
+  const octave=4+Math.floor((rounded+9)/12);
+  return {name:noteNames[noteIdx]+(octave>=0?octave:''), cents, semitones:rounded};
+}
+
+function playReferenceNote(){
+  if(tunerOsc){try{tunerOsc.stop()}catch(e){} tunerOsc=null}
+  const ac=new(window.AudioContext||window.webkitAudioContext)();
+  const osc=ac.createOscillator();
+  const gain=ac.createGain();
+  osc.type='sine';
+  osc.frequency.value=tunerBaseA;
+  gain.gain.setValueAtTime(0,ac.currentTime);
+  gain.gain.linearRampToValueAtTime(0.15,ac.currentTime+0.1);
+  gain.gain.linearRampToValueAtTime(0.15,ac.currentTime+2.9);
+  gain.gain.linearRampToValueAtTime(0,ac.currentTime+3);
+  osc.connect(gain);gain.connect(ac.destination);
+  osc.start();osc.stop(ac.currentTime+3);
+  tunerOsc=osc;
+  notify(`基準音: A=${tunerBaseA}Hz (3秒)`);
+}
+
+// Init podcast panel after boot
+const _origBoot2=window.boot;
+window.boot=function(){
+  _origBoot2();
+  initPodcastPanel();
+};
 </script>
 </body>
 </html>

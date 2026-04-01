@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Panda World x Drone | v4.0.0</title>
+<title>Panda World x Drone | v5.0.0 Living World</title>
 
 <style>
 /* --- Base Theme --- */
@@ -367,16 +367,48 @@ function Food({ position, onEaten }) {
   );
 }
 
-/* --- Panda Component (Ver 1.4.2 Model) --- */
-const Panda = forwardRef(({ position: initPos, droneRef, foods, speakerActive }, ref) => {
+/* --- Panda Component (Ver 2.0 Living World) --- */
+// 生活パラメータ（グローバル共有）
+const pandaLife = { hunger: 50, sleepiness: 20, happiness: 70, lastUpdate: Date.now() };
+function getPandaTimePhase() {
+  const h = new Date().getHours();
+  if (h >= 6 && h < 8) return 'MORNING';     // 起床・朝食
+  if (h >= 8 && h < 11) return 'FORAGE';      // 探索
+  if (h >= 11 && h < 13) return 'LUNCH';      // 昼食
+  if (h >= 13 && h < 15) return 'NAP';        // 昼寝
+  if (h >= 15 && h < 17) return 'PLAY';       // 遊び
+  if (h >= 17 && h < 19) return 'DINNER';     // 夕食
+  if (h >= 19 && h < 21) return 'EVENING';    // くつろぎ
+  return 'NIGHT';                              // 睡眠 (21-6)
+}
+function updatePandaNeeds(dt) {
+  const phase = getPandaTimePhase();
+  pandaLife.hunger = Math.min(100, pandaLife.hunger + dt * 0.8);
+  if (phase === 'NIGHT' || phase === 'NAP') {
+    pandaLife.sleepiness = Math.max(0, pandaLife.sleepiness - dt * 2);
+  } else {
+    pandaLife.sleepiness = Math.min(100, pandaLife.sleepiness + dt * 0.5);
+  }
+  pandaLife.lastUpdate = Date.now();
+}
+
+const Panda = forwardRef(({ position: initPos, droneRef, foods, speakerActive, isMain }, ref) => {
   const group = useRef(); const body = useRef(); const limbs = useRef([]);
   const targetPos = useRef(new THREE.Vector3());
   const [state, setState] = useState('WALK');
   const timer = useRef(0);
   const inCity = useRef(false);
   const bambooRef = useRef();
+  const zzRef = useRef(); // 睡眠エフェクト用
 
-  useImperativeHandle(ref, () => ({ position: group.current?.position || new THREE.Vector3(), object: group.current, isInCity: () => inCity.current }));
+  useImperativeHandle(ref, () => ({
+    position: group.current?.position || new THREE.Vector3(),
+    object: group.current,
+    isInCity: () => inCity.current,
+    getLife: () => pandaLife,
+    getPhase: getPandaTimePhase,
+    getState: () => state,
+  }));
   useEffect(() => { if (group.current) { group.current.position.set(...initPos); targetPos.current.copy(group.current.position); } }, [initPos]);
 
   useFrame((st, dt) => {
@@ -384,7 +416,11 @@ const Panda = forwardRef(({ position: initPos, droneRef, foods, speakerActive },
     const t = st.clock.getElapsedTime(); const g = group.current;
     inCity.current = g.position.z > 60;
 
-    // AI
+    // メインパンダのみ生活パラメータ更新
+    if (isMain) updatePandaNeeds(dt);
+    const phase = getPandaTimePhase();
+
+    // AI: 食べ物優先
     let overrideTarget = false;
     if (foods && foods.length > 0) {
       let nearestDist = 20; let nearestFood = null;
@@ -397,9 +433,11 @@ const Panda = forwardRef(({ position: initPos, droneRef, foods, speakerActive },
         targetPos.current.set(...nearestFood.position);
         targetPos.current.y = 0;
         overrideTarget = true;
-        if (nearestDist < 1.5) setState('EAT'); else setState('WALK');
+        if (nearestDist < 1.5) { setState('EAT'); pandaLife.hunger = Math.max(0, pandaLife.hunger - dt * 15); pandaLife.happiness = Math.min(100, pandaLife.happiness + dt * 3); }
+        else setState('WALK');
       }
     }
+    // スピーカー反応
     if (!overrideTarget && speakerActive && droneRef?.current?.object) {
       const dronePos = droneRef.current.position;
       if (dronePos) {
@@ -408,14 +446,37 @@ const Panda = forwardRef(({ position: initPos, droneRef, foods, speakerActive },
       }
     }
 
+    // 生活サイクルAI（時刻 + パラメータ連動）
     if (!overrideTarget) {
       timer.current -= dt;
       if (timer.current <= 0) {
-        const r = Math.random();
-        if (r < 0.5) { setState('WALK'); const angle = Math.random() * Math.PI * 2; const dist = 10 + Math.random() * 30; targetPos.current.set(THREE.MathUtils.clamp(g.position.x + Math.cos(angle)*dist, -450, 450), 0, THREE.MathUtils.clamp(g.position.z + Math.sin(angle)*dist, -450, 450)); timer.current = 10; }
-        else if (r < 0.7) { setState('SIT'); timer.current = 6; }
-        else if (r < 0.85) { setState('STAND'); timer.current = 4; }
-        else { setState('SLEEP'); timer.current = 8; }
+        if (phase === 'NIGHT') {
+          setState('SLEEP'); timer.current = 20 + Math.random() * 10;
+        } else if (phase === 'NAP') {
+          const r = Math.random();
+          if (pandaLife.sleepiness > 60 || r < 0.6) { setState('SLEEP'); timer.current = 12; }
+          else { setState('SIT'); timer.current = 6; }
+        } else if (phase === 'MORNING' || phase === 'LUNCH' || phase === 'DINNER') {
+          if (pandaLife.hunger > 40) {
+            setState('EAT'); timer.current = 8 + Math.random() * 5;
+            pandaLife.hunger = Math.max(0, pandaLife.hunger - 20);
+            pandaLife.happiness = Math.min(100, pandaLife.happiness + 5);
+          } else {
+            setState('SIT'); timer.current = 5;
+          }
+        } else if (phase === 'PLAY') {
+          const r = Math.random();
+          if (r < 0.5) { setState('WALK'); const angle = Math.random() * Math.PI * 2; const dist = 15 + Math.random() * 40; targetPos.current.set(THREE.MathUtils.clamp(g.position.x + Math.cos(angle)*dist, -450, 450), 0, THREE.MathUtils.clamp(g.position.z + Math.sin(angle)*dist, -450, 450)); timer.current = 12; pandaLife.happiness = Math.min(100, pandaLife.happiness + 2); }
+          else if (r < 0.7) { setState('STAND'); timer.current = 4; }
+          else { setState('SIT'); timer.current = 5; }
+        } else if (phase === 'FORAGE') {
+          setState('WALK'); const angle = Math.random() * Math.PI * 2; const dist = 20 + Math.random() * 50; targetPos.current.set(THREE.MathUtils.clamp(g.position.x + Math.cos(angle)*dist, -450, 450), 0, THREE.MathUtils.clamp(g.position.z + Math.sin(angle)*dist, -450, 450)); timer.current = 15;
+        } else { // EVENING
+          const r = Math.random();
+          if (r < 0.4) { setState('SIT'); timer.current = 8; }
+          else if (r < 0.7) { setState('WALK'); const angle = Math.random() * Math.PI * 2; targetPos.current.set(THREE.MathUtils.clamp(g.position.x + Math.cos(angle)*8, -450, 450), 0, THREE.MathUtils.clamp(g.position.z + Math.sin(angle)*8, -450, 450)); timer.current = 8; }
+          else { setState('STAND'); timer.current = 5; }
+        }
       }
     }
 
@@ -664,9 +725,9 @@ function PandaWrapper({ appMode, auto, cam, ctrl, resetSig, time, foods, speaker
   return (
     <>
       <OrbitControls enabled={appMode === "PANDA"} maxPolarAngle={Math.PI/2 - 0.1} minDistance={10} maxDistance={500} />
-      <Panda ref={mainPanda} position={[0, 0, 0]} droneRef={droneRef} foods={foods} speakerActive={speaker} />
-      <Panda position={[50, 0, -60]} droneRef={droneRef} foods={foods} speakerActive={speaker} />
-      <Panda position={[-70, 0, 55]} droneRef={droneRef} foods={foods} speakerActive={speaker} />
+      <Panda ref={mainPanda} position={[0, 0, 0]} droneRef={droneRef} foods={foods} speakerActive={speaker} isMain={true} />
+      <Panda position={[50, 0, -60]} droneRef={droneRef} foods={foods} speakerActive={speaker} isMain={false} />
+      <Panda position={[-70, 0, 55]} droneRef={droneRef} foods={foods} speakerActive={speaker} isMain={false} />
       {foods.map(f => <Food key={f.id} position={f.position} />)}
       <Drone ref={droneRef} active={appMode === "DRONE"} auto={auto} targetRef={mainPanda} camMode={cam} controlMode={ctrl} resetSignal={resetSig} time={time} speakerActive={speaker} lightOn={lightOn} lightTilt={lightTilt} />
       <PandaWarningChecker pandaRef={mainPanda} onWarningChange={onPandaWarning} />
@@ -755,7 +816,7 @@ function App() {
         <div className="top-hud">
           <div className="hud-info">
             <div className="hud-title">PANDA WORLD</div>
-            <div className="hud-sub">v4.0.0 | TIME: {time.getHours().toString().padStart(2,'0')}:{time.getMinutes().toString().padStart(2,'0')}</div>
+            <div className="hud-sub">v5.0.0 | {time.getHours().toString().padStart(2,'0')}:{time.getMinutes().toString().padStart(2,'0')} | {getPandaTimePhase()}</div>
             <div className={`warning-box ${pandaWarning?'active':''}`}>WARNING: PANDA IN CITY</div>
           </div>
           <div className="btn-group">
@@ -774,6 +835,11 @@ function App() {
           </div>
         </div>
         <div className="telemetry"><div className="telemetry-panel">
+          <div style={{marginBottom:'6px',color:'#ffaa00',fontWeight:'bold',fontSize:'10px',letterSpacing:'1px'}}>PANDA LIFE</div>
+          <div className="telemetry-row"><span>HUNGER</span><span className="val" style={{color:pandaLife.hunger>70?'#ff4444':pandaLife.hunger>40?'#ffaa00':'#44ff44'}}>{Math.round(pandaLife.hunger)}%</span></div>
+          <div className="telemetry-row"><span>SLEEPY</span><span className="val" style={{color:pandaLife.sleepiness>70?'#aa88ff':'#aaa'}}>{Math.round(pandaLife.sleepiness)}%</span></div>
+          <div className="telemetry-row"><span>HAPPY</span><span className="val" style={{color:'#ffdd44'}}>{Math.round(pandaLife.happiness)}%</span></div>
+          <div style={{borderTop:'1px solid #333',margin:'6px 0',paddingTop:'4px'}}></div>
           <div className="telemetry-row"><span>BATTERY</span><span className="val">{bat.toFixed(0)}%</span></div>
           <div className="telemetry-row"><span>CONTROL</span><span className="val">{ctrl===1?"MODE 1":"MODE 2"}</span></div>
           {lightOn && <div className="telemetry-row"><span>LIGHT</span><span className="val">{Math.round(lightTilt*100)}%</span></div>}
@@ -791,7 +857,7 @@ function App() {
         <div className="modal-overlay">
           <div className="modal-content">
             <h2 className="modal-title">PANDA WORLD x DRONE</h2>
-            <p><strong>Version:</strong> 4.0.0</p>
+            <p><strong>Version:</strong> 5.0.0 Living World</p>
             <p><strong>Developer:</strong> grace of touch</p>
             <hr style={{borderColor:'#333',margin:'15px 0'}}/>
             <p><strong>Joystick:</strong></p>

@@ -6,6 +6,11 @@
 <meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
 <meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
 <title>GraceVox — Grace of Touch</title>
+<link rel="icon" type="image/svg+xml" href="img/gracevox-icon.svg">
+<link rel="apple-touch-icon" href="img/gracevox-icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="GraceVox">
+<meta name="description" content="Voice-to-Text with Voice Print Visualizer — Voice Print Never Lies">
 <!-- © 2024-2026 Grace of Touch Co. All rights reserved. Unauthorized copying prohibited. -->
 <script>
 (function(){
@@ -16,6 +21,73 @@
   console.log('%c⚠ WARNING','color:red;font-size:24px;font-weight:bold;');
   console.log('%c© 2024-2026 Grace of Touch Co. All rights reserved. Patent Pending: Interim Copy Technology.','color:red;font-size:12px;');
   if(window.top!==window.self&&!document.referrer.includes('grace-of-touch')){document.body.innerHTML='';}
+})();
+</script>
+<script>
+// 環境検知: アプリ内ブラウザ、Safari、PWAを判定
+(function(){
+  const ua=navigator.userAgent||'';
+  const isKnownInApp=/FBAN|FBAV|Twitter|Line\/|Instagram|WeChat|Snapchat/i.test(ua);
+  const isiOS=/iPad|iPhone|iPod/.test(ua);
+  // iOS: UAに「Safari」が無いWebView
+  const isiOSInApp=isiOS&&/AppleWebKit/.test(ua)&&(!/Safari/.test(ua)||/CriOS|FxiOS|OPiOS/.test(ua))&&!isStandalone;
+  // Android: WebView（; wv) マーカーのみ）
+  const isAndroidInApp=/Android/.test(ua)&&/; wv\)/.test(ua);
+  const isInApp=isKnownInApp||isiOSInApp||isAndroidInApp;
+  const isStandalone=window.navigator.standalone===true||window.matchMedia('(display-mode:standalone)').matches;
+  const hasSR=!!(window.SpeechRecognition||window.webkitSpeechRecognition);
+  const hasGUM=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);
+
+  function _showEnvBanner(msg, sub){
+    const banner=document.createElement('div');
+    banner.id='envBanner';
+    banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:200;background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff;padding:12px 16px;font-size:13px;text-align:center;line-height:1.5;box-shadow:0 2px 12px rgba(0,0,0,0.4);';
+    banner.innerHTML='<div style="font-weight:700;margin-bottom:4px;">'+msg+'</div>'+
+      '<div style="font-size:11px;">'+sub+'</div>'+
+      '<button onclick="this.parentElement.remove()" style="margin-top:6px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:#fff;padding:4px 16px;border-radius:4px;font-size:11px;cursor:pointer;">閉じる</button>';
+    document.body.prepend(banner);
+  }
+
+  // 即時検知（UA判定）
+  if(isInApp){
+    const openMsg=isiOS?'右上の「…」→「Safariで開く」をタップ':'右上の「⋮」→「ブラウザで開く」をタップ';
+    document.addEventListener('DOMContentLoaded',()=>_showEnvBanner('アプリ内ブラウザでは音声機能が制限されます',openMsg+'してください'));
+  }else if(!hasSR&&!isStandalone){
+    document.addEventListener('DOMContentLoaded',()=>_showEnvBanner('このブラウザは音声認識に対応していません','Safari または Chrome でお開きください'));
+  }
+
+  // 遅延検知: SpeechRecognitionが存在するが実際に動かない場合（UAで検知できなかったアプリ内ブラウザ）
+  if(hasSR&&!isInApp){
+    document.addEventListener('DOMContentLoaded',function(){
+      setTimeout(function(){
+        try{
+          const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+          const test=new SR();
+          test.lang='ja-JP';
+          test.onresult=function(){};
+          test.onerror=function(e){
+            if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+              if(!document.getElementById('envBanner')){
+                const openMsg=isiOS?'Safariで開く':'ブラウザで開く';
+                _showEnvBanner('音声認識が利用できません','「'+openMsg+'」で開き直してください');
+              }
+            }
+            try{test.abort();}catch(ex){}
+          };
+          test.onend=function(){};
+          test.start();
+          // 2秒後にテスト終了
+          setTimeout(function(){ try{test.abort();}catch(e){} },2000);
+        }catch(e){
+          if(!document.getElementById('envBanner')){
+            _showEnvBanner('音声認識の初期化に失敗しました','Safari または Chrome でお開きください');
+          }
+        }
+      },1000);
+    });
+  }
+  // グローバルに環境情報を公開
+  window._gvEnv={isInApp:isInApp, isStandalone:isStandalone, hasSR:hasSR, hasGUM:hasGUM};
 })();
 </script>
 <style>
@@ -108,6 +180,11 @@
   }
   .current-text:focus { outline: none; }
   .interim { color: var(--text-dim); font-style: italic; }
+  .proof-mark { color: var(--accent); text-decoration: underline dotted rgba(108,92,231,0.4); cursor: pointer; }
+  .proof-tip { position:fixed; background:var(--surface); border:1px solid var(--accent); border-radius:8px; padding:8px 14px; font-size:12px; z-index:100; box-shadow:0 4px 16px rgba(0,0,0,0.4); max-width:260px; }
+  .proof-tip .proof-orig { color:var(--recording); text-decoration:line-through; margin-right:6px; }
+  .proof-tip .proof-new { color:var(--success); font-weight:600; }
+  .proof-tip .proof-close { float:right; cursor:pointer; color:var(--text-dim); margin-left:10px; }
   .placeholder { color: var(--text-dim); font-style: italic; font-size: 13px; }
 
   /* History panel */
@@ -149,14 +226,16 @@
 
   /* Controls */
   .controls {
-    display: flex; align-items: center; justify-content: center; gap: 16px;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
     padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); flex-shrink: 0;
+    position: relative;
   }
   .rec-btn {
     width: 56px; height: 56px; border-radius: 50%; border: 3px solid var(--accent);
     background: transparent; cursor: pointer; transition: all 0.3s;
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+    -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
   }
   .rec-btn:hover { box-shadow: 0 0 20px var(--accent-glow); }
   .rec-btn .inner { width: 24px; height: 24px; background: var(--accent); border-radius: 50%; transition: all 0.3s; }
@@ -164,7 +243,7 @@
   .rec-btn.recording .inner { background: var(--recording); border-radius: 4px; width: 20px; height: 20px; }
   @keyframes pulse { 0%,100%{box-shadow:0 0 20px var(--recording-glow)} 50%{box-shadow:0 0 44px var(--recording-glow)} }
 
-  .controls-info { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 70px; }
+  .controls-info { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 80px; flex-shrink: 0; overflow: hidden; }
   .status-bar { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-dim); white-space: nowrap; }
   .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
   .status-dot.ready { background: var(--success); }
@@ -187,7 +266,7 @@
 
   /* iOS Copy Banner */
   .ios-copy-banner {
-    display: none; position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%);
+    display: none; position: fixed; bottom: max(90px, calc(env(safe-area-inset-bottom) + 70px)); left: 50%; transform: translateX(-50%);
     z-index: 300; background: var(--accent); color: #fff; border: none;
     padding: 14px 40px; border-radius: 30px; font-size: 16px; font-weight: 700;
     cursor: pointer; box-shadow: 0 4px 20px var(--accent-glow);
@@ -235,7 +314,38 @@
   .panel-btn { background: none; border: 1px solid var(--border); color: var(--text-dim); padding: 8px; border-radius: 6px; font-size: 12px; cursor: pointer; width: 100%; }
   .settings-close { margin-top: 12px; width: 100%; padding: 10px; background: var(--accent); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
 
-  .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--accent); color: #fff; padding: 8px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 200; white-space: nowrap; }
+  /* AI Tsukkomi Bubble */
+  .ai-bubble-wrap {
+    flex-shrink: 0; padding: 0 0 4px 0; display: none;
+  }
+  .ai-bubble-wrap.show { display: block; animation: aiBubbleIn 0.4s ease-out; }
+  @keyframes aiBubbleIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .ai-bubble {
+    background: linear-gradient(135deg, rgba(108,92,231,0.12), rgba(34,211,238,0.08));
+    border: 1px solid rgba(108,92,231,0.25); border-radius: 12px;
+    padding: 10px 14px; position: relative;
+  }
+  .ai-bubble-header {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+  }
+  .ai-bubble-avatar {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #22d3ee);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: #fff; flex-shrink: 0;
+  }
+  .ai-bubble-name { font-size: 10px; color: var(--accent); letter-spacing: 0.5px; font-weight: 600; }
+  .ai-bubble-tag {
+    font-size: 9px; color: var(--text-dim); background: rgba(108,92,231,0.1);
+    padding: 1px 6px; border-radius: 8px; margin-left: auto;
+  }
+  .ai-bubble-text { font-size: 13px; line-height: 1.7; color: var(--text); }
+  .ai-bubble-close {
+    position: absolute; top: 6px; right: 8px; background: none; border: none;
+    color: var(--text-dim); font-size: 14px; cursor: pointer; padding: 2px;
+  }
+
+  .toast { position: fixed; bottom: max(90px, calc(env(safe-area-inset-bottom) + 70px)); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--accent); color: #fff; padding: 8px 18px; border-radius: 8px; font-size: 13px; opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 200; white-space: nowrap; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   @media (max-width: 600px) {
@@ -255,6 +365,50 @@
 </style>
 </head>
 <body>
+
+<!-- iOS PWA Microphone Permission Gate -->
+<div id="micGate" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;">
+  <div style="font-size:48px;">&#127908;</div>
+  <div style="font-size:18px;font-weight:700;color:#fff;text-align:center;">マイクを有効化</div>
+  <div style="font-size:13px;color:rgba(255,255,255,0.6);text-align:center;max-width:280px;line-height:1.6;">
+    GraceVoxの音声機能を使うには<br>マイクへのアクセスを許可してください
+  </div>
+  <button id="micGateBtn" style="margin-top:12px;padding:14px 48px;font-size:16px;font-weight:700;border:none;border-radius:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;cursor:pointer;box-shadow:0 4px 20px rgba(102,126,234,0.4);-webkit-tap-highlight-color:transparent;" onclick="_activateMic()">
+    許可して開始
+  </button>
+  <div style="font-size:11px;color:rgba(255,255,255,0.35);margin-top:8px;">タップ後にブラウザの許可ダイアログが出ます</div>
+</div>
+<script>
+// iOS PWA/Safari: コールドスタート時にユーザージェスチャーでマイクを事前取得
+function _activateMic(){
+  const btn=document.getElementById('micGateBtn');
+  btn.textContent='接続中...';btn.disabled=true;
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    // 許可成功 → ストリームは即解放（録音時に再取得）
+    stream.getTracks().forEach(tr=>tr.stop());
+    _gumGranted=true;
+    // AudioContextも事前にresume（iOS requires user gesture）
+    try{
+      const ac=new(window.AudioContext||window.webkitAudioContext)();
+      ac.resume().then(()=>ac.close());
+    }catch(e){}
+    document.getElementById('micGate').style.display='none';
+    sessionStorage.setItem('vt_micActivated','1');
+    if(typeof showToast==='function') showToast('マイク有効化完了');
+  }).catch(e=>{
+    btn.textContent='もう一度タップ';btn.disabled=false;
+    console.log('Mic gate failed:',e);
+  });
+}
+// 表示条件: iOS && (PWAまたはSafari) && 今セッションでまだ有効化していない
+document.addEventListener('DOMContentLoaded',()=>{
+  const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+  const alreadyActivated=sessionStorage.getItem('vt_micActivated')==='1';
+  if(isiOS && !alreadyActivated && window._gvEnv && !window._gvEnv.isInApp){
+    document.getElementById('micGate').style.display='flex';
+  }
+});
+</script>
 
 <!-- Setup -->
 <div class="setup-overlay" id="setupOverlay">
@@ -318,6 +472,10 @@
       <option value="tr-TR">TR Türkçe</option>
     </select>
     <div class="mode-pill" id="modePill">テキスト整形</div>
+    <div id="gv-live-counter" style="display:flex;gap:6px;font-family:'Courier New',monospace;font-size:9px;color:var(--accent);opacity:0.7;line-height:1;pointer-events:none;align-items:center;">
+      <span>ONLINE <span id="lc-online">-</span></span>
+      <span style="opacity:0.6;">WEEK <span id="lc-week">-</span></span>
+    </div>
     <button class="icon-btn" id="loginBtn" onclick="toggleLogin()" title="Login" style="font-size:12px;">&#128100;</button>
     <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="テーマ切替">&#9788;</button>
     <button class="icon-btn" onclick="toggleSettings()">&#9881;</button>
@@ -331,14 +489,28 @@
       <span class="current-label" id="currentLabel">Now</span>
       <div class="current-actions">
         <span class="char-count" id="charCount"></span>
+        <button class="action-btn" id="editBtn" onclick="toggleEdit()" style="display:none;">✏️ 編集</button>
         <button class="action-btn" onclick="clearCurrent()">Clear</button>
       </div>
     </div>
-    <div class="current-text" id="currentText">
+    <div class="current-text" id="currentText" contenteditable="false">
       <span class="placeholder">録音ボタンで開始</span>
     </div>
-    <!-- Voice Print Visualizer -->
-    <canvas id="vpCanvas" style="width:100%;height:60px;border-top:1px solid var(--border);display:none;"></canvas>
+    <!-- Voice Print Visualizer (inside panel, flex-shrink:0 to prevent overflow clip) -->
+    <canvas id="vpCanvas" style="width:100%;height:90px;flex-shrink:0;border-top:1px solid var(--border);display:none;border-radius:0 0 10px 10px;"></canvas>
+  </div>
+
+  <!-- AI Tsukkomi / Idea Bubble -->
+  <div class="ai-bubble-wrap" id="aiBubbleWrap">
+    <div class="ai-bubble">
+      <button class="ai-bubble-close" onclick="closeAiBubble()">&times;</button>
+      <div class="ai-bubble-header">
+        <div class="ai-bubble-avatar">AI</div>
+        <span class="ai-bubble-name">GraceVox AI</span>
+        <span class="ai-bubble-tag" id="aiBubbleTag">ツッコミ</span>
+      </div>
+      <div class="ai-bubble-text" id="aiBubbleText"></div>
+    </div>
   </div>
 
   <!-- History -->
@@ -361,7 +533,7 @@
     </div>
     <div class="volume-meter" id="volumeMeter"></div>
   </div>
-  <button class="rec-btn" id="recBtn" onclick="toggleRecording()">
+  <button class="rec-btn" id="recBtn" onclick="if(recMode==='toggle')toggleRecording()">
     <div class="inner"></div>
   </button>
   <button class="bs-btn" id="bsBtn" onclick="backspace()" title="Backspace">&#9003;</button>
@@ -394,6 +566,33 @@
     <div class="setting-group">
       <div class="setting-row"><span>言い直し自動検出</span><button class="toggle on" onclick="toggleSetting(this,'smartCorrection')"></button></div>
     </div>
+    <div class="setting-group">
+      <div class="setting-row"><span>AI校正（誤変換自動修正）</span><button class="toggle on" onclick="toggleSetting(this,'autoProofread')"></button></div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-row"><span>AIツッコミ/アイデア返し</span><button class="toggle on" id="aiTsukkomiToggle" onclick="toggleSetting(this,'aiTsukkomi')"></button></div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-row"><span>録音効果音</span><button class="toggle on" id="sfxToggle" onclick="toggleSetting(this,'sfxEnabled')"></button></div>
+      <div class="setting-row" style="margin-top:4px;">
+        <span style="font-size:11px;color:var(--text-dim);">音の種類</span>
+        <select id="sfxStyleSelect" onchange="setSfxStyle(this.value)" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:3px 6px;border-radius:6px;font-size:11px;font-family:inherit;">
+          <option value="ping">Ping（短い1音）</option>
+          <option value="double">Double（2音）</option>
+          <option value="chime">Chime（和音）</option>
+          <option value="click">Click（クリック）</option>
+          <option value="soft">Soft（やわらか）</option>
+          <option value="vibrate">振動のみ（音なし）</option>
+        </select>
+      </div>
+    </div>
+    <div class="setting-row" style="margin-top:6px;">
+      <span style="font-size:11px;color:var(--text-dim);">録音モード</span>
+      <select id="recModeSelect" onchange="setRecMode(this.value)" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:3px 6px;border-radius:6px;font-size:11px;font-family:inherit;">
+        <option value="toggle">トグル（押して開始/押して停止）</option>
+        <option value="hold">長押し（押している間だけ録音）</option>
+      </select>
+    </div>
     <div class="sep"></div>
     <div class="setting-group">
       <label>録音ホットキー</label>
@@ -406,7 +605,15 @@
     </div>
     <div class="setting-group">
       <label>カスタム辞書（from→to）</label>
-      <textarea id="customDict" placeholder="クロード→Claude&#10;ファイヤーベース→Firebase"></textarea>
+      <textarea id="customDict" placeholder="クロード→Claude&#10;ファイヤーベース→Firebase" style="height:60px;"></textarea>
+      <div id="learnedDictArea" style="margin-top:6px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:10px;color:var(--text-dim);">自動学習済み (<span id="learnedCount">0</span>件)</span>
+          <button class="action-btn" onclick="clearLearnedDict()" style="font-size:9px;padding:2px 8px;">クリア</button>
+        </div>
+        <div id="learnedList" style="font-size:10px;color:var(--text-dim);max-height:60px;overflow-y:auto;margin-top:4px;"></div>
+      </div>
+      <button class="action-btn" onclick="learnFromInput()" style="margin-top:6px;width:100%;padding:6px;font-size:11px;">現在のテキストから学習する</button>
     </div>
     <div class="sep"></div>
     <div class="setting-group"><button class="panel-btn" onclick="resetSetup()">声の再セットアップ</button></div>
@@ -420,6 +627,7 @@
 
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script>
@@ -487,6 +695,7 @@ async function syncFromCloud(){
 
 <script>
 let isRecording = false, recognition = null, audioContext = null, analyser = null, mediaStream = null;
+let _wasRecordingBeforePause = false; // PWA: pagehide時に録音中だったか記憶
 let finalTranscript = '', interimTranscript = '', sentences = [];
 let currentLang = 'ja-JP';
 let selectedHotkey = localStorage.getItem('vt_hotkey') || 'Convert';
@@ -494,7 +703,78 @@ let outputMode = localStorage.getItem('vt_mode') || 'clean';
 let voiceProfile = JSON.parse(localStorage.getItem('vt_voiceProfile') || 'null');
 let history = JSON.parse(localStorage.getItem('vt_history') || '[]');
 
-const settings = { removeFiller: true, autoPunctuation: true, smartCorrection: true };
+const settings = { removeFiller: true, autoPunctuation: true, smartCorrection: true, autoProofread: true, sfxEnabled: true, aiTsukkomi: true };
+let sfxStyle = localStorage.getItem('vt_sfx_style') || 'ping';
+let recMode = localStorage.getItem('vt_recMode') || 'toggle'; // 'toggle' or 'hold'
+// ─── 録音効果音（5種類から選択可能）───
+function playRecSFX(type){
+  if(!settings.sfxEnabled) return;
+  // 振動のみモード
+  if(sfxStyle==='vibrate'){
+    if(navigator.vibrate) navigator.vibrate(type==='start'?[30,20,30]:[50]);
+    return;
+  }
+  // 録音開始時はiOS標準マイク音と重ならないよう少し遅延
+  const delay=type==='start'?300:0;
+  setTimeout(()=>{_playRecSFXInner(type);},delay);
+}
+function _playRecSFXInner(type){
+  try{
+    const ac=new(window.AudioContext||window.webkitAudioContext)();
+    const ct=ac.currentTime;
+    const vol=0.10;
+    const S=sfxStyle;
+
+    if(type==='start'){
+      if(S==='ping'){
+        // Ping: 短い高音1回
+        _tone(ac,ct,880,vol,0.08);
+      }else if(S==='double'){
+        // Double: 上昇2音
+        _tone(ac,ct,660,vol,0.08);
+        _tone(ac,ct+0.12,880,vol,0.08);
+      }else if(S==='chime'){
+        // Chime: 和音（ド+ミ+ソ）
+        _tone(ac,ct,523,vol*0.7,0.15);
+        _tone(ac,ct,659,vol*0.7,0.15);
+        _tone(ac,ct,784,vol*0.7,0.15);
+      }else if(S==='click'){
+        // Click: ノイズクリック
+        _click(ac,ct,vol);
+      }else if(S==='soft'){
+        // Soft: やわらかい低音
+        _tone(ac,ct,440,vol*0.8,0.12,'triangle');
+      }
+    }else{
+      if(S==='ping'){
+        _tone(ac,ct,660,vol,0.08);
+      }else if(S==='double'){
+        _tone(ac,ct,880,vol,0.06);
+        _tone(ac,ct+0.10,520,vol,0.08);
+      }else if(S==='chime'){
+        _tone(ac,ct,784,vol*0.7,0.15);
+        _tone(ac,ct,523,vol*0.7,0.15);
+      }else if(S==='click'){
+        _click(ac,ct,vol);
+      }else if(S==='soft'){
+        _tone(ac,ct,330,vol*0.8,0.15,'triangle');
+      }
+    }
+  }catch(e){}
+}
+function _tone(ac,ct,freq,vol,dur,type){
+  const g=ac.createGain();g.connect(ac.destination);
+  g.gain.setValueAtTime(vol,ct);g.gain.exponentialRampToValueAtTime(0.001,ct+dur);
+  const o=ac.createOscillator();o.type=type||'sine';o.frequency.value=freq;o.connect(g);o.start(ct);o.stop(ct+dur);
+}
+function _click(ac,ct,vol){
+  const buf=ac.createBuffer(1,ac.sampleRate*0.03,ac.sampleRate);
+  const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/d.length*8);
+  const s=ac.createBufferSource();s.buffer=buf;
+  const g=ac.createGain();g.gain.value=vol*2;s.connect(g);g.connect(ac.destination);s.start(ct);
+}
+function setSfxStyle(v){sfxStyle=v;localStorage.setItem('vt_sfx_style',v);playRecSFX('start');}
+function setRecMode(v){recMode=v;localStorage.setItem('vt_recMode',v);showToast(v==='hold'?'長押しモード':'トグルモード');}
 const FILLERS_JA = ['えーと','えっと','えー','あー','あのー','あの','まあ','まぁ','なんか','こう','そのー','その','ええと','うーん','うん','なんていうか','なんというか','えーっと','あのですね','そうですね','まあその'];
 const FILLERS_EN = ['uh','um','uhm','like','you know','i mean','basically','actually','literally','sort of','kind of','well'];
 const HOTKEY_LABELS = {'Convert':'変換','NonConvert':'無変換','F2':'F2','F4':'F4'};
@@ -642,22 +922,89 @@ function initRecognition(){
     showToast('Chrome または Safari 最新版をお使いください');
     return;
   }
+  // iOS: 録音開始時にだけrecognitionを作成（待機中のマイクセッション防止）
+  if(isIOS){
+    recognition=null; // 待機中はnull（マイクセッションなし）
+    setStatus('ready',t('ready'));
+    return;
+  }
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   recognition=new SR();
-  // iOS Safariはcontinuous=trueだと不安定なのでfalse
-  recognition.continuous=!isIOS;
+  recognition.continuous=true;
   recognition.interimResults=true;
   recognition.lang=currentLang;
   recognition.onresult=handleResult; recognition.onerror=handleError; recognition.onend=handleEnd;
   setStatus('ready',t('ready'));
 }
+// iOS専用: 録音開始時にrecognitionを作成
+function _createRecognitionIOS(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  recognition=new SR();
+  recognition.continuous=false;
+  recognition.interimResults=true;
+  recognition.lang=currentLang;
+  recognition.onresult=handleResult; recognition.onerror=handleError; recognition.onend=handleEnd;
+}
 
-function toggleRecording(){ isRecording ? stopRecording() : startRecording(); }
+let _recoveryInProgress=false;
+let _appSwitchDirty=false; // アプリ切替が起きたフラグ
+let _lastResultTime=0; // handleResultが最後に来た時間（実際に音声を拾っているか）
+
+function toggleRecording(){
+  if(_recoveryInProgress) return;
+  if(isRecording){
+    // 停止は常に即停止（死んだセッションでも確実に止める）
+    if(_appSwitchDirty || !recognition){
+      console.log('Toggle stop: dead session, clean stop');
+      _appSwitchDirty=false;
+    }
+    stopRecording();
+  }else{
+    // 開始時にクリーンスタート（死んだセッションの復旧もここで行う）
+    _appSwitchDirty=false;
+    _mediaNeedsUserGesture=false;
+    cleanup();
+    startRecording();
+  }
+}
+// Hold（長押し）モード用
+let _holdActive=false;
+function _onHoldStart(e){
+  if(recMode!=='hold') return;
+  if(e.target.closest('#recBtn')){
+    e.preventDefault();
+    if(!isRecording){
+      _holdActive=true;
+      _appSwitchDirty=false;
+      cleanup();
+      startRecording();
+    }
+  }
+}
+function _onHoldEnd(e){
+  if(recMode!=='hold'||!_holdActive) return;
+  _holdActive=false;
+  if(isRecording) stopRecording();
+}
 
 let lastSavedPitch=0;
+// マイク完全解放（Bluetooth通話モード残留防止）
+function _releaseStream(s){
+  if(!s)return;
+  try{
+    s.getTracks().forEach(tr=>{tr.stop();tr.enabled=false;});
+    // iOS Safari: AudioTrackを明示的にremove
+    if(s.getAudioTracks) s.getAudioTracks().forEach(tr=>{try{s.removeTrack(tr);}catch(e){}});
+  }catch(e){}
+}
+function _releaseAudioCtx(ac){
+  if(!ac)return;
+  try{if(ac.state!=='closed')ac.close();}catch(e){}
+}
 function cleanup(){
-  try{ if(recognition) recognition.abort(); }catch(e){}
-  if(mediaStream){mediaStream.getTracks().forEach(tr=>tr.stop());mediaStream=null;}
+  try{ if(recognition){recognition.onend=null;recognition.onresult=null;recognition.onerror=null;recognition.abort();} }catch(e){}
+  _releaseStream(mediaStream); mediaStream=null;
+  _releaseAudioCtx(audioContext); audioContext=null;
   if(audioContext&&audioContext.state!=='closed'){try{audioContext.close();}catch(e){}}
   audioContext=null; analyser=null; recognition=null;
 }
@@ -665,8 +1012,22 @@ function cleanup(){
 async function startRecording(){
   if(isRecording) return;
 
+  // 環境チェック
+  if(window._gvEnv&&window._gvEnv.isInApp){
+    showToast('Safariで開いてください');
+    setStatus('error','アプリ内ブラウザ非対応');
+    return;
+  }
+  if(!('webkitSpeechRecognition' in window)&&!('SpeechRecognition' in window)){
+    showToast('このブラウザは音声認識に非対応です');
+    setStatus('error','非対応ブラウザ');
+    return;
+  }
+
   // 前回のリソースを確実にクリーンアップ
   cleanup();
+  _mediaNeedsUserGesture=false;
+  _lastResultTime=Date.now();
 
   // 状態リセット
   finalTranscript=''; interimTranscript=''; sentences=[];
@@ -676,40 +1037,110 @@ async function startRecording(){
   const el=document.getElementById('currentText');
   if(el.querySelector('.placeholder')) el.innerHTML='';
 
-  // 認識エンジンを常に新規作成
-  initRecognition();
-  if(!recognition) return;
-  recognition.lang=currentLang;
+  // 編集モード解除
+  if(_editMode){ _editMode=false; document.getElementById('currentText').contentEditable='false'; }
+  const editBtn=document.getElementById('editBtn');
+  if(editBtn){ editBtn.style.display='none'; editBtn.textContent='✏️ 編集'; editBtn.style.background=''; editBtn.style.borderColor=''; }
 
-  // マイク取得
-  try{
-    mediaStream=await navigator.mediaDevices.getUserMedia({audio:true});
-    audioContext=new (window.AudioContext||window.webkitAudioContext)();
-    analyser=audioContext.createAnalyser(); analyser.fftSize=2048;
-    audioContext.createMediaStreamSource(mediaStream).connect(analyser);
-    collectVoicePrint();
-    updateVolumeMeter();
-  }catch(e){
-    setStatus('error','マイク許可が必要です');
-    return;
-  }
-
-  try{ recognition.start(); }catch(e){ setStatus('error','認識開始失敗'); return; }
-
+  // UI即座に録音状態
   isRecording=true;
   document.getElementById('recBtn').classList.add('recording');
   document.getElementById('currentLabel').textContent='Recording...';
-  vpCanvasCtx=null; vpImageData=null;
-  document.getElementById('vpCanvas').style.display='block';
-  drawVoicePrint();
-  setStatus('recording',t('recording'));
+  setStatus('recording','準備中...');
+  playRecSFX('start');
   if(navigator.vibrate) navigator.vibrate(50);
+  _startWatchdog();
+
+  // 声紋ビジュアライザー準備
+  vpCanvasCtx=null; vpImageData=null; _iosVPCtx=null; _iosVPImage=null;
+  document.getElementById('vpCanvas').style.display='block';
+
+  // iOS PWA: getUserMediaとSpeechRecognitionの同時使用は
+  // オーディオセッション競合で認識が無音になる問題がある
+  // → PWAではSpeechRecognitionのみ使用（声紋ビジュアライザーは後から試行）
+  const _isPWA = isIOS && window._gvEnv && window._gvEnv.isStandalone;
+
+  if(_isPWA){
+    // === PWAモード: SpeechRecognition最優先 → 声紋は後から安全に試行 ===
+    if(!recognition){ if(isIOS){_createRecognitionIOS();}else{initRecognition();} }
+    if(!recognition){ isRecording=false; document.getElementById('recBtn').classList.remove('recording'); _stopWatchdog(); return; }
+    recognition.lang=currentLang;
+    try{
+      recognition.start();
+      console.log('PWA mode: recognition started (no getUserMedia yet)');
+    }catch(e){
+      console.log('PWA mode: recognition.start() failed:', e.message);
+      setStatus('error','認識開始失敗');
+      isRecording=false; _stopWatchdog(); return;
+    }
+    setTimeout(()=>{ if(isRecording) setStatus('recording','🎙 どうぞ話してください');
+      setTimeout(()=>{ if(isRecording) setStatus('recording',t('recording')); },2000);
+    },500);
+    // 声紋: 1.5秒遅延でgetUserMediaを試行（SpeechRecognitionが安定した後）
+    setTimeout(()=>{
+      if(!isRecording) return;
+      navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+        if(!isRecording) { stream.getTracks().forEach(tr=>tr.stop()); return; }
+        mediaStream=stream;
+        audioContext=new (window.AudioContext||window.webkitAudioContext)();
+        analyser=audioContext.createAnalyser(); analyser.fftSize=2048;
+        audioContext.createMediaStreamSource(stream).connect(analyser);
+        collectVoicePrint(); updateVolumeMeter(); drawVoicePrint();
+        console.log('PWA mode: media acquired for voiceprint');
+      }).catch(e=>{
+        console.log('PWA mode: getUserMedia failed (voiceprint unavailable):', e.message);
+      });
+    }, 1500);
+  }else{
+    _startDualAuth();
+  }
+}
+
+// 従来の並行取得（認証2回）
+function _startDualAuth(){
+  // 1. SpeechRecognitionを起動（touchstartで先行作成済みならスキップ）
+  if(!recognition){
+    if(isIOS){ _createRecognitionIOS(); }else{ initRecognition(); }
+  }
+  if(!recognition){ isRecording=false; document.getElementById('recBtn').classList.remove('recording'); _stopWatchdog(); return; }
+  recognition.lang=currentLang;
+  try{ recognition.start(); }catch(e){ setStatus('error','認識開始失敗'); isRecording=false; _stopWatchdog(); return; }
+
+  // 一声聞き漏れ対策: 「準備中...」→ 少し待ってから「どうぞ話してください」
+  setTimeout(()=>{
+    if(isRecording) setStatus('recording','🎙 どうぞ話してください');
+    setTimeout(()=>{
+      if(isRecording) setStatus('recording',t('recording'));
+    },2000);
+  },500);
+
+  // 2. 声紋ビジュアライザー用マイク（並行取得、文字起こしをブロックしない）
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    if(!isRecording) { stream.getTracks().forEach(tr=>tr.stop()); return; }
+    mediaStream=stream;
+    audioContext=new (window.AudioContext||window.webkitAudioContext)();
+    analyser=audioContext.createAnalyser(); analyser.fftSize=2048;
+    audioContext.createMediaStreamSource(stream).connect(analyser);
+    collectVoicePrint(); updateVolumeMeter();
+    vpCanvasCtx=null; vpImageData=null;
+    drawVoicePrint();
+    // 初回成功 → 次回からは認証1回化を試行
+    _gumGranted=true;
+  }).catch(e=>{
+    console.log('getUserMedia failed, text-only mode');
+  });
 }
 
 let stopDone=false;
+let _stopping=false; // 停止処理中フラグ（handleEndの再起動を防ぐ）
 function stopRecording(){
-  if(!isRecording) return;
+  if(!isRecording && !_stopping) return;
+  _stopping=true;
   isRecording=false;
+  playRecSFX('stop');
+  _stopWatchdog();
+  // まずrecognitionのイベントを即座に無効化（handleEnd再起動防止）
+  if(recognition){try{recognition.onend=null;recognition.onresult=null;recognition.onerror=null;}catch(e){}}
   document.getElementById('recBtn').classList.remove('recording');
 
   // 1. ピッチ
@@ -728,18 +1159,51 @@ function stopRecording(){
   // 4. 履歴保存
   try{ if(stopText) saveToHistory(stopText); }catch(e){}
 
-  // 4. 必ず画面クリア（エラーがあっても）
-  document.getElementById('currentText').innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
-  document.getElementById('charCount').textContent='';
+  // 4. テキストがあれば残す（編集可能にする）、なければプレースホルダー
+  if(stopText){
+    document.getElementById('currentText').innerHTML=getProofreadHTML(stopText);
+    document.getElementById('charCount').textContent=stopText.length+'文字';
+  }else{
+    document.getElementById('currentText').innerHTML='<span class="placeholder">'+t('placeholder')+'</span>';
+    document.getElementById('charCount').textContent='';
+  }
   document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
   document.getElementById('vpCanvas').style.display='none';
   finalTranscript=''; interimTranscript=''; sentences=[];
   if(navigator.vibrate) navigator.vibrate([30,30,30]);
   setStatus('ready',t('stop'));
+  // テキストがあれば編集ボタンを表示
+  const editBtn=document.getElementById('editBtn');
+  if(editBtn) editBtn.style.display=stopText?'inline-block':'none';
+  // AIツッコミ/アイデア返し
+  try{ generateAiResponse(stopText); }catch(e){}
 
-  // 5. リソース停止
-  try{recognition.stop();}catch(e){}
-  setTimeout(cleanup,500);
+  // 5. 全音声リソースを完全解放（Bluetooth電話モード残留防止）
+  const _recToKill = recognition;
+  const _streamToKill = mediaStream;
+  const _ctxToKill = audioContext;
+  recognition = null; mediaStream = null; audioContext = null; analyser = null;
+
+  // iOS Safari: mediaStreamを即座に解放（マイクインジケーター消去）
+  _releaseStream(_streamToKill);
+  _releaseAudioCtx(_ctxToKill);
+
+  // SpeechRecognitionを終了（内部マイクも解放）
+  if(_recToKill){
+    try{
+      _recToKill.onresult=null; _recToKill.onerror=null;
+      _recToKill.onend=function(){
+        // 二重解放は_releaseStream内でnullチェック済みなので安全
+        _stopping=false;
+      };
+      _recToKill.abort();
+    }catch(e){}
+  }
+
+  // フォールバック: 500ms後に停止フラグ確実リセット
+  setTimeout(function(){
+    _stopping=false;
+  }, 500);
 }
 
 // クリップボードコピー（ターミナル版と同じ方式）
@@ -770,6 +1234,8 @@ function selectAllText(){
 }
 
 function handleResult(event){
+  _lastRecActivityTime=Date.now();
+  _lastResultTime=Date.now();
   interimTranscript='';
   for(let i=event.resultIndex;i<event.results.length;i++){
     const t=event.results[i][0].transcript;
@@ -791,26 +1257,229 @@ function handleResult(event){
           else{ sentences.push(cleaned); }
         }else{ sentences.push(cleaned); }
         finalTranscript=sentences.join('');
-      }else{ finalTranscript+=t; }
+      }else{
+        // smartCorrection OFF でもautoProofreadは適用
+        const proofed=settings.autoProofread?autoProofread(t):t;
+        finalTranscript+=proofed;
+      }
     }else{ interimTranscript+=t; }
   }
-  // 録音中はリアルタイム表示を優先（重い処理は後回し）
+  // 録音中のリアルタイム表示（interim含めてAI校正を適用 + ハイライト）
   const el=document.getElementById('currentText');
+  const displayFinal=settings.autoProofread?autoProofread(finalTranscript):finalTranscript;
   if(interimTranscript){
-    // interim中は軽量表示
-    el.innerHTML=escapeHtml(finalTranscript)+'<span class="interim">'+escapeHtml(interimTranscript)+'</span>';
+    const displayInterim=settings.autoProofread?autoProofread(interimTranscript):interimTranscript;
+    el.innerHTML=getProofreadHTML(displayFinal)+'<span class="interim">'+escapeHtml(displayInterim)+'</span>';
   }else{
-    // final確定時のみフル処理
-    el.innerHTML=escapeHtml(processText(finalTranscript));
+    el.innerHTML=getProofreadHTML(processText(finalTranscript));
   }
   el.scrollTop=el.scrollHeight;
   document.getElementById('charCount').textContent=(finalTranscript.length+interimTranscript.length)+'文字';
 }
+function _isStreamAlive(s){ return s && s.active && s.getTracks().some(tr=>tr.readyState==='live'); }
+function _isCtxAlive(ac){ return ac && ac.state!=='closed'; }
+
+// メディア系を再取得して声紋+ボリュームループを全て再起動する共通関数
+let _mediaAcquireId=0;
+let _mediaNeedsUserGesture=false; // getUserMediaが失敗→次のタップで再試行フラグ
+let _gumGranted=false; // getUserMediaが過去に成功→認証1回化を試行するフラグ
+
+function _setupMediaFromStream(stream){
+  mediaStream=stream;
+  audioContext=new(window.AudioContext||window.webkitAudioContext)();
+  analyser=audioContext.createAnalyser();analyser.fftSize=2048;
+  audioContext.createMediaStreamSource(stream).connect(analyser);
+  setStatus('recording',t('recording'));
+  _mediaNeedsUserGesture=false;
+  collectVoicePrint();
+  updateVolumeMeter();
+  if(!_vpLoopRunning) drawVoicePrint();
+}
+
+function _acquireMediaAndStartLoops(){
+  const myId=++_mediaAcquireId;
+  _releaseStream(mediaStream); mediaStream=null;
+  _releaseAudioCtx(audioContext); audioContext=null; analyser=null;
+  vpCanvasCtx=null;vpImageData=null;vpUseTimeDomain=false;vpCheckCount=0;
+  document.getElementById('vpCanvas').style.display='block';
+
+  // 1回だけ試す（バックグラウンドではユーザージェスチャーなしで許可ダイアログが出ない）
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    if(myId!==_mediaAcquireId||!isRecording){stream.getTracks().forEach(tr=>tr.stop());return;}
+    _setupMediaFromStream(stream);
+  }).catch(()=>{
+    console.log('getUserMedia failed (no gesture context), waiting for user tap...');
+    _mediaNeedsUserGesture=true;
+    // 3秒後にもう1回だけ試す（許可がまだ有効な場合に備えて）
+    setTimeout(()=>{
+      if(myId!==_mediaAcquireId||!isRecording||!_mediaNeedsUserGesture) return;
+      navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+        if(myId!==_mediaAcquireId||!isRecording){stream.getTracks().forEach(tr=>tr.stop());return;}
+        _setupMediaFromStream(stream);
+      }).catch(()=>{});
+    },3000);
+  });
+}
+
+// ユーザーがタップした時にgetUserMediaを再試行（ジェスチャーコンテキストあり→許可ダイアログ出せる）
+function _tryMediaOnGesture(){
+  if(!isRecording) return;
+  // メディアが死んでいる場合も再試行（_mediaNeedsUserGestureだけでなくanalyser消失も検知）
+  if(!_mediaNeedsUserGesture && analyser && _isStreamAlive(mediaStream)) return;
+  console.log('Retrying getUserMedia with user gesture (needsGesture='+_mediaNeedsUserGesture+', analyser='+(!!analyser)+')');
+  _releaseStream(mediaStream); mediaStream=null;
+  _releaseAudioCtx(audioContext); audioContext=null; analyser=null;
+  vpCanvasCtx=null;vpImageData=null;vpUseTimeDomain=false;vpCheckCount=0;
+  navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+    if(!isRecording){stream.getTracks().forEach(tr=>tr.stop());return;}
+    _setupMediaFromStream(stream);
+  }).catch(e=>{
+    console.log('getUserMedia still failed:', e.message);
+  });
+}
+
 let errorRetryCount=0;
+let _lastRecActivityTime=0; // 最後にSpeechRecognitionからイベントが来た時間
+let _watchdogTimer=null;
+
+// ウォッチドッグ: SpeechRecognitionが完全に死んだ状態を検知して復旧
+function _startWatchdog(){
+  if(_watchdogTimer) clearInterval(_watchdogTimer);
+  _lastRecActivityTime=Date.now();
+  _watchdogTimer=setInterval(()=>{
+    if(!isRecording){clearInterval(_watchdogTimer);_watchdogTimer=null;return;}
+    const elapsed=Date.now()-_lastRecActivityTime;
+    // 15秒以上イベントが来ていない → SpeechRecognitionが死んでいる可能性大
+    if(elapsed>15000){
+      console.log('Watchdog: recognition seems dead, restarting... ('+Math.round(elapsed/1000)+'s silent)');
+      _lastRecActivityTime=Date.now(); // 連続発火防止
+      errorRetryCount=0;
+      try{if(recognition){recognition.onend=null;recognition.onresult=null;recognition.onerror=null;recognition.abort();}}catch(ex){}
+      recognition=null;
+      if(isIOS){ _createRecognitionIOS(); }else{ initRecognition(); }
+      if(recognition){recognition.lang=currentLang; try{recognition.start();}catch(ex){}}
+      // メディアも死んでいたら再取得
+      if(!analyser || !_isStreamAlive(mediaStream)){
+        _acquireMediaAndStartLoops();
+      }
+    }
+  },5000);
+}
+function _stopWatchdog(){
+  if(_watchdogTimer){clearInterval(_watchdogTimer);_watchdogTimer=null;}
+}
+
+// タッチ/操作復帰: iOSがタイマーをサスペンドしても、ユーザーが画面に触れた瞬間に復旧
+function _onUserInteraction(){
+  if(!isRecording) return;
+  const elapsed=Date.now()-_lastRecActivityTime;
+  // 10秒以上イベントが来ていない → 死んでいる可能性、即座にフル復旧
+  if(elapsed>10000){
+    console.log('Touch recovery: dead for '+Math.round(elapsed/1000)+'s, full restart...');
+    _recoveryInProgress=true;
+    setTimeout(()=>{ _recoveryInProgress=false; }, 2000);
+    _lastRecActivityTime=Date.now();
+    errorRetryCount=0;
+
+    // 1. SpeechRecognition: 必ず破棄→再生成
+    try{if(recognition){recognition.onend=null;recognition.onresult=null;recognition.onerror=null;recognition.abort();}}catch(ex){}
+    recognition=null;
+    if(isIOS){ _createRecognitionIOS(); }else{ initRecognition(); }
+    if(recognition){recognition.lang=currentLang; try{recognition.start();}catch(ex){}}
+
+    // 2. メディア系: 常に全破棄→再取得（共通関数で統一）
+    _acquireMediaAndStartLoops();
+  }
+}
+// タッチ系イベント: 死亡復帰 + メディア再許可
+// 録音ボタン自体のタッチは除外（停止時の再起動を防ぐ）
+function _onTouch(e){
+  if(e.target&&e.target.closest&&e.target.closest('#recBtn,.rec-btn,.bs-btn'))return;
+  _onUserInteraction();
+  _tryMediaOnGesture();
+}
+document.addEventListener('touchstart', _onTouch, {passive:true});
+// Hold mode: 録音ボタンに直接イベント登録
+// ボタンイベント登録
+(function(){
+  const btn=document.getElementById('recBtn');
+
+  // トグルモード: touchstartでSpeechRecognition先行起動（一声聞き漏れ対策）
+  let _prewarmed=false;
+  btn.addEventListener('touchstart', function(e){
+    if(recMode==='toggle' && !isRecording && !_prewarmed){
+      // clickより先にrecognitionを作っておく（まだstart()はしない）
+      _prewarmed=true;
+      cleanup();
+      if(isIOS){ _createRecognitionIOS(); }else{ initRecognition(); }
+    }
+  }, {passive:true});
+  // click後にフラグリセット
+  btn.addEventListener('click', function(){ _prewarmed=false; }, {passive:true});
+
+  // Hold mode
+  btn.addEventListener('touchstart', function(e){
+    if(recMode!=='hold') return;
+    console.log('HOLD: touchstart');
+    _holdActive=true;
+    _appSwitchDirty=false;
+    if(!isRecording){
+      cleanup();
+      startRecording();
+    }
+  }, {passive:true});
+
+  btn.addEventListener('touchend', function(e){
+    console.log('HOLD: touchend, active='+_holdActive+', rec='+isRecording);
+    if(recMode!=='hold'||!_holdActive) return;
+    _holdActive=false;
+    if(isRecording) stopRecording();
+  }, {passive:true});
+
+  btn.addEventListener('touchcancel', function(e){
+    console.log('HOLD: touchcancel');
+    if(recMode!=='hold'||!_holdActive) return;
+    _holdActive=false;
+    if(isRecording) stopRecording();
+  }, {passive:true});
+
+  // PC用: mousedown/mouseup
+  btn.addEventListener('mousedown', function(){
+    if(recMode!=='hold') return;
+    _holdActive=true;
+    _appSwitchDirty=false;
+    if(!isRecording){ cleanup(); startRecording(); }
+  });
+  document.addEventListener('mouseup', function(){
+    if(recMode!=='hold'||!_holdActive) return;
+    _holdActive=false;
+    if(isRecording) stopRecording();
+  });
+})();
+document.addEventListener('click', _onTouch);
+document.addEventListener('touchmove', _onUserInteraction, {passive:true});
+document.addEventListener('scroll', _onUserInteraction, {passive:true});
+
 function handleError(e){
+  _lastRecActivityTime=Date.now(); // エラーもアクティビティとしてカウント
   console.log('SpeechRecognition error:', e.error, e.message);
   if(e.error==='no-speech'){
     setStatus('recording','音声待ち...');
+    // no-speech後もhandleEndで再開されるが、連続しすぎたら一度リセット
+    errorRetryCount++;
+    if(errorRetryCount>20){
+      // iOS Safariが内部でthrottleしている可能性 → 少し休んでからフル再生成
+      errorRetryCount=0;
+      console.log('no-speech throttle recovery');
+      setTimeout(()=>{
+        if(!isRecording) return;
+        try{if(recognition){recognition.onend=null;recognition.onresult=null;recognition.onerror=null;recognition.abort();}}catch(ex){}
+        recognition=null;
+        if(isIOS){ _createRecognitionIOS(); }else{ initRecognition(); }
+        if(recognition){recognition.lang=currentLang; try{recognition.start();}catch(ex){}}
+      },2000);
+      return; // handleEndに流さない（二重起動防止）
+    }
   }else if(e.error==='not-allowed'||e.error==='service-not-allowed'){
     setStatus('error','マイク/音声認識の許可が必要です');
     document.getElementById('currentText').textContent='設定 > Safari > マイク・音声認識を許可してください';
@@ -828,40 +1497,69 @@ function handleError(e){
     }
   }else if(e.error==='aborted'){
     // iOS: バックグラウンド移行等で中断 → 自動リカバリー
-    if(isRecording && errorRetryCount<3){
+    if(isRecording && errorRetryCount<5){
       errorRetryCount++;
       setTimeout(()=>{
-        recognition=null; initRecognition();
-        if(recognition) try{recognition.start();}catch(ex){}
+        try{if(recognition){recognition.onend=null;recognition.abort();}}catch(ex){}
+        recognition=null;
+        if(isIOS){ _createRecognitionIOS(); }else{ initRecognition(); }
+        if(recognition){recognition.lang=currentLang; try{recognition.start();}catch(ex){}}
       },500);
     }
   }else{
     setStatus('error','エラー: '+e.error);
     // 自動リカバリー試行
-    if(isRecording && errorRetryCount<3){
+    if(isRecording && errorRetryCount<5){
       errorRetryCount++;
       setTimeout(()=>{
-        recognition=null; initRecognition();
-        if(recognition) try{recognition.start();}catch(ex){}
+        try{if(recognition){recognition.onend=null;recognition.abort();}}catch(ex){}
+        recognition=null;
+        if(isIOS){ _createRecognitionIOS(); }else{ initRecognition(); }
+        if(recognition){recognition.lang=currentLang; try{recognition.start();}catch(ex){}}
       },1000);
     }
   }
 }
 function handleEnd(){
+  _lastRecActivityTime=Date.now();
+  // 停止済み or 停止処理中なら何もしない
+  if(!isRecording || _stopping) return;
   // iOS(continuous=false)またはChrome(無音タイムアウト)で自動再開
   if(isRecording){
+    // 未確定のinterimテキストをfinalに昇格（消失防止）
+    if(interimTranscript&&interimTranscript.trim()){
+      const cleaned=settings.smartCorrection?basicClean(interimTranscript):interimTranscript;
+      if(cleaned.trim()){
+        sentences.push(cleaned);
+        finalTranscript=sentences.join('');
+      }
+      interimTranscript='';
+      // 画面更新
+      const el=document.getElementById('currentText');
+      el.innerHTML=escapeHtml(processText(finalTranscript));
+      el.scrollTop=el.scrollHeight;
+      document.getElementById('charCount').textContent=finalTranscript.length+'文字';
+    }
     if(isIOS){
       // iOS: 新しいインスタンスで再開
-      const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-      recognition=new SR();
-      recognition.continuous=false;
-      recognition.interimResults=true;
-      recognition.lang=currentLang;
-      recognition.onresult=handleResult;
-      recognition.onerror=handleError;
-      recognition.onend=handleEnd;
+      try{if(recognition){recognition.onend=null;recognition.abort();}}catch(ex){}
+      recognition=null;
+      _createRecognitionIOS();
     }
-    try{recognition.start();}catch(e){}
+    try{
+      recognition.start();
+      errorRetryCount=Math.max(0,errorRetryCount-1); // 成功したらカウントを徐々に回復
+    }catch(e){
+      // start()失敗 → 少し待ってからフル再生成
+      console.log('handleEnd start() failed:', e.message);
+      setTimeout(()=>{
+        if(!isRecording) return;
+        try{if(recognition){recognition.onend=null;recognition.abort();}}catch(ex){}
+        recognition=null;
+        if(isIOS){ _createRecognitionIOS(); }else{ initRecognition(); }
+        if(recognition){recognition.lang=currentLang; try{recognition.start();}catch(ex){}}
+      },1000);
+    }
   }
 }
 
@@ -896,7 +1594,266 @@ function basicClean(text){
     const fillers=currentLang.startsWith('ja')?FILLERS_JA:FILLERS_EN;
     fillers.forEach(f=>{ r=currentLang.startsWith('ja')?r.replace(new RegExp(escapeRegex(f),'gi'),''):r.replace(new RegExp(`\\b${escapeRegex(f)}\\b[,]?\\s*`,'gi'),''); });
   }
+  // AI校正: 音声認識でよくある誤変換を自動修正
+  if(settings.autoProofread!==false && currentLang.startsWith('ja')){
+    r = autoProofread(r);
+  }
   return r.replace(/\s{2,}/g,' ').trim();
+}
+
+// ─── AI校正（音声認識誤変換の自動修正）───
+function autoProofread(text){
+  let r = text;
+
+  // 1. 固有名詞・アプリ名の誤認識修正
+  const PROPER_NAMES = [
+    [/グレイスボックス|グレースボックス|グレイスボイス/g, 'GraceVox'],
+    [/グレースオブタッチ|グレイスオブタッチ/g, 'Grace of Touch'],
+    [/トラックフォン[ジズ]?|トラックホン[ジズ]?|トラックフォルジュ/g, 'TrackForge'],
+    [/トンネルスキャン/g, 'TunnelScan'],
+    [/ウォールガード/g, 'WallGuard'],
+    [/メガロケット/g, 'Mega Rocket'],
+    [/ドリームオン/g, 'Dream On'],
+    [/ファイアーベース|ファイヤーベース/g, 'Firebase'],
+    [/クロードコード|クロウドコード/g, 'Claude Code'],
+    [/クロード(?=で|に|が|は|の|を)/g, 'Claude'],
+    [/ジェミニ/g, 'Gemini'],
+    [/スペースエックス/g, 'SpaceX'],
+    [/ギットハブ|ギッドハブ/g, 'GitHub'],
+    [/リアクト/g, 'React'],
+    [/スリージェーエス|スリーJS/g, 'Three.js'],
+    [/テイルウィンド/g, 'Tailwind'],
+    [/プレイスボックス|ブレースボックス|ブレスオブタッチ|グライスオブタッチ/g, 'Grace of Touch'],
+    // アプリ名追加
+    [/レコーズ(?=で|に|が|は|の|を|ページ)/g, 'Records'],
+    [/グレースオブタッチレコーズ|グレイスオブタッチレコーズ/g, 'Grace of Touch Records'],
+    [/ドローンガード/g, 'DroneGuard'],
+    [/トンネルドローン/g, 'TunnelDrone'],
+    [/パンダワールド/g, 'Panda World'],
+    [/サウンドシューター/g, 'Sound Shooter'],
+    [/ロケットキャド|ロケットカド/g, 'RocketCAD'],
+    // 人名・プロジェクト名
+    [/エッグビレッジ/g, 'Egg Village'],
+    [/執行くん|しっこうくん|シッコウクン/g, '執行くん'],
+    [/アンチグラビティ|アンチグウラビティ/g, 'Antigravity'],
+    // 技術用語追加
+    [/プレイライト/g, 'Playwright'],
+    [/タイプスクリプト/g, 'TypeScript'],
+    [/ジャバスクリプト/g, 'JavaScript'],
+    [/ファイアストア/g, 'Firestore'],
+    [/ブレンダー(?=で|に|が|は|の|を|MCP)/g, 'Blender'],
+    [/オブシディアン/g, 'Obsidian'],
+    [/ノーション/g, 'Notion'],
+  ];
+
+  // 2. 日本語の音声認識でよくある同音異義語の誤変換
+  // 「正門」→「声紋」（音声認識で頻出する誤変換）
+  const HOMOPHONES = [
+    // 「正門」→「声紋」（最頻出の誤変換）
+    [/正門/g, '声紋'],
+    [/専門(?=の|が|は|を|で|ビジュアライザー|表示|分析)/g, '声紋'],
+    // 技術用語
+    [/構成(?=を|し|する|して|が|は)/g, (m,i,s)=>{
+      if(/誤[字変]|修正|チェック|間違|直[すし]/.test(s)) return '校正';
+      return m;
+    }],
+    [/変換した感じ/g, '変換した漢字'],
+    [/移動して/g, (m,i,s)=>{
+      // 声紋文脈での「移動」→そのまま
+      return m;
+    }],
+    // ビジネス用語
+    [/利用料金/g, '利用料金'],
+    [/無料途中/g, '無料'], // 音声の言い淀み
+    // 一般的な誤変換
+    [/意外と/g, (m,i,s)=>{
+      if(/以外/.test(s.substring(Math.max(0,i-5),i))) return m;
+      return m; // 「意外と」は正しい場合が多い
+    }],
+    [/感じの変換/g, '漢字の変換'],
+    [/番組があります/g, '場合があります'],
+    [/番組が/g, (m,i,s)=>{
+      // 「場合が」の誤認識（文脈：〜する番組が → 場合が）
+      if(/[るたいし]番組が/.test(s.substring(Math.max(0,i-3),i+m.length))) return '場合が';
+      return m;
+    }],
+    // 助詞の誤認識
+    [/([をにがはで])を([をにがはで])/g, '$1$2'], // 助詞の重複
+    // 音声認識追加パターン
+    [/危機(?=を作|を書|を引|にする)/g, '記事'], // 「記事を作る」→「危機を作る」
+    [/以上(?=な|に)(?!の)/g, (m,i,s)=>{
+      if(/異常|エラー|バグ|おかしい/.test(s)) return '異常';
+      return m;
+    }],
+    [/過程(?=で|を|が|は)/g, (m,i,s)=>{
+      if(/仮説|仮定|もし|想定|仮に/.test(s)) return '仮定';
+      return m;
+    }],
+    [/機能(?=する|して|し)/g, (m,i,s)=>{
+      if(/帰|戻|復/.test(s.substring(Math.max(0,i-3),i))) return '帰農';
+      return m;
+    }],
+    [/対応(?=語|後)/g, '対応'],
+    [/配信(?=を|で|が|は)/g, '配信'],
+  ];
+
+  // 3. 読点の自動挿入（長い文の区切り）
+  const PUNCTUATION_HINTS = [
+    [/([^、。]{15,}?)(けど|けれど|ですが|だが|しかし|ので|から|のに|ため|ながら)/g, '$1、$2'],
+    [/([^、。]{20,}?)(また|そして|それで|だから|でも|ただ|つまり)/g, '$1。$2'],
+  ];
+
+  // Apply learned dict first (user overrides)
+  r = applyLearnedDict(r);
+
+  // Apply proper names
+  PROPER_NAMES.forEach(([pattern, replacement]) => {
+    r = r.replace(pattern, replacement);
+  });
+
+  // Apply homophones (with context awareness)
+  HOMOPHONES.forEach(([pattern, replacement]) => {
+    if(typeof replacement === 'function'){
+      r = r.replace(pattern, (match, ...args) => {
+        const offset = typeof args[args.length-2] === 'number' ? args[args.length-2] : 0;
+        return replacement(match, offset, r);
+      });
+    } else {
+      r = r.replace(pattern, replacement);
+    }
+  });
+
+  // Apply punctuation hints
+  if(settings.autoPunctuation){
+    PUNCTUATION_HINTS.forEach(([pattern, replacement]) => {
+      r = r.replace(pattern, replacement);
+    });
+  }
+
+  return r;
+}
+
+// 校正変更の記録（ポップアップ表示用）
+let _proofChanges=[]; // [{original, corrected, position}]
+function autoProofreadWithTracking(text){
+  const before=text;
+  const result=autoProofread(text);
+  if(before!==result){
+    // 差分を検出して記録
+    // 簡易差分: 変更があった場合のみ記録
+    _proofChanges.push({original:before, corrected:result, time:Date.now()});
+    // 最大20件まで保持
+    if(_proofChanges.length>20) _proofChanges.shift();
+  }
+  return result;
+}
+
+// 校正ハイライト付きHTML生成
+function getProofreadHTML(text){
+  if(!settings.autoProofread) return escapeHtml(text);
+  let html=escapeHtml(text);
+  // 校正された部分をハイライト表示
+  const HIGHLIGHT_PAIRS=[
+    ['GraceVox','GraceVox'],['Grace of Touch','Grace of Touch'],['TrackForge','TrackForge'],
+    ['TunnelScan','TunnelScan'],['Firebase','Firebase'],['Claude Code','Claude Code'],
+    ['Claude','Claude'],['GitHub','GitHub'],['React','React'],['Three.js','Three.js'],
+    ['声紋','声紋'],['校正','校正'],
+    ['Grace of Touch Records','Grace of Touch Records'],['DroneGuard','DroneGuard'],
+    ['TunnelDrone','TunnelDrone'],['Panda World','Panda World'],['RocketCAD','RocketCAD'],
+    ['Egg Village','Egg Village'],['Antigravity','Antigravity'],
+    ['Playwright','Playwright'],['TypeScript','TypeScript'],['Blender','Blender'],['Obsidian','Obsidian'],
+  ];
+  HIGHLIGHT_PAIRS.forEach(([word])=>{
+    const escaped=escapeHtml(word);
+    if(html.includes(escaped)){
+      html=html.replace(new RegExp(escapeRegex(escaped),'g'),
+        '<span class="proof-mark" onclick="showProofTip(this)" data-word="'+escaped+'">'+escaped+'</span>');
+    }
+  });
+  return html;
+}
+
+// ─── ユーザー辞書学習 ───
+let learnedDict=JSON.parse(localStorage.getItem('vt_learnedDict')||'{}'); // {from: to}
+
+function addLearnedWord(from, to){
+  if(!from||!to||from===to) return;
+  learnedDict[from]=to;
+  localStorage.setItem('vt_learnedDict',JSON.stringify(learnedDict));
+  updateLearnedUI();
+}
+
+function clearLearnedDict(){
+  learnedDict={};
+  localStorage.setItem('vt_learnedDict','{}');
+  updateLearnedUI();
+  showToast('学習辞書をクリアしました');
+}
+
+function updateLearnedUI(){
+  const keys=Object.keys(learnedDict);
+  const countEl=document.getElementById('learnedCount');
+  const listEl=document.getElementById('learnedList');
+  if(countEl) countEl.textContent=keys.length;
+  if(listEl){
+    if(keys.length===0){
+      listEl.textContent='まだ学習データがありません';
+    }else{
+      listEl.innerHTML=keys.map(k=>
+        '<div style="display:flex;justify-content:space-between;padding:1px 0;">'+
+        '<span>'+escapeHtml(k)+' → '+escapeHtml(learnedDict[k])+'</span>'+
+        '<span style="cursor:pointer;color:var(--recording);" onclick="deleteLearnedWord(\''+escapeHtml(k)+'\')">✕</span></div>'
+      ).join('');
+    }
+  }
+}
+
+function deleteLearnedWord(key){
+  delete learnedDict[key];
+  localStorage.setItem('vt_learnedDict',JSON.stringify(learnedDict));
+  updateLearnedUI();
+}
+
+// テキスト中のAI校正パターンを検出して学習
+function learnFromInput(){
+  const text=document.getElementById('currentText')?.textContent||'';
+  if(!text.trim()){ showToast('テキストがありません'); return; }
+  // 固有名詞辞書のパターンから学習
+  const learned=[];
+  // 現在のテキストにある固有名詞を逆引きして学習
+  const LEARN_PATTERNS=[
+    {word:'GraceVox', readings:['グレイスボックス','グレースボックス','グレイスボイス']},
+    {word:'Grace of Touch', readings:['グレースオブタッチ','グレイスオブタッチ','プレイスボックス','ブレースボックス']},
+    {word:'TrackForge', readings:['トラックフォンジ','トラックホンジ','トラックフォルジュ']},
+    {word:'Firebase', readings:['ファイアーベース','ファイヤーベース']},
+    {word:'Claude Code', readings:['クロードコード','クロウドコード']},
+    {word:'GitHub', readings:['ギットハブ','ギッドハブ']},
+    {word:'声紋', readings:['正門','専門']},
+  ];
+  LEARN_PATTERNS.forEach(p=>{
+    if(text.includes(p.word)){
+      p.readings.forEach(r=>{
+        if(!learnedDict[r]){
+          addLearnedWord(r, p.word);
+          learned.push(r+'→'+p.word);
+        }
+      });
+    }
+  });
+  if(learned.length>0){
+    showToast(learned.length+'件学習しました');
+  }else{
+    showToast('新しい学習パターンはありませんでした');
+  }
+}
+
+// 学習済み辞書をautoProofreadに適用
+function applyLearnedDict(text){
+  let r=text;
+  Object.keys(learnedDict).forEach(from=>{
+    r=r.replace(new RegExp(escapeRegex(from),'g'), learnedDict[from]);
+  });
+  return r;
 }
 
 function processText(text){
@@ -995,6 +1952,78 @@ function clearHistory(){
   renderHistory();
 }
 
+// ─── ログエクスポート ───
+async function exportLog(format){
+  const pw = document.getElementById('exportPassword')?.value || '';
+  // 処理フローログ（ソースコード非公開）
+  const logData = {
+    exportDate: new Date().toISOString(),
+    app: 'GraceVox',
+    version: document.title,
+    sessionCount: history.length,
+    settings: {
+      outputMode, currentLang, recMode, sfxStyle,
+      removeFiller: settings.removeFiller,
+      autoPunctuation: settings.autoPunctuation,
+      smartCorrection: settings.smartCorrection,
+      autoProofread: settings.autoProofread,
+    },
+    voiceProfile: voiceProfile ? { type: voiceProfile.type, label: voiceProfile.label } : null,
+    learnedDictCount: Object.keys(learnedDict).length,
+    proofChanges: _proofChanges.map(c=>({time:new Date(c.time).toISOString(), original:c.original.substring(0,50), corrected:c.corrected.substring(0,50)})),
+    history: history.map(h=>({time:h.time, text:h.text, charCount:h.text?.length||0})),
+  };
+
+  let content, filename, mime;
+  if(format==='json'){
+    content = JSON.stringify(logData, null, 2);
+    filename = 'gracevox_log_'+logData.exportDate.slice(0,10)+'.json';
+    mime = 'application/json';
+  } else {
+    const lines = ['GraceVox Log Export', '='.repeat(40), 'Date: '+logData.exportDate, 'Sessions: '+logData.sessionCount, '', '--- Settings ---', JSON.stringify(logData.settings,null,2), '', '--- Proof Changes ---'];
+    logData.proofChanges.forEach(c=>lines.push(c.time+': '+c.original+' → '+c.corrected));
+    lines.push('', '--- History ---');
+    logData.history.forEach(h=>lines.push((h.time||'?')+': '+h.text));
+    content = lines.join('\n');
+    filename = 'gracevox_log_'+logData.exportDate.slice(0,10)+'.txt';
+    mime = 'text/plain';
+  }
+
+  // パスワード暗号化（Web Crypto API: AES-GCM）
+  if(pw){
+    try {
+      const enc = new TextEncoder();
+      const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pw), 'PBKDF2', false, ['deriveKey']);
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const key = await crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:100000,hash:'SHA-256'}, keyMaterial, {name:'AES-GCM',length:256}, false, ['encrypt']);
+      const encrypted = await crypto.subtle.encrypt({name:'AES-GCM',iv}, key, enc.encode(content));
+      // Pack: salt(16) + iv(12) + ciphertext
+      const packed = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+      packed.set(salt, 0);
+      packed.set(iv, salt.length);
+      packed.set(new Uint8Array(encrypted), salt.length + iv.length);
+      content = btoa(String.fromCharCode(...packed));
+      filename = filename.replace(/\.(json|txt)$/, '.enc.$1');
+      mime = 'application/octet-stream';
+      showToast('暗号化してエクスポート');
+    } catch(e) {
+      showToast('暗号化エラー: '+e.message);
+      return;
+    }
+  }
+
+  // ダウンロード
+  const blob = new Blob([content], {type: mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  if(!pw) showToast('ログをエクスポートしました');
+}
+
 function backspace(){
   if(sentences.length>0){
     sentences.pop();
@@ -1022,24 +2051,174 @@ function clearCurrent(){
   finalTranscript=''; interimTranscript=''; sentences=[];
 }
 
+// ─── AI ツッコミ / アイデア返しエンジン ───
+function closeAiBubble(){ document.getElementById('aiBubbleWrap').classList.remove('show'); }
+
+function generateAiResponse(text){
+  if(!settings.aiTsukkomi || !text || text.length<4) return;
+  const resp = _analyzeAndRespond(text);
+  if(!resp) return;
+  const wrap=document.getElementById('aiBubbleWrap');
+  document.getElementById('aiBubbleText').textContent=resp.text;
+  document.getElementById('aiBubbleTag').textContent=resp.tag;
+  wrap.classList.remove('show');
+  requestAnimationFrame(()=>wrap.classList.add('show'));
+  // 15秒後に自動で消す
+  clearTimeout(wrap._autoHide);
+  wrap._autoHide=setTimeout(()=>wrap.classList.remove('show'),15000);
+}
+
+function _analyzeAndRespond(text){
+  const t=text.trim();
+  const len=t.length;
+
+  // --- パターンマッチングによるツッコミ/アイデア ---
+
+  // 1. 疑問文 → アイデア提案
+  if(/[？?]$/.test(t) || /どうすれば|どうしたら|なんで|なぜ/.test(t)){
+    const ideas=[
+      '逆の視点から考えてみると新しい発見があるかも。',
+      'まず一番シンプルな方法を試してみては？',
+      '誰かに話すだけで整理されることもありますよ。今まさにそれかも。',
+      'この疑問、実はすでに答えを知っているのでは？',
+      '5歳の子に説明するつもりで言い直してみて。',
+    ];
+    return { text:ideas[Math.floor(Math.random()*ideas.length)], tag:'アイデア💡' };
+  }
+
+  // 2. ネガティブ → 励まし＋ツッコミ
+  if(/疲れた|しんどい|無理|だるい|めんどう|めんどくさい/.test(t)){
+    const enc=[
+      '声に出せてるだけ偉い。あとはGraceVoxに任せて休みましょう。',
+      '「無理」って言えるのは限界を知ってる証拠。ちょっと休憩しません？',
+      'お疲れさまです。コーヒーでも飲みながら次の一手を考えましょう。',
+    ];
+    return { text:enc[Math.floor(Math.random()*enc.length)], tag:'エール📣' };
+  }
+
+  // 3. TODO/やること系 → 構造化提案
+  if(/やらなきゃ|やること|タスク|TODO|予定|しなきゃ/.test(t)){
+    return { text:'リスト化しましょう！「1. ○○ 2. △△」と番号を振って話すと、後からコピペしやすいですよ。', tag:'Tips✨' };
+  }
+
+  // 4. 数字・金額 → 計算ツッコミ
+  const nums=t.match(/(\d+(?:,\d{3})*(?:\.\d+)?)\s*(?:円|ドル|万|億|個|件|人|回|時間|分|%)/g);
+  if(nums && nums.length>=1){
+    return { text:'数字が出てきましたね。メモ代わりにそのまま履歴に残しておくと後で便利です。', tag:'メモ📝' };
+  }
+
+  // 5. アイデア・企画系
+  if(/思いついた|アイデア|ひらめいた|こうしたら|もし.*なら|作りたい|作ろう/.test(t)){
+    const ideaResp=[
+      'いいですね！もう少し具体的に「誰が」「いつ」「どこで」を足すと実現に近づきますよ。',
+      'そのアイデア、3行でまとめてみて。エレベーターピッチの練習です。',
+      'メモしておかないと忘れますよ。あ、もう録音してるから大丈夫か。',
+    ];
+    return { text:ideaResp[Math.floor(Math.random()*ideaResp.length)], tag:'アイデア💡' };
+  }
+
+  // 6. 長文 → 要約提案
+  if(len>100){
+    return { text:'長めの内容ですね。後で見返す時のために、最初の一文を「結論」にすると読みやすくなりますよ。', tag:'Tips✨' };
+  }
+
+  // 7. 短すぎる → ユーモア
+  if(len<10){
+    const short=[
+      '短い！俳句かな？',
+      'シンプル。でも、もう少し聞きたいかも。',
+      'それだけ？続きがありそうな顔してますよ。',
+    ];
+    return { text:short[Math.floor(Math.random()*short.length)], tag:'ツッコミ🎤' };
+  }
+
+  // 8. ランダムツッコミ（上記に該当しない場合、50%の確率で表示）
+  if(Math.random()>0.5){
+    const general=[
+      '声、いい感じですね。この調子で。',
+      '録音メモ、習慣化してきましたね。',
+      '次は箇条書きモードも試してみては？',
+      'いい内容。Historyにしっかり残ってますよ。',
+    ];
+    return { text:general[Math.floor(Math.random()*general.length)], tag:'ひとこと💬' };
+  }
+
+  return null; // 何も返さない
+}
+
 // ─── Voice Print Visualizer (Spectrogram) ───
-let vpCanvasCtx=null, vpImageData=null;
+let vpCanvasCtx=null, vpImageData=null, vpUseTimeDomain=false, vpCheckCount=0;
+let _vpLoopRunning=false; // drawVoicePrintループの重複起動防止
 function drawVoicePrint(){
-  if(!analyser||!isRecording) return;
+  if(!isRecording){ _vpLoopRunning=false; return; }
+  _vpLoopRunning=true;
+  if(!analyser) { requestAnimationFrame(drawVoicePrint); return; } // analyser待ち（ループ維持）
   const canvas=document.getElementById('vpCanvas');
-  if(!canvas) return;
+  if(!canvas||canvas.offsetWidth<10) { requestAnimationFrame(drawVoicePrint); return; }
   if(!vpCanvasCtx){
-    canvas.width=canvas.offsetWidth*2;
-    canvas.height=80;
-    vpCanvasCtx=canvas.getContext('2d');
+    const dpr=window.devicePixelRatio||1;
+    canvas.width=canvas.offsetWidth*dpr;
+    canvas.height=Math.max(80,canvas.offsetHeight)*dpr;
+    vpCanvasCtx=canvas.getContext('2d',{willReadFrequently:true});
     vpImageData=null;
+    vpUseTimeDomain=false;
+    vpCheckCount=0;
   }
   const ctx=vpCanvasCtx;
   const w=canvas.width, h=canvas.height;
 
-  // 周波数データ
+  // 周波数データ取得
   const fd=new Uint8Array(analyser.frequencyBinCount);
   analyser.getByteFrequencyData(fd);
+
+  // iOS Safari対応: 最初の数フレームで全ゼロならtimeDomainモードに切替
+  if(!vpUseTimeDomain && vpCheckCount<10){
+    vpCheckCount++;
+    let allZero=true;
+    for(let i=0;i<Math.min(64,fd.length);i++){if(fd[i]>0){allZero=false;break;}}
+    if(allZero && vpCheckCount>=5) vpUseTimeDomain=true;
+  }
+
+  if(vpUseTimeDomain){
+    // iOS Safari: timeDomainデータから周波数エネルギーを計算
+    const td=new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(td);
+    const N=td.length;
+    const sr=audioContext?audioContext.sampleRate:44100;
+
+    // 方式: 短時間フレームごとのRMS + ゼロクロッシングで擬似周波数分布を生成
+    // 全体のRMS（音量）を計算
+    let totalRMS=0;
+    for(let i=0;i<N;i++){const s=(td[i]-128)/128;totalRMS+=s*s;}
+    totalRMS=Math.sqrt(totalRMS/N);
+
+    // ゼロクロッシングレート（声の基本周波数の推定）
+    let crossings=0;
+    for(let i=1;i<N;i++){
+      if((td[i]>=128&&td[i-1]<128)||(td[i]<128&&td[i-1]>=128))crossings++;
+    }
+    const estFreq=(crossings/2)*(sr/N); // 推定基本周波数
+
+    // 48ビンに声紋パターンを生成（全体に広がるように）
+    const BINS=48;
+    const energy=Math.min(1,totalRMS*6); // 正規化エネルギー
+    for(let k=0;k<BINS;k++){
+      const bandCenter=k/BINS; // 0〜1の位置
+      // 声のフォルマント分布をシミュレート（3つのピーク: 基本周波数, 第1フォルマント, 第2フォルマント）
+      const f0=estFreq>50?((estFreq-50)/5000):0.1; // 基本周波数の位置
+      const f1=Math.min(1,f0*3); // 第1フォルマント（約3倍）
+      const f2=Math.min(1,f0*6); // 第2フォルマント（約6倍）
+      // ガウシアン分布で各フォルマント周辺にエネルギーを分配
+      const g0=Math.exp(-Math.pow((bandCenter-f0)*8,2));
+      const g1=Math.exp(-Math.pow((bandCenter-f1)*6,2))*0.6;
+      const g2=Math.exp(-Math.pow((bandCenter-f2)*5,2))*0.3;
+      // 高周波域にも少しノイズを分散（息の音等）
+      const noise=Math.random()*0.1*energy;
+      const val=energy*(g0+g1+g2+noise);
+      fd[k]=Math.min(255,Math.floor(val*350));
+    }
+    for(let k=BINS;k<fd.length;k++) fd[k]=0;
+  }
 
   // スペクトログラム: 左にスクロール、右端に新しいデータを描画
   if(vpImageData){
@@ -1047,21 +2226,33 @@ function drawVoicePrint(){
   }
   vpImageData=ctx.getImageData(0,0,w,h);
 
-  // 右端に新しい列を描画
-  const sliceH=h/128;
-  for(let i=0;i<128;i++){
-    const v=fd[i]/255;
-    // 声紋カラーマップ（暗い→紫→シアン→白）
+  // 声の周波数帯域を対数スケールで表示（低音域に解像度を集中）
+  const DISPLAY_BINS=vpUseTimeDomain?48:96;
+  const sliceH=h/DISPLAY_BINS;
+  for(let i=0;i<DISPLAY_BINS;i++){
+    // 対数マッピング: 表示位置iを周波数ビンにマップ
+    let binIdx;
+    if(vpUseTimeDomain){
+      binIdx=i; // DFTモードは既に対数分布
+    }else{
+      // 線形ビン→対数表示: 低周波数帯に多くのピクセルを割り当て
+      binIdx=Math.floor(Math.pow(i/DISPLAY_BINS,1.5)*256);
+      binIdx=Math.min(binIdx,fd.length-1);
+    }
+    const v=fd[binIdx]/255;
     let r,g,b;
-    if(v<0.2){ r=v*5*30; g=0; b=v*5*60; }
-    else if(v<0.5){ const t=(v-0.2)/0.3; r=30+t*78; g=t*92; b=60+t*171; }
-    else if(v<0.8){ const t=(v-0.5)/0.3; r=108-t*108; g=92+t*124; b=231-t*31; }
-    else{ const t=(v-0.8)/0.2; r=t*200; g=216+t*39; b=200+t*55; }
+    // 声紋カラーマップ（鮮やか: サイバー・ネオン調）
+    if(v<0.05){ r=0; g=v*200; b=v*400; }
+    else if(v<0.2){ const tt=(v-0.05)/0.15; r=tt*40; g=10+tt*80; b=20+tt*180; }
+    else if(v<0.45){ const tt=(v-0.2)/0.25; r=40+tt*140; g=90-tt*50; b=200+tt*55; }
+    else if(v<0.75){ const tt=(v-0.45)/0.3; r=180+tt*75; g=40+tt*40; b=255-tt*100; }
+    else if(v<0.9){ const tt=(v-0.75)/0.15; r=255; g=80+tt*120; b=155+tt*100; }
+    else{ const tt=(v-0.9)/0.1; r=255; g=200+tt*55; b=255; }
     ctx.fillStyle=`rgb(${r|0},${g|0},${b|0})`;
-    ctx.fillRect(w-2,h-(i+1)*sliceH,2,sliceH);
+    ctx.fillRect(w-2,h-(i+1)*sliceH,2,Math.ceil(sliceH)+1);
   }
 
-  // ピッチ計算＆保存（描画と同時に収集 — 確実）
+  // ピッチ計算＆保存
   if(audioContext){
     const binHz=audioContext.sampleRate/analyser.fftSize;
     const minB=Math.floor(80/binHz), maxB=Math.min(Math.ceil(500/binHz),fd.length-1);
@@ -1070,20 +2261,86 @@ function drawVoicePrint(){
     if(pv>15){
       const hz=Math.round(pb*binHz);
       sessionPitchData.push(hz);
-      ctx.fillStyle='rgba(255,255,255,0.9)';
-      ctx.font='bold 12px sans-serif';
+      // 声の状態に応じたコメント表示
+      const avg=sessionPitchData.length>5?sessionPitchData.slice(-10).reduce((a,b)=>a+b,0)/Math.min(10,sessionPitchData.length):hz;
+      let comment='';
+      if(sessionPitchData.length<3) comment='listening...';
+      else if(avg<100) comment='落ち着いた声';
+      else if(avg<140) comment='いい調子';
+      else if(avg<200) comment='元気ですね!';
+      else if(avg<300) comment='テンション高い!';
+      else comment='全力!';
+      ctx.fillStyle='rgba(108,92,231,0.85)';
+      ctx.font='bold 10px sans-serif';
       ctx.textAlign='right';
-      ctx.fillText(hz+'Hz',w-4,14);
+      ctx.fillText(comment,w-4,12);
     }
   }
 
   requestAnimationFrame(drawVoicePrint);
 }
 
+// ─── iOS用 声紋ビジュアライザー（getUserMediaなし）───
+// SpeechRecognitionのinterim結果の変化量から声のエネルギーを推定
+let _iosVPLastText='', _iosVPEnergy=0, _iosVPCtx=null, _iosVPImage=null;
+function drawVoicePrintIOS(){
+  if(!isRecording) return;
+  const canvas=document.getElementById('vpCanvas');
+  if(!canvas||canvas.offsetWidth<10){requestAnimationFrame(drawVoicePrintIOS);return;}
+  if(!_iosVPCtx){
+    const dpr=window.devicePixelRatio||1;
+    canvas.width=canvas.offsetWidth*dpr;
+    canvas.height=Math.max(80,canvas.offsetHeight)*dpr;
+    _iosVPCtx=canvas.getContext('2d');
+    _iosVPImage=null;
+  }
+  const ctx=_iosVPCtx;
+  const w=canvas.width, h=canvas.height;
+  const now=performance.now()*0.001;
+
+  // 声のエネルギー推定: interimテキストの変化量
+  const currentText=interimTranscript||'';
+  const textChanged=currentText!==_iosVPLastText;
+  _iosVPLastText=currentText;
+  // テキスト変化があれば声が出ている→エネルギー上昇
+  const targetEnergy=textChanged?0.7+Math.random()*0.3:0;
+  _iosVPEnergy+=(targetEnergy-_iosVPEnergy)*0.3;
+
+  // スクロール
+  if(_iosVPImage) ctx.putImageData(_iosVPImage,-2,0);
+  _iosVPImage=ctx.getImageData(0,0,w,h);
+
+  // 声紋風の列を描画（エネルギーに基づく）
+  const BINS=48;
+  const sliceH=h/BINS;
+  for(let i=0;i<BINS;i++){
+    // 周波数帯ごとのエネルギー分布をシミュレート
+    const freq=i/BINS;
+    // 人の声は中低域(0.1-0.5)にエネルギーが集中
+    const voiceBand=Math.exp(-Math.pow((freq-0.25)*3,2))*0.8+Math.exp(-Math.pow((freq-0.5)*4,2))*0.4;
+    // ランダムな揺らぎ（自然な声紋パターン）
+    const noise=Math.sin(now*8+i*2.5)*0.3+Math.sin(now*13+i*4.1)*0.2+Math.sin(now*21+i*1.7)*0.1;
+    const v=Math.max(0,Math.min(1,_iosVPEnergy*voiceBand*(0.7+noise*0.6)));
+
+    let r,g,b;
+    if(v<0.05){ r=0; g=v*200; b=v*400; }
+    else if(v<0.2){ const tt=(v-0.05)/0.15; r=tt*40; g=10+tt*80; b=20+tt*180; }
+    else if(v<0.45){ const tt=(v-0.2)/0.25; r=40+tt*140; g=90-tt*50; b=200+tt*55; }
+    else if(v<0.75){ const tt=(v-0.45)/0.3; r=180+tt*75; g=40+tt*40; b=255-tt*100; }
+    else if(v<0.9){ const tt=(v-0.75)/0.15; r=255; g=80+tt*120; b=155+tt*100; }
+    else{ const tt=(v-0.9)/0.1; r=255; g=200+tt*55; b=255; }
+    ctx.fillStyle=`rgb(${r|0},${g|0},${b|0})`;
+    ctx.fillRect(w-2,h-(i+1)*sliceH,2,Math.ceil(sliceH)+1);
+  }
+
+  requestAnimationFrame(drawVoicePrintIOS);
+}
+
 // ─── Voice Print Live ───
 let sessionPitchData=[];
 function collectVoicePrint(){
-  if(!analyser||!audioContext) return;
+  if(!isRecording) return;
+  if(!analyser||!audioContext){ setTimeout(collectVoicePrint,200); return; } // analyser待ち（ループ維持）
   try{
     const fd=new Uint8Array(analyser.frequencyBinCount);
     analyser.getByteFrequencyData(fd);
@@ -1114,7 +2371,8 @@ function checkVoiceCondition(){
 
 // ─── Volume ───
 function updateVolumeMeter(){
-  if(!analyser||!isRecording)return;
+  if(!isRecording)return;
+  if(!analyser){requestAnimationFrame(updateVolumeMeter);return;} // analyser待ち（ループ維持）
   const d=new Uint8Array(analyser.frequencyBinCount); analyser.getByteFrequencyData(d);
   const bars=document.querySelectorAll('.volume-bar'), step=Math.floor(d.length/bars.length);
   bars.forEach((b,i)=>{b.style.height=Math.max(4,(d[i*step]||0)/255*28)+'px';});
@@ -1135,7 +2393,53 @@ function toggleTheme(){
 function toggleSettings(){ const o=document.getElementById('settingsOverlay'); o.classList.toggle('open'); if(!o.classList.contains('open')) localStorage.setItem('vt_customDict',document.getElementById('customDict')?.value||''); }
 function toggleSetting(btn,key){ settings[key]=!settings[key]; btn.classList.toggle('on',settings[key]); }
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2000); }
+// テキスト直接編集モード
+let _editMode=false;
+function toggleEdit(){
+  _editMode=!_editMode;
+  const el=document.getElementById('currentText');
+  const btn=document.getElementById('editBtn');
+  if(_editMode){
+    el.contentEditable='true';
+    el.focus();
+    btn.textContent='✅ 完了';
+    btn.style.background='rgba(46,204,113,0.2)';
+    btn.style.borderColor='rgba(46,204,113,0.5)';
+  }else{
+    el.contentEditable='false';
+    btn.textContent='✏️ 編集';
+    btn.style.background='';
+    btn.style.borderColor='';
+    // 編集内容をfinalTranscriptに反映
+    const newText=el.textContent||'';
+    if(newText.trim()){
+      finalTranscript=newText;
+      sentences=[newText];
+      copyToClipboard(newText);
+      showToast('編集を反映しました');
+    }
+  }
+}
 function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+function showProofTip(el){
+  // 既存のポップアップを閉じる
+  document.querySelectorAll('.proof-tip').forEach(t=>t.remove());
+  const word=el.dataset.word;
+  // 最近の校正変更から元のテキストを探す
+  let origWord='(音声認識の誤変換を修正)';
+  const tip=document.createElement('div');
+  tip.className='proof-tip';
+  tip.innerHTML='<span class="proof-close" onclick="this.parentElement.remove()">✕</span>'+
+    '<div style="margin-bottom:4px;font-size:10px;color:var(--text-dim);">AI校正</div>'+
+    '<span class="proof-new">'+word+'</span>'+
+    '<div style="margin-top:4px;font-size:10px;color:var(--text-dim);">タップで閉じる</div>';
+  tip.style.left=Math.min(el.getBoundingClientRect().left, window.innerWidth-270)+'px';
+  tip.style.top=(el.getBoundingClientRect().bottom+8)+'px';
+  document.body.appendChild(tip);
+  // 3秒で自動閉じ
+  setTimeout(()=>tip.remove(),3000);
+  tip.addEventListener('click',()=>tip.remove());
+}
 function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
 
 // ─── Keys ───
@@ -1156,45 +2460,169 @@ document.addEventListener('keydown',(e)=>{
   document.getElementById('outputMode').value=outputMode;
   document.getElementById('modePill').textContent=MODE_LABELS[outputMode];
   if(voiceProfile){ currentLang=voiceProfile.lang; document.getElementById('langSelect').value=currentLang; }
+  // SFX音の種類復元
+  const sfxSel=document.getElementById('sfxStyleSelect');
+  if(sfxSel) sfxSel.value=sfxStyle;
+  const recModeSel=document.getElementById('recModeSelect');
+  if(recModeSel) recModeSel.value=recMode;
+  updateLearnedUI();
   // テーマ復元
   const savedTheme=localStorage.getItem('vt_theme');
   if(savedTheme==='light'){ document.documentElement.classList.add('light'); document.getElementById('themeBtn').innerHTML='&#9790;'; }
   renderHistory();
   applyUILang();
-  checkSetup();
-  if(voiceProfile) initRecognition();
+  // セットアップは任意（初回でも即使える）
+  if(!voiceProfile){
+    voiceProfile = { lang:'ja-JP', setupDone:true };
+    localStorage.setItem('vt_voiceProfile', JSON.stringify(voiceProfile));
+  }
+  document.getElementById('setupOverlay').classList.add('hidden');
+  initRecognition();
 
-  // iOS: 画面復帰時に再初期化（バックグラウンドから戻ると認識が壊れる）
+  // 画面復帰時: まず既存リソースの生存チェック → 死んでいたら再取得
+  // （iOS Safariでは無駄な破棄→再取得が遅延の原因になる）
+  // _isStreamAlive / _isCtxAlive はグローバルスコープに定義済み
+
   document.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState==='visible'){
-      // 録音中だった場合は停止
-      if(isRecording){
-        isRecording=false;
-        document.getElementById('recBtn').classList.remove('recording');
-        try{recognition.stop();}catch(e){}
+    if(document.visibilityState==='hidden'){
+      if(isRecording) _appSwitchDirty=true;
+      // iOS: バックグラウンドに行ったらマイクストリームを即解放（オレンジドット消去）
+      if(!isRecording && mediaStream){
+        _releaseStream(mediaStream); mediaStream=null;
+        _releaseAudioCtx(audioContext); audioContext=null; analyser=null;
       }
-      // リソースをクリーンアップ
-      if(mediaStream){mediaStream.getTracks().forEach(tr=>tr.stop());mediaStream=null;}
-      if(audioContext){try{audioContext.close();}catch(e){} audioContext=null;}
-      analyser=null;
-      // 認識エンジンを完全に再作成
-      recognition=null;
-      stopDone=false;
-      initRecognition();
-      setStatus('ready',t('ready'));
-      document.querySelectorAll('.volume-bar').forEach(b=>b.style.height='4px');
-      // COPYバナーを消す
+    }
+    if(document.visibilityState==='visible'){
       document.getElementById('iosCopyBanner').classList.remove('show');
+      errorRetryCount=0;
+      if(!isRecording && !_wasRecordingBeforePause) return;
+
+      // 自動クリーンスタート: stop→startが最も確実
+      console.log('visibilitychange: auto clean restart');
+      const wasRec = isRecording || _wasRecordingBeforePause;
+      if(isRecording) stopRecording();
+      _wasRecordingBeforePause=false;
+      _appSwitchDirty=false;
+      if(wasRec){
+        setTimeout(()=>{ startRecording(); }, 200);
+      }
     }
   });
 
-  // iOS: pageshow（bfcacheから復帰時）
-  window.addEventListener('pageshow', (e)=>{
-    if(e.persisted){
-      recognition=null;
-      initRecognition();
+  // PWA(ホーム画面追加)では pagehide→pageshow が主要なライフサイクル
+  // pagehideで録音中だったことを記憶し、pageshowで自動再開する
+
+  // iOS PWA: pageshow（bfcache/アプリ切替から復帰時）
+  window.addEventListener('pageshow', async (e)=>{
+    errorRetryCount=0;
+    // AudioContext resume
+    if(audioContext && audioContext.state==='suspended'){
+      try{ await audioContext.resume(); }catch(e){}
+    }
+
+    if(e.persisted || _wasRecordingBeforePause){
+      // pagehideで停止された録音を自動再開
+      if(_wasRecordingBeforePause && !isRecording){
+        _wasRecordingBeforePause = false;
+        // UIを録音状態に戻してから再開
+        isRecording = true;
+        _startWatchdog(); // ウォッチドッグ再起動
+        document.getElementById('recBtn').classList.add('recording');
+        document.getElementById('currentLabel').textContent='Recording...';
+        document.getElementById('vpCanvas').style.display='block';
+        setStatus('recording','再接続中...');
+
+        // SpeechRecognition再生成
+        if(isIOS){ _createRecognitionIOS(); }else{ initRecognition(); }
+        if(recognition){
+          recognition.lang=currentLang;
+          try{recognition.start();}catch(ex){}
+        }
+
+        // マイク再取得（共通関数で統一）
+        _acquireMediaAndStartLoops();
+      } else if(isRecording){
+        // bfcacheからの復帰でまだ録音中 → recognition再生成 + メディア再取得
+        try{if(recognition){recognition.onend=null;recognition.abort();}}catch(ex){}
+        recognition=null;
+        if(isIOS){ _createRecognitionIOS(); }else{ initRecognition(); }
+        if(recognition){
+          recognition.lang=currentLang;
+          try{recognition.start();}catch(ex){}
+        }
+        // メディアも再取得（声紋が死んでいる可能性）
+        _acquireMediaAndStartLoops();
+      }
     }
   });
+
+  // フォーカス復帰時もフル復帰チェック（PWAで最も信頼できるイベント）
+  window.addEventListener('focus', async ()=>{
+    if(audioContext && audioContext.state==='suspended'){
+      try{ await audioContext.resume(); }catch(e){}
+    }
+    // pagehideで停止された録音をfocusでも復帰（pageshowが来ない場合のフォールバック）
+    if(_wasRecordingBeforePause && !isRecording){
+      // pageshowハンドラに委譲（二重起動防止のため少し待つ）
+      setTimeout(()=>{
+        if(_wasRecordingBeforePause && !isRecording){
+          // pageshowが来なかった → focusで復帰
+          window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));
+        }
+      }, 500);
+    }
+  });
+
+  // blur: 軽いスワイプ（アプリスイッチャー表示）でも発火する
+  window.addEventListener('blur', ()=>{
+    if(isRecording) _appSwitchDirty=true;
+  });
+
+  // ページ離脱時: リソース解放するが録音中だったことを記憶
+  window.addEventListener('pagehide', ()=>{
+    _wasRecordingBeforePause = isRecording;
+    if(isRecording){ isRecording=false; }
+    _releaseStream(mediaStream); mediaStream=null;
+    _releaseAudioCtx(audioContext); audioContext=null;
+    try{if(recognition){recognition.onend=null;recognition.abort();}}catch(e){}
+    recognition=null; analyser=null;
+  });
+  window.addEventListener('beforeunload', ()=>{
+    _releaseStream(mediaStream);
+    _releaseAudioCtx(audioContext);
+    try{if(recognition){recognition.onend=null;recognition.abort();}}catch(e){}
+  });
+})();
+
+// LiveCounter for GraceVox
+(function(){
+  try{
+    if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
+    const db=firebase.database();
+    const page='gracevox';
+    const presRef=db.ref('presence/'+page);
+    const myKey=Date.now()+'_'+Math.random().toString(36).slice(2,8);
+    const myRef=presRef.child(myKey);
+    myRef.set({t:firebase.database.ServerValue.TIMESTAMP});
+    myRef.onDisconnect().remove();
+    presRef.on('value',snap=>{
+      const el=document.getElementById('lc-online');
+      if(el)el.textContent=snap.numChildren();
+    });
+    const today=new Date().toISOString().slice(0,10);
+    const d=new Date();const jan1=new Date(d.getFullYear(),0,1);
+    const wk=Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
+    const week=d.getFullYear()+'W'+String(wk).padStart(2,'0');
+    db.ref('stats/'+page+'/daily/'+today).transaction(v=>(v||0)+1);
+    db.ref('stats/'+page+'/weekly/'+week).transaction(v=>(v||0)+1);
+    db.ref('stats/'+page+'/daily/'+today).on('value',snap=>{
+      const el=document.getElementById('lc-today');if(el)el.textContent=snap.val()||0;
+    });
+    db.ref('stats/'+page+'/weekly/'+week).on('value',snap=>{
+      const el=document.getElementById('lc-week');if(el)el.textContent=snap.val()||0;
+    });
+    window.addEventListener('beforeunload',()=>myRef.remove());
+  }catch(e){console.warn('LiveCounter:',e);}
 })();
 </script>
 </body>
