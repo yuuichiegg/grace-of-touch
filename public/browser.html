@@ -427,25 +427,24 @@ function buildNewTabPage() {
     <div class="new-tab-page">
       <div class="ntp-logo">GRACE BROWSER</div>
       <div style="font-size:10px;color:var(--text2);margin-bottom:16px;font-family:'JetBrains Mono',monospace;letter-spacing:.08em;opacity:.6;">Music · Voice · Community</div>
-      <div style="width:min(540px,92%);margin-bottom:16px;">
-        <div style="position:relative;">
+      <div style="width:min(540px,92%);margin-bottom:16px;display:flex;align-items:flex-start;gap:10px;">
+        <div style="flex:1;position:relative;">
           <textarea id="ntp-input" rows="2" placeholder="検索、URL、または音声メモ..."
-            style="width:100%;padding:12px 90px 12px 40px;background:var(--surface);border:1px solid var(--border);
+            style="width:100%;padding:12px 50px 12px 40px;background:var(--surface);border:1px solid var(--border);
             border-radius:16px;color:var(--text);font-size:14px;outline:none;resize:none;
             font-family:inherit;line-height:1.5;transition:all .2s;"></textarea>
           <span style="position:absolute;left:14px;top:14px;color:var(--text2);font-size:14px;pointer-events:none;">🔍</span>
-          <button id="ntp-voice-btn" onclick="startNtpVoice()" style="position:absolute;right:50px;top:10px;
+          <button id="ntp-voice-btn" onclick="startNtpVoice()" style="position:absolute;right:10px;top:10px;
             width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--voice,#6c5ce7),#8b5cf6);
             border:none;color:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;
             transition:all .2s;box-shadow:0 2px 8px rgba(108,92,231,.3);">🎤</button>
-          <button id="ntp-go-btn" onclick="ntpGo()" style="position:absolute;right:10px;top:10px;
-            width:32px;height:32px;border-radius:50%;
-            background:linear-gradient(135deg,var(--accent),var(--accent2,#00ff88));
-            border:none;color:#0a0e1a;font-size:16px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;
-            transition:all .2s;box-shadow:0 2px 8px rgba(0,229,255,.3);">→</button>
+          <canvas id="ntp-voiceprint" style="display:none;width:100%;height:48px;border-radius:0 0 12px 12px;
+            background:rgba(0,0,0,0.3);margin-top:-2px;"></canvas>
         </div>
-        <canvas id="ntp-voiceprint" style="display:none;width:100%;height:48px;border-radius:0 0 12px 12px;
-          background:rgba(0,0,0,0.3);margin-top:-4px;"></canvas>
+        <button id="ntp-go-btn" onclick="ntpGo()" style="width:44px;height:44px;border-radius:50%;flex-shrink:0;margin-top:4px;
+          background:linear-gradient(135deg,var(--accent),var(--accent2,#00ff88));
+          border:none;color:#0a0e1a;font-size:20px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;
+          transition:all .2s;box-shadow:0 2px 12px rgba(0,229,255,.3);">→</button>
       </div>
       <div style="width:min(540px,92%);margin-bottom:16px;">
         <div style="font-family:'Orbitron',monospace;font-size:10px;color:#8b7cf7;letter-spacing:.15em;margin-bottom:10px;">🎵 MUSIC STUDIO</div>
@@ -927,9 +926,17 @@ function startNtpVoice() {
   };
 
   _ntpVoiceRec.onend = () => {
+    // Auto-copy to clipboard when speech pauses (like GraceVox)
+    if (_ntpFinalText.trim()) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(_ntpFinalText.trim()).then(() => {
+          setStatus('📋 コピーしました — ■で停止、Enterで検索');
+        }).catch(() => {});
+      }
+    }
     // Auto-restart if still active (continuous mode may stop on silence)
     if (_ntpVoiceActive) {
-      _ntpResultIdx = 0; // reset index for new recognition session
+      _ntpResultIdx = 0;
       try { _ntpVoiceRec.start(); } catch(e) { stopNtpVoice(); }
     }
   };
