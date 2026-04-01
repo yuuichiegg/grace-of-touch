@@ -378,6 +378,22 @@
   }
   .track-item .track-btn:hover { border-color:var(--accent); color:var(--text); }
   .track-item .track-btn.playing { border-color:var(--accent); color:var(--accent); background:rgba(108,92,231,0.15); }
+
+  /* Trim handles */
+  .trim-handle {
+    position:absolute; top:0; width:14px; height:100%; cursor:ew-resize; z-index:2;
+    display:flex; align-items:center; justify-content:center;
+    touch-action:none; -webkit-user-select:none; user-select:none;
+  }
+  .trim-handle .trim-grip {
+    width:4px; height:20px; border-radius:2px; background:var(--recording);
+    box-shadow:0 0 4px rgba(231,76,60,0.5);
+  }
+  #trimLeft { left:0; }
+  #trimRight { right:0; }
+  .trim-overlay {
+    position:absolute; top:0; height:100%; background:rgba(0,0,0,0.45); pointer-events:none; z-index:1;
+  }
 </style>
 </head>
 <body>
@@ -560,16 +576,22 @@ document.addEventListener('DOMContentLoaded',()=>{
           <span id="playerTrackName" style="font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
           <div style="display:flex;align-items:center;gap:6px;">
             <span id="playerTime" style="font-size:10px;color:var(--text-dim);font-family:'Courier New',monospace;min-width:36px;">0:00</span>
-            <canvas id="playerWaveCanvas" style="flex:1;height:32px;cursor:pointer;border-radius:4px;"></canvas>
+            <div id="waveWrap" style="flex:1;position:relative;height:40px;border-radius:4px;overflow:hidden;touch-action:none;">
+              <canvas id="playerWaveCanvas" style="width:100%;height:100%;cursor:pointer;display:block;"></canvas>
+              <!-- Trim handles (drag to adjust) -->
+              <div id="trimLeft" class="trim-handle" style="left:0%;"><div class="trim-grip"></div></div>
+              <div id="trimRight" class="trim-handle" style="right:0%;"><div class="trim-grip"></div></div>
+              <div id="trimOverlayL" class="trim-overlay" style="left:0;width:0%;"></div>
+              <div id="trimOverlayR" class="trim-overlay" style="right:0;width:0%;"></div>
+            </div>
             <span id="playerDur" style="font-size:10px;color:var(--text-dim);font-family:'Courier New',monospace;min-width:36px;text-align:right;">0:00</span>
           </div>
         </div>
       </div>
-      <!-- Trim controls -->
+      <!-- Trim info + action -->
       <div id="trimControls" style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-dim);">
-        <button class="track-btn" onclick="setTrimStart()" title="開始点" style="font-size:9px;width:24px;height:24px;">[</button>
-        <span id="trimRange" style="flex:1;text-align:center;">全体</span>
-        <button class="track-btn" onclick="setTrimEnd()" title="終了点" style="font-size:9px;width:24px;height:24px;">]</button>
+        <span id="trimRange" style="flex:1;text-align:center;">ハンドルをドラッグしてトリミング</span>
+        <button class="track-btn" onclick="resetTrim()" title="リセット" style="font-size:9px;width:auto;padding:0 8px;height:24px;border-radius:4px;">↺</button>
         <button class="track-btn" onclick="applyTrim()" title="トリミング実行" style="font-size:9px;width:auto;padding:0 8px;height:24px;border-radius:4px;color:var(--accent);border-color:var(--accent);">✂ 切出</button>
       </div>
     </div>
@@ -3289,7 +3311,7 @@ function openPlayer(idx){
   document.getElementById('playerDur').textContent=_fmtTime(tr.dur);
   document.getElementById('playerTime').textContent='0:00';
   document.getElementById('playerPlayBtn').innerHTML='&#9654;';
-  document.getElementById('trimRange').textContent='全体';
+  _updateTrimHandles();
   // Highlight active track
   document.querySelectorAll('.track-item').forEach((el,i)=>{
     el.style.borderColor=i===idx?'var(--accent)':'';
@@ -3448,23 +3470,8 @@ function _updatePlayerUI(){
 
 // ─── Trim ───
 function _getCurrentPos(){
-  // Use audio position if playing, otherwise use last seek tap position
   if(_currentAudio&&_currentAudio._trackIdx===_playerTrackIdx) return _currentAudio.currentTime;
   return _seekPos||0;
-}
-function setTrimStart(){
-  if(_playerTrackIdx<0) return;
-  _trimStart=_getCurrentPos();
-  _updateTrimLabel();
-  _redrawPlayerWave();
-  showToast('開始点: '+_fmtTime(_trimStart));
-}
-function setTrimEnd(){
-  if(_playerTrackIdx<0) return;
-  _trimEnd=_getCurrentPos();
-  _updateTrimLabel();
-  _redrawPlayerWave();
-  showToast('終了点: '+_fmtTime(_trimEnd));
 }
 function _redrawPlayerWave(){
   const cache=_waveformCache[_playerTrackIdx];
@@ -3474,6 +3481,63 @@ function _redrawPlayerWave(){
   const ctx=cv.getContext('2d');
   _drawWaveform(ctx,cv.width,cv.height,cache.peaks,cache.maxPeak,_getCurrentPos(),tr.dur,_trimEnd,_trimStart);
 }
+function _updateTrimHandles(){
+  const tr=_tracks[_playerTrackIdx];if(!tr)return;
+  const dur=tr.dur||1;
+  const lPct=(_trimStart/dur)*100;
+  const rPct=((dur-_trimEnd)/dur)*100;
+  document.getElementById('trimLeft').style.left=lPct+'%';
+  document.getElementById('trimRight').style.right=rPct+'%';
+  document.getElementById('trimOverlayL').style.width=lPct+'%';
+  document.getElementById('trimOverlayR').style.width=rPct+'%';
+  _updateTrimLabel();
+  _redrawPlayerWave();
+}
+function resetTrim(){
+  if(_playerTrackIdx<0) return;
+  const tr=_tracks[_playerTrackIdx];
+  _trimStart=0;_trimEnd=tr?tr.dur:0;
+  _updateTrimHandles();
+  showToast('トリム範囲をリセット');
+}
+
+// Drag trim handles
+(function(){
+  let _dragging=null; // 'left' or 'right'
+  function getWrapRect(){return document.getElementById('waveWrap')?.getBoundingClientRect();}
+  function onStart(which,e){
+    e.preventDefault();e.stopPropagation();
+    _dragging=which;
+  }
+  function onMove(e){
+    if(!_dragging||_playerTrackIdx<0) return;
+    const tr=_tracks[_playerTrackIdx];if(!tr)return;
+    const rect=getWrapRect();if(!rect)return;
+    const clientX=e.touches?e.touches[0].clientX:e.clientX;
+    const pct=Math.max(0,Math.min(1,(clientX-rect.left)/rect.width));
+    const pos=pct*tr.dur;
+    if(_dragging==='left'){
+      _trimStart=Math.min(pos,_trimEnd-0.5);
+    }else{
+      _trimEnd=Math.max(pos,_trimStart+0.5);
+    }
+    _updateTrimHandles();
+  }
+  function onEnd(){_dragging=null;}
+  document.addEventListener('DOMContentLoaded',()=>{
+    const lh=document.getElementById('trimLeft');
+    const rh=document.getElementById('trimRight');
+    if(!lh||!rh) return;
+    lh.addEventListener('mousedown',e=>onStart('left',e));
+    lh.addEventListener('touchstart',e=>onStart('left',e),{passive:false});
+    rh.addEventListener('mousedown',e=>onStart('right',e));
+    rh.addEventListener('touchstart',e=>onStart('right',e),{passive:false});
+    window.addEventListener('mousemove',onMove);
+    window.addEventListener('touchmove',onMove,{passive:false});
+    window.addEventListener('mouseup',onEnd);
+    window.addEventListener('touchend',onEnd);
+  });
+})();
 function _updateTrimLabel(){
   const el=document.getElementById('trimRange');
   if(_trimStart===0&&(_trimEnd===0||_trimEnd>=(_tracks[_playerTrackIdx]?.dur||999))){
