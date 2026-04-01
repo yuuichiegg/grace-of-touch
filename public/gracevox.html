@@ -789,9 +789,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     <h2 style="text-align:center;margin-bottom:4px;">Grace<span style="color:var(--accent)">Vox</span> ログイン</h2>
     <p style="text-align:center;font-size:11px;color:var(--text-dim);margin-bottom:16px;">アカウント登録で履歴同期・Pro機能が使えます</p>
 
-    <!-- Google Sign-In (メイン) -->
-    <div id="googleSignInBtn" style="display:flex;justify-content:center;margin-bottom:8px;"></div>
-    <button onclick="googlePopupLogin()" style="width:100%;padding:12px;background:#fff;color:#333;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 1px 4px rgba(0,0,0,0.15);margin-bottom:12px;">
+    <!-- Google Sign-In (1ボタンのみ) -->
+    <button onclick="googlePopupLogin()" id="googleLoginBtn" style="width:100%;padding:14px;background:#fff;color:#333;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:0 2px 8px rgba(0,0,0,0.12);margin-bottom:12px;transition:all .15s;">
       <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
       Googleアカウントでログイン
     </button>
@@ -1073,8 +1072,13 @@ function showLogoutDialog(){
 
 function openLogin(){
   document.getElementById('loginOverlay').classList.add('open');
-  // Chrome保存アカウントでの自動ログインを試行
-  setTimeout(_triggerGoogleOneTap, 300);
+  // Chrome保存アカウントでの自動ログインを試行（One Tap）
+  setTimeout(()=>{
+    _initGoogleOneTap();
+    if(typeof google!=='undefined'&&google.accounts&&google.accounts.id){
+      google.accounts.id.prompt();
+    }
+  }, 300);
 }
 function closeLogin(){
   document.getElementById('loginOverlay').classList.remove('open');
@@ -1121,7 +1125,7 @@ async function resetPassword(){
   }
 }
 
-// Google Sign-In (GIS One Tap + Firebase signInWithPopup フォールバック)
+// Google Sign-In — signInWithPopup（Chromeアカウントピッカー）+ One Tap自動ログイン
 let _googleOneTapReady=false;
 function _initGoogleOneTap(){
   if(_googleOneTapReady||typeof google==='undefined'||!google.accounts) return;
@@ -1134,7 +1138,7 @@ function _initGoogleOneTap(){
         showToast('Googleログイン成功');
         closeLogin();
       }catch(e){
-        showToast('Firebase認証エラー: '+_authErrorMsg(e));
+        console.log('One Tap credential error:', e);
       }
     },
     auto_select:true,
@@ -1144,59 +1148,65 @@ function _initGoogleOneTap(){
   });
   _googleOneTapReady=true;
 }
-// Init when GIS library loads
 if(typeof google!=='undefined'&&google.accounts) _initGoogleOneTap();
-else window.addEventListener('load',()=>setTimeout(_initGoogleOneTap,1000));
+else window.addEventListener('load',()=>setTimeout(_initGoogleOneTap,1500));
 
-// ページ読み込み時に未ログインならOne Tapプロンプトを自動表示
+// ページ読み込み時: 未ログインならOne Tap自動表示
 window.addEventListener('load',()=>{
   setTimeout(()=>{
-    if(!fbAuth.currentUser) _triggerGoogleOneTap();
+    if(!fbAuth.currentUser){
+      _initGoogleOneTap();
+      if(typeof google!=='undefined'&&google.accounts&&google.accounts.id){
+        google.accounts.id.prompt();
+      }
+    }
   }, 2000);
 });
 
-// ログインモーダル表示時にOne Tapプロンプトも発火
-function _triggerGoogleOneTap(){
-  if(typeof google==='undefined'||!google.accounts||!google.accounts.id) return;
-  _initGoogleOneTap();
-  google.accounts.id.prompt((notification)=>{
-    // One Tapが表示されない場合、renderButtonにフォールバック
-    if(notification.isNotDisplayed()||notification.isSkippedMoment()){
-      _renderGoogleButton();
-    }
-  });
-}
+// メインのGoogleログインボタン
+// iOS PWA: popup不可→redirect / PC Chrome: popup（アカウントピッカー表示）
+const _isIOSPWA = /iPad|iPhone|iPod/.test(navigator.userAgent) && window.navigator.standalone;
+const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-// GIS renderButton（One Tapが使えない環境用フォールバック）
-function _renderGoogleButton(){
-  const btnDiv=document.getElementById('googleSignInBtn');
-  if(!btnDiv||btnDiv.dataset.rendered) return;
-  if(typeof google==='undefined'||!google.accounts) return;
-  _initGoogleOneTap();
-  google.accounts.id.renderButton(btnDiv,{
-    type:'standard',size:'large',theme:'filled_blue',text:'signin_with',shape:'pill',width:320,locale:'ja'
-  });
-  btnDiv.dataset.rendered='1';
-}
-
-// Firebase signInWithPopup — 最終フォールバック（Chromeアカウントピッカー表示）
 async function googlePopupLogin(){
+  const btn=document.getElementById('googleLoginBtn');
+  if(btn){btn.disabled=true;btn.style.opacity='0.6';btn.textContent='ログイン中...';}
+  const provider=new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({prompt:'select_account'});
+
+  // iOS / PWA: リダイレクト方式を優先（popupが動かない環境が多い）
+  if(_isIOS || _isIOSPWA){
+    showToast('Googleログイン画面に移動します...');
+    fbAuth.signInWithRedirect(provider);
+    return;
+  }
+
+  // PC / Android: popup方式（アカウントピッカー表示）
   try{
-    const provider=new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({prompt:'select_account'});
     await fbAuth.signInWithPopup(provider);
     showToast('Googleログイン成功');
     closeLogin();
   }catch(e){
-    if(e.code==='auth/popup-blocked'){
-      // ポップアップブロック時はリダイレクトにフォールバック
-      const provider=new firebase.auth.GoogleAuthProvider();
-      provider.setCustomParameters({prompt:'select_account'});
-      await fbAuth.signInWithRedirect(provider);
-    }else if(e.code!=='auth/popup-closed-by-user'){
-      showToast('Googleログインエラー: '+_authErrorMsg(e));
+    console.log('Google login error:', e.code, e.message);
+    if(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment'){
+      showToast('リダイレクトでログインします...');
+      fbAuth.signInWithRedirect(provider);
+      return;
+    }else if(e.code==='auth/unauthorized-domain'){
+      showToast('ドメイン未承認: Firebaseコンソールで grace-of-touch.web.app を追加してください');
+    }else if(e.code!=='auth/popup-closed-by-user'&&e.code!=='auth/cancelled-popup-request'){
+      showToast('ログインエラー: '+_authErrorMsg(e));
     }
+  }finally{
+    _resetGoogleBtn();
   }
+}
+
+function _resetGoogleBtn(){
+  const btn=document.getElementById('googleLoginBtn');
+  if(!btn)return;
+  btn.disabled=false;btn.style.opacity='';
+  btn.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>Googleアカウントでログイン';
 }
 
 // Phone SMS auth
