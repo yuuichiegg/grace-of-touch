@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>Grace Browser — Web Navigator</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0a0e1a;--surface:#111827;--surface2:#1a2235;--border:#1e293b;
+  --accent:#00e5ff;--accent2:#00ff88;--text:#e2e8f0;--text2:#94a3b8;
+  --danger:#ff4757;--warn:#ffa502;
+  --voice:#6c5ce7;--voice-glow:rgba(108,92,231,.4);--recording:#ff6b6b;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:'Noto Sans JP','JetBrains Mono',sans-serif;}
+
+/* ===== BROWSER CHROME ===== */
+#browser{display:flex;flex-direction:column;height:100vh;}
+
+/* --- Tab Bar --- */
+#tab-bar{display:flex;align-items:center;background:var(--bg);
+  padding:4px 8px 0;gap:2px;min-height:40px;overflow-x:auto;flex-shrink:0;}
+#tab-bar::-webkit-scrollbar{height:2px;}
+#tab-bar::-webkit-scrollbar-thumb{background:var(--accent);border-radius:1px;}
+
+.tab{display:flex;align-items:center;gap:6px;padding:6px 12px;
+  background:var(--surface);border-radius:8px 8px 0 0;cursor:pointer;
+  font-size:12px;color:var(--text2);max-width:200px;min-width:60px;
+  border:1px solid transparent;border-bottom:none;transition:all .15s;
+  font-family:'JetBrains Mono',monospace;user-select:none;flex-shrink:0;}
+.tab:hover{background:var(--surface2);color:var(--text);}
+.tab.active{background:var(--surface2);color:var(--accent);
+  border-color:var(--border);box-shadow:0 -2px 8px rgba(0,229,255,.1);}
+.tab-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+.tab-favicon{width:14px;height:14px;border-radius:2px;flex-shrink:0;}
+.tab-close{width:16px;height:16px;display:flex;align-items:center;justify-content:center;
+  border-radius:4px;font-size:14px;line-height:1;color:var(--text2);flex-shrink:0;}
+.tab-close:hover{background:var(--danger);color:#fff;}
+#new-tab-btn{width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+  background:transparent;border:1px dashed var(--border);border-radius:6px;
+  color:var(--text2);font-size:18px;cursor:pointer;flex-shrink:0;transition:all .15s;}
+#new-tab-btn:hover{border-color:var(--accent);color:var(--accent);
+  box-shadow:0 0 12px rgba(0,229,255,.15);}
+
+/* --- Navigation Bar --- */
+#nav-bar{display:flex;align-items:center;gap:6px;padding:6px 10px;
+  background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0;}
+.nav-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  background:transparent;border:none;color:var(--text2);cursor:pointer;
+  border-radius:6px;font-size:16px;transition:all .15s;}
+.nav-btn:hover:not(:disabled){background:rgba(0,229,255,.1);color:var(--accent);}
+.nav-btn:disabled{opacity:.3;cursor:default;}
+.nav-btn:active:not(:disabled){transform:scale(.9);}
+
+#url-bar-wrapper{flex:1;position:relative;display:flex;align-items:center;}
+#url-bar{width:100%;padding:7px 68px 7px 34px;background:var(--bg);
+  border:1px solid var(--border);border-radius:20px;color:var(--text);
+  font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;
+  transition:all .2s;}
+#url-bar:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,229,255,.15);}
+#url-bar::placeholder{color:var(--text2);}
+#url-icon{position:absolute;left:11px;font-size:14px;pointer-events:none;color:var(--text2);}
+#ssl-indicator{position:absolute;left:11px;font-size:13px;cursor:help;}
+#ssl-indicator.secure{color:var(--accent2);}
+#ssl-indicator.insecure{color:var(--warn);}
+#voice-btn{position:absolute;right:32px;width:24px;height:24px;border-radius:50%;
+  background:var(--surface);border:1.5px solid var(--voice);color:var(--voice);
+  font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;z-index:2;}
+#voice-btn:hover{background:var(--voice);color:#fff;box-shadow:0 0 12px var(--voice-glow);}
+#voice-btn.listening{background:var(--recording);border-color:var(--recording);color:#fff;
+  animation:voicePulse 1s ease-in-out infinite;}
+@keyframes voicePulse{0%,100%{box-shadow:0 0 0 0 rgba(255,107,107,.4)}50%{box-shadow:0 0 0 8px rgba(255,107,107,0)}}
+#bookmark-btn{position:absolute;right:8px;font-size:16px;cursor:pointer;
+  color:var(--text2);transition:all .15s;background:none;border:none;}
+#bookmark-btn:hover{color:var(--warn);}
+#bookmark-btn.bookmarked{color:var(--warn);}
+
+/* --- Side Panel Toggle --- */
+#panel-btn{font-size:18px;}
+
+/* --- Content Area --- */
+#content-area{flex:1;position:relative;overflow:hidden;background:var(--bg);}
+.tab-content{position:absolute;inset:0;display:none;}
+.tab-content.active{display:block;}
+.tab-content iframe{width:100%;height:100%;border:none;background:#fff;}
+
+/* --- New Tab Page --- */
+.new-tab-page{display:flex;flex-direction:column;align-items:center;
+  justify-content:center;height:100%;padding:40px 20px;overflow-y:auto;}
+.ntp-logo{font-family:'Orbitron',monospace;font-size:clamp(28px,5vw,48px);
+  font-weight:900;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:8px;user-select:none;}
+.ntp-sub{font-size:12px;color:var(--text2);margin-bottom:32px;
+  font-family:'JetBrains Mono',monospace;letter-spacing:.1em;}
+.ntp-search{width:min(500px,90%);position:relative;margin-bottom:40px;}
+.ntp-search input{width:100%;padding:14px 20px 14px 44px;background:var(--surface);
+  border:1px solid var(--border);border-radius:24px;color:var(--text);
+  font-size:15px;outline:none;transition:all .2s;font-family:inherit;}
+.ntp-search input:focus{border-color:var(--accent);box-shadow:0 0 20px rgba(0,229,255,.1);}
+.ntp-search-icon{position:absolute;left:16px;top:50%;transform:translateY(-50%);
+  color:var(--text2);font-size:16px;}
+.ntp-shortcuts{display:grid;grid-template-columns:repeat(auto-fill,80px);
+  gap:16px;justify-content:center;max-width:500px;}
+.ntp-shortcut{display:flex;flex-direction:column;align-items:center;gap:8px;
+  cursor:pointer;padding:12px 8px;border-radius:12px;transition:all .15s;}
+.ntp-shortcut:hover{background:var(--surface);}
+.ntp-shortcut-icon{width:48px;height:48px;border-radius:12px;background:var(--surface2);
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+  border:1px solid var(--border);transition:all .15s;}
+.ntp-shortcut:hover .ntp-shortcut-icon{border-color:var(--accent);
+  box-shadow:0 0 12px rgba(0,229,255,.15);}
+.ntp-shortcut-label{font-size:11px;color:var(--text2);text-align:center;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:72px;}
+
+/* --- Side Panel (Bookmarks/History) --- */
+#side-panel{position:absolute;top:0;right:0;width:300px;height:100%;
+  background:var(--surface);border-left:1px solid var(--border);
+  transform:translateX(100%);transition:transform .25s ease;z-index:100;
+  display:flex;flex-direction:column;}
+#side-panel.open{transform:translateX(0);}
+.panel-header{display:flex;align-items:center;padding:12px 16px;gap:8px;
+  border-bottom:1px solid var(--border);}
+.panel-tab{padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;
+  color:var(--text2);transition:all .15s;font-family:'JetBrains Mono',monospace;}
+.panel-tab:hover{color:var(--text);}
+.panel-tab.active{background:rgba(0,229,255,.1);color:var(--accent);}
+.panel-close{margin-left:auto;cursor:pointer;color:var(--text2);font-size:18px;
+  width:24px;height:24px;display:flex;align-items:center;justify-content:center;
+  border-radius:4px;}
+.panel-close:hover{background:var(--danger);color:#fff;}
+.panel-body{flex:1;overflow-y:auto;padding:8px;}
+.panel-body::-webkit-scrollbar{width:4px;}
+.panel-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.panel-item{display:flex;align-items:center;gap:8px;padding:8px 12px;
+  border-radius:6px;cursor:pointer;font-size:12px;color:var(--text2);
+  transition:all .1s;}
+.panel-item:hover{background:var(--surface2);color:var(--text);}
+.panel-item-icon{font-size:14px;flex-shrink:0;}
+.panel-item-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.panel-item-url{font-size:10px;color:var(--text2);opacity:.6;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;}
+.panel-item-delete{opacity:0;color:var(--danger);font-size:14px;flex-shrink:0;cursor:pointer;}
+.panel-item:hover .panel-item-delete{opacity:1;}
+.panel-empty{text-align:center;color:var(--text2);font-size:12px;padding:40px 20px;opacity:.5;}
+
+/* --- Loading Bar --- */
+#loading-bar{position:absolute;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--accent),var(--accent2));
+  z-index:200;transition:width .3s ease;width:0;opacity:0;}
+#loading-bar.loading{opacity:1;}
+
+/* --- Status Bar --- */
+#status-bar{display:flex;align-items:center;padding:2px 10px;
+  background:var(--surface);border-top:1px solid var(--border);
+  font-size:10px;color:var(--text2);font-family:'JetBrains Mono',monospace;
+  flex-shrink:0;min-height:22px;gap:12px;}
+#status-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#tab-count{opacity:.6;}
+
+/* --- Context Menu --- */
+#context-menu{position:fixed;background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:4px;min-width:180px;z-index:1000;display:none;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);}
+.ctx-item{padding:8px 12px;font-size:12px;color:var(--text);cursor:pointer;
+  border-radius:4px;display:flex;align-items:center;gap:8px;}
+.ctx-item:hover{background:rgba(0,229,255,.1);color:var(--accent);}
+.ctx-sep{height:1px;background:var(--border);margin:4px 8px;}
+
+/* --- Voice Search Overlay --- */
+#voice-overlay{position:fixed;inset:0;background:rgba(10,14,26,.92);z-index:500;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+  backdrop-filter:blur(12px);}
+#voice-overlay.active{display:flex;}
+.voice-ring{width:140px;height:140px;border-radius:50%;border:3px solid var(--voice);
+  display:flex;align-items:center;justify-content:center;position:relative;
+  transition:all .3s;}
+.voice-ring.listening{border-color:var(--recording);
+  box-shadow:0 0 40px var(--voice-glow);}
+.voice-ring-icon{font-size:48px;transition:all .3s;}
+.voice-wave{position:absolute;inset:-20px;border-radius:50%;border:2px solid var(--voice);
+  opacity:0;animation:none;}
+.voice-ring.listening .voice-wave{animation:waveExpand 2s ease-out infinite;}
+.voice-ring.listening .voice-wave:nth-child(2){animation-delay:.5s;}
+.voice-ring.listening .voice-wave:nth-child(3){animation-delay:1s;}
+@keyframes waveExpand{0%{transform:scale(.7);opacity:.6}100%{transform:scale(1.3);opacity:0}}
+#voice-canvas{width:min(400px,80vw);height:80px;margin:24px 0;}
+#voice-text{font-size:18px;color:var(--text);min-height:28px;text-align:center;
+  max-width:80vw;font-family:'Noto Sans JP',sans-serif;}
+#voice-interim{font-size:14px;color:var(--text2);min-height:20px;margin-top:4px;text-align:center;}
+#voice-hint{font-size:11px;color:var(--text2);margin-top:20px;
+  font-family:'JetBrains Mono',monospace;opacity:.6;}
+#voice-close{position:absolute;top:20px;right:20px;width:40px;height:40px;
+  border-radius:50%;background:var(--surface);border:1px solid var(--border);
+  color:var(--text2);font-size:20px;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;}
+#voice-close:hover{background:var(--danger);color:#fff;}
+#voice-lang-bar{display:flex;gap:6px;margin-top:16px;}
+.voice-lang{padding:4px 12px;border-radius:12px;font-size:11px;cursor:pointer;
+  color:var(--text2);border:1px solid var(--border);transition:all .15s;
+  font-family:'JetBrains Mono',monospace;}
+.voice-lang:hover{border-color:var(--accent);}
+.voice-lang.active{background:var(--voice);border-color:var(--voice);color:#fff;}
+
+/* --- NTP Voice Button --- */
+.ntp-voice-section{margin-bottom:32px;text-align:center;}
+.ntp-voice-btn{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--voice),#8b5cf6);
+  border:none;color:#fff;font-size:28px;cursor:pointer;transition:all .25s;
+  box-shadow:0 4px 20px var(--voice-glow);display:flex;align-items:center;justify-content:center;margin:0 auto;}
+.ntp-voice-btn:hover{transform:scale(1.1);box-shadow:0 6px 30px var(--voice-glow);}
+.ntp-voice-btn:active{transform:scale(.95);}
+.ntp-voice-label{font-size:11px;color:var(--text2);margin-top:10px;
+  font-family:'JetBrains Mono',monospace;letter-spacing:.05em;}
+
+/* --- Animations --- */
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.loading-shimmer{background:linear-gradient(90deg,var(--surface) 25%,var(--surface2) 50%,var(--surface) 75%);
+  background-size:200% 100%;animation:shimmer 1.5s infinite;}
+
+/* --- Responsive --- */
+@media(max-width:600px){
+  .tab{max-width:120px;padding:6px 8px;}
+  #side-panel{width:100%;}
+  .ntp-shortcuts{grid-template-columns:repeat(auto-fill,70px);gap:12px;}
+}
+</style>
+</head>
+<body>
+
+<div id="browser">
+  <!-- Loading Bar -->
+  <div id="loading-bar"></div>
+
+  <!-- Tab Bar -->
+  <div id="tab-bar">
+    <div id="tabs-container"></div>
+    <button id="new-tab-btn" title="新しいタブ (Ctrl+T)">+</button>
+  </div>
+
+  <!-- Navigation Bar -->
+  <div id="nav-bar">
+    <button class="nav-btn" id="btn-back" title="戻る" disabled>◀</button>
+    <button class="nav-btn" id="btn-forward" title="進む" disabled>▶</button>
+    <button class="nav-btn" id="btn-reload" title="再読み込み">⟳</button>
+    <button class="nav-btn" id="btn-home" title="ホーム">⌂</button>
+    <div id="url-bar-wrapper">
+      <span id="ssl-indicator" title="接続情報">🔍</span>
+      <input type="text" id="url-bar" placeholder="URLを入力、音声で検索..." autocomplete="off" spellcheck="false">
+      <button id="voice-btn" title="音声検索 (Ctrl+Shift+V)">🎤</button>
+      <button id="bookmark-btn" title="ブックマーク">☆</button>
+    </div>
+    <button class="nav-btn" id="btn-download" title="ダウンロード">↓</button>
+    <button class="nav-btn" id="panel-btn" title="サイドパネル">☰</button>
+  </div>
+
+  <!-- Content Area -->
+  <div id="content-area">
+    <div id="side-panel">
+      <div class="panel-header">
+        <div class="panel-tab active" data-panel="bookmarks">★ ブックマーク</div>
+        <div class="panel-tab" data-panel="history">⏱ 履歴</div>
+        <div class="panel-close">✕</div>
+      </div>
+      <div class="panel-body" id="panel-content"></div>
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div id="status-bar">
+    <span id="status-text">準備完了</span>
+    <span id="tab-count"></span>
+    <span id="clock"></span>
+  </div>
+</div>
+
+<!-- Voice Search Overlay -->
+<div id="voice-overlay">
+  <button id="voice-close">✕</button>
+  <div class="voice-ring" id="voice-ring">
+    <div class="voice-wave"></div>
+    <div class="voice-wave"></div>
+    <div class="voice-wave"></div>
+    <span class="voice-ring-icon">🎤</span>
+  </div>
+  <canvas id="voice-canvas"></canvas>
+  <div id="voice-text"></div>
+  <div id="voice-interim"></div>
+  <div id="voice-lang-bar">
+    <div class="voice-lang active" data-lang="ja-JP">日本語</div>
+    <div class="voice-lang" data-lang="en-US">English</div>
+    <div class="voice-lang" data-lang="zh-CN">中文</div>
+  </div>
+  <div id="voice-hint">話しかけてください... ESCで終了</div>
+</div>
+
+<!-- Context Menu -->
+<div id="context-menu"></div>
+
+<script>
+// ===== Grace Browser Engine =====
+const SEARCH_ENGINE = 'https://www.google.com/search?igu=1&q=';
+const HOME_URL = 'grace://newtab';
+const PROXY_PREFIXES = [
+  '', // direct
+];
+
+// State
+let tabs = [];
+let activeTabId = null;
+let nextTabId = 1;
+let panelMode = 'bookmarks';
+
+// Storage helpers
+function loadJSON(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) || fallback; }
+  catch { return fallback; }
+}
+function saveJSON(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+let bookmarks = loadJSON('grace-bookmarks', [
+  { title: 'Google', url: 'https://www.google.com/webhp?igu=1', icon: '🔍' },
+  { title: 'Wikipedia', url: 'https://ja.wikipedia.org/', icon: '📚' },
+  { title: 'YouTube', url: 'https://www.youtube.com/', icon: '▶️' },
+  { title: 'GitHub', url: 'https://github.com/', icon: '🐙' },
+  { title: 'MDN', url: 'https://developer.mozilla.org/', icon: '📖' },
+  { title: 'Grace of Touch', url: '/index.html', icon: '🚀' },
+]);
+
+let history = loadJSON('grace-history', []);
+const MAX_HISTORY = 200;
+
+// DOM refs
+const tabsContainer = document.getElementById('tabs-container');
+const contentArea = document.getElementById('content-area');
+const urlBar = document.getElementById('url-bar');
+const sslIndicator = document.getElementById('ssl-indicator');
+const bookmarkBtn = document.getElementById('bookmark-btn');
+const loadingBar = document.getElementById('loading-bar');
+const statusText = document.getElementById('status-text');
+const tabCountEl = document.getElementById('tab-count');
+const sidePanel = document.getElementById('side-panel');
+const panelContent = document.getElementById('panel-content');
+const contextMenu = document.getElementById('context-menu');
+
+// ===== Tab Management =====
+function createTab(url = HOME_URL, active = true) {
+  const id = nextTabId++;
+  const tab = {
+    id, url, title: '新しいタブ', history: [], historyIndex: -1, loading: false
+  };
+  tabs.push(tab);
+  if (active) activateTab(id);
+  if (url !== HOME_URL) navigateTab(id, url);
+  renderTabs();
+  return id;
+}
+
+function closeTab(id) {
+  const idx = tabs.findIndex(t => t.id === id);
+  if (idx === -1) return;
+  // Remove content
+  const content = document.getElementById(`tab-content-${id}`);
+  if (content) content.remove();
+  tabs.splice(idx, 1);
+  if (tabs.length === 0) {
+    createTab();
+    return;
+  }
+  if (activeTabId === id) {
+    const newIdx = Math.min(idx, tabs.length - 1);
+    activateTab(tabs[newIdx].id);
+  }
+  renderTabs();
+}
+
+function activateTab(id) {
+  activeTabId = id;
+  // Toggle content visibility
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  let content = document.getElementById(`tab-content-${id}`);
+  if (!content) {
+    content = createTabContent(id);
+  }
+  content.classList.add('active');
+  // Update URL bar
+  const tab = getTab(id);
+  if (tab) {
+    updateUrlBar(tab.url);
+    updateNavButtons(tab);
+  }
+  renderTabs();
+}
+
+function getTab(id) { return tabs.find(t => t.id === id); }
+
+function createTabContent(id) {
+  const tab = getTab(id);
+  const div = document.createElement('div');
+  div.className = 'tab-content active';
+  div.id = `tab-content-${id}`;
+  if (!tab || tab.url === HOME_URL) {
+    div.innerHTML = buildNewTabPage();
+    initNewTabPage(div, id);
+  }
+  contentArea.insertBefore(div, sidePanel);
+  return div;
+}
+
+function buildNewTabPage() {
+  let shortcuts = bookmarks.slice(0, 8).map(b =>
+    `<div class="ntp-shortcut" data-url="${escapeAttr(b.url)}">
+      <div class="ntp-shortcut-icon">${b.icon || '🌐'}</div>
+      <div class="ntp-shortcut-label">${escapeHTML(b.title)}</div>
+    </div>`
+  ).join('');
+  return `
+    <div class="new-tab-page">
+      <div class="ntp-logo">GRACE BROWSER</div>
+      <div class="ntp-sub">Navigate the Digital Universe</div>
+      <div class="ntp-voice-section">
+        <button class="ntp-voice-btn" id="ntp-voice-btn">🎤</button>
+        <div class="ntp-voice-label">GraceVox 音声検索</div>
+      </div>
+      <div class="ntp-search">
+        <span class="ntp-search-icon">🔍</span>
+        <input type="text" placeholder="検索またはURLを入力..." id="ntp-input">
+      </div>
+      <div class="ntp-shortcuts">${shortcuts}</div>
+    </div>`;
+}
+
+function initNewTabPage(container, tabId) {
+  const input = container.querySelector('#ntp-input');
+  if (input) {
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && input.value.trim()) {
+        navigateTab(tabId, resolveUrl(input.value.trim()));
+      }
+    });
+    setTimeout(() => input.focus(), 100);
+  }
+  const voiceBtn = container.querySelector('#ntp-voice-btn');
+  if (voiceBtn) {
+    voiceBtn.addEventListener('click', () => startVoiceSearch());
+  }
+  container.querySelectorAll('.ntp-shortcut').forEach(el => {
+    el.addEventListener('click', () => {
+      navigateTab(tabId, el.dataset.url);
+    });
+  });
+}
+
+// ===== Navigation =====
+function navigateTab(id, url) {
+  const tab = getTab(id);
+  if (!tab) return;
+
+  url = resolveUrl(url);
+
+  if (url === HOME_URL) {
+    tab.url = url;
+    tab.title = '新しいタブ';
+    const content = document.getElementById(`tab-content-${id}`);
+    if (content) {
+      content.innerHTML = buildNewTabPage();
+      initNewTabPage(content, id);
+    }
+    if (id === activeTabId) updateUrlBar(url);
+    renderTabs();
+    return;
+  }
+
+  // Push to tab history
+  if (tab.historyIndex < tab.history.length - 1) {
+    tab.history = tab.history.slice(0, tab.historyIndex + 1);
+  }
+  tab.history.push(url);
+  tab.historyIndex = tab.history.length - 1;
+
+  tab.url = url;
+  tab.loading = true;
+  showLoading(true);
+  setStatus(`読み込み中: ${url}`);
+
+  const content = document.getElementById(`tab-content-${id}`);
+  if (content) {
+    const iframe = document.createElement('iframe');
+    iframe.sandbox = 'allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox';
+    iframe.referrerPolicy = 'no-referrer';
+    iframe.allow = 'autoplay; encrypted-media';
+    iframe.src = url;
+
+    iframe.addEventListener('load', () => {
+      tab.loading = false;
+      showLoading(false);
+      try {
+        const doc = iframe.contentDocument;
+        if (doc && doc.title) tab.title = doc.title;
+      } catch(e) {
+        tab.title = extractDomain(url);
+      }
+      addHistory(tab.title, url);
+      if (id === activeTabId) {
+        updateUrlBar(url);
+        updateNavButtons(tab);
+      }
+      setStatus('準備完了');
+      renderTabs();
+    });
+
+    iframe.addEventListener('error', () => {
+      tab.loading = false;
+      showLoading(false);
+      tab.title = extractDomain(url);
+      setStatus('読み込みエラー');
+      renderTabs();
+    });
+
+    content.innerHTML = '';
+    content.appendChild(iframe);
+  }
+
+  if (id === activeTabId) {
+    updateUrlBar(url);
+    updateNavButtons(tab);
+  }
+  renderTabs();
+}
+
+function goBack() {
+  const tab = getTab(activeTabId);
+  if (!tab || tab.historyIndex <= 0) return;
+  tab.historyIndex--;
+  const url = tab.history[tab.historyIndex];
+  loadHistoryEntry(tab, url);
+}
+
+function goForward() {
+  const tab = getTab(activeTabId);
+  if (!tab || tab.historyIndex >= tab.history.length - 1) return;
+  tab.historyIndex++;
+  const url = tab.history[tab.historyIndex];
+  loadHistoryEntry(tab, url);
+}
+
+function loadHistoryEntry(tab, url) {
+  tab.url = url;
+  const content = document.getElementById(`tab-content-${tab.id}`);
+  if (content) {
+    const iframe = content.querySelector('iframe');
+    if (iframe) {
+      iframe.src = url;
+    } else {
+      navigateTab(tab.id, url);
+      return;
+    }
+  }
+  if (tab.id === activeTabId) {
+    updateUrlBar(url);
+    updateNavButtons(tab);
+  }
+}
+
+function reload() {
+  const tab = getTab(activeTabId);
+  if (!tab) return;
+  if (tab.url === HOME_URL) return;
+  const content = document.getElementById(`tab-content-${tab.id}`);
+  if (content) {
+    const iframe = content.querySelector('iframe');
+    if (iframe) {
+      tab.loading = true;
+      showLoading(true);
+      iframe.src = iframe.src;
+    }
+  }
+}
+
+function goHome() {
+  navigateTab(activeTabId, HOME_URL);
+}
+
+// ===== URL Resolution =====
+function resolveUrl(input) {
+  if (!input) return HOME_URL;
+  if (input === HOME_URL) return input;
+  if (input.startsWith('/')) return input; // local paths
+  if (/^https?:\/\//i.test(input)) return input;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(input)) return input;
+  // Check if it looks like a domain
+  if (/^[^\s]+\.[^\s]+$/.test(input) && !input.includes(' ')) {
+    return 'https://' + input;
+  }
+  // Treat as search
+  return SEARCH_ENGINE + encodeURIComponent(input);
+}
+
+function extractDomain(url) {
+  try {
+    if (url.startsWith('/')) return 'localhost';
+    return new URL(url).hostname;
+  } catch { return url.slice(0, 30); }
+}
+
+// ===== UI Rendering =====
+function renderTabs() {
+  tabsContainer.innerHTML = '';
+  tabs.forEach(tab => {
+    const el = document.createElement('div');
+    el.className = 'tab' + (tab.id === activeTabId ? ' active' : '');
+    el.innerHTML = `
+      <span class="tab-favicon">${tab.url === HOME_URL ? '🏠' : '🌐'}</span>
+      <span class="tab-title">${escapeHTML(tab.title || '新しいタブ')}</span>
+      <span class="tab-close" data-id="${tab.id}">×</span>`;
+    el.addEventListener('click', (e) => {
+      if (e.target.classList.contains('tab-close')) {
+        closeTab(parseInt(e.target.dataset.id));
+      } else {
+        activateTab(tab.id);
+      }
+    });
+    // Middle click to close
+    el.addEventListener('auxclick', (e) => {
+      if (e.button === 1) { e.preventDefault(); closeTab(tab.id); }
+    });
+    tabsContainer.appendChild(el);
+  });
+  tabCountEl.textContent = `${tabs.length} タブ`;
+  updateBookmarkBtn();
+}
+
+function updateUrlBar(url) {
+  if (url === HOME_URL) {
+    urlBar.value = '';
+    sslIndicator.textContent = '🔍';
+    sslIndicator.className = '';
+    sslIndicator.title = '検索';
+  } else {
+    urlBar.value = url;
+    if (url.startsWith('https://')) {
+      sslIndicator.textContent = '🔒';
+      sslIndicator.className = 'secure';
+      sslIndicator.title = '安全な接続';
+    } else if (url.startsWith('http://')) {
+      sslIndicator.textContent = '⚠';
+      sslIndicator.className = 'insecure';
+      sslIndicator.title = '保護されていない接続';
+    } else {
+      sslIndicator.textContent = '📄';
+      sslIndicator.className = '';
+      sslIndicator.title = 'ローカルページ';
+    }
+  }
+}
+
+function updateNavButtons(tab) {
+  document.getElementById('btn-back').disabled = !tab || tab.historyIndex <= 0;
+  document.getElementById('btn-forward').disabled = !tab || tab.historyIndex >= tab.history.length - 1;
+}
+
+function updateBookmarkBtn() {
+  const tab = getTab(activeTabId);
+  if (tab && bookmarks.some(b => b.url === tab.url)) {
+    bookmarkBtn.textContent = '★';
+    bookmarkBtn.classList.add('bookmarked');
+  } else {
+    bookmarkBtn.textContent = '☆';
+    bookmarkBtn.classList.remove('bookmarked');
+  }
+}
+
+function showLoading(show) {
+  if (show) {
+    loadingBar.style.width = '70%';
+    loadingBar.classList.add('loading');
+  } else {
+    loadingBar.style.width = '100%';
+    setTimeout(() => {
+      loadingBar.classList.remove('loading');
+      loadingBar.style.width = '0';
+    }, 300);
+  }
+}
+
+function setStatus(text) { statusText.textContent = text; }
+
+// ===== Bookmarks & History =====
+function toggleBookmark() {
+  const tab = getTab(activeTabId);
+  if (!tab || tab.url === HOME_URL) return;
+  const idx = bookmarks.findIndex(b => b.url === tab.url);
+  if (idx >= 0) {
+    bookmarks.splice(idx, 1);
+  } else {
+    bookmarks.push({ title: tab.title || extractDomain(tab.url), url: tab.url, icon: '🌐' });
+  }
+  saveJSON('grace-bookmarks', bookmarks);
+  updateBookmarkBtn();
+  if (panelMode === 'bookmarks') renderPanel();
+}
+
+function addHistory(title, url) {
+  if (url === HOME_URL) return;
+  history.unshift({ title, url, time: Date.now() });
+  if (history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
+  saveJSON('grace-history', history);
+}
+
+// ===== Side Panel =====
+function togglePanel() {
+  sidePanel.classList.toggle('open');
+  if (sidePanel.classList.contains('open')) renderPanel();
+}
+
+function renderPanel() {
+  const items = panelMode === 'bookmarks' ? bookmarks : history;
+  if (items.length === 0) {
+    panelContent.innerHTML = `<div class="panel-empty">${panelMode === 'bookmarks' ? 'ブックマークはありません' : '履歴はありません'}</div>`;
+    return;
+  }
+  panelContent.innerHTML = items.map((item, i) => {
+    const timeStr = item.time ? new Date(item.time).toLocaleString('ja-JP', {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    }) : '';
+    return `<div class="panel-item" data-url="${escapeAttr(item.url)}">
+      <span class="panel-item-icon">${item.icon || '🌐'}</span>
+      <div style="flex:1;overflow:hidden;">
+        <div class="panel-item-text">${escapeHTML(item.title)}</div>
+        <div class="panel-item-url">${timeStr ? timeStr + ' · ' : ''}${escapeHTML(item.url)}</div>
+      </div>
+      <span class="panel-item-delete" data-idx="${i}" title="削除">✕</span>
+    </div>`;
+  }).join('');
+
+  panelContent.querySelectorAll('.panel-item').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.classList.contains('panel-item-delete')) {
+        const idx = parseInt(e.target.dataset.idx);
+        if (panelMode === 'bookmarks') {
+          bookmarks.splice(idx, 1);
+          saveJSON('grace-bookmarks', bookmarks);
+        } else {
+          history.splice(idx, 1);
+          saveJSON('grace-history', history);
+        }
+        renderPanel();
+        return;
+      }
+      navigateTab(activeTabId, el.dataset.url);
+      sidePanel.classList.remove('open');
+    });
+  });
+}
+
+// ===== Event Listeners =====
+document.getElementById('new-tab-btn').addEventListener('click', () => createTab());
+document.getElementById('btn-back').addEventListener('click', goBack);
+document.getElementById('btn-forward').addEventListener('click', goForward);
+document.getElementById('btn-reload').addEventListener('click', reload);
+document.getElementById('btn-home').addEventListener('click', goHome);
+document.getElementById('panel-btn').addEventListener('click', togglePanel);
+bookmarkBtn.addEventListener('click', toggleBookmark);
+
+document.querySelector('.panel-close').addEventListener('click', () => {
+  sidePanel.classList.remove('open');
+});
+
+document.querySelectorAll('.panel-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    panelMode = tab.dataset.panel;
+    renderPanel();
+  });
+});
+
+// URL bar
+urlBar.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && urlBar.value.trim()) {
+    navigateTab(activeTabId, resolveUrl(urlBar.value.trim()));
+    urlBar.blur();
+  }
+  if (e.key === 'Escape') { urlBar.blur(); }
+});
+urlBar.addEventListener('focus', () => urlBar.select());
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey) {
+    switch(e.key) {
+      case 't': e.preventDefault(); createTab(); break;
+      case 'w': e.preventDefault(); closeTab(activeTabId); break;
+      case 'l': e.preventDefault(); urlBar.focus(); break;
+      case 'r': e.preventDefault(); reload(); break;
+    }
+    if (e.shiftKey && e.key === 'V') { e.preventDefault(); startVoiceSearch(); }
+  }
+  if (e.altKey) {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); goBack(); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); goForward(); }
+  }
+});
+
+// ===== GraceVox Voice Search Engine =====
+const voiceOverlay = document.getElementById('voice-overlay');
+const voiceRing = document.getElementById('voice-ring');
+const voiceTextEl = document.getElementById('voice-text');
+const voiceInterimEl = document.getElementById('voice-interim');
+const voiceCanvas = document.getElementById('voice-canvas');
+const voiceCloseBtn = document.getElementById('voice-close');
+const voiceNavBtn = document.getElementById('voice-btn');
+let voiceLang = 'ja-JP';
+let voiceRecognition = null;
+let voiceAudioCtx = null;
+let voiceAnalyser = null;
+let voiceMediaStream = null;
+let voiceAnimFrame = null;
+let voiceFinalText = '';
+
+const hasSpeechRecognition = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+function startVoiceSearch() {
+  if (!hasSpeechRecognition) {
+    setStatus('このブラウザは音声認識に対応していません');
+    return;
+  }
+  voiceFinalText = '';
+  voiceTextEl.textContent = '';
+  voiceInterimEl.textContent = '';
+  voiceOverlay.classList.add('active');
+  voiceRing.classList.add('listening');
+  voiceNavBtn.classList.add('listening');
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  voiceRecognition = new SR();
+  voiceRecognition.continuous = true;
+  voiceRecognition.interimResults = true;
+  voiceRecognition.lang = voiceLang;
+
+  voiceRecognition.onresult = (e) => {
+    let interim = '';
+    let final = '';
+    for (let i = 0; i < e.results.length; i++) {
+      if (e.results[i].isFinal) {
+        final += e.results[i][0].transcript;
+      } else {
+        interim += e.results[i][0].transcript;
+      }
+    }
+    if (final) voiceFinalText = final;
+    voiceTextEl.textContent = voiceFinalText || '';
+    voiceInterimEl.textContent = interim;
+  };
+
+  voiceRecognition.onerror = (e) => {
+    if (e.error === 'no-speech') {
+      voiceInterimEl.textContent = '音声が検出されませんでした';
+    } else if (e.error === 'not-allowed') {
+      voiceInterimEl.textContent = 'マイクへのアクセスが許可されていません';
+      stopVoiceSearch();
+    }
+  };
+
+  voiceRecognition.onend = () => {
+    // If we have text, navigate
+    const text = (voiceFinalText || voiceTextEl.textContent).trim();
+    if (text) {
+      stopVoiceVisuals();
+      voiceOverlay.classList.remove('active');
+      navigateTab(activeTabId, resolveUrl(text));
+      setStatus(`音声検索: "${text}"`);
+    }
+  };
+
+  voiceRecognition.start();
+  startVoiceVisualizer();
+  setStatus('🎤 音声入力中...');
+}
+
+function stopVoiceSearch() {
+  if (voiceRecognition) {
+    try { voiceRecognition.abort(); } catch(e) {}
+    voiceRecognition = null;
+  }
+  stopVoiceVisuals();
+  voiceOverlay.classList.remove('active');
+  voiceRing.classList.remove('listening');
+  voiceNavBtn.classList.remove('listening');
+  setStatus('準備完了');
+}
+
+function confirmVoiceSearch() {
+  const text = (voiceFinalText || voiceTextEl.textContent || voiceInterimEl.textContent).trim();
+  if (voiceRecognition) {
+    try { voiceRecognition.stop(); } catch(e) {}
+  }
+  if (text) {
+    stopVoiceVisuals();
+    voiceOverlay.classList.remove('active');
+    voiceRing.classList.remove('listening');
+    voiceNavBtn.classList.remove('listening');
+    navigateTab(activeTabId, resolveUrl(text));
+    setStatus(`音声検索: "${text}"`);
+  }
+}
+
+function startVoiceVisualizer() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    voiceMediaStream = stream;
+    voiceAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    voiceAnalyser = voiceAudioCtx.createAnalyser();
+    voiceAnalyser.fftSize = 256;
+    const source = voiceAudioCtx.createMediaStreamSource(stream);
+    source.connect(voiceAnalyser);
+    drawVoiceWave();
+  }).catch(() => {});
+}
+
+function drawVoiceWave() {
+  if (!voiceAnalyser) return;
+  const canvas = voiceCanvas;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.offsetWidth * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  ctx.scale(dpr, dpr);
+  const W = canvas.offsetWidth;
+  const H = canvas.offsetHeight;
+  const bufLen = voiceAnalyser.frequencyBinCount;
+  const data = new Uint8Array(bufLen);
+
+  function draw() {
+    voiceAnimFrame = requestAnimationFrame(draw);
+    voiceAnalyser.getByteFrequencyData(data);
+    ctx.clearRect(0, 0, W, H);
+
+    const barCount = 64;
+    const barW = W / barCount - 1;
+    const step = Math.floor(bufLen / barCount);
+    for (let i = 0; i < barCount; i++) {
+      const val = data[i * step] / 255;
+      const barH = val * H * 0.9;
+      const x = i * (barW + 1);
+      const hue = 250 + val * 60;
+      ctx.fillStyle = `hsla(${hue}, 80%, 65%, ${0.3 + val * 0.7})`;
+      ctx.fillRect(x, H / 2 - barH / 2, barW, barH || 1);
+    }
+  }
+  draw();
+}
+
+function stopVoiceVisuals() {
+  if (voiceAnimFrame) cancelAnimationFrame(voiceAnimFrame);
+  voiceAnimFrame = null;
+  if (voiceMediaStream) {
+    voiceMediaStream.getTracks().forEach(t => t.stop());
+    voiceMediaStream = null;
+  }
+  if (voiceAudioCtx) {
+    voiceAudioCtx.close().catch(() => {});
+    voiceAudioCtx = null;
+  }
+  voiceAnalyser = null;
+  voiceRing.classList.remove('listening');
+  voiceNavBtn.classList.remove('listening');
+}
+
+// Voice overlay events
+voiceCloseBtn.addEventListener('click', stopVoiceSearch);
+voiceNavBtn.addEventListener('click', () => {
+  if (voiceNavBtn.classList.contains('listening')) {
+    confirmVoiceSearch();
+  } else {
+    startVoiceSearch();
+  }
+});
+
+// Voice overlay click on ring to confirm
+voiceRing.addEventListener('click', confirmVoiceSearch);
+
+// Voice language selector
+document.querySelectorAll('.voice-lang').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.voice-lang').forEach(e => e.classList.remove('active'));
+    el.classList.add('active');
+    voiceLang = el.dataset.lang;
+    // Restart recognition with new language
+    if (voiceRecognition) {
+      try { voiceRecognition.abort(); } catch(e) {}
+      setTimeout(() => startVoiceSearch(), 200);
+    }
+  });
+});
+
+// ESC to close voice overlay
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && voiceOverlay.classList.contains('active')) {
+    stopVoiceSearch();
+  }
+});
+
+// Close context menu on click
+document.addEventListener('click', () => contextMenu.style.display = 'none');
+
+// Clock
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Helpers
+function escapeHTML(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeAttr(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+// ===== Init =====
+createTab();
+setStatus('Grace Browser — 準備完了');
+
+// Tab bar container setup
+tabsContainer.style.display = 'flex';
+tabsContainer.style.alignItems = 'center';
+tabsContainer.style.gap = '2px';
+tabsContainer.style.flex = '1';
+tabsContainer.style.overflow = 'hidden';
+</script>
+</body>
+</html>
