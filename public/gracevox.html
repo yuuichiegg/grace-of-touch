@@ -3934,16 +3934,95 @@ function renderTracks(){
     panel.style.display='none';return;
   }
   panel.style.display='flex';
+  document.getElementById('panelResizeHandle').style.display='block';
   // Newest first (reverse order)
   const indices=[..._tracks.keys()].reverse();
   list.innerHTML=indices.map(i=>{const tr=_tracks[i];return`
-    <div class="track-item" id="track-${i}" onclick="openPlayer(${i})" style="cursor:pointer;">
-      <span class="track-name">${escapeHtml(tr.name)}</span>
-      <span class="track-dur">${_fmtTime(tr.dur)}</span>
-      <button class="track-btn" onclick="event.stopPropagation();downloadTrack(${i})" title="DL">&#11015;</button>
-      <button class="track-btn" onclick="event.stopPropagation();deleteTrack(${i})" title="削除" style="font-size:11px;">&#10005;</button>
+    <div class="track-item" id="track-${i}" onclick="openPlayer(${i})" style="cursor:pointer;flex-direction:column;align-items:stretch;padding:6px 10px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+        <button class="track-btn" onclick="event.stopPropagation();quickPlay(${i},this)" style="width:24px;height:24px;font-size:11px;" title="再生">&#9654;</button>
+        <span class="track-name" style="flex:1;">${escapeHtml(tr.name)}</span>
+        <span class="track-dur">${_fmtTime(tr.dur)}</span>
+        <button class="track-btn" onclick="event.stopPropagation();downloadTrack(${i})" title="DL">&#11015;</button>
+        <button class="track-btn" onclick="event.stopPropagation();deleteTrack(${i})" title="削除" style="font-size:11px;">&#10005;</button>
+      </div>
+      <canvas class="track-wave-mini" id="trackWave-${i}" style="width:100%;height:36px;border-radius:4px;background:rgba(0,0,0,0.25);cursor:pointer;display:block;"></canvas>
     </div>`}).join('');
   list.scrollTop=0;
+  // Generate inline waveforms for each track
+  indices.forEach(i => _generateInlineWaveform(i));
+}
+
+// Quick play/stop from track list
+let _quickPlayAudio=null, _quickPlayIdx=-1;
+function quickPlay(idx, btn){
+  if(_quickPlayIdx===idx && _quickPlayAudio && !_quickPlayAudio.paused){
+    _quickPlayAudio.pause(); _quickPlayAudio.currentTime=0;
+    btn.innerHTML='&#9654;'; _quickPlayIdx=-1; return;
+  }
+  if(_quickPlayAudio){ _quickPlayAudio.pause(); _quickPlayAudio.currentTime=0; }
+  // Reset all play buttons
+  document.querySelectorAll('.track-item .track-btn:first-child').forEach(b=>b.innerHTML='&#9654;');
+  const tr=_tracks[idx]; if(!tr) return;
+  _quickPlayAudio=new Audio(tr.data);
+  _quickPlayAudio.play();
+  _quickPlayIdx=idx;
+  btn.innerHTML='&#9646;&#9646;';
+  _quickPlayAudio.onended=()=>{ btn.innerHTML='&#9654;'; _quickPlayIdx=-1; };
+}
+
+// Generate mini waveform for track list
+async function _generateInlineWaveform(idx){
+  const tr=_tracks[idx]; if(!tr) return;
+  const cv=document.getElementById('trackWave-'+idx);
+  if(!cv) return;
+  const w=cv.clientWidth*2||300, h=cv.clientHeight*2||72;
+  cv.width=w; cv.height=h;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,w,h);
+
+  // Use cached waveform if available
+  if(_waveformCache[idx]){
+    _drawMiniWave(ctx,w,h,_waveformCache[idx].peaks,_waveformCache[idx].maxPeak);
+    return;
+  }
+  try{
+    const resp=await fetch(tr.data);
+    const arrBuf=await resp.arrayBuffer();
+    const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    const decoded=await audioCtx.decodeAudioData(arrBuf);
+    const raw=decoded.getChannelData(0);
+    const numBars=Math.min(w/2,150);
+    const blockSize=Math.floor(raw.length/numBars);
+    const peaks=new Float32Array(numBars);
+    for(let i=0;i<numBars;i++){
+      let sum=0;
+      for(let j=0;j<blockSize;j++) sum+=Math.abs(raw[i*blockSize+j]);
+      peaks[i]=sum/blockSize;
+    }
+    const maxPeak=Math.max(...peaks)||1;
+    _waveformCache[idx]={peaks,maxPeak,decoded};
+    _drawMiniWave(ctx,w,h,peaks,maxPeak);
+    audioCtx.close();
+  }catch(e){}
+}
+
+function _drawMiniWave(ctx,w,h,peaks,maxPeak){
+  const numBars=peaks.length;
+  const barW=w/numBars-1;
+  for(let i=0;i<numBars;i++){
+    const v=peaks[i]/maxPeak;
+    const barH=v*h*0.85;
+    const x=i*(barW+1);
+    // Cyber neon colors
+    const hue=220+v*80;
+    ctx.fillStyle=`hsla(${hue},80%,${50+v*20}%,${0.4+v*0.6})`;
+    ctx.fillRect(x, h/2-barH/2, barW, barH||1);
+  }
+  // Center line
+  ctx.strokeStyle='rgba(0,229,255,0.15)';
+  ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,h/2); ctx.lineTo(w,h/2); ctx.stroke();
 }
 
 // ─── Player with waveform seekbar ───
