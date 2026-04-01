@@ -397,10 +397,24 @@
 /* Pi-chan animations */
 @keyframes pichan-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 @keyframes pichan-tilt{0%,100%{transform:rotate(0deg)}50%{transform:rotate(12deg)}}
-@keyframes pichan-walk{0%{transform:translateX(0)}25%{transform:translateX(8px) rotate(5deg)}50%{transform:translateX(0)}75%{transform:translateX(-8px) rotate(-5deg)}100%{transform:translateX(0)}}
+@keyframes pichan-walk{0%{transform:translateX(0)}25%{transform:translateX(4px) rotate(3deg)}50%{transform:translateX(0)}75%{transform:translateX(-4px) rotate(-3deg)}100%{transform:translateX(0)}}
+/* 羽ばたきながら飛ぶ（上下にパタパタ） */
+@keyframes pichan-flap{
+  0%{transform:translateY(0) rotate(0) scaleX(1)}
+  12%{transform:translateY(-8px) rotate(-8deg) scaleX(0.85)}
+  25%{transform:translateY(-3px) rotate(5deg) scaleX(1)}
+  37%{transform:translateY(-10px) rotate(-6deg) scaleX(0.85)}
+  50%{transform:translateY(-4px) rotate(4deg) scaleX(1)}
+  62%{transform:translateY(-9px) rotate(-7deg) scaleX(0.85)}
+  75%{transform:translateY(-2px) rotate(3deg) scaleX(1)}
+  87%{transform:translateY(-7px) rotate(-5deg) scaleX(0.85)}
+  100%{transform:translateY(0) rotate(0) scaleX(1)}
+}
 @keyframes pichan-fly{0%{transform:translate(0,0) rotate(0)}20%{transform:translate(12px,-20px) rotate(-10deg)}40%{transform:translate(-8px,-30px) rotate(8deg)}60%{transform:translate(15px,-15px) rotate(-5deg)}80%{transform:translate(-5px,-25px) rotate(6deg)}100%{transform:translate(0,0) rotate(0)}}
 @keyframes pichan-hop{0%,100%{transform:translateY(0) scale(1)}30%{transform:translateY(-12px) scale(1.1)}60%{transform:translateY(-4px) scale(0.95)}}
-#pichanMini{transition:bottom .8s ease, right .8s ease, left .8s ease;}
+/* 移動時: ゆるいカーブ軌道でパタパタ飛ぶ */
+#pichanMini{transition:bottom 1.2s cubic-bezier(.34,1.56,.64,1), right 1.2s cubic-bezier(.34,1.56,.64,1);}
+#pichanMini.flying-move #pichanBody{animation:pichan-flap .4s ease infinite;}
 #pichanMini:hover #pichanBody{transform:scale(1.2);}
 </style>
 </head>
@@ -2805,7 +2819,16 @@ const PERCH_POINTS = [
 ];
 let _pichanAtPerch = null;
 
-// Wander: ぴーちゃんが画面内を自由に移動（パーチポイントに止まることも）
+// パタパタ飛びながら移動する共通関数
+function pichanFlyTo(el, toRight, toBottom) {
+  el.classList.add('flying-move'); // 羽ばたきアニメ開始
+  el.style.right = toRight + 'px';
+  el.style.bottom = toBottom + 'px';
+  // CSSトランジション完了後に羽ばたき停止（1.2s = transition duration）
+  setTimeout(() => { el.classList.remove('flying-move'); }, 1300);
+}
+
+// Wander: ぴーちゃんが画面内をパタパタ飛んで移動
 function pichanWander() {
   if (_pichanState === 'recording' || _pichanState === 'listening') return;
   const el = document.getElementById('pichanMini');
@@ -2813,40 +2836,36 @@ function pichanWander() {
 
   const roll = Math.random();
 
-  // 40% chance: パーチポイントに止まる
+  // 40% chance: パーチポイントに飛んでいく
   if (roll < 0.4) {
     const perch = PERCH_POINTS[Math.floor(Math.random() * PERCH_POINTS.length)];
     const perchEl = document.getElementById(perch.id);
     if (perchEl) {
       const rect = perchEl.getBoundingClientRect();
-      el.style.right = (window.innerWidth - rect.right + rect.width/2 - 14) + 'px';
-      el.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+      const toR = window.innerWidth - rect.right + rect.width/2 - 14;
+      const toB = window.innerHeight - rect.top + 4;
+      pichanFlyTo(el, Math.max(0, toR), Math.max(0, toB));
       _pichanAtPerch = perch;
       perchEl.style.opacity = '0.8';
       const mood = document.getElementById('pichanMood');
       if (mood) mood.textContent = perch.mood;
-      // エサ皿のときは食べる動作
+      // エサ皿のときは到着後に食べる動作
       if (perch.id === 'perch-food') {
-        const body = document.getElementById('pichanBody');
-        if (body) body.style.animation = 'pichan-tilt .4s ease 3';
+        setTimeout(() => {
+          const body = document.getElementById('pichanBody');
+          if (body) body.style.animation = 'pichan-tilt .4s ease 3';
+        }, 1400);
       }
       setTimeout(() => { perchEl.style.opacity = ''; _pichanAtPerch = null; }, 6000);
       return;
     }
   }
 
-  // 20% chance: 飛ぶ
-  if (roll < 0.6 && _pichanState === 'idle') {
-    updatePichanState('flying');
-    setTimeout(() => { if (_pichanState === 'flying') updatePichanState('idle'); }, 2000);
-  }
-
-  // 移動先をランダムに
+  // ランダムな場所へパタパタ飛ぶ
   const maxR = window.innerWidth - 60;
   const newRight = Math.max(12, Math.min(maxR, Math.floor(Math.random() * maxR)));
   const newBottom = Math.max(70, Math.min(window.innerHeight - 140, 70 + Math.floor(Math.random() * 250)));
-  el.style.right = newRight + 'px';
-  el.style.bottom = newBottom + 'px';
+  pichanFlyTo(el, newRight, newBottom);
 }
 
 // Wander: schedule next move (not setInterval — avoids overlap with interaction)
@@ -2877,9 +2896,7 @@ function pichanTap() {
       const curB = parseInt(el.style.bottom) || 70;
       const escapeR = Math.max(12, Math.min(window.innerWidth - 50, curR + (Math.random() > 0.5 ? 60 : -60)));
       const escapeB = Math.max(70, Math.min(window.innerHeight - 140, curB + (Math.random() > 0.5 ? 40 : -40)));
-      el.style.right = escapeR + 'px';
-      el.style.bottom = escapeB + 'px';
-      if (body) body.style.animation = 'pichan-hop .4s ease';
+      pichanFlyTo(el, escapeR, escapeB);
       const escMsgs = ['あっ！逃げちゃった！', 'ぴぴっ！つかまらないよ〜', 'えへへ、こっちだよ〜'];
       showAiBubble(escMsgs[Math.floor(Math.random() * escMsgs.length)], 'ぴーちゃん🐤');
     }
