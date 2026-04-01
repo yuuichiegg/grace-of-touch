@@ -597,8 +597,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     </div>
   </div>
 
+  <!-- Resize handle between History and Track Library -->
+  <div id="panelResizeHandle" style="display:none;height:8px;cursor:ns-resize;background:transparent;flex-shrink:0;position:relative;touch-action:none;">
+    <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:40px;height:3px;border-radius:2px;background:rgba(0,229,255,0.3);"></div>
+  </div>
   <!-- Audio Track Library -->
-  <div class="history-panel" id="trackPanel" style="display:none;flex:1.2;min-height:0;position:relative;">
+  <div class="history-panel" id="trackPanel" style="display:none;flex:1.2;min-height:60px;position:relative;">
     <div class="history-header">
       <span class="history-label">🎵 TRACK LIBRARY</span>
       <span id="recTimer" style="font-size:11px;color:var(--recording);font-family:'Courier New',monospace;display:none;">● 00:00</span>
@@ -3545,26 +3549,73 @@ function toggleLibraryView() {
   const panel = document.getElementById('trackPanel');
   const histPanel = document.querySelector('.history-panel:not(#trackPanel)');
   const currentPanel = document.querySelector('.current-panel');
+  const handle = document.getElementById('panelResizeHandle');
 
   _libraryExpanded = !_libraryExpanded;
 
   if (_libraryExpanded) {
     panel.style.display = 'flex';
-    panel.style.flex = '3';
-    panel.style.minHeight = '200px';
-    if (histPanel) histPanel.style.display = 'none';
-    if (currentPanel) currentPanel.style.flex = '0.5';
+    panel.style.flex = '2';
+    panel.style.minHeight = '100px';
+    if (handle) handle.style.display = 'block';
+    if (histPanel) histPanel.style.flex = '1';
+    if (currentPanel) currentPanel.style.flex = '1';
     document.getElementById('libToggleBtn').style.color = 'var(--accent)';
     updatePichanState('happy');
   } else {
     panel.style.display = 'none';
     panel.style.flex = '1.2';
-    if (histPanel) histPanel.style.display = '';
+    if (handle) handle.style.display = 'none';
+    if (histPanel) { histPanel.style.display = ''; histPanel.style.flex = ''; }
     if (currentPanel) currentPanel.style.flex = '';
     document.getElementById('libToggleBtn').style.color = '';
     updatePichanState('idle');
   }
 }
+
+// ─── Panel Resize Handle ───
+(function(){
+  const handle = document.getElementById('panelResizeHandle');
+  if (!handle) return;
+  let _resizing = false, _startY = 0;
+  let _histFlex = 1, _trackFlex = 2;
+
+  handle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    _resizing = true;
+    _startY = e.clientY;
+    handle.setPointerCapture(e.pointerId);
+    handle.style.background = 'rgba(0,229,255,0.1)';
+    const histPanel = document.querySelector('.history-panel:not(#trackPanel)');
+    const trackPanel = document.getElementById('trackPanel');
+    if (histPanel) _histFlex = histPanel.offsetHeight;
+    if (trackPanel) _trackFlex = trackPanel.offsetHeight;
+  });
+
+  handle.addEventListener('pointermove', (e) => {
+    if (!_resizing) return;
+    const dy = e.clientY - _startY;
+    const histPanel = document.querySelector('.history-panel:not(#trackPanel)');
+    const trackPanel = document.getElementById('trackPanel');
+    if (histPanel && trackPanel) {
+      const newHist = Math.max(60, _histFlex + dy);
+      const newTrack = Math.max(60, _trackFlex - dy);
+      histPanel.style.flex = '0 0 ' + newHist + 'px';
+      trackPanel.style.flex = '0 0 ' + newTrack + 'px';
+    }
+  });
+
+  handle.addEventListener('pointerup', (e) => {
+    _resizing = false;
+    handle.releasePointerCapture(e.pointerId);
+    handle.style.background = 'transparent';
+  });
+
+  handle.addEventListener('pointercancel', () => {
+    _resizing = false;
+    handle.style.background = 'transparent';
+  });
+})();
 
 // ─── Recording Popup ───
 let _recPopupOpen = false;
@@ -3686,6 +3737,7 @@ async function startAudioRec(){
     _audioRecBtn().style.borderColor='var(--recording)';
     _audioRecBtn().style.color='var(--recording)';
     document.getElementById('trackPanel').style.display='flex';
+    document.getElementById('panelResizeHandle').style.display='block';
     // Start recording waveform + timer
     _startRecWave(stream);
     _startRecTimer();
@@ -3768,12 +3820,17 @@ function _startRecWave(stream){
       for(let c=0;c<cols;c++){
         const col=_spectroHistory[c];
         for(let b=0;b<binsToShow;b++){
-          const val=col[b]/255;
-          if(val<0.02) continue;
-          const r=Math.round(108*val);
-          const g=Math.round(92+163*val);
-          const bl=Math.round(231*Math.min(1,val*1.5));
-          ctx2.fillStyle=`rgb(${r},${g},${bl})`;
+          const v=col[b]/255;
+          if(v<0.02) continue;
+          // Cyber neon palette (same as main voice print)
+          let r,g,bl;
+          if(v<0.05){ r=0; g=v*200; bl=v*400; }
+          else if(v<0.2){ const t=(v-0.05)/0.15; r=t*40; g=10+t*80; bl=20+t*180; }
+          else if(v<0.45){ const t=(v-0.2)/0.25; r=40+t*140; g=90-t*50; bl=200+t*55; }
+          else if(v<0.75){ const t=(v-0.45)/0.3; r=180+t*75; g=40+t*40; bl=255-t*100; }
+          else if(v<0.9){ const t=(v-0.75)/0.15; r=255; g=80+t*120; bl=155+t*100; }
+          else{ const t=(v-0.9)/0.1; r=255; g=200+t*55; bl=255; }
+          ctx2.fillStyle=`rgb(${r|0},${g|0},${bl|0})`;
           ctx2.fillRect(c*colW, h2-(b+1)*binH, colW+0.5, binH+0.5);
         }
       }
@@ -3811,13 +3868,17 @@ function _startRecWave(stream){
       for(let c=0;c<cols;c++){
         const col=_spectroHistory[c];
         for(let b=0;b<binsToShow;b++){
-          const val=col[b]/255;
-          if(val<0.02) continue;
-          // Color: purple → cyan → white based on intensity
-          const r=Math.round(108*val);
-          const g=Math.round(92+163*val);
-          const bl=Math.round(231*Math.min(1,val*1.5));
-          ctx.fillStyle=`rgb(${r},${g},${bl})`;
+          const v=col[b]/255;
+          if(v<0.02) continue;
+          // Cyber neon palette
+          let r,g,bl;
+          if(v<0.05){ r=0; g=v*200; bl=v*400; }
+          else if(v<0.2){ const t=(v-0.05)/0.15; r=t*40; g=10+t*80; bl=20+t*180; }
+          else if(v<0.45){ const t=(v-0.2)/0.25; r=40+t*140; g=90-t*50; bl=200+t*55; }
+          else if(v<0.75){ const t=(v-0.45)/0.3; r=180+t*75; g=40+t*40; bl=255-t*100; }
+          else if(v<0.9){ const t=(v-0.75)/0.15; r=255; g=80+t*120; bl=155+t*100; }
+          else{ const t=(v-0.9)/0.1; r=255; g=200+t*55; bl=255; }
+          ctx.fillStyle=`rgb(${r|0},${g|0},${bl|0})`;
           ctx.fillRect(c*colW, specY+specH-(b+1)*binH, colW+0.5, binH+0.5);
         }
       }
