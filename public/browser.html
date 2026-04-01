@@ -425,12 +425,12 @@ function buildNewTabPage() {
   ).join('');
 
   const graceApps = [
-    { icon:'🎤', title:'GraceVox', url:'gracevox.html' },
-    { icon:'🎵', title:'Records', url:'records.html' },
+    { icon:'🎤', title:'GraceVox', url:'/gracevox.html' },
+    { icon:'🎵', title:'Records', url:'/records.html' },
     { icon:'🎛️', title:'TrackForge', url:'/trackforge/' },
-    { icon:'🚀', title:'Mega Rocket', url:'rocket.html' },
-    { icon:'🐼', title:'Panda World', url:'pandaworld.html' },
-    { icon:'🥁', title:'Resonance', url:'resonance-drum.html' },
+    { icon:'🚀', title:'Mega Rocket', url:'/rocket.html' },
+    { icon:'🐼', title:'Panda World', url:'/pandaworld.html' },
+    { icon:'🥁', title:'Resonance', url:'/resonance-drum.html' },
   ];
   const graceShortcuts = graceApps.map(a =>
     `<div class="ntp-shortcut" data-url="${escapeAttr(a.url)}">
@@ -624,7 +624,9 @@ function resolveUrl(input) {
   if (input.startsWith('/')) return input; // local paths
   if (/^https?:\/\//i.test(input)) return input;
   if (/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(input)) return input;
-  // Check if it looks like a domain
+  // Local file paths (e.g., gracevox.html, records.html)
+  if (/\.(html?|htm)$/i.test(input)) return '/' + input;
+  // Check if it looks like a domain (must have at least one dot, not just .html)
   if (/^[^\s]+\.[^\s]+$/.test(input) && !input.includes(' ')) {
     return 'https://' + input;
   }
