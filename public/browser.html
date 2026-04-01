@@ -174,40 +174,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 .ctx-item:hover{background:rgba(0,229,255,.1);color:var(--accent);}
 .ctx-sep{height:1px;background:var(--border);margin:4px 8px;}
 
-/* --- Voice Search Overlay --- */
-#voice-overlay{position:fixed;inset:0;background:rgba(10,14,26,.92);z-index:500;
-  display:none;flex-direction:column;align-items:center;justify-content:center;
-  backdrop-filter:blur(12px);}
-#voice-overlay.active{display:flex;}
-.voice-ring{width:140px;height:140px;border-radius:50%;border:3px solid var(--voice);
-  display:flex;align-items:center;justify-content:center;position:relative;
-  transition:all .3s;}
-.voice-ring.listening{border-color:var(--recording);
-  box-shadow:0 0 40px var(--voice-glow);}
-.voice-ring-icon{font-size:48px;transition:all .3s;}
-.voice-wave{position:absolute;inset:-20px;border-radius:50%;border:2px solid var(--voice);
-  opacity:0;animation:none;}
-.voice-ring.listening .voice-wave{animation:waveExpand 2s ease-out infinite;}
-.voice-ring.listening .voice-wave:nth-child(2){animation-delay:.5s;}
-.voice-ring.listening .voice-wave:nth-child(3){animation-delay:1s;}
-@keyframes waveExpand{0%{transform:scale(.7);opacity:.6}100%{transform:scale(1.3);opacity:0}}
-#voice-canvas{width:min(400px,80vw);height:80px;margin:24px 0;}
-#voice-text{font-size:18px;color:var(--text);min-height:28px;text-align:center;
-  max-width:80vw;font-family:'Noto Sans JP',sans-serif;}
-#voice-interim{font-size:14px;color:var(--text2);min-height:20px;margin-top:4px;text-align:center;}
-#voice-hint{font-size:11px;color:var(--text2);margin-top:20px;
-  font-family:'JetBrains Mono',monospace;opacity:.6;}
-#voice-close{position:absolute;top:20px;right:20px;width:40px;height:40px;
-  border-radius:50%;background:var(--surface);border:1px solid var(--border);
-  color:var(--text2);font-size:20px;cursor:pointer;display:flex;
-  align-items:center;justify-content:center;}
-#voice-close:hover{background:var(--danger);color:#fff;}
-#voice-lang-bar{display:flex;gap:6px;margin-top:16px;}
-.voice-lang{padding:4px 12px;border-radius:12px;font-size:11px;cursor:pointer;
-  color:var(--text2);border:1px solid var(--border);transition:all .15s;
-  font-family:'JetBrains Mono',monospace;}
-.voice-lang:hover{border-color:var(--accent);}
-.voice-lang.active{background:var(--voice);border-color:var(--voice);color:#fff;}
+/* --- Voice active state (URL bar glow) --- */
+#url-bar.voice-active{border-color:var(--recording);box-shadow:0 0 12px rgba(255,107,107,.2);}
 
 /* --- NTP Voice Button --- */
 .ntp-voice-section{margin-bottom:32px;text-align:center;}
@@ -281,25 +249,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   </div>
 </div>
 
-<!-- Voice Search Overlay -->
-<div id="voice-overlay">
-  <button id="voice-close">✕</button>
-  <div class="voice-ring" id="voice-ring">
-    <div class="voice-wave"></div>
-    <div class="voice-wave"></div>
-    <div class="voice-wave"></div>
-    <span class="voice-ring-icon">🎤</span>
-  </div>
-  <canvas id="voice-canvas"></canvas>
-  <div id="voice-text"></div>
-  <div id="voice-interim"></div>
-  <div id="voice-lang-bar">
-    <div class="voice-lang active" data-lang="ja-JP">日本語</div>
-    <div class="voice-lang" data-lang="en-US">English</div>
-    <div class="voice-lang" data-lang="zh-CN">中文</div>
-  </div>
-  <div id="voice-hint">話しかけてください... ESCで終了</div>
-</div>
+<!-- Voice overlay removed — voice input goes directly to URL bar -->
 
 <!-- Context Menu -->
 <div id="context-menu"></div>
@@ -841,21 +791,11 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// ===== GraceVox Voice Search Engine =====
-const voiceOverlay = document.getElementById('voice-overlay');
-const voiceRing = document.getElementById('voice-ring');
-const voiceTextEl = document.getElementById('voice-text');
-const voiceInterimEl = document.getElementById('voice-interim');
-const voiceCanvas = document.getElementById('voice-canvas');
-const voiceCloseBtn = document.getElementById('voice-close');
+// ===== Inline Voice Search (URL bar direct input) =====
 const voiceNavBtn = document.getElementById('voice-btn');
-let voiceLang = 'ja-JP';
 let voiceRecognition = null;
-let voiceAudioCtx = null;
-let voiceAnalyser = null;
-let voiceMediaStream = null;
-let voiceAnimFrame = null;
 let voiceFinalText = '';
+let _voiceActive = false;
 
 const hasSpeechRecognition = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
@@ -864,18 +804,21 @@ function startVoiceSearch() {
     setStatus('このブラウザは音声認識に対応していません');
     return;
   }
+  if (_voiceActive) { stopVoiceSearch(); return; } // toggle off
+
   voiceFinalText = '';
-  voiceTextEl.textContent = '';
-  voiceInterimEl.textContent = '';
-  voiceOverlay.classList.add('active');
-  voiceRing.classList.add('listening');
+  _voiceActive = true;
   voiceNavBtn.classList.add('listening');
+  urlBar.classList.add('voice-active');
+  urlBar.value = '';
+  urlBar.placeholder = '🎤 話してください...';
+  urlBar.focus();
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   voiceRecognition = new SR();
-  voiceRecognition.continuous = true;
+  voiceRecognition.continuous = false;
   voiceRecognition.interimResults = true;
-  voiceRecognition.lang = voiceLang;
+  voiceRecognition.lang = 'ja-JP';
 
   voiceRecognition.onresult = (e) => {
     let interim = '';
@@ -888,158 +831,59 @@ function startVoiceSearch() {
       }
     }
     if (final) voiceFinalText = final;
-    voiceTextEl.textContent = voiceFinalText || '';
-    voiceInterimEl.textContent = interim;
+    // リアルタイムでURLバーに表示
+    urlBar.value = voiceFinalText || interim;
   };
 
   voiceRecognition.onerror = (e) => {
     if (e.error === 'no-speech') {
-      voiceInterimEl.textContent = '音声が検出されませんでした';
+      setStatus('音声が検出されませんでした。もう一度お試しください');
     } else if (e.error === 'not-allowed') {
-      voiceInterimEl.textContent = 'マイクへのアクセスが許可されていません';
-      stopVoiceSearch();
+      setStatus('マイクへのアクセスが許可されていません');
     }
+    stopVoiceSearch();
   };
 
   voiceRecognition.onend = () => {
-    // Put text into URL bar for user to review before searching
-    const text = (voiceFinalText || voiceTextEl.textContent).trim();
+    _voiceActive = false;
+    voiceNavBtn.classList.remove('listening');
+    urlBar.placeholder = 'URLを入力、音声で検索...';
+    const text = (voiceFinalText || urlBar.value).trim();
     if (text) {
-      stopVoiceVisuals();
-      voiceOverlay.classList.remove('active');
       urlBar.value = text;
       urlBar.focus();
       urlBar.select();
       setStatus(`🎤 "${text}" — Enterで検索`);
+    } else {
+      setStatus('準備完了');
     }
   };
 
   voiceRecognition.start();
-  startVoiceVisualizer();
-  setStatus('🎤 音声入力中...');
+  setStatus('🎤 音声入力中... もう一度押すと停止');
 }
 
 function stopVoiceSearch() {
   if (voiceRecognition) {
-    try { voiceRecognition.abort(); } catch(e) {}
+    try { voiceRecognition.stop(); } catch(e) {}
     voiceRecognition = null;
   }
-  stopVoiceVisuals();
-  voiceOverlay.classList.remove('active');
-  voiceRing.classList.remove('listening');
+  _voiceActive = false;
   voiceNavBtn.classList.remove('listening');
+  urlBar.classList.remove('voice-active');
+  urlBar.placeholder = 'URLを入力、音声で検索...';
   setStatus('準備完了');
 }
 
-function confirmVoiceSearch() {
-  const text = (voiceFinalText || voiceTextEl.textContent || voiceInterimEl.textContent).trim();
-  if (voiceRecognition) {
-    try { voiceRecognition.stop(); } catch(e) {}
-  }
-  if (text) {
-    stopVoiceVisuals();
-    voiceOverlay.classList.remove('active');
-    voiceRing.classList.remove('listening');
-    voiceNavBtn.classList.remove('listening');
-    urlBar.value = text;
-    urlBar.focus();
-    urlBar.select();
-    setStatus(`🎤 "${text}" — Enterで検索`);
-  }
-}
+// Legacy function kept for NTP voice button compatibility
+function confirmVoiceSearch() { stopVoiceSearch(); }
 
-function startVoiceVisualizer() {
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-    voiceMediaStream = stream;
-    voiceAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    voiceAnalyser = voiceAudioCtx.createAnalyser();
-    voiceAnalyser.fftSize = 256;
-    const source = voiceAudioCtx.createMediaStreamSource(stream);
-    source.connect(voiceAnalyser);
-    drawVoiceWave();
-  }).catch(() => {});
-}
+// Voice button: toggle inline voice input
+voiceNavBtn.addEventListener('click', startVoiceSearch);
 
-function drawVoiceWave() {
-  if (!voiceAnalyser) return;
-  const canvas = voiceCanvas;
-  const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = canvas.offsetWidth * dpr;
-  canvas.height = canvas.offsetHeight * dpr;
-  ctx.scale(dpr, dpr);
-  const W = canvas.offsetWidth;
-  const H = canvas.offsetHeight;
-  const bufLen = voiceAnalyser.frequencyBinCount;
-  const data = new Uint8Array(bufLen);
-
-  function draw() {
-    voiceAnimFrame = requestAnimationFrame(draw);
-    voiceAnalyser.getByteFrequencyData(data);
-    ctx.clearRect(0, 0, W, H);
-
-    const barCount = 64;
-    const barW = W / barCount - 1;
-    const step = Math.floor(bufLen / barCount);
-    for (let i = 0; i < barCount; i++) {
-      const val = data[i * step] / 255;
-      const barH = val * H * 0.9;
-      const x = i * (barW + 1);
-      const hue = 250 + val * 60;
-      ctx.fillStyle = `hsla(${hue}, 80%, 65%, ${0.3 + val * 0.7})`;
-      ctx.fillRect(x, H / 2 - barH / 2, barW, barH || 1);
-    }
-  }
-  draw();
-}
-
-function stopVoiceVisuals() {
-  if (voiceAnimFrame) cancelAnimationFrame(voiceAnimFrame);
-  voiceAnimFrame = null;
-  if (voiceMediaStream) {
-    voiceMediaStream.getTracks().forEach(t => t.stop());
-    voiceMediaStream = null;
-  }
-  if (voiceAudioCtx) {
-    voiceAudioCtx.close().catch(() => {});
-    voiceAudioCtx = null;
-  }
-  voiceAnalyser = null;
-  voiceRing.classList.remove('listening');
-  voiceNavBtn.classList.remove('listening');
-}
-
-// Voice overlay events
-voiceCloseBtn.addEventListener('click', stopVoiceSearch);
-voiceNavBtn.addEventListener('click', () => {
-  if (voiceNavBtn.classList.contains('listening')) {
-    confirmVoiceSearch();
-  } else {
-    startVoiceSearch();
-  }
-});
-
-// Voice overlay click on ring to confirm
-voiceRing.addEventListener('click', confirmVoiceSearch);
-
-// Voice language selector
-document.querySelectorAll('.voice-lang').forEach(el => {
-  el.addEventListener('click', () => {
-    document.querySelectorAll('.voice-lang').forEach(e => e.classList.remove('active'));
-    el.classList.add('active');
-    voiceLang = el.dataset.lang;
-    // Restart recognition with new language
-    if (voiceRecognition) {
-      try { voiceRecognition.abort(); } catch(e) {}
-      setTimeout(() => startVoiceSearch(), 200);
-    }
-  });
-});
-
-// ESC to close voice overlay
+// ESC to stop voice input
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && voiceOverlay.classList.contains('active')) {
+  if (e.key === 'Escape' && _voiceActive) {
     stopVoiceSearch();
   }
 });
