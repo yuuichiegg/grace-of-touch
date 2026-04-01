@@ -6,6 +6,17 @@
 <meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
 <meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
 <title>Grace Browser v2 — Web Navigator</title>
+<!-- © 2024-2026 Grace of Touch Co. All rights reserved. Unauthorized copying prohibited. -->
+<script>
+(function(){
+  document.addEventListener('contextmenu',function(e){e.preventDefault();});
+  document.addEventListener('keydown',function(e){
+    if(e.key==='F12'||(e.ctrlKey&&e.shiftKey&&(e.key==='I'||e.key==='J'))||(e.ctrlKey&&e.key==='u')){e.preventDefault();}
+  });
+  console.log('%c⚠ WARNING','color:red;font-size:24px;font-weight:bold;');
+  console.log('%c© 2024-2026 Grace of Touch Co. All rights reserved.','color:red;font-size:12px;');
+})();
+</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
