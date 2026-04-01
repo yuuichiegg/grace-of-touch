@@ -420,11 +420,14 @@ document.addEventListener('DOMContentLoaded',()=>{
       <br><button class="setup-btn secondary" onclick="skipSetup()">スキップ</button>
     </div>
     <div class="setup-step" id="setup-step-2">
-      <h2>声のサンプル録音</h2>
-      <p>普段の話し方で10秒ほど話してください</p>
+      <h2>声のキャリブレーション</h2>
+      <p>以下の文章を声に出して読んでください</p>
+      <div id="calibText" style="background:rgba(108,92,231,0.08);border:1px solid rgba(108,92,231,0.2);border-radius:10px;padding:14px;margin:12px 0;font-size:14px;line-height:1.8;text-align:left;color:var(--text);">
+        「GraceVoxは、声紋を解析して文字を校正するアプリです。Firebase上で動作し、Three.jsで3Dを描画します。今日の会議の議事録を作成してください。」
+      </div>
       <div class="voice-circle" id="voiceCircle">&#127908;</div>
       <div class="progress-bar"><div class="progress-fill" id="setupProgress"></div></div>
-      <p id="setupTimer" style="font-size:20px;font-weight:700;color:var(--accent);">10</p>
+      <p id="setupTimer" style="font-size:20px;font-weight:700;color:var(--accent);">15</p>
       <button class="setup-btn" id="setupRecBtn" onclick="startSetupRec()">録音開始</button>
     </div>
     <div class="setup-step" id="setup-step-3">
@@ -973,7 +976,7 @@ function startSetupRec() {
       for(let i=0;i<fd.length;i++){wSum+=i*fd[i];tSum+=fd[i];}
       if(tSum>0) spectralData.push(wSum/tSum*(ac.sampleRate/an.fftSize));
     },100);
-    sr.start(); let rem=10;
+    sr.start(); let rem=15;
     const ti=setInterval(()=>{
       rem--; document.getElementById('setupTimer').textContent=rem;
       document.getElementById('setupProgress').style.width=((10-rem)/10*100)+'%';
@@ -988,7 +991,19 @@ function startSetupRec() {
         const pitchStd=pd.length>1?Math.sqrt(pd.reduce((s,v)=>s+(v-avgPitch)**2,0)/(pd.length-1)):0;
         const avgVol=volData.length?volData.reduce((a,b)=>a+b,0)/volData.length:0;
         const avgSpectral=spectralData.length?spectralData.reduce((a,b)=>a+b,0)/spectralData.length:0;
-        const speakingRate=text.length/10; // 文字/秒
+        const speakingRate=text.length/15; // 文字/秒
+        // キャリブレーション精度: 認識テキストと元テキストを比較して誤認識パターン学習
+        const calibRef='GraceVox 声紋 解析 校正 Firebase Three.js 3D 会議 議事録 作成';
+        const calibWords=calibRef.split(/\s+/);
+        const recognizedWords=text.replace(/[、。！？\s]+/g,' ').split(/\s+/);
+        const misrecognitions=[];
+        calibWords.forEach(cw=>{
+          if(!recognizedWords.some(rw=>rw.includes(cw))){
+            // This calibration word was not recognized correctly - find closest match
+            const closest=recognizedWords.find(rw=>rw.length>=2&&cw.length>=2);
+            if(closest) misrecognitions.push({expected:cw, got:closest});
+          }
+        });
         voiceProfile={
           lang,
           avgPitch:Math.round(avgPitch),        // 基本周波数（Hz）
@@ -996,6 +1011,12 @@ function startSetupRec() {
           avgVolume:Math.round(avgVol*1000)/1000, // 平均音量
           spectralCentroid:Math.round(avgSpectral), // 声の明るさ
           speakingRate:Math.round(speakingRate*10)/10, // 話速
+          // 校正に使う追加データ
+          punctuationInterval:speakingRate>3?12:speakingRate>2?15:20, // 話速に応じた句読点間隔
+          isHighPitch:avgPitch>250,
+          isLowPitch:avgPitch<150,
+          isFastSpeaker:speakingRate>3,
+          calibMisrecognitions:misrecognitions, // 誤認識パターン
           setupDone:true,
           setupDate:new Date().toISOString()
         };
@@ -1010,13 +1031,16 @@ function startSetupRec() {
         const vpInfo=document.getElementById('voicePrintInfo');
         const pitchLabel=avgPitch<150?'低め':avgPitch<250?'標準':'高め';
         const brightLabel=avgSpectral<500?'落ち着いた':avgSpectral<1000?'標準':'明るい';
+        const puncLabel=voiceProfile.isFastSpeaker?'短め（早口対応）':'標準';
         vpInfo.innerHTML=`
-          <div style="font-weight:600;color:var(--accent);margin-bottom:4px;">Voice Print</div>
+          <div style="font-weight:600;color:var(--accent);margin-bottom:4px;">Voice Print Analysis</div>
           <div>🎵 ピッチ: <strong>${Math.round(avgPitch)} Hz</strong> (${pitchLabel})</div>
           <div>📊 変動幅: <strong>±${Math.round(pitchStd)} Hz</strong></div>
           <div>🔊 音量: <strong>${(avgVol*100).toFixed(1)}%</strong></div>
           <div>✨ 声質: <strong>${brightLabel}トーン</strong> (${Math.round(avgSpectral)} Hz)</div>
           <div>⚡ 話速: <strong>${speakingRate.toFixed(1)} 文字/秒</strong></div>
+          <div>📝 句読点間隔: <strong>${puncLabel}</strong></div>
+          ${misrecognitions.length?'<div style="margin-top:6px;font-size:10px;color:var(--recording);">⚠ 誤認識パターン '+misrecognitions.length+'件を学習しました</div>':'<div style="margin-top:6px;font-size:10px;color:var(--success);">✓ キャリブレーション精度: 良好</div>'}
         `;
         setTimeout(()=>setupNext(3),800);
       }
@@ -1819,10 +1843,11 @@ function autoProofread(text){
     [/配信(?=を|で|が|は)/g, '配信'],
   ];
 
-  // 3. 読点の自動挿入（長い文の区切り）
+  // 3. 読点の自動挿入（話速に応じた間隔調整）
+  const puncInterval = voiceProfile?.punctuationInterval || 15;
   const PUNCTUATION_HINTS = [
-    [/([^、。]{15,}?)(けど|けれど|ですが|だが|しかし|ので|から|のに|ため|ながら)/g, '$1、$2'],
-    [/([^、。]{20,}?)(また|そして|それで|だから|でも|ただ|つまり)/g, '$1。$2'],
+    [new RegExp('([^、。]{'+puncInterval+',}?)(けど|けれど|ですが|だが|しかし|ので|から|のに|ため|ながら)','g'), '$1、$2'],
+    [new RegExp('([^、。]{'+(puncInterval+5)+',}?)(また|そして|それで|だから|でも|ただ|つまり)','g'), '$1。$2'],
   ];
 
   // Apply learned dict first (user overrides)
