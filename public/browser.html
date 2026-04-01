@@ -409,7 +409,7 @@ function buildNewTabPage() {
       <div class="ntp-search" style="margin-bottom:20px;">
         <span class="ntp-search-icon">🔍</span>
         <input type="text" placeholder="検索、URL、または音声メモ..." id="ntp-input" style="padding-right:48px;">
-        <button id="ntp-voice-btn" onclick="startVoiceSearch()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
+        <button id="ntp-voice-btn" onclick="startNtpVoice()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);
           width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--voice,#6c5ce7),#8b5cf6);
           border:none;color:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;
           transition:all .2s;box-shadow:0 2px 8px rgba(108,92,231,.3);">🎤</button>
@@ -439,10 +439,7 @@ function initNewTabPage(container, tabId) {
     });
     setTimeout(() => input.focus(), 100);
   }
-  const voiceBtn = container.querySelector('#ntp-voice-btn');
-  if (voiceBtn) {
-    voiceBtn.addEventListener('click', () => startVoiceSearch());
-  }
+  // NTP voice button is handled by startNtpVoice() via onclick
   container.querySelectorAll('.ntp-shortcut').forEach(el => {
     el.addEventListener('click', () => {
       navigateTab(tabId, el.dataset.url);
@@ -830,6 +827,60 @@ let voiceFinalText = '';
 let _voiceActive = false;
 
 const hasSpeechRecognition = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+// NTP voice: input directly into NTP search box (not URL bar)
+let _ntpVoiceActive = false, _ntpVoiceRec = null;
+function startNtpVoice() {
+  if (!hasSpeechRecognition) { setStatus('音声認識非対応'); return; }
+  const ntpInput = document.getElementById('ntp-input');
+  const btn = document.getElementById('ntp-voice-btn');
+  if (!ntpInput) { startVoiceSearch(); return; } // fallback
+
+  if (_ntpVoiceActive) { // toggle off
+    if (_ntpVoiceRec) { try{_ntpVoiceRec.stop();}catch(e){} _ntpVoiceRec=null; }
+    _ntpVoiceActive = false;
+    if (btn) { btn.style.background='linear-gradient(135deg,#6c5ce7,#8b5cf6)'; btn.textContent='🎤'; }
+    ntpInput.placeholder = '検索、URL、または音声メモ...';
+    return;
+  }
+
+  _ntpVoiceActive = true;
+  ntpInput.value = '';
+  ntpInput.placeholder = '🎤 話してください...';
+  ntpInput.focus();
+  if (btn) { btn.style.background='#ff6b6b'; btn.textContent='■'; }
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  _ntpVoiceRec = new SR();
+  _ntpVoiceRec.continuous = false;
+  _ntpVoiceRec.interimResults = true;
+  _ntpVoiceRec.lang = 'ja-JP';
+
+  let finalText = '';
+  _ntpVoiceRec.onresult = (e) => {
+    let interim = '', final = '';
+    for (let i = 0; i < e.results.length; i++) {
+      if (e.results[i].isFinal) final += e.results[i][0].transcript;
+      else interim += e.results[i][0].transcript;
+    }
+    if (final) finalText = final;
+    ntpInput.value = finalText || interim;
+  };
+  _ntpVoiceRec.onerror = () => { startNtpVoice(); }; // toggle off on error
+  _ntpVoiceRec.onend = () => {
+    _ntpVoiceActive = false;
+    _ntpVoiceRec = null;
+    if (btn) { btn.style.background='linear-gradient(135deg,#6c5ce7,#8b5cf6)'; btn.textContent='🎤'; }
+    ntpInput.placeholder = '検索、URL、または音声メモ...';
+    if (ntpInput.value.trim()) {
+      ntpInput.focus();
+      ntpInput.select();
+      setStatus(`🎤 "${ntpInput.value}" — Enterで検索`);
+    }
+  };
+  _ntpVoiceRec.start();
+  setStatus('🎤 NTP音声入力中...');
+}
 
 function startVoiceSearch() {
   if (!hasSpeechRecognition) {
