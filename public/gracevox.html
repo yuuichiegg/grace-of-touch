@@ -727,6 +727,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <div id="iosCopyBanner" style="display:none;"></div>
 <div class="toast" id="toast"></div>
 
+<!-- Google Identity Services (GIS) — bypasses Firebase redirect/popup issues -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
@@ -970,17 +973,40 @@ async function resetPassword(){
 
 // SNS Login (Google / Apple)
 function snsLogin(provider){
-  let authProvider;
   if(provider==='google'){
-    authProvider=new firebase.auth.GoogleAuthProvider();
+    closeLogin();
+    // Google Identity Services: token-based flow (no redirect/popup issues)
+    if(typeof google==='undefined'||!google.accounts){
+      showToast('Googleライブラリ読み込み中...しばらく待ってもう一度タップ');
+      return;
+    }
+    const client=google.accounts.oauth2.initTokenClient({
+      client_id:'505078300866-dbt43ves9ga1bcep3nf7ectiadumgtlu.apps.googleusercontent.com',
+      scope:'email profile',
+      callback:async(response)=>{
+        if(response.error){
+          showToast('Googleログインエラー: '+response.error);
+          return;
+        }
+        try{
+          // Exchange Google access token for Firebase credential
+          const credential=firebase.auth.GoogleAuthProvider.credential(null,response.access_token);
+          await fbAuth.signInWithCredential(credential);
+          showToast('Googleログイン成功');
+        }catch(e){
+          showToast('Firebase認証エラー: '+_authErrorMsg(e));
+        }
+      }
+    });
+    client.requestAccessToken();
   }else if(provider==='apple'){
-    authProvider=new firebase.auth.OAuthProvider('apple.com');
+    closeLogin();
+    const authProvider=new firebase.auth.OAuthProvider('apple.com');
     authProvider.addScope('email');
     authProvider.addScope('name');
+    showToast('Appleログインに移動...');
+    fbAuth.signInWithRedirect(authProvider);
   }
-  closeLogin();
-  showToast(provider==='google'?'Googleログインに移動...':'Appleログインに移動...');
-  fbAuth.signInWithRedirect(authProvider);
 }
 
 // Phone SMS auth
