@@ -631,7 +631,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         </div>
       </div>
       <div id="proPromo" style="padding:12px;border-radius:10px;border:1px solid var(--accent);background:rgba(108,92,231,0.08);margin-top:8px;">
-        <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:6px;">GraceVox Pro — ¥980/月</div>
+        <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:6px;">GraceVox Pro — ¥2,980/月</div>
         <ul style="font-size:11px;color:var(--text-dim);margin:0;padding-left:16px;line-height:1.6;">
           <li>音声認識 <b>無制限</b></li>
           <li>AI校正エンジン（固有名詞+同音異義語）</li>
@@ -665,7 +665,7 @@ let fbUser=null;
 // ══════════════════════════════
 // FREEMIUM PLAN SYSTEM
 // ══════════════════════════════
-const FREE_MONTHLY_LIMIT=30;
+const FREE_MONTHLY_LIMIT=10;
 let userPlan='free'; // 'free' or 'pro'
 let monthlyUsage=0;
 
@@ -1720,8 +1720,12 @@ function basicClean(text){
 }
 
 // ─── AI校正（音声認識誤変換の自動修正）───
+// Track corrections for Taxnap-style confirmation
+let _lastCorrections = []; // [{orig, corrected}]
+
 function autoProofread(text){
   let r = text;
+  _lastCorrections = [];
 
   // 1. 固有名詞・アプリ名の誤認識修正
   const PROPER_NAMES = [
@@ -1824,9 +1828,12 @@ function autoProofread(text){
   // Apply learned dict first (user overrides)
   r = applyLearnedDict(r);
 
-  // Apply proper names
+  // Apply proper names (track corrections)
   PROPER_NAMES.forEach(([pattern, replacement]) => {
-    r = r.replace(pattern, replacement);
+    r = r.replace(pattern, (match) => {
+      if(match !== replacement) _lastCorrections.push({orig:match, corrected:replacement});
+      return replacement;
+    });
   });
 
   // Apply homophones (with context awareness)
@@ -1884,8 +1891,11 @@ function getProofreadHTML(text){
   HIGHLIGHT_PAIRS.forEach(([word])=>{
     const escaped=escapeHtml(word);
     if(html.includes(escaped)){
+      // Find the original text for this correction
+      const corr=_lastCorrections.find(c=>c.corrected===word);
+      const origAttr=corr?' data-orig="'+escapeHtml(corr.orig)+'"':'';
       html=html.replace(new RegExp(escapeRegex(escaped),'g'),
-        '<span class="proof-mark" onclick="showProofTip(this)" data-word="'+escaped+'">'+escaped+'</span>');
+        '<span class="proof-mark" onclick="showProofTip(this)" data-word="'+escaped+'"'+origAttr+'>'+escaped+'</span>');
     }
   });
   return html;
@@ -2540,23 +2550,66 @@ function toggleEdit(){
 }
 function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
 function showProofTip(el){
-  // 既存のポップアップを閉じる
   document.querySelectorAll('.proof-tip').forEach(t=>t.remove());
   const word=el.dataset.word;
-  // 最近の校正変更から元のテキストを探す
-  let origWord='(音声認識の誤変換を修正)';
+  const orig=el.dataset.orig||'';
   const tip=document.createElement('div');
   tip.className='proof-tip';
-  tip.innerHTML='<span class="proof-close" onclick="this.parentElement.remove()">✕</span>'+
-    '<div style="margin-bottom:4px;font-size:10px;color:var(--text-dim);">AI校正</div>'+
-    '<span class="proof-new">'+word+'</span>'+
-    '<div style="margin-top:4px;font-size:10px;color:var(--text-dim);">タップで閉じる</div>';
-  tip.style.left=Math.min(el.getBoundingClientRect().left, window.innerWidth-270)+'px';
-  tip.style.top=(el.getBoundingClientRect().bottom+8)+'px';
+  tip.style.maxWidth='280px';
+
+  if(orig){
+    // Taxnap-style: show original → corrected with action buttons
+    tip.innerHTML=
+      '<span class="proof-close" onclick="this.parentElement.remove()">✕</span>'+
+      '<div style="margin-bottom:6px;font-size:10px;color:var(--text-dim);font-weight:600;">AI校正</div>'+
+      '<div style="margin-bottom:8px;">'+
+        '<span class="proof-orig">'+escapeHtml(orig)+'</span>'+
+        '<span style="color:var(--text-dim);margin:0 4px;">→</span>'+
+        '<span class="proof-new">'+escapeHtml(word)+'</span>'+
+      '</div>'+
+      '<div style="display:flex;gap:6px;">'+
+        '<button onclick="proofAccept(this,\''+escapeHtml(orig)+'\',\''+escapeHtml(word)+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--success);background:rgba(0,255,179,0.1);color:var(--success);font-size:11px;cursor:pointer;font-family:inherit;">✓ はい</button>'+
+        '<button onclick="proofReject(this,\''+escapeHtml(orig)+'\',\''+escapeHtml(word)+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--recording);background:rgba(255,68,68,0.1);color:var(--recording);font-size:11px;cursor:pointer;font-family:inherit;">✗ いいえ</button>'+
+        '<button onclick="proofAlways(this,\''+escapeHtml(orig)+'\',\''+escapeHtml(word)+'\')" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--accent);background:rgba(108,92,231,0.1);color:var(--accent);font-size:11px;cursor:pointer;font-family:inherit;">◎ 常に修正</button>'+
+      '</div>';
+  }else{
+    // No original - just show the corrected word
+    tip.innerHTML=
+      '<span class="proof-close" onclick="this.parentElement.remove()">✕</span>'+
+      '<div style="margin-bottom:4px;font-size:10px;color:var(--text-dim);">AI校正済み</div>'+
+      '<span class="proof-new">'+escapeHtml(word)+'</span>';
+    setTimeout(()=>tip.remove(),3000);
+  }
+
+  const rect=el.getBoundingClientRect();
+  tip.style.left=Math.min(rect.left, window.innerWidth-290)+'px';
+  tip.style.top=(rect.bottom+8)+'px';
   document.body.appendChild(tip);
-  // 3秒で自動閉じ
-  setTimeout(()=>tip.remove(),3000);
-  tip.addEventListener('click',()=>tip.remove());
+}
+
+function proofAccept(btn,orig,corrected){
+  showToast('「'+orig+'→'+corrected+'」を承認');
+  btn.closest('.proof-tip').remove();
+}
+
+function proofReject(btn,orig,corrected){
+  // Revert the correction in the output area
+  const out=document.getElementById('output');
+  if(out){
+    out.innerHTML=out.innerHTML.replace(
+      new RegExp('<span[^>]*>'+escapeRegex(escapeHtml(corrected))+'</span>','g'),
+      escapeHtml(orig)
+    );
+  }
+  showToast('「'+corrected+'」を元に戻しました');
+  btn.closest('.proof-tip').remove();
+}
+
+function proofAlways(btn,orig,corrected){
+  // Add to learned dictionary so it always corrects this
+  addLearnedWord(orig, corrected);
+  showToast('「'+orig+'→'+corrected+'」を辞書に登録');
+  btn.closest('.proof-tip').remove();
 }
 function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
 
