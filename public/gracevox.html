@@ -2742,18 +2742,24 @@ const PICHAN_SKINS = {
     idle:'🐤', listening:'🐥', happy:'🐤', sleepy:'🐣', thinking:'🐤', recording:'🐥', flying:'🐥',
     name:'ぴーちゃん(ひよこ)', gradient:'linear-gradient(135deg,#FFD700,#FFA500)'
   },
-  inko: {
+  inko_red: {
     idle:'🦜', listening:'🦜', happy:'🦜', sleepy:'🦜', thinking:'🦜', recording:'🦜', flying:'🦜',
-    name:'ぴーちゃん(インコ)', gradient:'linear-gradient(135deg,#4FC3F7,#0288D1)'
+    name:'ぴーちゃん(赤インコ)', gradient:'linear-gradient(135deg,#FF6B6B,#E53935)'
+  },
+  inko_blue: {
+    idle:'🦜', listening:'🦜', happy:'🦜', sleepy:'🦜', thinking:'🦜', recording:'🦜', flying:'🦜',
+    name:'ぴーちゃん(青インコ)', gradient:'linear-gradient(135deg,#4FC3F7,#0288D1)'
   }
 };
+const SKIN_ORDER = ['chick', 'inko_red', 'inko_blue'];
 
 function pichanEmoji(state) {
   return (PICHAN_SKINS[_pichanSkin] || PICHAN_SKINS.chick)[state] || PICHAN_SKINS.chick.idle;
 }
 
 function togglePichanSkin() {
-  _pichanSkin = _pichanSkin === 'chick' ? 'inko' : 'chick';
+  const idx = SKIN_ORDER.indexOf(_pichanSkin);
+  _pichanSkin = SKIN_ORDER[(idx + 1) % SKIN_ORDER.length];
   localStorage.setItem('gv_pichan_skin', _pichanSkin);
   updatePichanState(_pichanState);
   const avatar = document.getElementById('pichanAvatar');
@@ -2761,7 +2767,12 @@ function togglePichanSkin() {
     avatar.textContent = pichanEmoji('idle');
     avatar.style.background = PICHAN_SKINS[_pichanSkin].gradient;
   }
-  showAiBubble(_pichanSkin === 'inko' ? 'インコモードだよ！ピピッ🦜' : 'ひよこに戻ったよ！ぴよぴよ🐤', 'きせかえ✨');
+  const msgs = {
+    chick: 'ひよこに戻ったよ！ぴよぴよ🐤',
+    inko_red: '赤インコだよ！ピピッ🦜❤️',
+    inko_blue: 'スカイブルーインコ！さわやか〜🦜💙',
+  };
+  showAiBubble(msgs[_pichanSkin] || 'きせかえ完了！', 'きせかえ✨');
 }
 
 function updatePichanState(state) {
@@ -2879,17 +2890,64 @@ function pichanTap() {
   setTimeout(pichanWander, 500);
 }
 
-// Long press to toggle skin
-let _pichanLongPress = null;
-document.getElementById('pichanMini')?.addEventListener('pointerdown', () => {
-  _pichanLongPress = setTimeout(togglePichanSkin, 800);
-});
-document.getElementById('pichanMini')?.addEventListener('pointerup', () => {
-  if (_pichanLongPress) { clearTimeout(_pichanLongPress); _pichanLongPress = null; }
-});
-document.getElementById('pichanMini')?.addEventListener('pointerleave', () => {
-  if (_pichanLongPress) { clearTimeout(_pichanLongPress); _pichanLongPress = null; }
-});
+// Drag to move + long press to change skin
+(function(){
+  const el = document.getElementById('pichanMini');
+  if (!el) return;
+  let _longPress = null, _dragging = false, _dragStartX = 0, _dragStartY = 0;
+  let _elStartR = 0, _elStartB = 0, _moved = false;
+
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    _dragging = false; _moved = false;
+    _dragStartX = e.clientX; _dragStartY = e.clientY;
+    _elStartR = parseInt(el.style.right) || 12;
+    _elStartB = parseInt(el.style.bottom) || 70;
+    el.setPointerCapture(e.pointerId);
+    // Long press: 800ms without moving → skin change
+    _longPress = setTimeout(() => {
+      if (!_moved) { togglePichanSkin(); _dragging = false; }
+      _longPress = null;
+    }, 800);
+  });
+
+  el.addEventListener('pointermove', (e) => {
+    const dx = e.clientX - _dragStartX;
+    const dy = e.clientY - _dragStartY;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      _moved = true; _dragging = true;
+      if (_longPress) { clearTimeout(_longPress); _longPress = null; }
+      // Move pi-chan (right/bottom based)
+      const newR = Math.max(0, Math.min(window.innerWidth - 40, _elStartR - dx));
+      const newB = Math.max(0, Math.min(window.innerHeight - 50, _elStartB + dy));
+      el.style.right = newR + 'px';
+      el.style.bottom = newB + 'px';
+      el.style.transition = 'none'; // instant follow
+      const body = document.getElementById('pichanBody');
+      if (body) body.style.animation = 'pichan-fly .5s ease';
+    }
+  });
+
+  el.addEventListener('pointerup', (e) => {
+    el.releasePointerCapture(e.pointerId);
+    if (_longPress) { clearTimeout(_longPress); _longPress = null; }
+    el.style.transition = '';
+    if (_dragging) {
+      _dragging = false;
+      updatePichanState('happy');
+      setTimeout(() => { if (_pichanState === 'happy') updatePichanState('idle'); }, 1500);
+    }
+  });
+
+  el.addEventListener('pointercancel', () => {
+    if (_longPress) { clearTimeout(_longPress); _longPress = null; }
+    _dragging = false;
+    el.style.transition = '';
+  });
+
+  // Prevent default touch scroll while dragging pi-chan
+  el.style.touchAction = 'none';
+})();
 
 // Sleepy timer + wander
 setInterval(() => {
