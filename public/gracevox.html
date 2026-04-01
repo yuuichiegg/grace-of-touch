@@ -2943,9 +2943,9 @@ function pichanTap() {
     if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
       _moved = true; _dragging = true;
       if (_longPress) { clearTimeout(_longPress); _longPress = null; }
-      // Move pi-chan (right/bottom based)
+      // Move pi-chan (right/bottom positioning: right decreases when mouse goes right, bottom decreases when mouse goes down)
       const newR = Math.max(0, Math.min(window.innerWidth - 40, _elStartR - dx));
-      const newB = Math.max(0, Math.min(window.innerHeight - 50, _elStartB + dy));
+      const newB = Math.max(0, Math.min(window.innerHeight - 50, _elStartB - dy));
       el.style.right = newR + 'px';
       el.style.bottom = newB + 'px';
       el.style.transition = 'none'; // instant follow
