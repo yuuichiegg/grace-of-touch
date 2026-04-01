@@ -822,27 +822,26 @@ let fbUser=null;
 // ══════════════════════════════
 // FREEMIUM PLAN SYSTEM
 // ══════════════════════════════
-const FREE_MONTHLY_LIMIT=10;
+const FREE_DAILY_LIMIT=15;
 let userPlan='free'; // 'free' or 'pro'
-let monthlyUsage=0;
+let dailyUsage=0;
 
 function getPlanKey(){
-  const d=new Date();
-  return 'gv_usage_'+d.getFullYear()+'_'+(d.getMonth()+1);
+  return 'gv_usage_'+new Date().toISOString().slice(0,10);
 }
 
 function loadUsage(){
-  monthlyUsage=parseInt(localStorage.getItem(getPlanKey())||'0');
+  dailyUsage=parseInt(localStorage.getItem(getPlanKey())||'0');
   updatePlanUI();
 }
 
 function incrementUsage(){
   if(userPlan==='pro')return true;
-  monthlyUsage++;
-  localStorage.setItem(getPlanKey(),String(monthlyUsage));
+  dailyUsage++;
+  localStorage.setItem(getPlanKey(),String(dailyUsage));
   updatePlanUI();
-  if(monthlyUsage>FREE_MONTHLY_LIMIT){
-    showToast('今月の無料枠('+FREE_MONTHLY_LIMIT+'回)を超えました。Proプランをご検討ください');
+  if(dailyUsage>FREE_DAILY_LIMIT){
+    showToast('今日の無料枠('+FREE_DAILY_LIMIT+'回)を超えました。Proプランをご検討ください');
     return false;
   }
   return true;
@@ -850,8 +849,8 @@ function incrementUsage(){
 
 function checkUsageLimit(){
   if(userPlan==='pro')return true;
-  if(monthlyUsage>=FREE_MONTHLY_LIMIT){
-    showToast('無料枠('+FREE_MONTHLY_LIMIT+'回/月)に達しました');
+  if(dailyUsage>=FREE_DAILY_LIMIT){
+    showToast('無料枠('+FREE_DAILY_LIMIT+'回/日)に達しました');
     return false;
   }
   return true;
@@ -873,11 +872,11 @@ function updatePlanUI(){
   }else{
     nameEl.textContent='Free';
     nameEl.style.color='';
-    const pct=Math.min(100,Math.round(monthlyUsage/FREE_MONTHLY_LIMIT*100));
-    const remaining=Math.max(0,FREE_MONTHLY_LIMIT-monthlyUsage);
-    usageEl.textContent=remaining>0?'あと'+remaining+'回使えます':'今月の無料枠を使い切りました';
+    const pct=Math.min(100,Math.round(dailyUsage/FREE_DAILY_LIMIT*100));
+    const remaining=Math.max(0,FREE_DAILY_LIMIT-dailyUsage);
+    usageEl.textContent=remaining>0?'今日あと'+remaining+'回使えます':'今日の無料枠を使い切りました';
     barEl.style.width=(100-pct)+'%';
-    barEl.style.background=remaining<=2?'var(--recording)':'var(--accent)';
+    barEl.style.background=remaining<=3?'var(--recording)':'var(--accent)';
     promoEl.style.display='block';
   }
 }
