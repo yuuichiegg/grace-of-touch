@@ -416,19 +416,25 @@ function buildNewTabPage() {
     <div class="new-tab-page">
       <div class="ntp-logo">GRACE BROWSER</div>
       <div style="font-size:10px;color:var(--text2);margin-bottom:16px;font-family:'JetBrains Mono',monospace;letter-spacing:.08em;opacity:.6;">Music · Voice · Community</div>
-      <div style="display:flex;align-items:center;gap:10px;width:min(540px,92%);margin-bottom:20px;">
-        <div class="ntp-search" style="margin-bottom:0;flex:1;">
-          <span class="ntp-search-icon">🔍</span>
-          <input type="text" placeholder="検索、URL、または音声メモ..." id="ntp-input" style="padding-right:44px;">
-          <button id="ntp-voice-btn" onclick="startNtpVoice()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);
+      <div style="width:min(540px,92%);margin-bottom:16px;">
+        <div style="position:relative;">
+          <textarea id="ntp-input" rows="2" placeholder="検索、URL、または音声メモ..."
+            style="width:100%;padding:12px 90px 12px 40px;background:var(--surface);border:1px solid var(--border);
+            border-radius:16px;color:var(--text);font-size:14px;outline:none;resize:none;
+            font-family:inherit;line-height:1.5;transition:all .2s;"></textarea>
+          <span style="position:absolute;left:14px;top:14px;color:var(--text2);font-size:14px;pointer-events:none;">🔍</span>
+          <button id="ntp-voice-btn" onclick="startNtpVoice()" style="position:absolute;right:50px;top:10px;
             width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--voice,#6c5ce7),#8b5cf6);
             border:none;color:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;
             transition:all .2s;box-shadow:0 2px 8px rgba(108,92,231,.3);">🎤</button>
+          <button id="ntp-go-btn" onclick="ntpGo()" style="position:absolute;right:10px;top:10px;
+            width:32px;height:32px;border-radius:50%;
+            background:linear-gradient(135deg,var(--accent),var(--accent2,#00ff88));
+            border:none;color:#0a0e1a;font-size:16px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;
+            transition:all .2s;box-shadow:0 2px 8px rgba(0,229,255,.3);">→</button>
         </div>
-        <button id="ntp-go-btn" onclick="ntpGo()" style="width:44px;height:44px;border-radius:50%;flex-shrink:0;
-          background:linear-gradient(135deg,var(--accent),var(--accent2,#00ff88));
-          border:none;color:#0a0e1a;font-size:20px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;
-          transition:all .2s;box-shadow:0 2px 12px rgba(0,229,255,.3);">→</button>
+        <canvas id="ntp-voiceprint" style="display:none;width:100%;height:48px;border-radius:0 0 12px 12px;
+          background:rgba(0,0,0,0.3);margin-top:-4px;"></canvas>
       </div>
       <div style="width:min(540px,92%);margin-bottom:16px;">
         <div style="font-family:'Orbitron',monospace;font-size:10px;color:#8b7cf7;letter-spacing:.15em;margin-bottom:10px;">🎵 MUSIC STUDIO</div>
@@ -449,7 +455,8 @@ function initNewTabPage(container, tabId) {
   const input = container.querySelector('#ntp-input');
   if (input) {
     input.addEventListener('keydown', e => {
-      if (e.key === 'Enter' && input.value.trim()) {
+      if (e.key === 'Enter' && !e.shiftKey && input.value.trim()) {
+        e.preventDefault(); // prevent newline in textarea
         navigateTab(tabId, resolveUrl(input.value.trim()));
       }
     });
@@ -852,58 +859,136 @@ function ntpGo() {
   }
 }
 
-// NTP voice: input directly into NTP search box (not URL bar)
+// NTP voice: GraceVox-quality voice input with voiceprint
 let _ntpVoiceActive = false, _ntpVoiceRec = null;
+let _ntpVoiceCtx = null, _ntpVoiceAnalyser = null, _ntpVoiceStream = null, _ntpVoiceAnim = null;
+let _ntpFinalText = '';
+
 function startNtpVoice() {
   if (!hasSpeechRecognition) { setStatus('音声認識非対応'); return; }
   const ntpInput = document.getElementById('ntp-input');
   const btn = document.getElementById('ntp-voice-btn');
-  if (!ntpInput) { startVoiceSearch(); return; } // fallback
+  if (!ntpInput) return;
 
-  if (_ntpVoiceActive) { // toggle off
-    if (_ntpVoiceRec) { try{_ntpVoiceRec.stop();}catch(e){} _ntpVoiceRec=null; }
-    _ntpVoiceActive = false;
-    if (btn) { btn.style.background='linear-gradient(135deg,#6c5ce7,#8b5cf6)'; btn.textContent='🎤'; }
-    ntpInput.placeholder = '検索、URL、または音声メモ...';
-    return;
-  }
+  if (_ntpVoiceActive) { stopNtpVoice(); return; } // toggle off
 
   _ntpVoiceActive = true;
-  ntpInput.value = '';
+  _ntpFinalText = ntpInput.value || ''; // keep existing text
   ntpInput.placeholder = '🎤 話してください...';
   ntpInput.focus();
   if (btn) { btn.style.background='#ff6b6b'; btn.textContent='■'; }
 
+  // Show voiceprint canvas
+  const vpCanvas = document.getElementById('ntp-voiceprint');
+  if (vpCanvas) vpCanvas.style.display = 'block';
+
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   _ntpVoiceRec = new SR();
-  _ntpVoiceRec.continuous = false;
+  _ntpVoiceRec.continuous = true;  // 途切れても継続
   _ntpVoiceRec.interimResults = true;
   _ntpVoiceRec.lang = 'ja-JP';
 
-  let finalText = '';
   _ntpVoiceRec.onresult = (e) => {
     let interim = '', final = '';
     for (let i = 0; i < e.results.length; i++) {
       if (e.results[i].isFinal) final += e.results[i][0].transcript;
       else interim += e.results[i][0].transcript;
     }
-    if (final) finalText = final;
-    ntpInput.value = finalText || interim;
+    if (final) _ntpFinalText += final;
+    ntpInput.value = _ntpFinalText + interim;
+    // Auto-resize textarea
+    ntpInput.style.height = 'auto';
+    ntpInput.style.height = Math.min(120, ntpInput.scrollHeight) + 'px';
   };
-  _ntpVoiceRec.onerror = () => { startNtpVoice(); }; // toggle off on error
-  _ntpVoiceRec.onend = () => {
-    _ntpVoiceActive = false;
-    _ntpVoiceRec = null;
-    if (btn) { btn.style.background='linear-gradient(135deg,#6c5ce7,#8b5cf6)'; btn.textContent='🎤'; }
-    ntpInput.placeholder = '検索、URL、または音声メモ...';
-    if (ntpInput.value.trim()) {
-      ntpInput.focus();
-      ntpInput.select();
-      setStatus(`🎤 "${ntpInput.value}" — Enterで検索`);
+
+  _ntpVoiceRec.onerror = (e) => {
+    if (e.error === 'no-speech') {
+      setStatus('音声が検出されませんでした — マイクは待機中');
+      // Don't stop! Keep listening
+    } else if (e.error === 'not-allowed') {
+      setStatus('マイクへのアクセスが許可されていません');
+      stopNtpVoice();
     }
   };
+
+  _ntpVoiceRec.onend = () => {
+    // Auto-restart if still active (continuous mode may stop on silence)
+    if (_ntpVoiceActive) {
+      try { _ntpVoiceRec.start(); } catch(e) { stopNtpVoice(); }
+    }
+  };
+
   _ntpVoiceRec.start();
-  setStatus('🎤 NTP音声入力中...');
+  _startNtpVoiceprint();
+  setStatus('🎤 音声入力中... ■で停止');
+}
+
+function stopNtpVoice() {
+  _ntpVoiceActive = false;
+  if (_ntpVoiceRec) { try{_ntpVoiceRec.abort();}catch(e){} _ntpVoiceRec=null; }
+  _stopNtpVoiceprint();
+  const btn = document.getElementById('ntp-voice-btn');
+  const ntpInput = document.getElementById('ntp-input');
+  if (btn) { btn.style.background='linear-gradient(135deg,#6c5ce7,#8b5cf6)'; btn.textContent='🎤'; }
+  if (ntpInput) ntpInput.placeholder = '検索、URL、または音声メモ...';
+  const vpCanvas = document.getElementById('ntp-voiceprint');
+  if (vpCanvas) vpCanvas.style.display = 'none';
+  setStatus('準備完了');
+}
+
+// Voiceprint visualizer for NTP
+function _startNtpVoiceprint() {
+  if (!navigator.mediaDevices) return;
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    _ntpVoiceStream = stream;
+    _ntpVoiceCtx = new (window.AudioContext || window.webkitAudioContext)();
+    _ntpVoiceAnalyser = _ntpVoiceCtx.createAnalyser();
+    _ntpVoiceAnalyser.fftSize = 256;
+    _ntpVoiceCtx.createMediaStreamSource(stream).connect(_ntpVoiceAnalyser);
+    _drawNtpVoiceprint();
+  }).catch(() => {});
+}
+
+function _drawNtpVoiceprint() {
+  if (!_ntpVoiceAnalyser || !_ntpVoiceActive) return;
+  const cv = document.getElementById('ntp-voiceprint');
+  if (!cv) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth * dpr, h = cv.clientHeight * dpr;
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  const ctx = cv.getContext('2d');
+  const data = new Uint8Array(_ntpVoiceAnalyser.frequencyBinCount);
+  _ntpVoiceAnalyser.getByteFrequencyData(data);
+
+  // Scroll left
+  const img = ctx.getImageData(2, 0, w - 2, h);
+  ctx.putImageData(img, 0, 0);
+  ctx.clearRect(w - 2, 0, 2, h);
+
+  // Draw new column (cyber neon palette)
+  const bins = Math.min(data.length, 64);
+  const sliceH = h / bins;
+  for (let i = 0; i < bins; i++) {
+    const v = data[i] / 255;
+    if (v < 0.02) continue;
+    let r, g, b;
+    if (v < 0.05) { r=0; g=v*200; b=v*400; }
+    else if (v < 0.2) { const t=(v-0.05)/0.15; r=t*40; g=10+t*80; b=20+t*180; }
+    else if (v < 0.45) { const t=(v-0.2)/0.25; r=40+t*140; g=90-t*50; b=200+t*55; }
+    else if (v < 0.75) { const t=(v-0.45)/0.3; r=180+t*75; g=40+t*40; b=255-t*100; }
+    else if (v < 0.9) { const t=(v-0.75)/0.15; r=255; g=80+t*120; b=155+t*100; }
+    else { const t=(v-0.9)/0.1; r=255; g=200+t*55; b=255; }
+    ctx.fillStyle = `rgb(${r|0},${g|0},${b|0})`;
+    ctx.fillRect(w - 2, h - (i + 1) * sliceH, 2, Math.ceil(sliceH) + 1);
+  }
+  _ntpVoiceAnim = requestAnimationFrame(_drawNtpVoiceprint);
+}
+
+function _stopNtpVoiceprint() {
+  if (_ntpVoiceAnim) { cancelAnimationFrame(_ntpVoiceAnim); _ntpVoiceAnim = null; }
+  if (_ntpVoiceStream) { _ntpVoiceStream.getTracks().forEach(t => t.stop()); _ntpVoiceStream = null; }
+  if (_ntpVoiceCtx) { _ntpVoiceCtx.close().catch(()=>{}); _ntpVoiceCtx = null; }
+  _ntpVoiceAnalyser = null;
 }
 
 function startVoiceSearch() {
