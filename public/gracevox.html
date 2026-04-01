@@ -362,6 +362,22 @@
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Track items */
+  .track-item {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    background: rgba(108,92,231,0.05); border: 1px solid rgba(108,92,231,0.1);
+    border-radius: 8px; margin-bottom: 4px; font-size: 12px;
+  }
+  .track-item .track-name { flex:1; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .track-item .track-dur { font-size:10px; color:var(--text-dim); min-width:36px; text-align:right; }
+  .track-item .track-btn {
+    background:none; border:1px solid var(--border); color:var(--text-dim);
+    width:28px; height:28px; border-radius:50%; cursor:pointer; font-size:13px;
+    display:flex; align-items:center; justify-content:center; transition:all 0.2s; flex-shrink:0;
+  }
+  .track-item .track-btn:hover { border-color:var(--accent); color:var(--text); }
+  .track-item .track-btn.playing { border-color:var(--accent); color:var(--accent); background:rgba(108,92,231,0.15); }
 </style>
 </head>
 <body>
@@ -524,6 +540,17 @@ document.addEventListener('DOMContentLoaded',()=>{
     </div>
     <div class="history-content" id="historyContent">
       <div class="history-empty">テキストを選択してコピー、または Save で履歴に保存</div>
+    </div>
+  </div>
+
+  <!-- Audio Track Library -->
+  <div class="history-panel" id="trackPanel" style="display:none;max-height:180px;">
+    <div class="history-header">
+      <span class="history-label">TRACKS</span>
+      <button class="action-btn" onclick="clearTracks()" style="font-size:10px;padding:2px 8px;">Clear All</button>
+    </div>
+    <div class="history-content" id="trackList" style="padding:6px 10px;">
+      <div class="history-empty" id="trackEmpty">録音するとここにトラックが表示されます</div>
     </div>
   </div>
 </main>
@@ -3060,9 +3087,11 @@ document.addEventListener('keydown',(e)=>{
 })();
 
 // ═══════════════════════════════
-// AUDIO RECORDING (MediaRecorder)
+// AUDIO RECORDING + TRACK LIBRARY
 // ═══════════════════════════════
-let _audioRecording=false, _mediaRecorder=null, _audioChunks=[];
+let _audioRecording=false, _mediaRecorder=null, _audioChunks=[], _audioRecStartTime=0;
+let _tracks=JSON.parse(localStorage.getItem('gv_tracks')||'[]'); // [{name,blob(base64),mime,dur,date}]
+let _currentAudio=null, _playingTrackIdx=-1;
 const _audioRecBtn=()=>document.getElementById('audioRecBtn');
 
 function toggleAudioRec(){
@@ -3077,24 +3106,32 @@ async function startAudioRec(){
                    MediaRecorder.isTypeSupported('audio/mp4')?'audio/mp4':'';
     _mediaRecorder=mimeType?new MediaRecorder(stream,{mimeType}):new MediaRecorder(stream);
     _audioChunks=[];
+    _audioRecStartTime=Date.now();
     _mediaRecorder.ondataavailable=e=>{if(e.data.size>0)_audioChunks.push(e.data);};
     _mediaRecorder.onstop=()=>{
       stream.getTracks().forEach(tr=>tr.stop());
       if(_audioChunks.length===0) return;
       const blob=new Blob(_audioChunks,{type:_mediaRecorder.mimeType});
-      const ext=_mediaRecorder.mimeType.includes('mp4')?'m4a':'webm';
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a');
-      a.href=url;
-      a.download='gracevox_'+new Date().toISOString().slice(0,19).replace(/[:-]/g,'')+ '.'+ext;
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
-      setTimeout(()=>URL.revokeObjectURL(url),5000);
-      showToast('録音を保存しました');
+      const dur=Math.round((Date.now()-_audioRecStartTime)/1000);
+      const trackNum=_tracks.length+1;
+      const name='Track '+trackNum;
+      // Convert blob to base64 for localStorage
+      const reader=new FileReader();
+      reader.onloadend=()=>{
+        const track={name,data:reader.result,mime:_mediaRecorder.mimeType,dur,date:new Date().toISOString()};
+        _tracks.push(track);
+        _saveTracks();
+        renderTracks();
+        showToast(name+' を保存しました（'+_formatDur(dur)+'）');
+      };
+      reader.readAsDataURL(blob);
     };
     _mediaRecorder.start();
     _audioRecording=true;
     _audioRecBtn().style.borderColor='var(--recording)';
     _audioRecBtn().style.color='var(--recording)';
+    // Show track panel
+    document.getElementById('trackPanel').style.display='flex';
     showToast('音声録音開始');
   }catch(e){
     showToast('マイクアクセスに失敗: '+e.message);
@@ -3109,6 +3146,101 @@ function stopAudioRec(){
   _audioRecBtn().style.borderColor='';
   _audioRecBtn().style.color='';
 }
+
+function _saveTracks(){
+  try{
+    // Keep only last 20 tracks to avoid localStorage quota
+    if(_tracks.length>20) _tracks=_tracks.slice(-20);
+    localStorage.setItem('gv_tracks',JSON.stringify(_tracks));
+  }catch(e){
+    // Quota exceeded — remove oldest
+    _tracks.shift();
+    try{localStorage.setItem('gv_tracks',JSON.stringify(_tracks));}catch(e2){}
+  }
+}
+
+function _formatDur(s){
+  const m=Math.floor(s/60);
+  const sec=s%60;
+  return m>0?(m+':'+String(sec).padStart(2,'0')):(sec+'秒');
+}
+
+function renderTracks(){
+  const list=document.getElementById('trackList');
+  const panel=document.getElementById('trackPanel');
+  if(_tracks.length===0){
+    list.innerHTML='<div class="history-empty" id="trackEmpty">録音するとここにトラックが表示されます</div>';
+    panel.style.display='none';
+    return;
+  }
+  panel.style.display='flex';
+  list.innerHTML=_tracks.map((tr,i)=>`
+    <div class="track-item" id="track-${i}">
+      <span class="track-name">${escapeHtml(tr.name)}</span>
+      <span class="track-dur">${_formatDur(tr.dur)}</span>
+      <button class="track-btn" onclick="playTrack(${i})" title="再生" id="playBtn-${i}">&#9654;</button>
+      <button class="track-btn" onclick="downloadTrack(${i})" title="ダウンロード">&#11015;</button>
+      <button class="track-btn" onclick="deleteTrack(${i})" title="削除" style="font-size:11px;">&#10005;</button>
+    </div>
+  `).join('');
+}
+
+function playTrack(idx){
+  // Stop current playback
+  if(_currentAudio){
+    _currentAudio.pause();
+    _currentAudio=null;
+    if(_playingTrackIdx>=0){
+      const btn=document.getElementById('playBtn-'+_playingTrackIdx);
+      if(btn){btn.innerHTML='&#9654;';btn.classList.remove('playing');}
+    }
+    if(_playingTrackIdx===idx){_playingTrackIdx=-1;return;} // Toggle off
+  }
+  const tr=_tracks[idx];
+  if(!tr) return;
+  _currentAudio=new Audio(tr.data);
+  _playingTrackIdx=idx;
+  const btn=document.getElementById('playBtn-'+idx);
+  if(btn){btn.innerHTML='&#9646;&#9646;';btn.classList.add('playing');}
+  _currentAudio.onended=()=>{
+    if(btn){btn.innerHTML='&#9654;';btn.classList.remove('playing');}
+    _currentAudio=null;_playingTrackIdx=-1;
+  };
+  _currentAudio.play().catch(()=>{});
+}
+
+function downloadTrack(idx){
+  const tr=_tracks[idx];
+  if(!tr) return;
+  const ext=tr.mime&&tr.mime.includes('mp4')?'m4a':'webm';
+  const a=document.createElement('a');
+  a.href=tr.data;
+  a.download=tr.name.replace(/\s+/g,'_')+'_'+tr.date.slice(0,10)+'.'+ext;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  showToast(tr.name+' をダウンロード');
+}
+
+function deleteTrack(idx){
+  const tr=_tracks[idx];
+  if(!tr) return;
+  if(_playingTrackIdx===idx&&_currentAudio){_currentAudio.pause();_currentAudio=null;_playingTrackIdx=-1;}
+  _tracks.splice(idx,1);
+  _saveTracks();
+  renderTracks();
+  showToast('トラックを削除しました');
+}
+
+function clearTracks(){
+  if(_tracks.length===0) return;
+  if(!confirm('全トラックを削除しますか？')) return;
+  if(_currentAudio){_currentAudio.pause();_currentAudio=null;_playingTrackIdx=-1;}
+  _tracks=[];
+  _saveTracks();
+  renderTracks();
+}
+
+// Render on load
+renderTracks();
 
 // ═══════════════════════════════
 // SNS SHARE (Text + OGP Image)
