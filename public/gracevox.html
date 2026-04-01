@@ -789,8 +789,10 @@ fbAuth.onAuthStateChanged((user)=>{
     btn.title=user.displayName||user.email||'Logged in';
     syncFromCloud();
     checkProStatus();
-    // Owner-only: show live counter
+    // Owner: auto-pro + show live counter
     if(OWNER_EMAILS.includes(user.email)){
+      userPlan='pro';
+      updatePlanUI();
       document.getElementById('gv-live-counter').style.display='flex';
     }
   }else{
