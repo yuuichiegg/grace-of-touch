@@ -4810,6 +4810,52 @@ const SpaceElevator={
       cityGroup.add(tree);
     }
 
+    // Terminal Pandas (3) — lightweight MeshBasicMaterial only, no extra lights
+    const pandaWhite=new THREE.MeshBasicMaterial({color:0xdddddd});
+    const pandaBlack=new THREE.MeshBasicMaterial({color:0x111111});
+    const pandaPink=new THREE.MeshBasicMaterial({color:0x332222});
+    this._terminalPandas=[];
+    const pandaSpots=[{x:-25,z:30},{x:30,z:-20},{x:-10,z:-35}];
+    for(const spot of pandaSpots){
+      const pg=new THREE.Group();
+      // Body (white ellipsoid)
+      const body=new THREE.Mesh(new THREE.SphereGeometry(1.8,8,6),pandaWhite);
+      body.scale.set(1,0.8,0.7);body.position.y=1.8;pg.add(body);
+      // Head
+      const head=new THREE.Mesh(new THREE.SphereGeometry(1.2,8,6),pandaWhite);
+      head.position.set(0,3.2,0.8);pg.add(head);
+      // Ears (black)
+      const earL=new THREE.Mesh(new THREE.SphereGeometry(0.4,4,4),pandaBlack);
+      earL.position.set(-0.7,4.2,0.6);pg.add(earL);
+      const earR=new THREE.Mesh(new THREE.SphereGeometry(0.4,4,4),pandaBlack);
+      earR.position.set(0.7,4.2,0.6);pg.add(earR);
+      // Eye patches
+      const eyeL=new THREE.Mesh(new THREE.SphereGeometry(0.35,4,4),pandaBlack);
+      eyeL.position.set(-0.4,3.3,1.7);pg.add(eyeL);
+      const eyeR=new THREE.Mesh(new THREE.SphereGeometry(0.35,4,4),pandaBlack);
+      eyeR.position.set(0.4,3.3,1.7);pg.add(eyeR);
+      // Nose
+      const nose=new THREE.Mesh(new THREE.SphereGeometry(0.15,4,4),pandaPink);
+      nose.position.set(0,3.0,1.9);pg.add(nose);
+      // Arms (black)
+      const armL=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.3,1.8,4),pandaBlack);
+      armL.position.set(-1.5,1.8,0);armL.rotation.z=0.4;pg.add(armL);
+      const armR=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.3,1.8,4),pandaBlack);
+      armR.position.set(1.5,1.8,0);armR.rotation.z=-0.4;pg.add(armR);
+      // Legs (black)
+      const legL=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.35,1.2,4),pandaBlack);
+      legL.position.set(-0.6,0.6,0);pg.add(legL);
+      const legR=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.35,1.2,4),pandaBlack);
+      legR.position.set(0.6,0.6,0);pg.add(legR);
+      pg.position.set(spot.x,4.0,spot.z);
+      pg.userData._walkAngle=Math.random()*Math.PI*2;
+      pg.userData._walkSpeed=0.15+Math.random()*0.1;
+      pg.userData._idleTimer=0;
+      pg.userData._isIdle=false;
+      cityGroup.add(pg);
+      this._terminalPandas.push(pg);
+    }
+
     // City lights (subtle)
     const cityLight=new THREE.PointLight(0xffeecc,0.6,120);
     cityLight.position.set(0,30,0);
@@ -4921,6 +4967,30 @@ const SpaceElevator={
         if(d2>5000){p.userData._walkAngle=a+Math.PI+Math.random()*0.5;}
         // Occasional direction change
         if(Math.random()<0.005)p.userData._walkAngle+=Math.random()*1-0.5;
+      });
+    }
+    // Animate terminal pandas — wander + idle behavior
+    if(this._terminalPandas){
+      this._terminalPandas.forEach(pg=>{
+        const ud=pg.userData;
+        if(ud._isIdle){
+          ud._idleTimer-=dt;
+          // Sitting animation — gentle sway
+          pg.rotation.z=Math.sin(t*0.8)*0.05;
+          if(ud._idleTimer<=0){ud._isIdle=false;ud._walkAngle+=Math.random()*2-1;}
+        }else{
+          const a=ud._walkAngle,s=ud._walkSpeed;
+          pg.position.x+=Math.cos(a)*s*dt;
+          pg.position.z+=Math.sin(a)*s*dt;
+          pg.rotation.y=-a+Math.PI/2;
+          // Waddle animation
+          pg.rotation.z=Math.sin(t*3)*0.08;
+          const d2=pg.position.x*pg.position.x+pg.position.z*pg.position.z;
+          if(d2>4000){ud._walkAngle=a+Math.PI+Math.random()*0.5;}
+          // Random idle (sit down and rest)
+          if(Math.random()<0.002){ud._isIdle=true;ud._idleTimer=3+Math.random()*5;pg.rotation.z=0;}
+          if(Math.random()<0.008)ud._walkAngle+=Math.random()*1.5-0.75;
+        }
       });
     }
   }
