@@ -779,6 +779,11 @@ loadUsage();
   }
 })();
 
+// Handle redirect result (iOS PWA)
+fbAuth.getRedirectResult().then(result=>{
+  if(result&&result.user) showToast('ログインしました: '+result.user.displayName);
+}).catch(e=>{ if(e.code!=='auth/popup-closed-by-user') console.log('Redirect auth:',e); });
+
 // Auth state
 const OWNER_EMAILS=['yuuichiegg@gmail.com'];
 fbAuth.onAuthStateChanged((user)=>{
@@ -809,7 +814,17 @@ function toggleLogin(){
     if(confirm('ログアウトしますか？')) fbAuth.signOut();
   }else{
     const provider=new firebase.auth.GoogleAuthProvider();
-    fbAuth.signInWithPopup(provider).catch(e=>showToast('Login: '+e.message));
+    // iOS PWA: popup doesn't work, use redirect instead
+    const isPWA=window.navigator.standalone===true||window.matchMedia('(display-mode:standalone)').matches;
+    const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+    if(isPWA||isiOS){
+      fbAuth.signInWithRedirect(provider);
+    }else{
+      fbAuth.signInWithPopup(provider).catch(e=>{
+        // Popup blocked fallback → redirect
+        fbAuth.signInWithRedirect(provider);
+      });
+    }
   }
 }
 
