@@ -416,17 +416,19 @@ function buildNewTabPage() {
     <div class="new-tab-page">
       <div class="ntp-logo">GRACE BROWSER</div>
       <div style="font-size:10px;color:var(--text2);margin-bottom:16px;font-family:'JetBrains Mono',monospace;letter-spacing:.08em;opacity:.6;">Music · Voice · Community</div>
-      <div class="ntp-search" style="margin-bottom:20px;">
-        <span class="ntp-search-icon">🔍</span>
-        <input type="text" placeholder="検索、URL、または音声メモ..." id="ntp-input" style="padding-right:82px;">
-        <button id="ntp-go-btn" onclick="ntpGo()" style="position:absolute;right:44px;top:50%;transform:translateY(-50%);
-          width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2,#00ff88));
-          border:none;color:#0a0e1a;font-size:16px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;
-          transition:all .2s;box-shadow:0 2px 8px rgba(0,229,255,.3);">→</button>
-        <button id="ntp-voice-btn" onclick="startNtpVoice()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);
-          width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--voice,#6c5ce7),#8b5cf6);
-          border:none;color:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;
-          transition:all .2s;box-shadow:0 2px 8px rgba(108,92,231,.3);">🎤</button>
+      <div style="display:flex;align-items:center;gap:10px;width:min(540px,92%);margin-bottom:20px;">
+        <div class="ntp-search" style="margin-bottom:0;flex:1;">
+          <span class="ntp-search-icon">🔍</span>
+          <input type="text" placeholder="検索、URL、または音声メモ..." id="ntp-input" style="padding-right:44px;">
+          <button id="ntp-voice-btn" onclick="startNtpVoice()" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);
+            width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--voice,#6c5ce7),#8b5cf6);
+            border:none;color:#fff;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+            transition:all .2s;box-shadow:0 2px 8px rgba(108,92,231,.3);">🎤</button>
+        </div>
+        <button id="ntp-go-btn" onclick="ntpGo()" style="width:44px;height:44px;border-radius:50%;flex-shrink:0;
+          background:linear-gradient(135deg,var(--accent),var(--accent2,#00ff88));
+          border:none;color:#0a0e1a;font-size:20px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;
+          transition:all .2s;box-shadow:0 2px 12px rgba(0,229,255,.3);">→</button>
       </div>
       <div style="width:min(540px,92%);margin-bottom:16px;">
         <div style="font-family:'Orbitron',monospace;font-size:10px;color:#8b7cf7;letter-spacing:.15em;margin-bottom:10px;">🎵 MUSIC STUDIO</div>
