@@ -2808,6 +2808,10 @@ function updatePichanState(state) {
   body.textContent = pichanEmoji(state);
   mood.textContent = s.mood;
   body.style.animation = s.anim;
+  // 青インコ: CSSフィルターで絵文字をスカイブルーに着色
+  body.style.filter = _pichanSkin === 'inko_blue'
+    ? 'hue-rotate(180deg) saturate(1.8) brightness(1.1) drop-shadow(0 2px 6px rgba(0,150,255,0.4))'
+    : 'drop-shadow(0 2px 6px rgba(0,0,0,0.3))';
   _pichanLastActivity = Date.now();
 }
 
