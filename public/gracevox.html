@@ -605,10 +605,11 @@ document.addEventListener('DOMContentLoaded',()=>{
       <button class="action-btn" onclick="toggleLibraryView()" style="font-size:10px;padding:2px 8px;color:var(--accent);">✕ 閉じる</button>
       <button class="action-btn" onclick="clearTracks()" style="font-size:10px;padding:2px 8px;">Clear All</button>
     </div>
-    <!-- Recording visualizer (waveform + spectrogram) -->
+    <!-- Recording visualizer (waveform + voice print) -->
     <div id="recVizWrap" style="display:none;border-bottom:1px solid var(--border);flex-shrink:0;position:relative;">
-      <canvas id="recWaveCanvas" style="width:100%;height:72px;display:block;"></canvas>
-      <button id="vizModeBtn" onclick="cycleVizMode()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:var(--text-dim);font-size:9px;padding:2px 6px;border-radius:4px;cursor:pointer;z-index:2;">波形</button>
+      <canvas id="recWaveCanvas" style="width:100%;height:56px;display:block;"></canvas>
+      <canvas id="recVoicePrintCanvas" style="width:100%;height:56px;display:block;border-top:1px solid rgba(255,255,255,0.05);"></canvas>
+      <button id="vizModeBtn" onclick="cycleVizMode()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:var(--text-dim);font-size:9px;padding:2px 6px;border-radius:4px;cursor:pointer;z-index:2;">波形+声紋</button>
     </div>
     <!-- Player bar (visible when a track is selected) -->
     <div id="trackPlayer" style="display:none;padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
@@ -655,7 +656,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     <div class="inner"></div>
   </button>
   <button class="bs-btn" id="bsBtn" onclick="backspace()" title="Backspace">&#9003;</button>
-  <button class="bs-btn" id="audioRecBtn" onclick="openRecPopup()" title="録音スタジオ" style="font-size:16px;">&#127908;</button>
+  <button class="bs-btn" id="audioRecBtn" onclick="toggleAudioRec()" title="音声録音" style="font-size:16px;">&#127908;</button>
   <button class="bs-btn" id="libToggleBtn" onclick="toggleLibraryView()" title="トラックライブラリ" style="font-size:14px;">📂</button>
   <button class="bs-btn" id="shareBtn" onclick="shareResult()" title="SNS共有" style="font-size:16px;">&#128279;</button>
   <div class="controls-info">
@@ -3725,6 +3726,7 @@ const SPECTRO_COLS=120;
 function _startRecWave(stream){
   document.getElementById('recVizWrap').style.display='block';
   const cv=document.getElementById('recWaveCanvas');
+  const cv2=document.getElementById('recVoicePrintCanvas');
   _recAudioCtx=new(window.AudioContext||window.webkitAudioContext)();
   _recAnalyser=_recAudioCtx.createAnalyser();
   _recAnalyser.fftSize=512;
@@ -3735,6 +3737,7 @@ function _startRecWave(stream){
 
   function draw(){
     if(!_audioRecording) return;
+    // === Waveform canvas ===
     const w=cv.clientWidth*2, h=cv.clientHeight*2;
     if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;}
     const ctx=cv.getContext('2d');
@@ -3747,11 +3750,39 @@ function _startRecWave(stream){
     _spectroHistory.push(new Uint8Array(freqBuf));
     if(_spectroHistory.length>SPECTRO_COLS) _spectroHistory.shift();
 
-    const showWave=_vizMode==='wave'||_vizMode==='both';
-    const showSpec=_vizMode==='spectrum'||_vizMode==='both';
-    const waveH=_vizMode==='both'?h*0.4:h;
-    const specH=_vizMode==='both'?h*0.6:h;
-    const specY=_vizMode==='both'?waveH:0;
+    // Always show waveform on canvas 1
+    const showWave=true;
+    const waveH=h;
+
+    // === Voice print canvas (always show spectrogram) ===
+    if(cv2){
+      const w2=cv2.clientWidth*2, h2=cv2.clientHeight*2;
+      if(cv2.width!==w2||cv2.height!==h2){cv2.width=w2;cv2.height=h2;}
+      const ctx2=cv2.getContext('2d');
+      ctx2.clearRect(0,0,w2,h2);
+      const cols=_spectroHistory.length;
+      const colW=w2/SPECTRO_COLS;
+      const bins=_spectroHistory[0]?.length||1;
+      const binsToShow=Math.min(bins,80);
+      const binH=h2/binsToShow;
+      for(let c=0;c<cols;c++){
+        const col=_spectroHistory[c];
+        for(let b=0;b<binsToShow;b++){
+          const val=col[b]/255;
+          if(val<0.02) continue;
+          const r=Math.round(108*val);
+          const g=Math.round(92+163*val);
+          const bl=Math.round(231*Math.min(1,val*1.5));
+          ctx2.fillStyle=`rgb(${r},${g},${bl})`;
+          ctx2.fillRect(c*colW, h2-(b+1)*binH, colW+0.5, binH+0.5);
+        }
+      }
+    }
+
+    // Legacy compat: vizMode vars for existing wave drawing below
+    const showSpec=false; // spectrogram now on separate canvas
+    const specH=0;
+    const specY=0;
 
     // Waveform
     if(showWave){
