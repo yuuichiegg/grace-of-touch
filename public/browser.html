@@ -888,13 +888,17 @@ function startNtpVoice() {
   _ntpVoiceRec.interimResults = true;
   _ntpVoiceRec.lang = 'ja-JP';
 
+  let _ntpResultIdx = 0; // track processed results to avoid duplication
   _ntpVoiceRec.onresult = (e) => {
-    let interim = '', final = '';
-    for (let i = 0; i < e.results.length; i++) {
-      if (e.results[i].isFinal) final += e.results[i][0].transcript;
-      else interim += e.results[i][0].transcript;
+    let interim = '';
+    for (let i = _ntpResultIdx; i < e.results.length; i++) {
+      if (e.results[i].isFinal) {
+        _ntpFinalText += e.results[i][0].transcript;
+        _ntpResultIdx = i + 1; // mark as processed
+      } else {
+        interim += e.results[i][0].transcript;
+      }
     }
-    if (final) _ntpFinalText += final;
     ntpInput.value = _ntpFinalText + interim;
     // Auto-resize textarea
     ntpInput.style.height = 'auto';
@@ -914,6 +918,7 @@ function startNtpVoice() {
   _ntpVoiceRec.onend = () => {
     // Auto-restart if still active (continuous mode may stop on silence)
     if (_ntpVoiceActive) {
+      _ntpResultIdx = 0; // reset index for new recognition session
       try { _ntpVoiceRec.start(); } catch(e) { stopNtpVoice(); }
     }
   };
