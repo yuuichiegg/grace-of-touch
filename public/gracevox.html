@@ -3711,7 +3711,9 @@ async function startAudioRec(){
     _audioRecBtn().style.borderColor='var(--recording)';
     _audioRecBtn().style.color='var(--recording)';
     document.getElementById('trackPanel').style.display='flex';
-    document.getElementById('panelResizeHandle').style.display='block';
+    document.getElementById('trackPanel').style.flex='0 0 auto'; // shrink to fit visualizer only
+    document.getElementById('panelResizeHandle').style.display='none'; // hide resize during recording
+    document.getElementById('trackList').style.display='none'; // hide track list during recording
     // Start recording waveform + timer
     _startRecWave(stream);
     _startRecTimer();
@@ -3727,6 +3729,10 @@ function stopAudioRec(){
   _audioRecBtn().style.borderColor='';
   _audioRecBtn().style.color='';
   _stopRecTimer();
+  // Restore track list after recording
+  document.getElementById('trackList').style.display='';
+  document.getElementById('trackPanel').style.flex='1.2';
+  document.getElementById('panelResizeHandle').style.display='block';
 }
 
 // ─── Viz mode: 'wave' / 'spectrum' / 'both' ───

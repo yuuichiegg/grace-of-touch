@@ -374,19 +374,31 @@ function buildNewTabPage() {
     </div>`
   ).join('');
 
-  const graceApps = [
-    { icon:'🚀', title:'Terminal', url:'/index.html' },
-    { icon:'🎤', title:'GraceVox', url:'/gracevox.html' },
-    { icon:'🎵', title:'Records', url:'/records.html' },
-    { icon:'🎛️', title:'TrackForge', url:'/trackforge/' },
-    { icon:'🚀', title:'Mega Rocket', url:'/rocket.html' },
-    { icon:'🐼', title:'Panda World', url:'/pandaworld.html' },
-    { icon:'🥁', title:'Resonance', url:'/resonance-drum.html' },
-    { icon:'🌐', title:'Browser', url:'grace://newtab' },
+  // Music & Audio Studio Apps (primary)
+  const studioApps = [
+    { icon:'🎤', title:'GraceVox', desc:'音声入力', url:'/gracevox.html' },
+    { icon:'🎛️', title:'TrackForge', desc:'DTM/MTR', url:'/trackforge/' },
+    { icon:'🎵', title:'Records', desc:'楽曲ライブラリ', url:'/records.html' },
+    { icon:'🥁', title:'Resonance', desc:'3D楽器', url:'/resonance-drum.html' },
   ];
-  const graceShortcuts = graceApps.map(a =>
+  const studioHTML = studioApps.map(a =>
+    `<div class="ntp-shortcut" data-url="${escapeAttr(a.url)}" style="gap:4px;">
+      <div class="ntp-shortcut-icon" style="border-color:rgba(108,92,231,.4);background:rgba(108,92,231,.1);font-size:24px;">${a.icon}</div>
+      <div class="ntp-shortcut-label" style="color:#8b7cf7;font-size:10px;">${escapeHTML(a.title)}</div>
+      <div style="font-size:8px;color:var(--text2);opacity:.6;">${a.desc}</div>
+    </div>`
+  ).join('');
+
+  // Other Grace of Touch Apps
+  const otherApps = [
+    { icon:'🚀', title:'Terminal', url:'/index.html' },
+    { icon:'🚀', title:'Rocket', url:'/rocket.html' },
+    { icon:'🐼', title:'Panda', url:'/pandaworld.html' },
+    { icon:'⚙️', title:'Engine', url:'/grace-engine-demo.html' },
+  ];
+  const otherHTML = otherApps.map(a =>
     `<div class="ntp-shortcut" data-url="${escapeAttr(a.url)}">
-      <div class="ntp-shortcut-icon" style="border-color:rgba(0,229,255,.3);background:rgba(0,229,255,.05);">${a.icon}</div>
+      <div class="ntp-shortcut-icon" style="border-color:rgba(0,229,255,.2);background:rgba(0,229,255,.04);">${a.icon}</div>
       <div class="ntp-shortcut-label" style="color:var(--accent);">${escapeHTML(a.title)}</div>
     </div>`
   ).join('');
@@ -394,16 +406,21 @@ function buildNewTabPage() {
   return `
     <div class="new-tab-page">
       <div class="ntp-logo">GRACE BROWSER</div>
+      <div style="font-size:10px;color:var(--text2);margin-bottom:16px;font-family:'JetBrains Mono',monospace;letter-spacing:.08em;opacity:.6;">Music · Voice · Community</div>
       <div class="ntp-search" style="margin-bottom:20px;">
         <span class="ntp-search-icon">🔍</span>
-        <input type="text" placeholder="検索またはURLを入力... 🎤" id="ntp-input">
+        <input type="text" placeholder="検索、URL、または音声メモ... 🎤" id="ntp-input">
       </div>
-      <div style="width:min(540px,92%);margin-bottom:20px;">
-        <div style="font-family:'Orbitron',monospace;font-size:10px;color:var(--accent);letter-spacing:.15em;margin-bottom:10px;">GRACE OF TOUCH</div>
-        <div class="ntp-shortcuts">${graceShortcuts}</div>
+      <div style="width:min(540px,92%);margin-bottom:16px;">
+        <div style="font-family:'Orbitron',monospace;font-size:10px;color:#8b7cf7;letter-spacing:.15em;margin-bottom:10px;">🎵 MUSIC STUDIO</div>
+        <div class="ntp-shortcuts" style="gap:12px;">${studioHTML}</div>
+      </div>
+      <div style="width:min(540px,92%);margin-bottom:16px;">
+        <div style="font-family:'Orbitron',monospace;font-size:9px;color:var(--accent);letter-spacing:.15em;margin-bottom:8px;opacity:.5;">APPS</div>
+        <div class="ntp-shortcuts">${otherHTML}</div>
       </div>
       <div style="width:min(540px,92%);">
-        <div style="font-family:'Orbitron',monospace;font-size:9px;color:var(--text2);letter-spacing:.15em;margin-bottom:10px;opacity:.5;">BOOKMARKS</div>
+        <div style="font-family:'Orbitron',monospace;font-size:9px;color:var(--text2);letter-spacing:.15em;margin-bottom:8px;opacity:.4;">WEB</div>
         <div class="ntp-shortcuts">${shortcuts}</div>
       </div>
     </div>`;
