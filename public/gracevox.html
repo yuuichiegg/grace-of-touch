@@ -395,8 +395,12 @@
     position:absolute; top:0; height:100%; background:rgba(0,0,0,0.45); pointer-events:none; z-index:1;
   }
 /* Pi-chan animations */
-@keyframes pichan-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-@keyframes pichan-tilt{0%,100%{transform:rotate(0deg)}50%{transform:rotate(8deg)}}
+@keyframes pichan-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes pichan-tilt{0%,100%{transform:rotate(0deg)}50%{transform:rotate(12deg)}}
+@keyframes pichan-walk{0%{transform:translateX(0)}25%{transform:translateX(8px) rotate(5deg)}50%{transform:translateX(0)}75%{transform:translateX(-8px) rotate(-5deg)}100%{transform:translateX(0)}}
+@keyframes pichan-fly{0%{transform:translate(0,0) rotate(0)}20%{transform:translate(12px,-20px) rotate(-10deg)}40%{transform:translate(-8px,-30px) rotate(8deg)}60%{transform:translate(15px,-15px) rotate(-5deg)}80%{transform:translate(-5px,-25px) rotate(6deg)}100%{transform:translate(0,0) rotate(0)}}
+@keyframes pichan-hop{0%,100%{transform:translateY(0) scale(1)}30%{transform:translateY(-12px) scale(1.1)}60%{transform:translateY(-4px) scale(0.95)}}
+#pichanMini{transition:bottom .8s ease, right .8s ease, left .8s ease;}
 #pichanMini:hover #pichanBody{transform:scale(1.2);}
 </style>
 </head>
@@ -552,10 +556,20 @@ document.addEventListener('DOMContentLoaded',()=>{
     </div>
   </div>
 
-  <!-- Pi-chan Mini (always visible in bottom corner) -->
-  <div id="pichanMini" style="position:fixed;bottom:90px;left:12px;z-index:55;cursor:pointer;user-select:none;transition:transform .3s ease;" onclick="pichanTap()">
-    <div id="pichanBody" style="font-size:32px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.3));transition:transform .2s ease;">🐤</div>
-    <div id="pichanMood" style="font-size:9px;text-align:center;color:var(--text-dim);font-family:'Courier New',monospace;margin-top:-2px;">♪</div>
+  <!-- Pi-chan Perch Points (止まり木・鳥かご・エサ) -->
+  <div id="pichanPerches" style="position:fixed;inset:0;pointer-events:none;z-index:54;">
+    <!-- 止まり木 (Now パネル右上) -->
+    <div class="perch" id="perch-branch" style="position:absolute;top:68px;right:80px;font-size:16px;opacity:.4;transition:opacity .3s;" title="止まり木">🌿</div>
+    <!-- 鳥かご (History 右上) -->
+    <div class="perch" id="perch-cage" style="position:absolute;bottom:280px;right:20px;font-size:18px;opacity:.35;transition:opacity .3s;" title="鳥かご">🪺</div>
+    <!-- エサ皿 (コントロール左) -->
+    <div class="perch" id="perch-food" style="position:absolute;bottom:52px;left:12px;font-size:14px;opacity:.3;transition:opacity .3s;" title="エサ">🌾</div>
+  </div>
+
+  <!-- Pi-chan Mini (bottom-right, above controls) -->
+  <div id="pichanMini" style="position:fixed;bottom:70px;right:12px;z-index:55;cursor:pointer;user-select:none;text-align:center;" onclick="pichanTap()">
+    <div id="pichanBody" style="font-size:28px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.3));transition:transform .2s ease;">🐤</div>
+    <div id="pichanMood" style="font-size:8px;color:var(--text-dim);font-family:'Courier New',monospace;margin-top:-2px;">♪</div>
   </div>
 
   <!-- History -->
@@ -2715,10 +2729,40 @@ function showAiBubble(text, tag){
   wrap._autoHide=setTimeout(()=>wrap.classList.remove('show'),15000);
 }
 
-// ─── Pi-chan Buddy System ───
-let _pichanState = 'idle'; // idle, listening, happy, sleepy, thinking
+// ─── Pi-chan Buddy System (Living Character) ───
+let _pichanState = 'idle';
 let _pichanTapCount = 0;
 let _pichanLastActivity = Date.now();
+let _pichanSkin = localStorage.getItem('gv_pichan_skin') || 'chick'; // chick or inko
+let _pichanWanderTimer = null;
+
+// Skin definitions: ひよこ(chick) or 青インコ(inko)
+const PICHAN_SKINS = {
+  chick: {
+    idle:'🐤', listening:'🐥', happy:'🐤', sleepy:'🐣', thinking:'🐤', recording:'🐥', flying:'🐥',
+    name:'ぴーちゃん(ひよこ)', gradient:'linear-gradient(135deg,#FFD700,#FFA500)'
+  },
+  inko: {
+    idle:'🦜', listening:'🦜', happy:'🦜', sleepy:'🦜', thinking:'🦜', recording:'🦜', flying:'🦜',
+    name:'ぴーちゃん(インコ)', gradient:'linear-gradient(135deg,#4FC3F7,#0288D1)'
+  }
+};
+
+function pichanEmoji(state) {
+  return (PICHAN_SKINS[_pichanSkin] || PICHAN_SKINS.chick)[state] || PICHAN_SKINS.chick.idle;
+}
+
+function togglePichanSkin() {
+  _pichanSkin = _pichanSkin === 'chick' ? 'inko' : 'chick';
+  localStorage.setItem('gv_pichan_skin', _pichanSkin);
+  updatePichanState(_pichanState);
+  const avatar = document.getElementById('pichanAvatar');
+  if (avatar) {
+    avatar.textContent = pichanEmoji('idle');
+    avatar.style.background = PICHAN_SKINS[_pichanSkin].gradient;
+  }
+  showAiBubble(_pichanSkin === 'inko' ? 'インコモードだよ！ピピッ🦜' : 'ひよこに戻ったよ！ぴよぴよ🐤', 'きせかえ✨');
+}
 
 function updatePichanState(state) {
   _pichanState = state;
@@ -2727,51 +2771,133 @@ function updatePichanState(state) {
   if (!body || !mood) return;
 
   const states = {
-    idle: { emoji: '🐤', mood: '♪', anim: '' },
-    listening: { emoji: '🐥', mood: '🎤 聞いてるよ', anim: 'pichan-bounce' },
-    happy: { emoji: '🐤', mood: '✨ いいね！', anim: 'pichan-bounce' },
-    sleepy: { emoji: '🐣', mood: '💤 zzz...', anim: '' },
-    thinking: { emoji: '🐤', mood: '🤔 うーん...', anim: 'pichan-tilt' },
-    recording: { emoji: '🐥', mood: '● REC', anim: 'pichan-bounce' },
+    idle:      { mood: '♪',           anim: 'pichan-walk 3s ease infinite' },
+    listening: { mood: '🎤 聞いてるよ', anim: 'pichan-tilt .8s ease infinite' },
+    happy:     { mood: '✨ いいね！',   anim: 'pichan-hop .6s ease' },
+    sleepy:    { mood: '💤 zzz...',    anim: 'none' },
+    thinking:  { mood: '🤔 うーん...', anim: 'pichan-tilt 1s ease infinite' },
+    recording: { mood: '● REC',       anim: 'pichan-bounce .5s ease infinite' },
+    flying:    { mood: '〜♪',         anim: 'pichan-fly 2s ease' },
   };
   const s = states[state] || states.idle;
-  body.textContent = s.emoji;
+  body.textContent = pichanEmoji(state);
   mood.textContent = s.mood;
-  body.style.animation = s.anim ? s.anim + ' .6s ease infinite' : 'none';
+  body.style.animation = s.anim;
   _pichanLastActivity = Date.now();
 }
+
+// Perch points: ぴーちゃんが止まれる場所
+const PERCH_POINTS = [
+  { id:'perch-branch', action:'止まり木でひと休み🌿', mood:'♪ ここ好き〜' },
+  { id:'perch-cage',   action:'おうちに帰ってきた🪺', mood:'🏠 ただいま〜' },
+  { id:'perch-food',   action:'もぐもぐタイム🌾',     mood:'😋 おいしい！' },
+];
+let _pichanAtPerch = null;
+
+// Wander: ぴーちゃんが画面内を自由に移動（パーチポイントに止まることも）
+function pichanWander() {
+  if (_pichanState === 'recording' || _pichanState === 'listening') return;
+  const el = document.getElementById('pichanMini');
+  if (!el) return;
+
+  const roll = Math.random();
+
+  // 40% chance: パーチポイントに止まる
+  if (roll < 0.4) {
+    const perch = PERCH_POINTS[Math.floor(Math.random() * PERCH_POINTS.length)];
+    const perchEl = document.getElementById(perch.id);
+    if (perchEl) {
+      const rect = perchEl.getBoundingClientRect();
+      el.style.right = (window.innerWidth - rect.right + rect.width/2 - 14) + 'px';
+      el.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+      _pichanAtPerch = perch;
+      perchEl.style.opacity = '0.8';
+      const mood = document.getElementById('pichanMood');
+      if (mood) mood.textContent = perch.mood;
+      // エサ皿のときは食べる動作
+      if (perch.id === 'perch-food') {
+        const body = document.getElementById('pichanBody');
+        if (body) body.style.animation = 'pichan-tilt .4s ease 3';
+      }
+      setTimeout(() => { perchEl.style.opacity = ''; _pichanAtPerch = null; }, 6000);
+      return;
+    }
+  }
+
+  // 20% chance: 飛ぶ
+  if (roll < 0.6 && _pichanState === 'idle') {
+    updatePichanState('flying');
+    setTimeout(() => { if (_pichanState === 'flying') updatePichanState('idle'); }, 2000);
+  }
+
+  // 移動先をランダムに
+  const maxR = window.innerWidth - 60;
+  const newRight = Math.max(12, Math.min(maxR, Math.floor(Math.random() * maxR)));
+  const newBottom = Math.max(70, Math.min(window.innerHeight - 140, 70 + Math.floor(Math.random() * 250)));
+  el.style.right = newRight + 'px';
+  el.style.bottom = newBottom + 'px';
+}
+
+// Start wandering every 8-15 seconds
+function startPichanWander() {
+  if (_pichanWanderTimer) clearInterval(_pichanWanderTimer);
+  _pichanWanderTimer = setInterval(pichanWander, 8000 + Math.random() * 7000);
+}
+startPichanWander();
 
 function pichanTap() {
   _pichanTapCount++;
   const body = document.getElementById('pichanBody');
-  if (body) { body.style.transform = 'scale(1.3)'; setTimeout(() => body.style.transform = '', 200); }
+  if (body) { body.style.transform = 'scale(1.3) rotate(-10deg)'; setTimeout(() => body.style.transform = '', 300); }
 
   if (_pichanTapCount >= 5) {
     _pichanTapCount = 0;
     const msgs = [
       'そんなに突かないでよ〜',
-      'くすぐったい！',
+      'くすぐったい！ぴぴっ！',
       '撫でてくれるの？嬉しい！',
       '今日も一緒に頑張ろうね！',
       'ぴぴっ！元気100倍！',
+      '長押しで着せ替えできるよ〜',
     ];
     showAiBubble(msgs[Math.floor(Math.random() * msgs.length)], 'ぴーちゃん🐤');
+  } else if (_pichanTapCount === 3) {
+    // 3タップで着せ替えヒント
+    showAiBubble('ぴーちゃんを長押しすると着せ替えできるよ！', 'Tips🐤');
   } else {
     const tips = [
       '録音ボタンを押すと、声をテキストに変換するよ！',
-      'Hold モードなら押してる間だけ録音できるよ',
+      'Holdモードなら押してる間だけ録音できるよ',
       '声紋は指紋と同じくらいユニークなんだって！',
-      'トラックライブラリで録音を管理できるよ',
+      'トラックライブラリで録音を管理できるよ📂',
       '校正エンジンが漢字の間違いを直してくれるよ',
+      'ぼくはここで見守ってるからね〜',
     ];
     showAiBubble(tips[Math.floor(Math.random() * tips.length)], 'Tips🐤');
   }
+  // Move pi-chan to a new spot after tap
+  setTimeout(pichanWander, 500);
 }
 
-// Pi-chan sleepy timer
+// Long press to toggle skin
+let _pichanLongPress = null;
+document.getElementById('pichanMini')?.addEventListener('pointerdown', () => {
+  _pichanLongPress = setTimeout(togglePichanSkin, 800);
+});
+document.getElementById('pichanMini')?.addEventListener('pointerup', () => {
+  if (_pichanLongPress) { clearTimeout(_pichanLongPress); _pichanLongPress = null; }
+});
+document.getElementById('pichanMini')?.addEventListener('pointerleave', () => {
+  if (_pichanLongPress) { clearTimeout(_pichanLongPress); _pichanLongPress = null; }
+});
+
+// Sleepy timer + wander
 setInterval(() => {
   if (Date.now() - _pichanLastActivity > 120000 && _pichanState === 'idle') {
     updatePichanState('sleepy');
+    // sleepy pi-chan goes to corner
+    const el = document.getElementById('pichanMini');
+    if (el) { el.style.right = '12px'; el.style.bottom = '70px'; }
   }
 }, 30000);
 

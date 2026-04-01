@@ -900,13 +900,15 @@ function startVoiceSearch() {
   };
 
   voiceRecognition.onend = () => {
-    // If we have text, navigate
+    // Put text into URL bar for user to review before searching
     const text = (voiceFinalText || voiceTextEl.textContent).trim();
     if (text) {
       stopVoiceVisuals();
       voiceOverlay.classList.remove('active');
-      navigateTab(activeTabId, resolveUrl(text));
-      setStatus(`音声検索: "${text}"`);
+      urlBar.value = text;
+      urlBar.focus();
+      urlBar.select();
+      setStatus(`🎤 "${text}" — Enterで検索`);
     }
   };
 
@@ -937,8 +939,10 @@ function confirmVoiceSearch() {
     voiceOverlay.classList.remove('active');
     voiceRing.classList.remove('listening');
     voiceNavBtn.classList.remove('listening');
-    navigateTab(activeTabId, resolveUrl(text));
-    setStatus(`音声検索: "${text}"`);
+    urlBar.value = text;
+    urlBar.focus();
+    urlBar.select();
+    setStatus(`🎤 "${text}" — Enterで検索`);
   }
 }
 
