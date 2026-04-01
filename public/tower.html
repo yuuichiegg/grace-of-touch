@@ -73,9 +73,17 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=0.65;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const controls=new OrbitControls(camera,canvas);
-controls.enableDamping=true;controls.dampingFactor=0.05;controls.target.set(0,18,0);
-controls.minDistance=15;controls.maxDistance=100;controls.maxPolarAngle=Math.PI*0.85;
+controls.enableDamping=true;controls.dampingFactor=0.08;controls.target.set(0,18,0);
+controls.minDistance=10;controls.maxDistance=120;controls.maxPolarAngle=Math.PI*0.88;
 controls.autoRotate=true;controls.autoRotateSpeed=0.3;
+controls.rotateSpeed=0.6;controls.enablePan=true;controls.panSpeed=0.8;
+controls.mouseButtons={LEFT:THREE.MOUSE.ROTATE,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.PAN};
+// Smooth scroll zoom
+controls.zoomSpeed=0.8;
+// Touch: one finger=rotate, two fingers=pan/zoom
+controls.touches={ONE:THREE.TOUCH.ROTATE,TWO:THREE.TOUCH.DOLLY_PAN};
+// Stop auto-rotate on interaction
+canvas.addEventListener('pointerdown',()=>{controls.autoRotate=false});
 scene.add(new THREE.AmbientLight(0x1a1a3a,0.5));
 const dirLight=new THREE.DirectionalLight(0xffffff,0.6);
 dirLight.position.set(30,50,20);dirLight.castShadow=true;
@@ -158,7 +166,19 @@ FLOORS.forEach(fd=>{const l=makeLbl(fd.floor+"  "+fd.label);l.position.set(bw/2+
 const floorListEl=document.getElementById("floor-list");FLOORS.slice().reverse().forEach(fd=>{const btn=document.createElement("div");btn.className="floor-btn";btn.textContent=fd.floor;btn.dataset.floorId=fd.id;btn.addEventListener("click",()=>selectFloor(fd));floorListEl.appendChild(btn)});
 let selectedFloor=null;
 function selectFloor(fd){selectedFloor=fd;document.querySelectorAll(".floor-btn").forEach(b=>b.classList.toggle("active",b.dataset.floorId===fd.id));document.getElementById("floor-panel").classList.add("active");document.getElementById("panel-title").textContent=fd.floor+" - "+fd.label;const ae=document.getElementById("panel-apps");ae.innerHTML="";fd.apps.forEach(app=>{const d=document.createElement("div");d.className="floor-app";d.innerHTML='<div class="app-name">'+app.name+'</div><div class="app-desc">'+app.desc+'</div>';if(app.url){d.addEventListener("click",()=>{window.location.href=app.url});d.style.cursor="pointer"}else{d.style.opacity="0.5";d.style.cursor="default"}ae.appendChild(d)});animCam(fd.y+2)}
-function animCam(ty){const sy=controls.target.y,st=performance.now();function tick(now){const t=Math.min((now-st)/800,1),e=1-Math.pow(1-t,3);controls.target.y=sy+(ty-sy)*e;if(t<1)requestAnimationFrame(tick)}requestAnimationFrame(tick)}
+function animCam(ty){
+const sy=controls.target.y,st=performance.now();
+// Also smoothly zoom closer when selecting a floor
+const startDist=camera.position.distanceTo(controls.target);
+const targetDist=Math.min(startDist,28);
+function tick(now){
+const t=Math.min((now-st)/800,1),e=1-Math.pow(1-t,3);
+controls.target.y=sy+(ty-sy)*e;
+// Smoothly adjust distance
+const dir=camera.position.clone().sub(controls.target).normalize();
+const curDist=startDist+(targetDist-startDist)*e;
+camera.position.copy(controls.target).add(dir.multiplyScalar(curDist));
+if(t<1)requestAnimationFrame(tick)}requestAnimationFrame(tick)}
 const rc=new THREE.Raycaster(),mouse=new THREE.Vector2(),tooltip=document.getElementById("tooltip");
 function onPM(e){const x=e.clientX||(e.touches&&e.touches[0]?.clientX),y=e.clientY||(e.touches&&e.touches[0]?.clientY);if(x===undefined)return;mouse.x=(x/window.innerWidth)*2-1;mouse.y=-(y/window.innerHeight)*2+1;rc.setFromCamera(mouse,camera);const hits=rc.intersectObjects(floorMeshes.map(f=>f.mesh));if(hits.length>0){const fd=hits[0].object.userData.floorData;tooltip.style.display="block";tooltip.textContent=fd.floor+" - "+fd.label;tooltip.style.left=(x+15)+"px";tooltip.style.top=(y-10)+"px";canvas.style.cursor="pointer"}else{tooltip.style.display="none";canvas.style.cursor="grab"}}
 function onCl(e){const x=e.clientX||(e.changedTouches&&e.changedTouches[0]?.clientX),y=e.clientY||(e.changedTouches&&e.changedTouches[0]?.clientY);if(x===undefined)return;mouse.x=(x/window.innerWidth)*2-1;mouse.y=-(y/window.innerHeight)*2+1;rc.setFromCamera(mouse,camera);const hits=rc.intersectObjects(floorMeshes.map(f=>f.mesh));if(hits.length>0){selectFloor(hits[0].object.userData.floorData);controls.autoRotate=false}}
