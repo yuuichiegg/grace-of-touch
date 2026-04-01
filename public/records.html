@@ -82,6 +82,17 @@ canvas{display:block}
 /* Back btn */
 #back-btn{position:absolute;bottom:84px;right:20px;z-index:10;padding:10px 20px;border-radius:12px;cursor:pointer;font-family:"Orbitron",sans-serif;font-size:.7rem;font-weight:700;background:rgba(10,10,20,.8);border:1px solid rgba(212,175,55,.3);color:#d4af37;transition:all .3s;backdrop-filter:blur(8px)}
 #back-btn:hover{background:rgba(212,175,55,.15);border-color:#d4af37}
+/* Lyrics panel */
+#lyrics-panel{position:fixed;right:20px;bottom:84px;width:320px;max-height:50vh;overflow-y:auto;z-index:25;background:rgba(10,10,20,.95);border:1px solid rgba(212,175,55,.3);border-radius:16px;padding:16px;backdrop-filter:blur(16px);display:none;font-size:.75rem;line-height:1.8;color:#ccc}
+#lyrics-panel.active{display:block}
+#lyrics-panel::-webkit-scrollbar{width:4px}
+#lyrics-panel::-webkit-scrollbar-thumb{background:rgba(212,175,55,.3);border-radius:2px}
+.lyrics-header{font-family:"Orbitron",sans-serif;font-size:.7rem;color:#d4af37;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.lyrics-close{cursor:pointer;color:#888;font-size:1rem;padding:4px}
+.lyrics-close:hover{color:#d4af37}
+.lyrics-body{white-space:pre-wrap;color:#e0d8c8}
+.no-lyrics{color:#666;text-align:center;padding:20px 0;font-style:italic}
+@media(max-width:600px){#lyrics-panel{width:calc(100vw - 40px);right:20px}}
 
 #tooltip{position:absolute;z-index:20;padding:8px 14px;border-radius:8px;background:rgba(10,10,20,.9);border:1px solid rgba(212,175,55,.4);font-size:.7rem;pointer-events:none;display:none;font-family:"Orbitron",sans-serif;color:#d4af37;backdrop-filter:blur(8px)}
 
@@ -152,8 +163,10 @@ canvas{display:block}
     <div class="ctrl-btn play-btn" id="btn-play">&#9654;</div>
     <div class="ctrl-btn" id="btn-next">&#9654;&#9654;</div>
   </div>
+  <div class="ctrl-btn" id="btn-lyrics" title="Lyrics" style="font-size:11px;font-weight:700">詞</div>
   <div id="player-time">0:00 / 0:00</div>
 </div>
+<div id="lyrics-panel"></div>
 
 <!-- Password Gate (hidden by default, shown via unlock button) -->
 <div id="pw-gate" class="hidden">
@@ -284,6 +297,7 @@ const CATALOG = [
 
   /* === ソロオリジナル === */
   { id:11, file:"11_struggle.mp3",             title:"STRUGGLE",             artist:"Yuuichi Onozaki", year:2008, genre:"Rock",         cat:"GOT-011", origin:"original", status:"public",
+    lyrics:"そっと今日のこと　振り返るけど　何も覚えちゃいないよ\n部屋はちらかしっぱなしで　万年布団　さえない毎日だよ。\n\nラジオつければ　喋ってくれて　時間がたやすく流れていく\n\n※　何やってんだよと　戒める僕　続かないこれじゃつまらないぜ\n　　何やろうかと　考えてる暇があるなら　今　動き出せ\n(I am struggling now, every for my chance, you get possible chance)\n\n思わずこれやりますと　ゆってはみたけど　現実はなかなか受け入れてくんない\n反抗心は世の流れ？　だから僕も反抗期　転んでも立ち上がる\n\n最後の最後ってぱっとしないけど　勝負するってそういう事でしょう\n\n　　結果の見据えた進歩などない　ひたすら夢中になれるかなんだろう\n　　足がすくんで　立てそうになくなっても　夢だけは握り締めていろよ\n\n※",
     versions:[{date:"2008-07-13",type:"original",note:"初回レコーディング"},{date:"2009-01-26",type:"eq",note:"EQマスタリング"},{date:"2009-11-02",type:"remix",note:"ベース・ギター追加"},{date:"2010-09-08",type:"karaoke",note:"カラオケver"},{date:"2014-04-12",type:"lyrics",note:"歌詞文書化"}] },
   { id:12, file:"12_kaleidoscope_of_leaf.mp3", title:"kaleidoscope of leaf",  artist:"Yuuichi Onozaki", year:2009, genre:"Rock/Pop",     cat:"GOT-012", origin:"original", status:"public",
     versions:[{date:"2009-06-07",type:"original",note:"初デモ"},{date:"2009-11-26",type:"demo",note:"デモ2"},{date:"2010-11-07",type:"band",note:"エッグビレッジ練習"},{date:"2011-11-20",type:"remix",note:"2011 Ver."},{date:"2014-02-04",type:"remix",note:"2014 Ver."},{date:"2015-07",type:"remix",note:"2015 Ver."},{date:"2022-02",type:"remix",note:"2022 Ver."}] },
@@ -746,6 +760,45 @@ progressWrap.addEventListener("click", e => {
   const ratio = (e.clientX - rect.left) / rect.width;
   audio.currentTime = ratio * audio.duration;
 });
+
+/* ============================================
+   LYRICS PANEL
+   ============================================ */
+const lyricsPanel = document.getElementById("lyrics-panel");
+const btnLyrics = document.getElementById("btn-lyrics");
+let lyricsOpen = false;
+
+function updateLyricsPanel() {
+  if (currentTrackIdx < 0) { lyricsPanel.classList.remove("active"); return; }
+  const track = CATALOG[currentTrackIdx];
+  let html = '<div class="lyrics-header"><span>LYRICS — ' + (track ? track.title : '') + '</span><span class="lyrics-close" onclick="toggleLyrics()">✕</span></div>';
+  if (track && track.lyrics) {
+    html += '<div class="lyrics-body">' + track.lyrics.replace(/\n/g, '<br>') + '</div>';
+  } else {
+    html += '<div class="no-lyrics">歌詞データ未登録</div>';
+  }
+  lyricsPanel.innerHTML = html;
+}
+
+function toggleLyrics() {
+  lyricsOpen = !lyricsOpen;
+  if (lyricsOpen) {
+    updateLyricsPanel();
+    lyricsPanel.classList.add("active");
+    btnLyrics.classList.add("on");
+  } else {
+    lyricsPanel.classList.remove("active");
+    btnLyrics.classList.remove("on");
+  }
+}
+btnLyrics.addEventListener("click", toggleLyrics);
+
+// Update lyrics when track changes
+const _origPlayTrack = playTrack;
+playTrack = function(idx) {
+  _origPlayTrack(idx);
+  if (lyricsOpen) updateLyricsPanel();
+};
 
 /* ============================================
    FLOOR UI RENDERING

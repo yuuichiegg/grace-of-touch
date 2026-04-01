@@ -80,6 +80,7 @@ select{background:#0a1520;color:#00d8ff;border:1px solid rgba(0,216,255,.2);bord
       <label><input type="checkbox" id="cutChk" onchange="updateView()"/> X-Ray</label>
       <label><input type="checkbox" id="printChk" onchange="togglePrintMode()"/> Print</label>
       <button id="dlBtn" class="btn" style="display:none;padding:4px 10px;font-size:10px" onclick="exportCurrentPlateSTL()">STL</button>
+      <button class="btn" style="padding:4px 10px;font-size:10px" onclick="exportOBJ()">OBJ</button>
       <button class="btn" style="padding:4px 10px;font-size:10px" onclick="exportGLTF()">glTF</button>
     </div>
   </div>
@@ -89,6 +90,7 @@ select{background:#0a1520;color:#00d8ff;border:1px solid rgba(0,216,255,.2);bord
 <script type="module">
 import * as THREE from 'three';
 import {GLTFExporter} from 'three/addons/exporters/GLTFExporter.js';
+import {OBJExporter} from 'three/addons/exporters/OBJExporter.js';
 
 // ══════════════════════════════
 // ROTARY SPEAKER AUDIO ENGINE
@@ -509,6 +511,16 @@ window.exportCurrentPlateSTL=()=>{
   const meshes=[];
   root.traverse(child=>{if(child.isMesh&&child.visible)meshes.push(child);});
   exportSTL(meshes,'ResonanceDrum_Stand.stl');
+};
+window.exportOBJ=()=>{
+  const exporter=new OBJExporter();
+  const result=exporter.parse(root);
+  const blob=new Blob([result],{type:'text/plain'});
+  const link=document.createElement('a');
+  link.href=URL.createObjectURL(blob);
+  link.download='ResonanceDrum.obj';
+  link.click();
+  document.getElementById('hud-tone').innerHTML='<span class="label">EXPORT:</span> OBJ saved (Blender/MSFS/Cities ready)';
 };
 window.exportGLTF=()=>{
   const exporter=new GLTFExporter();
