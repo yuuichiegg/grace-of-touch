@@ -4971,6 +4971,7 @@ const SpaceElevator={
     }
     // Animate terminal pandas — wander + idle behavior
     if(this._terminalPandas){
+      const t=now*0.001;
       this._terminalPandas.forEach(pg=>{
         const ud=pg.userData;
         if(ud._isIdle){
