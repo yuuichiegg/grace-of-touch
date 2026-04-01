@@ -129,6 +129,17 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   border:1px solid var(--border);transition:all .15s;}
 .ntp-shortcut:hover .ntp-shortcut-icon{border-color:var(--accent);
   box-shadow:0 0 12px rgba(0,229,255,.15);}
+/* Feed cards */
+.feed-card{display:flex;gap:10px;padding:10px;background:var(--surface);
+  border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all .15s;}
+.feed-card:hover{border-color:#ff6b9d;background:var(--surface2);}
+.feed-card img{width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0;}
+.feed-card-info{flex:1;min-width:0;}
+.feed-card-title{font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
+.feed-card-sub{font-size:10px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.feed-card-tag{font-size:9px;padding:2px 6px;border-radius:4px;margin-top:4px;display:inline-block;}
+#ntp-feed::-webkit-scrollbar{width:3px;}
+#ntp-feed::-webkit-scrollbar-thumb{background:#ff6b9d;border-radius:2px;}
 .ntp-shortcut-label{font-size:11px;color:var(--text2);text-align:center;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:72px;}
 
@@ -454,6 +465,12 @@ function buildNewTabPage() {
         <div style="font-family:'Orbitron',monospace;font-size:9px;color:var(--accent);letter-spacing:.15em;margin-bottom:8px;opacity:.5;">APPS</div>
         <div class="ntp-shortcuts">${otherHTML}</div>
       </div>
+      <div style="width:min(540px,92%);margin-bottom:16px;">
+        <div style="font-family:'Orbitron',monospace;font-size:10px;color:#ff6b9d;letter-spacing:.15em;margin-bottom:10px;">🎧 PODCAST & DTM FEED</div>
+        <div id="ntp-feed" style="display:flex;flex-direction:column;gap:8px;max-height:200px;overflow-y:auto;padding-right:4px;">
+          <div style="color:var(--text2);font-size:11px;opacity:.5;text-align:center;padding:12px;">Loading feed...</div>
+        </div>
+      </div>
       <div style="width:min(540px,92%);">
         <div style="font-family:'Orbitron',monospace;font-size:9px;color:var(--text2);letter-spacing:.15em;margin-bottom:8px;opacity:.4;">WEB</div>
         <div class="ntp-shortcuts">${shortcuts}</div>
@@ -478,6 +495,61 @@ function initNewTabPage(container, tabId) {
       navigateTab(tabId, el.dataset.url);
     });
   });
+  // Load Podcast/DTM feed
+  loadNtpFeed(container, tabId);
+}
+
+// Podcast/DTM Feed — curated music production & podcast content
+async function loadNtpFeed(container, tabId) {
+  const feedEl = container.querySelector('#ntp-feed');
+  if (!feedEl) return;
+
+  // Curated DTM/Music/Podcast categories (iTunes Search API — free, no key needed)
+  const queries = [
+    { q: 'DTM+music+production', tag: 'DTM', color: '#6c5ce7' },
+    { q: 'podcast+音楽制作', tag: 'Podcast', color: '#ff6b9d' },
+    { q: 'synthesizer+tutorial', tag: 'Synth', color: '#00e5ff' },
+    { q: 'recording+mixing+mastering', tag: 'Mix', color: '#ffa502' },
+  ];
+
+  try {
+    // Fetch one random category to keep it fast
+    const pick = queries[Math.floor(Math.random() * queries.length)];
+    const res = await fetch(`https://itunes.apple.com/search?term=${pick.q}&media=podcast&limit=6&country=jp`);
+    if (!res.ok) throw new Error('Feed fetch failed');
+    const data = await res.json();
+    if (!data.results || data.results.length === 0) {
+      feedEl.innerHTML = '<div style="color:var(--text2);font-size:11px;text-align:center;padding:12px;">No feeds available</div>';
+      return;
+    }
+    feedEl.innerHTML = data.results.map(item => `
+      <div class="feed-card" data-url="${escapeAttr(item.collectionViewUrl || item.trackViewUrl || '')}">
+        <img src="${escapeAttr(item.artworkUrl60 || item.artworkUrl100 || '')}" alt="" loading="lazy"
+          onerror="this.style.display='none'">
+        <div class="feed-card-info">
+          <div class="feed-card-title">${escapeHTML(item.trackName || item.collectionName || '')}</div>
+          <div class="feed-card-sub">${escapeHTML(item.artistName || '')}</div>
+          <span class="feed-card-tag" style="background:${pick.color}22;color:${pick.color};">${pick.tag}</span>
+        </div>
+      </div>
+    `).join('');
+
+    feedEl.querySelectorAll('.feed-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const url = card.dataset.url;
+        if (url) window.open(url, '_blank');
+      });
+    });
+  } catch (e) {
+    feedEl.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px;">
+        <div style="font-size:11px;color:var(--text2);">オフラインまたはフィード取得失敗</div>
+        <div style="display:flex;gap:8px;">
+          ${queries.map(q => `<span class="feed-card-tag" style="background:${q.color}22;color:${q.color};cursor:pointer;"
+            onclick="window.open('https://podcasts.apple.com/jp/search?term=${q.q}','_blank')">${q.tag}</span>`).join('')}
+        </div>
+      </div>`;
+  }
 }
 
 // ===== Navigation =====
