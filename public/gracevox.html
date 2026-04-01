@@ -669,7 +669,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-functions-compat.js"></script>
 <script>
-const FIREBASE_CONFIG={apiKey:"AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",authDomain:"grace-of-touch.web.app",projectId:"grace-of-touch",storageBucket:"grace-of-touch.firebasestorage.app",messagingSenderId:"505078300866",appId:"1:505078300866:web:adad2a27b163c3b0f1bb5b"};
+const FIREBASE_CONFIG={apiKey:"AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",authDomain:"grace-of-touch.firebaseapp.com",projectId:"grace-of-touch",storageBucket:"grace-of-touch.firebasestorage.app",messagingSenderId:"505078300866",appId:"1:505078300866:web:adad2a27b163c3b0f1bb5b"};
 firebase.initializeApp(FIREBASE_CONFIG);
 const fbAuth=firebase.auth();
 const fbDb=firebase.firestore();
@@ -852,20 +852,8 @@ function toggleLogin(){
     if(confirm('ログアウトしますか？')) fbAuth.signOut();
   }else{
     const provider=new firebase.auth.GoogleAuthProvider();
-    showToast('Googleログイン中...');
-    fbAuth.signInWithPopup(provider).catch(e=>{
-      console.log('Popup auth failed:',e.code,e.message);
-      // iOS PWA: popup fails → open in Safari
-      if(e.code==='auth/popup-blocked'||e.code==='auth/popup-closed-by-user'||e.code==='auth/cancelled-popup-request'){
-        showToast('ポップアップがブロックされました。再度タップしてください');
-      }else{
-        // Fallback: open login page in Safari (external browser)
-        const url='https://grace-of-touch.web.app/gracevox-login.html';
-        if(confirm('PWAではGoogleログインが制限されています。\nSafariで開いてログインしますか？')){
-          window.open(url,'_blank');
-        }
-      }
-    });
+    showToast('Googleログインに移動します...');
+    fbAuth.signInWithRedirect(provider);
   }
 }
 
@@ -2944,7 +2932,7 @@ function shareResult(){
     navigator.share({
       title:'GraceVox — Voice Print Never Lies',
       text: text.slice(0,280)+'\n\n#GraceVox #VoicePrint',
-      url:'https://grace-of-touch.web.app/gracevox.html'
+      url:'https://grace-of-touch.firebaseapp.com/gracevox.html'
     }).catch(()=>{});
     return;
   }
@@ -3004,7 +2992,7 @@ function generateShareImage(text){
   // Footer
   ctx.font='16px -apple-system, sans-serif';
   ctx.fillStyle='#6b6b80';
-  ctx.fillText('grace-of-touch.web.app/gracevox',40,610);
+  ctx.fillText('grace-of-touch.firebaseapp.com/gracevox',40,610);
 
   // Download
   cv.toBlob(blob=>{
@@ -3015,7 +3003,7 @@ function generateShareImage(text){
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(url),5000);
     // Also copy text
-    copyToClipboard(text.slice(0,280)+'\n\n#GraceVox #VoicePrint\nhttps://grace-of-touch.web.app/gracevox.html');
+    copyToClipboard(text.slice(0,280)+'\n\n#GraceVox #VoicePrint\nhttps://grace-of-touch.firebaseapp.com/gracevox.html');
     showToast('共有画像をダウンロード＋テキストをコピーしました');
   },'image/png');
 }
