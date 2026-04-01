@@ -3475,11 +3475,14 @@ document.addEventListener('keydown',(e)=>{
   document.addEventListener('visibilitychange', ()=>{
     if(document.visibilityState==='hidden'){
       if(isRecording) _appSwitchDirty=true;
-      // iOS: バックグラウンドに行ったらマイクストリームを即解放（オレンジドット消去）
-      if(!isRecording && mediaStream){
+      _wasRecordingBeforePause = _wasRecordingBeforePause || isRecording;
+      // バックグラウンド: 録音中でもマイクストリームを即解放（他アプリのマイク使用を妨げない）
+      if(mediaStream){
         _releaseStream(mediaStream); mediaStream=null;
         _releaseAudioCtx(audioContext); audioContext=null; analyser=null;
       }
+      // SpeechRecognitionも一時停止（マイク解放を確実に）
+      if(recognition){try{recognition.abort();}catch(e){}}
     }
     if(document.visibilityState==='visible'){
       document.getElementById('iosCopyBanner').classList.remove('show');
