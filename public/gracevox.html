@@ -566,8 +566,11 @@ document.addEventListener('DOMContentLoaded',()=>{
       <span id="recTimer" style="font-size:11px;color:var(--recording);font-family:'Courier New',monospace;display:none;">● 00:00</span>
       <button class="action-btn" onclick="clearTracks()" style="font-size:10px;padding:2px 8px;">Clear All</button>
     </div>
-    <!-- Recording waveform (visible during audio recording) -->
-    <canvas id="recWaveCanvas" style="width:100%;height:48px;display:none;border-bottom:1px solid var(--border);flex-shrink:0;"></canvas>
+    <!-- Recording visualizer (waveform + spectrogram) -->
+    <div id="recVizWrap" style="display:none;border-bottom:1px solid var(--border);flex-shrink:0;position:relative;">
+      <canvas id="recWaveCanvas" style="width:100%;height:72px;display:block;"></canvas>
+      <button id="vizModeBtn" onclick="cycleVizMode()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:var(--text-dim);font-size:9px;padding:2px 6px;border-radius:4px;cursor:pointer;z-index:2;">波形</button>
+    </div>
     <!-- Player bar (visible when a track is selected) -->
     <div id="trackPlayer" style="display:none;padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
@@ -576,7 +579,7 @@ document.addEventListener('DOMContentLoaded',()=>{
           <span id="playerTrackName" style="font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
           <div style="display:flex;align-items:center;gap:6px;">
             <span id="playerTime" style="font-size:10px;color:var(--text-dim);font-family:'Courier New',monospace;min-width:36px;">0:00</span>
-            <div id="waveWrap" style="flex:1;position:relative;height:40px;border-radius:4px;overflow:hidden;touch-action:none;">
+            <div id="waveWrap" style="flex:1;position:relative;height:56px;border-radius:4px;overflow:hidden;touch-action:none;">
               <canvas id="playerWaveCanvas" style="width:100%;height:100%;cursor:pointer;display:block;"></canvas>
               <!-- Trim handles (drag to adjust) -->
               <div id="trimLeft" class="trim-handle" style="left:0%;"><div class="trim-grip"></div></div>
@@ -3215,44 +3218,109 @@ function stopAudioRec(){
   _stopRecTimer();
 }
 
-// ─── Recording waveform (real-time) ───
+// ─── Viz mode: 'wave' / 'spectrum' / 'both' ───
+let _vizMode=localStorage.getItem('gv_vizMode')||'both';
+function cycleVizMode(){
+  const modes=['wave','spectrum','both'];
+  _vizMode=modes[(modes.indexOf(_vizMode)+1)%modes.length];
+  localStorage.setItem('gv_vizMode',_vizMode);
+  const labels={'wave':'波形','spectrum':'声紋','both':'両方'};
+  document.getElementById('vizModeBtn').textContent=labels[_vizMode];
+}
+// Init label
+document.addEventListener('DOMContentLoaded',()=>{
+  const btn=document.getElementById('vizModeBtn');
+  if(btn) btn.textContent={'wave':'波形','spectrum':'声紋','both':'両方'}[_vizMode]||'両方';
+});
+
+// Spectrogram history buffer (scrolling columns)
+let _spectroHistory=[];
+const SPECTRO_COLS=120;
+
+// ─── Recording visualizer (real-time) ───
 function _startRecWave(stream){
+  document.getElementById('recVizWrap').style.display='block';
   const cv=document.getElementById('recWaveCanvas');
-  cv.style.display='block';
   _recAudioCtx=new(window.AudioContext||window.webkitAudioContext)();
   _recAnalyser=_recAudioCtx.createAnalyser();
-  _recAnalyser.fftSize=256;
+  _recAnalyser.fftSize=512;
   _recAudioCtx.createMediaStreamSource(stream).connect(_recAnalyser);
-  const buf=new Uint8Array(_recAnalyser.frequencyBinCount);
+  const timeBuf=new Uint8Array(_recAnalyser.fftSize);
+  const freqBuf=new Uint8Array(_recAnalyser.frequencyBinCount);
+  _spectroHistory=[];
+
   function draw(){
-    if(!_audioRecording){return;}
-    _recAnalyser.getByteTimeDomainData(buf);
+    if(!_audioRecording) return;
     const w=cv.clientWidth*2, h=cv.clientHeight*2;
     if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;}
     const ctx=cv.getContext('2d');
     ctx.clearRect(0,0,w,h);
-    ctx.strokeStyle='#6c5ce7';ctx.lineWidth=2;
-    ctx.beginPath();
-    const sliceW=w/buf.length;
-    for(let i=0;i<buf.length;i++){
-      const v=buf[i]/128.0;
-      const y=(v*h)/2;
-      if(i===0)ctx.moveTo(0,y); else ctx.lineTo(i*sliceW,y);
+
+    _recAnalyser.getByteTimeDomainData(timeBuf);
+    _recAnalyser.getByteFrequencyData(freqBuf);
+
+    // Store spectrogram column
+    _spectroHistory.push(new Uint8Array(freqBuf));
+    if(_spectroHistory.length>SPECTRO_COLS) _spectroHistory.shift();
+
+    const showWave=_vizMode==='wave'||_vizMode==='both';
+    const showSpec=_vizMode==='spectrum'||_vizMode==='both';
+    const waveH=_vizMode==='both'?h*0.4:h;
+    const specH=_vizMode==='both'?h*0.6:h;
+    const specY=_vizMode==='both'?waveH:0;
+
+    // Waveform
+    if(showWave){
+      ctx.strokeStyle='#6c5ce7';ctx.lineWidth=2;
+      ctx.beginPath();
+      for(let i=0;i<timeBuf.length;i++){
+        const v=timeBuf[i]/128.0;
+        const y=(v*waveH)/2;
+        if(i===0) ctx.moveTo(0,y); else ctx.lineTo(i*(w/timeBuf.length),y);
+      }
+      ctx.stroke();
+      // Volume glow
+      let sum=0;for(let i=0;i<timeBuf.length;i++) sum+=Math.abs(timeBuf[i]-128);
+      const vol=Math.min(1,sum/timeBuf.length/40);
+      ctx.fillStyle=`rgba(108,92,231,${vol*0.3})`;
+      ctx.fillRect(0,0,w,waveH);
     }
-    ctx.stroke();
-    // Volume bar at right
-    let sum=0;for(let i=0;i<buf.length;i++)sum+=Math.abs(buf[i]-128);
-    const vol=Math.min(1,sum/buf.length/40);
-    ctx.fillStyle=vol>0.6?'var(--recording)':'rgba(108,92,231,0.5)';
-    ctx.fillRect(w-8,h*(1-vol),6,h*vol);
+
+    // Spectrogram (scrolling columns — voice print style)
+    if(showSpec){
+      const cols=_spectroHistory.length;
+      const colW=w/SPECTRO_COLS;
+      const bins=_spectroHistory[0]?.length||1;
+      const binsToShow=Math.min(bins,80); // focus on voice frequencies
+      const binH=specH/binsToShow;
+      for(let c=0;c<cols;c++){
+        const col=_spectroHistory[c];
+        for(let b=0;b<binsToShow;b++){
+          const val=col[b]/255;
+          if(val<0.02) continue;
+          // Color: purple → cyan → white based on intensity
+          const r=Math.round(108*val);
+          const g=Math.round(92+163*val);
+          const bl=Math.round(231*Math.min(1,val*1.5));
+          ctx.fillStyle=`rgb(${r},${g},${bl})`;
+          ctx.fillRect(c*colW, specY+specH-(b+1)*binH, colW+0.5, binH+0.5);
+        }
+      }
+      // Divider line
+      if(_vizMode==='both'){
+        ctx.strokeStyle='rgba(108,92,231,0.3)';ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(0,specY);ctx.lineTo(w,specY);ctx.stroke();
+      }
+    }
+
     requestAnimationFrame(draw);
   }
   draw();
 }
 function _stopRecWave(){
-  document.getElementById('recWaveCanvas').style.display='none';
+  document.getElementById('recVizWrap').style.display='none';
   if(_recAudioCtx&&_recAudioCtx.state!=='closed')try{_recAudioCtx.close();}catch(e){}
-  _recAudioCtx=null;_recAnalyser=null;
+  _recAudioCtx=null;_recAnalyser=null;_spectroHistory=[];
 }
 
 // ─── Recording timer ───
