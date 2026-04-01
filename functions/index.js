@@ -84,6 +84,93 @@ function serverProofread(text) {
   return { text: r, corrections };
 }
 
+// ============================================================
+// Interim Copy Technology (Patent Pending — Server-side only)
+// © 2024-2026 Grace of Touch Co. All rights reserved.
+// ============================================================
+
+// Japanese filler words for removal
+const FILLERS_JA = ['えーと','えっと','あのー','あの','えー','ええと','まあ','そのー','その','なんか','こう','ほら','ね','さ','うーん','うん','ああ','あー'];
+
+// Similarity detection for retake/correction (言い直し検出)
+function isSimilar(a, b) {
+  if (!a || !b) return false;
+  const na = a.replace(/[。、！？\s]/g, ''), nb = b.replace(/[。、！？\s]/g, '');
+  if (na.length < 2 || nb.length < 2) return false;
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  let prefixMatch = 0;
+  for (let i = 0; i < Math.min(na.length, nb.length); i++) {
+    if (na[i] === nb[i]) prefixMatch++; else break;
+  }
+  if (prefixMatch >= 3 && prefixMatch / Math.max(na.length, nb.length) > 0.4) return true;
+  let common = 0;
+  const shorter = na.length <= nb.length ? na : nb, longer = na.length > nb.length ? na : nb;
+  const used = new Set();
+  for (let i = 0; i < shorter.length; i++) {
+    const idx = longer.indexOf(shorter[i], 0);
+    if (idx !== -1 && !used.has(idx)) { common++; used.add(idx); }
+  }
+  return common / Math.max(na.length, nb.length) > 0.5;
+}
+
+// Server-side text cleaning (filler removal + proofreading)
+function serverClean(text, options = {}) {
+  let r = text;
+  // Filler removal
+  if (options.removeFiller !== false) {
+    FILLERS_JA.forEach(f => {
+      r = r.replace(new RegExp(f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '');
+    });
+  }
+  // Apply proofreading
+  const proofResult = serverProofread(r);
+  r = proofResult.text;
+  // Clean up whitespace
+  r = r.replace(/\s{2,}/g, ' ').trim();
+  return { text: r, corrections: proofResult.corrections };
+}
+
+// Cloud Function: Interim Copy Processing API
+exports.interimProcess = functions.https.onCall(async (data, context) => {
+  const { text, sentences, lang, options } = data;
+  if (!text || typeof text !== "string") {
+    throw new functions.https.HttpsError("invalid-argument", "text is required");
+  }
+  if (text.length > 10000) {
+    throw new functions.https.HttpsError("invalid-argument", "text too long (max 10000)");
+  }
+  if (lang && !lang.startsWith("ja")) {
+    return { text, sentences: sentences || [], corrections: [] };
+  }
+
+  // Clean and proofread the new text
+  const cleaned = serverClean(text, options || {});
+
+  // Retake detection: compare against existing sentences
+  const resultSentences = Array.isArray(sentences) ? [...sentences] : [];
+  if (options && options.smartCorrection !== false && resultSentences.length > 0) {
+    const lastIdx = resultSentences.length - 1;
+    if (isSimilar(resultSentences[lastIdx], cleaned.text)) {
+      resultSentences[lastIdx] = cleaned.text; // Replace with retake
+    } else if (resultSentences.length > 1 && isSimilar(resultSentences[lastIdx - 1], cleaned.text)) {
+      resultSentences[lastIdx - 1] = cleaned.text;
+      resultSentences.splice(lastIdx, 1);
+    } else {
+      resultSentences.push(cleaned.text);
+    }
+  } else {
+    resultSentences.push(cleaned.text);
+  }
+
+  return {
+    text: cleaned.text,
+    sentences: resultSentences,
+    finalTranscript: resultSentences.join(''),
+    corrections: cleaned.corrections,
+  };
+});
+
 // Cloud Function: AI Proofreading API
 exports.proofread = functions.https.onCall(async (data, context) => {
   const { text, lang } = data;

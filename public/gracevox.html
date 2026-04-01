@@ -1819,25 +1819,25 @@ function handleResult(event){
     if(event.results[i].isFinal){
       if(settings.smartCorrection){
         const cleaned=basicClean(t);
-        // 直前の文と比較して言い直しを検出
+        // ローカルフォールバック（即時表示用）
         if(sentences.length>0){
           const lastIdx=sentences.length-1;
-          // 完全一致 or 類似 → 置換（言い直し）
           if(isSimilar(sentences[lastIdx],cleaned)){
-            sentences[lastIdx]=cleaned; // 新しい方を採用
+            sentences[lastIdx]=cleaned;
           }
-          // 直前2文まで遡って類似チェック
           else if(sentences.length>1 && isSimilar(sentences[lastIdx-1],cleaned)){
             sentences[lastIdx-1]=cleaned;
-            sentences.splice(lastIdx,1); // 間の文も削除
+            sentences.splice(lastIdx,1);
           }
           else{ sentences.push(cleaned); }
         }else{ sentences.push(cleaned); }
         finalTranscript=sentences.join('');
+        // サーバー側 Interim Copy Processing（非同期で上書き）
+        _serverInterimProcess(t, sentences.slice());
       }else{
-        // smartCorrection OFF でもautoProofreadは適用
         const proofed=settings.autoProofread?autoProofread(t):t;
         finalTranscript+=proofed;
+        _serverProofreadAsync(proofed);
       }
     }else{ interimTranscript+=t; }
   }
@@ -2183,6 +2183,32 @@ function basicClean(text){
 // ─── AI校正（音声認識誤変換の自動修正）───
 // Track corrections for Taxnap-style confirmation
 let _lastCorrections = []; // [{orig, corrected}]
+
+// Server-side Interim Copy Processing (Patent Pending)
+async function _serverInterimProcess(text, currentSentences){
+  if(!firebase.functions) return;
+  try{
+    const interimProcess=firebase.functions().httpsCallable('interimProcess');
+    const result=await interimProcess({
+      text, sentences:currentSentences, lang:currentLang,
+      options:{removeFiller:settings.removeFiller, smartCorrection:settings.smartCorrection, autoProofread:settings.autoProofread}
+    });
+    if(result.data&&result.data.finalTranscript){
+      sentences=result.data.sentences||sentences;
+      finalTranscript=result.data.finalTranscript;
+      _lastCorrections=result.data.corrections||[];
+      const el=document.getElementById('currentText');
+      if(el){
+        const displayFinal=settings.autoProofread?autoProofread(finalTranscript):finalTranscript;
+        el.innerHTML=getProofreadHTML(processText(finalTranscript));
+        el.scrollTop=el.scrollHeight;
+        document.getElementById('charCount').textContent=finalTranscript.length+'文字';
+      }
+    }
+  }catch(e){
+    // Server unavailable — local fallback already applied
+  }
+}
 
 // Server-side proofreading (async, updates display when result arrives)
 async function _serverProofreadAsync(text){
