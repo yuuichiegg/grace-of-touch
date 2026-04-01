@@ -465,6 +465,25 @@ function navigateTab(id, url) {
   tab.historyIndex = tab.history.length - 1;
 
   tab.url = url;
+
+  // External URLs → open in real browser tab (iframe blocked by X-Frame-Options)
+  const isLocal = url.startsWith('/') || url.startsWith(window.location.origin);
+  if (!isLocal && /^https?:\/\//i.test(url)) {
+    window.open(url, '_blank');
+    addHistory(extractDomain(url), url);
+    // Stay on current page
+    tab.history.pop();
+    tab.historyIndex = Math.max(0, tab.historyIndex - 1);
+    tab.url = tab.history[tab.historyIndex] || HOME_URL;
+    if (id === activeTabId) {
+      updateUrlBar(tab.url);
+      updateNavButtons(tab);
+    }
+    setStatus(`外部サイトを新しいタブで開きました`);
+    renderTabs();
+    return;
+  }
+
   tab.loading = true;
   showLoading(true);
   setStatus(`読み込み中: ${url}`);
