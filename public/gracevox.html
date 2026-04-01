@@ -655,12 +655,35 @@ document.addEventListener('DOMContentLoaded',()=>{
     <div class="inner"></div>
   </button>
   <button class="bs-btn" id="bsBtn" onclick="backspace()" title="Backspace">&#9003;</button>
-  <button class="bs-btn" id="audioRecBtn" onclick="toggleAudioRec()" title="音声録音" style="font-size:16px;">&#127908;</button>
+  <button class="bs-btn" id="audioRecBtn" onclick="openRecPopup()" title="録音スタジオ" style="font-size:16px;">&#127908;</button>
   <button class="bs-btn" id="libToggleBtn" onclick="toggleLibraryView()" title="トラックライブラリ" style="font-size:14px;">📂</button>
   <button class="bs-btn" id="shareBtn" onclick="shareResult()" title="SNS共有" style="font-size:16px;">&#128279;</button>
   <div class="controls-info">
     <div class="hotkey-hint"><kbd id="hotkeyDisplay">変換</kbd> or <kbd>F2</kbd></div>
     <a href="gracevox-terms.html" style="font-size:9px;color:var(--text-dim);text-decoration:none;">Terms</a>
+  </div>
+</div>
+
+<!-- Recording Popup Overlay -->
+<div id="recPopup" onclick="if(event.target===this)closeRecPopup()" style="display:none;position:fixed;inset:0;z-index:80;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  flex-direction:column;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:20px;width:min(360px,90vw);max-height:80vh;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;align-items:center;justify-content:between;">
+      <span style="font-family:'Courier New',monospace;font-weight:700;font-size:14px;color:var(--accent);flex:1;">🎤 録音スタジオ</span>
+      <button onclick="closeRecPopup()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;padding:4px 8px;">✕</button>
+    </div>
+    <!-- Recording timer -->
+    <div id="recPopupTimer" style="font-family:'Courier New',monospace;font-size:28px;color:var(--recording);text-align:center;letter-spacing:0.1em;">00:00</div>
+    <!-- Visualizer canvas -->
+    <canvas id="recPopupCanvas" style="width:100%;height:80px;border-radius:8px;background:rgba(0,0,0,0.3);"></canvas>
+    <!-- Controls -->
+    <div style="display:flex;align-items:center;justify-content:center;gap:16px;padding:8px 0;">
+      <button id="recPopupBtn" onclick="toggleRecPopup()" style="width:64px;height:64px;border-radius:50%;background:var(--recording);border:3px solid rgba(255,255,255,0.2);
+        color:#fff;font-size:24px;cursor:pointer;transition:all .2s;box-shadow:0 4px 20px rgba(255,100,100,0.3);">●</button>
+    </div>
+    <div id="recPopupStatus" style="text-align:center;font-size:11px;color:var(--text-dim);font-family:'Courier New',monospace;">タップして録音開始</div>
+    <!-- Recent tracks (mini list) -->
+    <div id="recPopupTracks" style="max-height:120px;overflow-y:auto;border-top:1px solid var(--border);padding-top:8px;margin-top:4px;"></div>
   </div>
 </div>
 
@@ -3540,6 +3563,86 @@ function toggleLibraryView() {
     document.getElementById('libToggleBtn').style.color = '';
     updatePichanState('idle');
   }
+}
+
+// ─── Recording Popup ───
+let _recPopupOpen = false;
+let _recPopupRecording = false;
+let _recPopupTimerInterval = null;
+let _recPopupSeconds = 0;
+
+function openRecPopup() {
+  const popup = document.getElementById('recPopup');
+  if (!popup) return;
+  popup.style.display = 'flex';
+  _recPopupOpen = true;
+  document.getElementById('recPopupTimer').textContent = '00:00';
+  document.getElementById('recPopupStatus').textContent = 'タップして録音開始';
+  document.getElementById('recPopupBtn').textContent = '●';
+  document.getElementById('recPopupBtn').style.background = 'var(--recording)';
+  renderRecPopupTracks();
+  updatePichanState('happy');
+}
+
+function closeRecPopup() {
+  if (_recPopupRecording) toggleRecPopup(); // stop recording first
+  const popup = document.getElementById('recPopup');
+  if (popup) popup.style.display = 'none';
+  _recPopupOpen = false;
+  updatePichanState('idle');
+}
+
+function toggleRecPopup() {
+  if (_recPopupRecording) {
+    // Stop
+    _recPopupRecording = false;
+    if (_recPopupTimerInterval) { clearInterval(_recPopupTimerInterval); _recPopupTimerInterval = null; }
+    document.getElementById('recPopupBtn').textContent = '●';
+    document.getElementById('recPopupBtn').style.background = 'var(--recording)';
+    document.getElementById('recPopupBtn').style.transform = '';
+    document.getElementById('recPopupStatus').textContent = '録音完了！';
+    // Call existing stop function
+    if (typeof stopAudioRec === 'function') stopAudioRec();
+    updatePichanState('happy');
+    setTimeout(renderRecPopupTracks, 500);
+  } else {
+    // Start
+    _recPopupRecording = true;
+    _recPopupSeconds = 0;
+    document.getElementById('recPopupBtn').textContent = '■';
+    document.getElementById('recPopupBtn').style.background = '#333';
+    document.getElementById('recPopupBtn').style.transform = 'scale(0.9)';
+    document.getElementById('recPopupStatus').textContent = '● 録音中...';
+    _recPopupTimerInterval = setInterval(() => {
+      _recPopupSeconds++;
+      const m = Math.floor(_recPopupSeconds / 60);
+      const s = _recPopupSeconds % 60;
+      document.getElementById('recPopupTimer').textContent =
+        String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    }, 1000);
+    // Call existing start function
+    if (typeof startAudioRec === 'function') startAudioRec();
+    updatePichanState('recording');
+  }
+}
+
+function renderRecPopupTracks() {
+  const container = document.getElementById('recPopupTracks');
+  if (!container) return;
+  const tracks = JSON.parse(localStorage.getItem('gv_tracks') || '[]');
+  if (tracks.length === 0) {
+    container.innerHTML = '<div style="text-align:center;font-size:10px;color:var(--text-dim);padding:8px;">録音トラックなし</div>';
+    return;
+  }
+  // Show last 3 tracks
+  const recent = tracks.slice(-3).reverse();
+  container.innerHTML = recent.map((t, i) => {
+    const dur = t.dur ? Math.floor(t.dur/60) + ':' + String(Math.floor(t.dur%60)).padStart(2,'0') : '-';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:11px;color:var(--text);">' +
+      '<span style="color:var(--accent);">♪</span>' +
+      '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (t.name || 'Track') + '</span>' +
+      '<span style="color:var(--text-dim);font-family:\'Courier New\',monospace;font-size:10px;">' + dur + '</span></div>';
+  }).join('');
 }
 
 function toggleAudioRec(){

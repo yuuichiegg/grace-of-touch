@@ -375,12 +375,14 @@ function buildNewTabPage() {
   ).join('');
 
   const graceApps = [
+    { icon:'🚀', title:'Terminal', url:'/index.html' },
     { icon:'🎤', title:'GraceVox', url:'/gracevox.html' },
     { icon:'🎵', title:'Records', url:'/records.html' },
     { icon:'🎛️', title:'TrackForge', url:'/trackforge/' },
     { icon:'🚀', title:'Mega Rocket', url:'/rocket.html' },
     { icon:'🐼', title:'Panda World', url:'/pandaworld.html' },
     { icon:'🥁', title:'Resonance', url:'/resonance-drum.html' },
+    { icon:'🌐', title:'Browser', url:'grace://newtab' },
   ];
   const graceShortcuts = graceApps.map(a =>
     `<div class="ntp-shortcut" data-url="${escapeAttr(a.url)}">
@@ -392,26 +394,17 @@ function buildNewTabPage() {
   return `
     <div class="new-tab-page">
       <div class="ntp-logo">GRACE BROWSER</div>
-      <div class="ntp-sub">Navigate the Digital Universe</div>
-      <div class="ntp-voice-section">
-        <button class="ntp-voice-btn" id="ntp-voice-btn">🎤</button>
-        <div class="ntp-voice-label">GraceVox 音声検索</div>
-      </div>
-      <div class="ntp-search">
+      <div class="ntp-search" style="margin-bottom:20px;">
         <span class="ntp-search-icon">🔍</span>
-        <input type="text" placeholder="検索またはURLを入力..." id="ntp-input">
+        <input type="text" placeholder="検索またはURLを入力... 🎤" id="ntp-input">
       </div>
-      <div style="width:min(500px,90%);margin-bottom:12px;">
-        <div style="font-family:'Orbitron',monospace;font-size:9px;color:var(--accent);letter-spacing:.2em;margin-bottom:10px;opacity:.6;">GRACE OF TOUCH APPS</div>
+      <div style="width:min(540px,92%);margin-bottom:20px;">
+        <div style="font-family:'Orbitron',monospace;font-size:10px;color:var(--accent);letter-spacing:.15em;margin-bottom:10px;">GRACE OF TOUCH</div>
         <div class="ntp-shortcuts">${graceShortcuts}</div>
       </div>
-      <div style="width:min(500px,90%);margin-top:20px;">
-        <div style="font-family:'Orbitron',monospace;font-size:9px;color:var(--text2);letter-spacing:.2em;margin-bottom:10px;opacity:.6;">BOOKMARKS</div>
+      <div style="width:min(540px,92%);">
+        <div style="font-family:'Orbitron',monospace;font-size:9px;color:var(--text2);letter-spacing:.15em;margin-bottom:10px;opacity:.5;">BOOKMARKS</div>
         <div class="ntp-shortcuts">${shortcuts}</div>
-      </div>
-      <div style="margin-top:32px;">
-        <a href="index.html" style="font-family:'Orbitron',monospace;font-size:10px;color:var(--accent);text-decoration:none;letter-spacing:.15em;opacity:.5;transition:opacity .2s;"
-           onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.5'">🚀 BACK TO SPACE TERMINAL</a>
       </div>
     </div>`;
 }
