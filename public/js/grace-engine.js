@@ -73,7 +73,8 @@
       });
       this.renderer.setPixelRatio(this.options.pixelRatio);
       this.renderer.setSize(this.canvas.clientWidth, this.canvas.clientHeight);
-      this.renderer.outputColorSpace = THREE.SRGBColorSpace || THREE.sRGBEncoding;
+      if (THREE.SRGBColorSpace) this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+      else if (THREE.sRGBEncoding) this.renderer.outputEncoding = THREE.sRGBEncoding;
       if (this.options.shadows) {
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
