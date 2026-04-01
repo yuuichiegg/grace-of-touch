@@ -94,14 +94,14 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 
 /* --- New Tab Page --- */
 .new-tab-page{display:flex;flex-direction:column;align-items:center;
-  justify-content:center;height:100%;padding:40px 20px;overflow-y:auto;}
-.ntp-logo{font-family:'Orbitron',monospace;font-size:clamp(28px,5vw,48px);
+  justify-content:flex-start;height:100%;padding:32px 20px 40px;overflow-y:auto;}
+.ntp-logo{font-family:'Orbitron',monospace;font-size:clamp(22px,4vw,36px);
   font-weight:900;background:linear-gradient(135deg,var(--accent),var(--accent2));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
-  margin-bottom:8px;user-select:none;}
-.ntp-sub{font-size:12px;color:var(--text2);margin-bottom:32px;
+  margin-bottom:4px;user-select:none;}
+.ntp-sub{font-size:11px;color:var(--text2);margin-bottom:16px;
   font-family:'JetBrains Mono',monospace;letter-spacing:.1em;}
-.ntp-search{width:min(500px,90%);position:relative;margin-bottom:40px;}
+.ntp-search{width:min(500px,90%);position:relative;margin-bottom:20px;}
 .ntp-search input{width:100%;padding:14px 20px 14px 44px;background:var(--surface);
   border:1px solid var(--border);border-radius:24px;color:var(--text);
   font-size:15px;outline:none;transition:all .2s;font-family:inherit;}
@@ -178,8 +178,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 #url-bar.voice-active{border-color:var(--recording);box-shadow:0 0 12px rgba(255,107,107,.2);}
 
 /* --- NTP Voice Button --- */
-.ntp-voice-section{margin-bottom:32px;text-align:center;}
-.ntp-voice-btn{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--voice),#8b5cf6);
+.ntp-voice-section{margin-bottom:16px;text-align:center;}
+.ntp-voice-btn{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--voice),#8b5cf6);
   border:none;color:#fff;font-size:28px;cursor:pointer;transition:all .25s;
   box-shadow:0 4px 20px var(--voice-glow);display:flex;align-items:center;justify-content:center;margin:0 auto;}
 .ntp-voice-btn:hover{transform:scale(1.1);box-shadow:0 6px 30px var(--voice-glow);}
