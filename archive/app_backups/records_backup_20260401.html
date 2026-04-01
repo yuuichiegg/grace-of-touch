@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="author" content="Grace of Touch Records / Yuuichi Onozaki">
+<title>Grace of Touch Records</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#0a0a1a;font-family:"Noto Sans JP",sans-serif;color:#fff}
+canvas{display:block}
+#app{position:relative;width:100vw;height:100vh}
+#three-canvas{position:absolute;top:0;left:0;width:100%;height:100%}
+
+/* Header */
+#header{position:absolute;top:0;left:0;right:0;z-index:10;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,rgba(10,10,26,.95) 0%,rgba(10,10,26,0) 100%);pointer-events:none}
+#header>*{pointer-events:auto}
+.logo{font-family:"Orbitron",sans-serif;font-weight:900;font-size:1.3rem;background:linear-gradient(135deg,#d4af37,#f5e6a3);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-sub{font-size:.6rem;color:#b8960c;font-family:"Orbitron",sans-serif;letter-spacing:3px}
+
+/* Floor buttons */
+#floor-list{position:absolute;left:20px;top:50%;transform:translateY(-50%);z-index:10;display:flex;flex-direction:column;gap:6px}
+.floor-btn{padding:8px 14px;border-radius:10px;cursor:pointer;font-size:.7rem;font-family:"Orbitron",sans-serif;font-weight:700;background:rgba(10,10,20,.7);border:1px solid rgba(212,175,55,.25);color:#aaa;transition:all .3s;backdrop-filter:blur(8px);white-space:nowrap}
+.floor-btn:hover,.floor-btn.active{background:rgba(212,175,55,.15);border-color:#d4af37;color:#f5e6a3;box-shadow:0 0 15px rgba(212,175,55,.3)}
+
+/* Floor panel (right) */
+#floor-panel{position:absolute;right:20px;top:50%;transform:translateY(-50%);z-index:10;width:300px;max-height:85vh;overflow-y:auto;background:rgba(10,10,20,.92);border:1px solid rgba(212,175,55,.3);border-radius:16px;padding:16px;backdrop-filter:blur(16px);display:none;transition:all .3s}
+#floor-panel.active{display:block}
+#floor-panel::-webkit-scrollbar{width:4px}
+#floor-panel::-webkit-scrollbar-thumb{background:rgba(212,175,55,.3);border-radius:2px}
+
+/* Record Shop UI */
+.shop-header{font-family:"Orbitron",sans-serif;font-size:.9rem;color:#d4af37;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.shop-header .vinyl-icon{width:20px;height:20px;border-radius:50%;border:2px solid #d4af37;position:relative;display:inline-flex;align-items:center;justify-content:center}
+.shop-header .vinyl-icon::after{content:"";width:4px;height:4px;border-radius:50%;background:#d4af37}
+
+/* Record cards */
+.record-card{display:flex;gap:12px;padding:10px;border-radius:12px;background:rgba(212,175,55,.05);border:1px solid rgba(212,175,55,.12);margin-bottom:8px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
+.record-card:hover{background:rgba(212,175,55,.12);border-color:rgba(212,175,55,.35);transform:translateX(-3px)}
+.record-card.playing{border-color:#d4af37;box-shadow:0 0 20px rgba(212,175,55,.2)}
+.record-cover{width:56px;height:56px;border-radius:8px;background:linear-gradient(135deg,#1a1a2a,#2a2040);display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;overflow:hidden}
+.record-cover .vinyl{width:40px;height:40px;border-radius:50%;background:radial-gradient(circle,#1a1a1a 20%,#2a2a3a 21%,#1a1a2a 45%,#2a2a3a 46%,#1a1a2a 70%,#333 71%,#111 100%);transition:transform 2s linear}
+.record-card.playing .vinyl{animation:spin-vinyl 2s linear infinite}
+.record-cover .vinyl::after{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:#d4af37}
+@keyframes spin-vinyl{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.record-info{flex:1;min-width:0}
+.record-title{font-size:.8rem;font-weight:700;color:#f5e6a3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.record-artist{font-size:.65rem;color:#888;margin-top:2px}
+.record-cat{font-size:.55rem;color:#d4af37;font-family:"Orbitron",sans-serif;margin-top:4px;letter-spacing:1px}
+.record-duration{font-size:.6rem;color:#666;font-family:"Orbitron",sans-serif}
+
+/* Player bar */
+#player-bar{position:absolute;bottom:0;left:0;right:0;z-index:20;height:72px;background:rgba(10,10,20,.95);border-top:1px solid rgba(212,175,55,.3);backdrop-filter:blur(16px);display:flex;align-items:center;padding:0 20px;gap:16px;transform:translateY(100%);transition:transform .4s ease}
+#player-bar.active{transform:translateY(0)}
+#player-vinyl{width:48px;height:48px;border-radius:50%;background:radial-gradient(circle,#1a1a1a 22%,#2a2a3a 23%,#1a1a2a 47%,#2a2a3a 48%,#1a1a2a 72%,#333 73%,#111 100%);flex-shrink:0;position:relative}
+#player-vinyl::after{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:#d4af37}
+#player-vinyl.spinning{animation:spin-vinyl 2s linear infinite}
+#player-info{flex:1;min-width:0}
+#player-title{font-size:.8rem;font-weight:700;color:#f5e6a3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#player-artist{font-size:.6rem;color:#888}
+#player-controls{display:flex;align-items:center;gap:12px}
+.ctrl-btn{width:36px;height:36px;border-radius:50%;border:1px solid rgba(212,175,55,.3);background:rgba(212,175,55,.08);color:#d4af37;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;font-size:14px}
+.ctrl-btn:hover{background:rgba(212,175,55,.2);border-color:#d4af37}
+.ctrl-btn.play-btn{width:42px;height:42px;border-color:#d4af37}
+#progress-wrap{position:absolute;top:-3px;left:0;right:0;height:6px;cursor:pointer}
+#progress-bg{width:100%;height:2px;background:rgba(212,175,55,.15);margin-top:2px}
+#progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#d4af37,#f5e6a3);border-radius:1px;transition:width .1s linear}
+#player-time{font-size:.6rem;color:#888;font-family:"Orbitron",sans-serif;min-width:90px;text-align:right}
+
+/* Catalog view */
+.catalog-table{width:100%;font-size:.7rem}
+.catalog-table th{text-align:left;color:#d4af37;font-family:"Orbitron",sans-serif;font-size:.6rem;padding:6px 4px;border-bottom:1px solid rgba(212,175,55,.2);letter-spacing:1px}
+.catalog-table td{padding:6px 4px;border-bottom:1px solid rgba(255,255,255,.05);color:#ccc}
+.catalog-table tr:hover td{color:#f5e6a3}
+.tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:.55rem;background:rgba(212,175,55,.1);border:1px solid rgba(212,175,55,.2);color:#d4af37;margin-right:3px}
+
+/* Floor description */
+.floor-desc{font-size:.7rem;color:#888;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(212,175,55,.1);line-height:1.5}
+
+/* Back btn */
+#back-btn{position:absolute;bottom:84px;right:20px;z-index:10;padding:10px 20px;border-radius:12px;cursor:pointer;font-family:"Orbitron",sans-serif;font-size:.7rem;font-weight:700;background:rgba(10,10,20,.8);border:1px solid rgba(212,175,55,.3);color:#d4af37;transition:all .3s;backdrop-filter:blur(8px)}
+#back-btn:hover{background:rgba(212,175,55,.15);border-color:#d4af37}
+
+#tooltip{position:absolute;z-index:20;padding:8px 14px;border-radius:8px;background:rgba(10,10,20,.9);border:1px solid rgba(212,175,55,.4);font-size:.7rem;pointer-events:none;display:none;font-family:"Orbitron",sans-serif;color:#d4af37;backdrop-filter:blur(8px)}
+
+/* Password Gate */
+#pw-gate{position:absolute;top:0;left:0;right:0;bottom:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0a1a}
+#pw-gate.hidden{display:none}
+#pw-gate .pw-vinyl{width:80px;height:80px;border-radius:50%;background:radial-gradient(circle,#1a1a1a 22%,#2a2a3a 23%,#1a1a2a 47%,#2a2a3a 48%,#1a1a2a 72%,#333 73%,#111 100%);margin-bottom:24px;position:relative;animation:spin-vinyl 4s linear infinite}
+#pw-gate .pw-vinyl::after{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:#d4af37}
+#pw-box{display:flex;gap:8px;margin-top:16px}
+#pw-input{background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.3);border-radius:8px;padding:10px 16px;color:#f5e6a3;font-family:"Orbitron",sans-serif;font-size:.75rem;letter-spacing:2px;outline:none;width:200px;text-align:center}
+#pw-input:focus{border-color:#d4af37;box-shadow:0 0 15px rgba(212,175,55,.2)}
+#pw-input::placeholder{color:rgba(212,175,55,.3)}
+#pw-submit{background:rgba(212,175,55,.1);border:1px solid rgba(212,175,55,.4);border-radius:8px;padding:10px 20px;color:#d4af37;font-family:"Orbitron",sans-serif;font-size:.7rem;cursor:pointer;transition:all .2s}
+#pw-submit:hover{background:rgba(212,175,55,.2);border-color:#d4af37}
+#pw-error{color:#ff4444;font-size:.65rem;margin-top:8px;opacity:0;transition:opacity .3s;font-family:"Orbitron",sans-serif}
+#pw-error.show{opacity:1}
+
+/* Loading */
+#loading{position:absolute;top:0;left:0;right:0;bottom:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0a1a;transition:opacity .8s}
+#loading.fade{opacity:0;pointer-events:none}
+.load-bar{width:200px;height:3px;background:rgba(212,175,55,.15);border-radius:2px;overflow:hidden;margin-top:20px}
+.load-fill{height:100%;width:0%;background:linear-gradient(90deg,#d4af37,#f5e6a3);border-radius:2px;transition:width .3s}
+
+/* Responsive */
+@media(max-width:768px){
+  .logo{font-size:1rem}
+  #floor-panel{width:240px;right:10px;padding:12px}
+  #floor-list{left:10px}
+  .floor-btn{padding:6px 10px;font-size:.6rem}
+  #back-btn{bottom:80px;right:10px;padding:8px 14px;font-size:.6rem}
+  #player-bar{padding:0 12px;gap:10px}
+  #player-time{display:none}
+}
+@media(max-width:480px){
+  #floor-list{display:none}
+  #floor-panel{width:calc(100vw - 40px);right:20px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+<canvas id="three-canvas"></canvas>
+
+<div id="header">
+  <div>
+    <div class="logo">GRACE OF TOUCH RECORDS</div>
+    <div class="logo-sub">STORAGE BANK &amp; LABEL</div>
+  </div>
+  <div id="lock-btn" style="cursor:pointer;font-family:Orbitron;font-size:.65rem;padding:6px 14px;border-radius:8px;border:1px solid rgba(212,175,55,.3);background:rgba(10,10,20,.6);color:#d4af37;backdrop-filter:blur(8px)" onclick="toggleLockUI()">&#128274; UNLOCK FULL</div>
+</div>
+
+<div id="floor-list"></div>
+<div id="floor-panel"></div>
+<div id="tooltip"></div>
+
+<div id="back-btn" onclick="location.href='tower.html'">&#8592; Back to Tower</div>
+
+<!-- Audio Player Bar -->
+<div id="player-bar">
+  <div id="progress-wrap"><div id="progress-bg"><div id="progress-fill"></div></div></div>
+  <div id="player-vinyl"></div>
+  <div id="player-info">
+    <div id="player-title">No Track Selected</div>
+    <div id="player-artist">Grace of Touch Records</div>
+  </div>
+  <div id="player-controls">
+    <div class="ctrl-btn" id="btn-prev">&#9664;&#9664;</div>
+    <div class="ctrl-btn play-btn" id="btn-play">&#9654;</div>
+    <div class="ctrl-btn" id="btn-next">&#9654;&#9654;</div>
+  </div>
+  <div id="player-time">0:00 / 0:00</div>
+</div>
+
+<!-- Password Gate (hidden by default, shown via unlock button) -->
+<div id="pw-gate" class="hidden">
+  <div class="pw-vinyl"></div>
+  <div class="logo" style="font-size:1.8rem">FULL CATALOG ACCESS</div>
+  <div class="logo-sub" style="margin-top:6px">ENTER PASSWORD TO UNLOCK</div>
+  <div id="pw-box">
+    <input type="password" id="pw-input" placeholder="PASSWORD" autocomplete="off">
+    <button id="pw-submit">UNLOCK</button>
+  </div>
+  <div id="pw-error">INVALID PASSWORD</div>
+  <div style="margin-top:16px;font-size:.6rem;color:#666;cursor:pointer" onclick="document.getElementById('pw-gate').classList.add('hidden')">&#8592; Back</div>
+</div>
+
+<div id="loading" style="display:none">
+  <div class="logo" style="font-size:2rem">GRACE OF TOUCH</div>
+  <div class="logo-sub" style="margin-top:8px">RECORDS LOADING...</div>
+  <div class="load-bar"><div class="load-fill" id="load-fill"></div></div>
+</div>
+</div>
+
+<!-- Disable dev tools / right-click -->
+<script>
+document.addEventListener("contextmenu",e=>e.preventDefault());
+document.addEventListener("keydown",e=>{if(e.key==="F12"||(e.ctrlKey&&e.shiftKey&&e.key==="I")||(e.ctrlKey&&e.key==="u"))e.preventDefault()});
+console.log("%c\u00a9 Grace of Touch Records - All Rights Reserved","color:#d4af37;font-size:14px;font-weight:bold");
+
+/* Password Gate Logic */
+(function(){
+  /* SHA-256 hash of password */
+  const PW_HASH = "44e7257a69dbb9f919b292714a0e51493447264dcb841bf39ba32d6a25d54676";
+  const SESSION_KEY = "got_records_auth";
+
+  async function sha256(msg) {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(msg));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,"0")).join("");
+  }
+
+  /* Public mode: anyone can browse public tracks (original + AI)
+     Full mode: password unlocks band/held tracks + full catalog */
+  const isFullAuth = sessionStorage.getItem(SESSION_KEY) === "1";
+
+  /* Always allow entry — no gate for public content */
+  document.getElementById("pw-gate").classList.add("hidden");
+  document.getElementById("loading").style.display = "";
+
+  /* But expose a lock/unlock button for full access */
+  window._recordsFullAccess = isFullAuth;
+  window._recordsUnlock = async function(val) {
+    const hash = await sha256(val);
+    if (hash === PW_HASH) {
+      sessionStorage.setItem(SESSION_KEY, "1");
+      window._recordsFullAccess = true;
+      return true;
+    }
+    return false;
+  };
+
+  /* Wire up unlock UI */
+  const pwInput = document.getElementById("pw-input");
+  const pwSubmit = document.getElementById("pw-submit");
+  const pwError = document.getElementById("pw-error");
+
+  async function tryUnlock() {
+    const val = pwInput.value.trim();
+    if (!val) return;
+    const ok = await window._recordsUnlock(val);
+    if (ok) {
+      document.getElementById("pw-gate").classList.add("hidden");
+      document.getElementById("lock-btn").innerHTML = "&#128275; FULL ACCESS";
+      document.getElementById("lock-btn").style.color = "#4ade80";
+      document.getElementById("lock-btn").style.borderColor = "rgba(74,222,128,.4)";
+    } else {
+      pwError.classList.add("show");
+      pwInput.value = "";
+      pwInput.focus();
+      setTimeout(() => pwError.classList.remove("show"), 2000);
+    }
+  }
+  pwSubmit.addEventListener("click", tryUnlock);
+  pwInput.addEventListener("keydown", e => { if (e.key === "Enter") tryUnlock(); });
+
+  if (isFullAuth) {
+    document.getElementById("lock-btn").innerHTML = "&#128275; FULL ACCESS";
+    document.getElementById("lock-btn").style.color = "#4ade80";
+    document.getElementById("lock-btn").style.borderColor = "rgba(74,222,128,.4)";
+  }
+
+  window.toggleLockUI = function() {
+    if (window._recordsFullAccess) return;
+    document.getElementById("pw-gate").classList.remove("hidden");
+    pwInput.value = "";
+    pwInput.focus();
+  };
+})();
+</script>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+/* ============================================
+   CATALOG DATA
+   ============================================ */
+/*
+  origin: "original" = ソロ完全自作
+          "ai"       = AI生成（本人Prod.）
+          "collab"   = 共作/アレンジ協力
+          "band"     = バンド/エッグビレッジ
+          "shugyo"   = 執行くん作曲
+  status: "public"   = 公開OK
+          "vault"    = 非公開（パスワード内のみ）
+          "held"     = 権利確認待ち
+*/
+const CATALOG = [
+  /* === AI楽曲 (Prod. Grace of Touch) === */
+  { id:1,  file:"01_distance.mp3",       title:"Distance",              artist:"Grace of Touch",  year:2024, genre:"Electronic",   cat:"GOT-001", origin:"ai",       status:"public" },
+  { id:2,  file:"02_run_this_down.mp3",   title:"Run This Down",         artist:"Grace of Touch",  year:2024, genre:"Electronic",   cat:"GOT-002", origin:"ai",       status:"public" },
+  { id:3,  file:"03_future_ocean.mp3",    title:"Future Ocean",          artist:"Grace of Touch",  year:2024, genre:"Ambient",      cat:"GOT-003", origin:"ai",       status:"public" },
+  { id:4,  file:"04_untitled.mp3",        title:"Untitled",              artist:"Grace of Touch",  year:2024, genre:"Experimental", cat:"GOT-004", origin:"ai",       status:"public" },
+  { id:5,  file:"05_thethon.mp3",         title:"Thethon",               artist:"Grace of Touch",  year:2024, genre:"Electronic",   cat:"GOT-005", origin:"ai",       status:"public" },
+  { id:6,  file:"06_noel_yamabiko.mp3",   title:"Noel Yamabiko",         artist:"Grace of Touch",  year:2024, genre:"J-Pop",        cat:"GOT-006", origin:"ai",       status:"public" },
+  { id:7,  file:"07_noel_elefolk.mp3",    title:"Noel Elefolk",          artist:"Grace of Touch",  year:2024, genre:"Electro Folk", cat:"GOT-007", origin:"ai",       status:"public" },
+  { id:8,  file:"08_sorasido.mp3",        title:"Sorasido",              artist:"Grace of Touch",  year:2024, genre:"J-Pop",        cat:"GOT-008", origin:"ai",       status:"public" },
+  { id:9,  file:"09_tankyu.mp3",          title:"Tankyu",                artist:"Grace of Touch",  year:2024, genre:"Electronic",   cat:"GOT-009", origin:"ai",       status:"public" },
+  { id:10, file:"10_atodashi_janken.mp3", title:"Atodashi Janken",       artist:"Grace of Touch",  year:2024, genre:"Pop",          cat:"GOT-010", origin:"ai",       status:"public" },
+
+  /* === ソロオリジナル === */
+  { id:11, file:null, title:"STRUGGLE",             artist:"Yuuichi Onozaki", year:2008, genre:"Rock",         cat:"GOT-011", origin:"original", status:"vault",
+    versions:[{date:"2008-07-13",type:"original",note:"初回レコーディング"},{date:"2009-01-26",type:"eq",note:"EQマスタリング"},{date:"2009-11-02",type:"remix",note:"ベース・ギター追加"},{date:"2010-09-08",type:"karaoke",note:"カラオケver"},{date:"2014-04-12",type:"lyrics",note:"歌詞文書化"}] },
+  { id:12, file:null, title:"kaleidoscope of leaf",  artist:"Yuuichi Onozaki", year:2009, genre:"Rock/Pop",     cat:"GOT-012", origin:"original", status:"vault",
+    versions:[{date:"2009-06-07",type:"original",note:"初デモ"},{date:"2009-11-26",type:"demo",note:"デモ2"},{date:"2010-11-07",type:"band",note:"エッグビレッジ練習"},{date:"2011-11-20",type:"remix",note:"2011 Ver."},{date:"2014-02-04",type:"remix",note:"2014 Ver."},{date:"2015-07",type:"remix",note:"2015 Ver."},{date:"2022-02",type:"remix",note:"2022 Ver."}] },
+  { id:13, file:null, title:"Rain",                  artist:"Yuuichi Onozaki", year:2009, genre:"Ballad",       cat:"GOT-013", origin:"original", status:"vault" },
+  { id:14, file:null, title:"priconception",          artist:"Yuuichi Onozaki", year:2009, genre:"Rock",         cat:"GOT-014", origin:"original", status:"vault" },
+  { id:15, file:null, title:"どこまでも続く川",        artist:"Yuuichi Onozaki", year:2010, genre:"Folk",         cat:"GOT-015", origin:"original", status:"vault" },
+  { id:16, file:null, title:"SNOW SNOW SNOW",         artist:"Yuuichi Onozaki", year:2010, genre:"Pop",          cat:"GOT-016", origin:"original", status:"vault" },
+  { id:17, file:null, title:"照らすように",            artist:"Yuuichi Onozaki", year:2010, genre:"Ballad",       cat:"GOT-017", origin:"original", status:"vault" },
+  { id:18, file:null, title:"Dropout",                artist:"Yuuichi Onozaki", year:2010, genre:"Rock",         cat:"GOT-018", origin:"original", status:"vault" },
+  { id:19, file:null, title:"僕らの音楽",              artist:"Yuuichi Onozaki", year:2010, genre:"Pop",          cat:"GOT-019", origin:"original", status:"vault" },
+  { id:20, file:null, title:"Loving long time ago",   artist:"Yuuichi Onozaki", year:2010, genre:"Ballad",       cat:"GOT-020", origin:"original", status:"vault",
+    versions:[{date:"2010-10-21",type:"original",note:"初回デモ"},{date:"2014-04-17",type:"remix",note:"2014 Ver."},{date:"2015",type:"remix",note:"2015 Remix Ver."},{date:"2021-12",type:"remix",note:"2021 Ver."}] },
+  { id:21, file:null, title:"through",                artist:"Yuuichi Onozaki", year:2011, genre:"Rock",         cat:"GOT-021", origin:"original", status:"vault" },
+  { id:22, file:null, title:"Amusement park in tears",artist:"Yuuichi Onozaki", year:2013, genre:"Pop",          cat:"GOT-022", origin:"original", status:"vault",
+    versions:[{date:"2013-01-10",type:"original",note:"初回制作"},{date:"2013-01-14",type:"recording",note:"レコーディング"},{date:"2014-03-15",type:"remix",note:"リミックス"}] },
+  { id:23, file:null, title:"THE DICE",               artist:"Yuuichi Onozaki", year:2013, genre:"Rock",         cat:"GOT-023", origin:"original", status:"vault" },
+  { id:24, file:null, title:"PLANE",                  artist:"Yuuichi Onozaki", year:2014, genre:"Pop",          cat:"GOT-024", origin:"original", status:"vault" },
+  { id:25, file:null, title:"モンブランミルフィーユ",    artist:"Yuuichi Onozaki", year:2018, genre:"Pop",          cat:"GOT-025", origin:"original", status:"vault" },
+
+  /* === バンド/エッグビレッジ（権利確認待ち） === */
+  { id:50, file:null, title:"Formula",               artist:"Egg Village",     year:2009, genre:"Rock",         cat:"EGG-001", origin:"band",    status:"held" },
+  { id:51, file:null, title:"1988",                   artist:"Koji Shugyo",     year:2010, genre:"Rock",         cat:"SHG-001", origin:"shugyo",  status:"held" },
+  { id:52, file:null, title:"Climb into the Sky",     artist:"Koji Shugyo",     year:2012, genre:"Rock",         cat:"SHG-002", origin:"shugyo",  status:"held" },
+  { id:53, file:null, title:"Traveler",               artist:"Egg Village",     year:2010, genre:"Rock",         cat:"EGG-002", origin:"band",    status:"held" },
+  { id:54, file:null, title:"Pessimistic World",      artist:"Yuuichi Onozaki", year:2010, genre:"Rock",         cat:"EGG-003", origin:"band",    status:"held" }
+];
+const ORIGIN_LABELS = { original:"ORIGINAL", ai:"AI", collab:"COLLAB", band:"BAND", shugyo:"SHUGYO" };
+const ORIGIN_COLORS = { original:"#d4af37", ai:"#22d3ee", collab:"#a78bfa", band:"#ff6b35", shugyo:"#4ade80" };
+const STATUS_LABELS = { public:"PUBLIC", vault:"VAULT", held:"HELD" };
+const STATUS_COLORS = { public:"#4ade80", vault:"#d4af37", held:"#ff4444" };
+
+/* ============================================
+   FLOOR DATA
+   ============================================ */
+const FLOORS = [
+  { id:"b1", floor:"B1", label:"Vault \u2014 Master Archive",     y:-2, color:0x1a1510, desc:"金庫室。マスター音源の安全な保管庫。全楽曲のオリジナルファイルをアーカイブ。" },
+  { id:"f1", floor:"1F", label:"Record Shop",                     y:0,  color:0x2a1f10, desc:"レコードショップ。ビニール盤が並ぶラックから楽曲をブラウズ＆試聴。" },
+  { id:"f2", floor:"2F", label:"Catalog Room",                    y:5,  color:0x1a2010, desc:"カタログ室。楽曲メタデータの管理、タグ付け、検索。" },
+  { id:"f3", floor:"3F", label:"Mastering Suite",                 y:10, color:0x201a18, desc:"マスタリングスイート。リマスター管理、バージョン比較。" },
+  { id:"f4", floor:"4F", label:"A&R Office",                      y:15, color:0x18181a, desc:"A&Rオフィス。リリース計画、配信先管理、プロモーション。" },
+  { id:"rf", floor:"RF", label:"Rooftop Lounge",                  y:20, color:0x101020, desc:"屋上ラウンジ。夜景を眺めながらプレイリストを楽しむ。" }
+];
+
+const GOLD = 0xd4af37;
+const GOLD_LIGHT = 0xf5e6a3;
+const DARK_BG = 0x0a0a1a;
+
+/* ============================================
+   THREE.JS SETUP
+   ============================================ */
+const canvas = document.getElementById("three-canvas");
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(DARK_BG, 0.006);
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 500);
+camera.position.set(28, 18, 32);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.7;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.target.set(0, 10, 0);
+controls.minDistance = 12;
+controls.maxDistance = 80;
+controls.maxPolarAngle = Math.PI * 0.85;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.25;
+
+/* Lights */
+scene.add(new THREE.AmbientLight(0x1a1510, 0.6));
+const dirLight = new THREE.DirectionalLight(0xffeedd, 0.5);
+dirLight.position.set(25, 40, 15);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048, 2048);
+dirLight.shadow.camera.near = 1; dirLight.shadow.camera.far = 100;
+dirLight.shadow.camera.left = -30; dirLight.shadow.camera.right = 30;
+dirLight.shadow.camera.top = 40; dirLight.shadow.camera.bottom = -10;
+scene.add(dirLight);
+
+scene.add(new THREE.PointLight(GOLD, 0.4, 50).translateTo || (() => { const l = new THREE.PointLight(GOLD, 0.4, 50); l.position.set(-10, 15, 8); scene.add(l); return l; })());
+const cyanL = new THREE.PointLight(0x22d3ee, 0.2, 50);
+cyanL.position.set(12, 20, -8);
+scene.add(cyanL);
+
+/* Ground */
+const gridH = new THREE.GridHelper(160, 60, GOLD, 0x1a1510);
+gridH.position.y = -3;
+gridH.material.opacity = 0.2;
+gridH.material.transparent = true;
+scene.add(gridH);
+
+const gnd = new THREE.Mesh(
+  new THREE.PlaneGeometry(160, 160),
+  new THREE.MeshStandardMaterial({ color: 0x0a0a12, roughness: 0.9, metalness: 0.1 })
+);
+gnd.rotation.x = -Math.PI / 2;
+gnd.position.y = -3.01;
+gnd.receiveShadow = true;
+scene.add(gnd);
+
+/* Stars */
+const starGeo = new THREE.BufferGeometry();
+const starPos = new Float32Array(2000 * 3);
+for (let i = 0; i < 2000; i++) {
+  starPos[i*3] = (Math.random() - 0.5) * 300;
+  starPos[i*3+1] = Math.random() * 150 + 20;
+  starPos[i*3+2] = (Math.random() - 0.5) * 300;
+}
+starGeo.setAttribute("position", new THREE.BufferAttribute(starPos, 3));
+scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.25, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending })));
+
+/* ============================================
+   BUILDING
+   ============================================ */
+const BG = new THREE.Group();
+scene.add(BG);
+
+const bw = 7, bd = 5.5, fH = 4;
+const floorMeshes = [];
+
+/* Materials */
+const glassMat = new THREE.MeshPhysicalMaterial({
+  color: 0x1a1510, metalness: 0.2, roughness: 0.05,
+  transmission: 0.5, thickness: 0.5, transparent: true, opacity: 0.3, side: THREE.DoubleSide
+});
+const frameMat = new THREE.MeshStandardMaterial({ color: 0x3a3020, metalness: 0.85, roughness: 0.25 });
+const goldMetalMat = new THREE.MeshStandardMaterial({ color: GOLD, metalness: 0.9, roughness: 0.2 });
+
+/* Build each floor */
+FLOORS.forEach(fd => {
+  const fg = new THREE.Group();
+  fg.position.y = fd.y;
+
+  /* Slab */
+  const slab = new THREE.Mesh(
+    new THREE.BoxGeometry(bw + 0.6, 0.3, bd + 0.6),
+    new THREE.MeshStandardMaterial({ color: 0x2a2218, metalness: 0.7, roughness: 0.3 })
+  );
+  slab.castShadow = true;
+  slab.receiveShadow = true;
+  fg.add(slab);
+
+  const wH = fH - 0.3;
+
+  /* Glass walls */
+  const fGeo = new THREE.PlaneGeometry(bw, wH);
+  const sGeo = new THREE.PlaneGeometry(bd, wH);
+
+  [[0, bd/2, 0], [0, -bd/2, Math.PI]].forEach(([x, z, ry]) => {
+    const w = new THREE.Mesh(fGeo, glassMat.clone());
+    w.position.set(x, wH/2 + 0.15, z);
+    w.rotation.y = ry || 0;
+    fg.add(w);
+  });
+  [[-bw/2, Math.PI/2], [bw/2, -Math.PI/2]].forEach(([x, ry]) => {
+    const w = new THREE.Mesh(sGeo, glassMat.clone());
+    w.position.set(x, wH/2 + 0.15, 0);
+    w.rotation.y = ry;
+    fg.add(w);
+  });
+
+  /* Window glow strips */
+  const goldColor = new THREE.Color(GOLD);
+  for (let s = 0; s < 3; s++) {
+    const yO = 0.6 + s * (wH / 3);
+    const stripMat = new THREE.MeshStandardMaterial({
+      color: GOLD, emissive: GOLD, emissiveIntensity: 0.3 + Math.random() * 0.3,
+      metalness: 0.2, roughness: 0.3, transparent: true, opacity: 0.6
+    });
+    const stF = new THREE.Mesh(new THREE.PlaneGeometry(bw * 0.85, 0.2), stripMat);
+    stF.position.set(0, yO + 0.15, bd/2 + 0.02);
+    fg.add(stF);
+    const stB = new THREE.Mesh(new THREE.PlaneGeometry(bw * 0.85, 0.2), stripMat.clone());
+    stB.position.set(0, yO + 0.15, -bd/2 - 0.02);
+    stB.rotation.y = Math.PI;
+    fg.add(stB);
+  }
+
+  /* Individual windows */
+  const cols = 4, rows = 2;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const wx = -bw/2 + (c + 0.5) * (bw / cols);
+      const wy = 0.8 + r * (wH / rows) + 0.5;
+      const bright = 0.15 + Math.random() * 0.4;
+      const wc = Math.random() > 0.4 ? GOLD : 0xf5e6a3;
+      const winMat = new THREE.MeshBasicMaterial({ color: wc, transparent: true, opacity: bright });
+      const winGeo = new THREE.PlaneGeometry(0.9, 1.1);
+      const win = new THREE.Mesh(winGeo, winMat);
+      win.position.set(wx, wy, bd/2 + 0.03);
+      fg.add(win);
+      const winB = new THREE.Mesh(winGeo, winMat.clone());
+      winB.position.set(wx, wy, -bd/2 - 0.03);
+      winB.rotation.y = Math.PI;
+      fg.add(winB);
+    }
+  }
+
+  /* Pillars */
+  const pGeo = new THREE.BoxGeometry(0.3, wH + 0.3, 0.3);
+  [[-bw/2, -bd/2], [bw/2, -bd/2], [-bw/2, bd/2], [bw/2, bd/2]].forEach(([x, z]) => {
+    const p = new THREE.Mesh(pGeo, frameMat);
+    p.position.set(x, wH/2 + 0.15, z);
+    p.castShadow = true;
+    fg.add(p);
+  });
+
+  /* Interior light */
+  const iL = new THREE.PointLight(GOLD, 0.12, 6);
+  iL.position.set(0, 2, 0);
+  fg.add(iL);
+
+  /* Hit box */
+  const hb = new THREE.Mesh(
+    new THREE.BoxGeometry(bw + 1, fH, bd + 1),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  hb.position.y = fH / 2;
+  hb.userData = { floorData: fd };
+  fg.add(hb);
+
+  BG.add(fg);
+  floorMeshes.push({ mesh: hb, floorData: fd, group: fg });
+});
+
+/* ============================================
+   BUILDING TOP — Roof + Vinyl Sign
+   ============================================ */
+const roofY = FLOORS[FLOORS.length - 1].y + fH;
+
+/* Roof slab */
+const roof = new THREE.Mesh(
+  new THREE.BoxGeometry(bw + 0.8, 0.5, bd + 0.8),
+  new THREE.MeshStandardMaterial({ color: 0x2a2218, metalness: 0.8, roughness: 0.2 })
+);
+roof.position.y = roofY;
+roof.castShadow = true;
+BG.add(roof);
+
+/* Giant vinyl record on roof */
+const vinylGroup = new THREE.Group();
+vinylGroup.position.y = roofY + 3;
+vinylGroup.rotation.x = -0.3;
+
+const vinylGeo = new THREE.CylinderGeometry(3, 3, 0.1, 64);
+const vinylMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8, roughness: 0.15 });
+const vinylDisc = new THREE.Mesh(vinylGeo, vinylMat);
+vinylGroup.add(vinylDisc);
+
+/* Grooves */
+for (let i = 1; i <= 5; i++) {
+  const groove = new THREE.Mesh(
+    new THREE.TorusGeometry(0.5 + i * 0.45, 0.02, 8, 64),
+    new THREE.MeshBasicMaterial({ color: 0x222222, transparent: true, opacity: 0.6 })
+  );
+  groove.rotation.x = Math.PI / 2;
+  groove.position.y = 0.06;
+  vinylGroup.add(groove);
+}
+
+/* Label center */
+const labelGeo = new THREE.CylinderGeometry(0.7, 0.7, 0.12, 32);
+const labelMat = new THREE.MeshStandardMaterial({ color: GOLD, emissive: GOLD, emissiveIntensity: 0.3, metalness: 0.5, roughness: 0.3 });
+const labelDisc = new THREE.Mesh(labelGeo, labelMat);
+vinylGroup.add(labelDisc);
+
+/* Center hole */
+const holeMat = new THREE.MeshBasicMaterial({ color: 0x0a0a1a });
+const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.14, 16), holeMat);
+vinylGroup.add(hole);
+
+BG.add(vinylGroup);
+
+/* Neon sign pole */
+const pole = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.08, 0.08, 5, 8),
+  new THREE.MeshStandardMaterial({ color: 0x3a3020, metalness: 0.9, roughness: 0.2 })
+);
+pole.position.set(0, roofY + 2.5, 0);
+BG.add(pole);
+
+/* Gold glow on top */
+const topGlow = new THREE.PointLight(GOLD, 0.8, 15);
+topGlow.position.set(0, roofY + 5, 0);
+BG.add(topGlow);
+
+/* Base ring */
+const baseRingMat = new THREE.MeshBasicMaterial({ color: GOLD, side: THREE.DoubleSide, transparent: true, opacity: 0.3 });
+const baseRing = new THREE.Mesh(new THREE.RingGeometry(6, 6.8, 64), baseRingMat);
+baseRing.rotation.x = -Math.PI / 2;
+baseRing.position.y = -2.99;
+BG.add(baseRing);
+
+/* Entrance awning — Record Shop feel */
+const awning = new THREE.Mesh(
+  new THREE.BoxGeometry(bw + 2, 0.15, 2),
+  new THREE.MeshStandardMaterial({ color: 0x8b0000, metalness: 0.3, roughness: 0.6 })
+);
+awning.position.set(0, 3.5, bd/2 + 1);
+awning.castShadow = true;
+BG.add(awning);
+
+/* Small surrounding buildings */
+function addSubBldg(x, z, h, col) {
+  const b = new THREE.Mesh(
+    new THREE.BoxGeometry(2.5, h, 2),
+    new THREE.MeshStandardMaterial({ color: col, metalness: 0.3, roughness: 0.5, transparent: true, opacity: 0.6 })
+  );
+  b.position.set(x, h/2 - 3, z);
+  b.castShadow = true;
+  BG.add(b);
+}
+addSubBldg(-12, 6, 8, 0x1a1510);
+addSubBldg(13, -5, 6, 0x151a10);
+addSubBldg(-10, -9, 5, 0x10151a);
+
+/* Floor labels */
+function makeLabel(text) {
+  const c = document.createElement("canvas");
+  c.width = 512; c.height = 64;
+  const x = c.getContext("2d");
+  x.clearRect(0, 0, 512, 64);
+  x.font = "bold 26px Orbitron, sans-serif";
+  x.fillStyle = "#d4af37";
+  x.shadowColor = "#d4af37";
+  x.shadowBlur = 8;
+  x.textAlign = "left";
+  x.fillText(text, 10, 40);
+  const t = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, opacity: 0.85 }));
+  sp.scale.set(9, 1.1, 1);
+  return sp;
+}
+FLOORS.forEach(fd => {
+  const l = makeLabel(fd.floor + "  " + fd.label);
+  l.position.set(bw/2 + 5.5, fd.y + 2, 0);
+  BG.add(l);
+});
+
+/* ============================================
+   FLOATING PARTICLES (gold dust)
+   ============================================ */
+const fpGeo = new THREE.BufferGeometry();
+const fpCount = 150;
+const fpPos = new Float32Array(fpCount * 3);
+const fpCol = new Float32Array(fpCount * 3);
+for (let i = 0; i < fpCount; i++) {
+  const a = Math.random() * Math.PI * 2, r = 5 + Math.random() * 12;
+  fpPos[i*3] = Math.cos(a) * r;
+  fpPos[i*3+1] = Math.random() * 30 - 5;
+  fpPos[i*3+2] = Math.sin(a) * r;
+  const c = Math.random() > 0.3 ? new THREE.Color(GOLD) : new THREE.Color(0x22d3ee);
+  fpCol[i*3] = c.r; fpCol[i*3+1] = c.g; fpCol[i*3+2] = c.b;
+}
+fpGeo.setAttribute("position", new THREE.BufferAttribute(fpPos, 3));
+fpGeo.setAttribute("color", new THREE.BufferAttribute(fpCol, 3));
+const floatPart = new THREE.Points(fpGeo, new THREE.PointsMaterial({
+  size: 0.12, transparent: true, opacity: 0.5, vertexColors: true, blending: THREE.AdditiveBlending
+}));
+scene.add(floatPart);
+
+/* ============================================
+   AUDIO ENGINE
+   ============================================ */
+const audio = new Audio();
+audio.crossOrigin = "anonymous";
+let currentTrackIdx = -1;
+let isPlaying = false;
+
+const playerBar = document.getElementById("player-bar");
+const playerVinyl = document.getElementById("player-vinyl");
+const playerTitle = document.getElementById("player-title");
+const playerArtist = document.getElementById("player-artist");
+const playerTime = document.getElementById("player-time");
+const progressFill = document.getElementById("progress-fill");
+const btnPlay = document.getElementById("btn-play");
+const btnPrev = document.getElementById("btn-prev");
+const btnNext = document.getElementById("btn-next");
+const progressWrap = document.getElementById("progress-wrap");
+
+function formatTime(s) {
+  if (isNaN(s)) return "0:00";
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return m + ":" + (sec < 10 ? "0" : "") + sec;
+}
+
+function playTrack(idx) {
+  if (idx < 0 || idx >= CATALOG.length) return;
+  const track = CATALOG[idx];
+  if (!track.file) { /* No audio file yet */ return; }
+  currentTrackIdx = idx;
+  audio.src = "music/" + track.file;
+  audio.play().then(() => {
+    isPlaying = true;
+    updatePlayerUI();
+  }).catch(() => {
+    isPlaying = false;
+    updatePlayerUI();
+  });
+  playerBar.classList.add("active");
+  updatePlayerUI();
+  updateCardStates();
+}
+
+function togglePlay() {
+  if (currentTrackIdx < 0) { playTrack(0); return; }
+  if (isPlaying) { audio.pause(); isPlaying = false; }
+  else { audio.play().then(() => { isPlaying = true; updatePlayerUI(); }); }
+  updatePlayerUI();
+}
+
+function updatePlayerUI() {
+  const track = CATALOG[currentTrackIdx];
+  if (track) {
+    playerTitle.textContent = track.title;
+    playerArtist.textContent = track.artist + " \u2014 " + track.cat;
+  }
+  btnPlay.innerHTML = isPlaying ? "&#9646;&#9646;" : "&#9654;";
+  playerVinyl.classList.toggle("spinning", isPlaying);
+}
+
+function updateCardStates() {
+  document.querySelectorAll(".record-card").forEach((card, i) => {
+    card.classList.toggle("playing", i === currentTrackIdx);
+  });
+}
+
+audio.addEventListener("timeupdate", () => {
+  if (audio.duration) {
+    progressFill.style.width = (audio.currentTime / audio.duration * 100) + "%";
+    playerTime.textContent = formatTime(audio.currentTime) + " / " + formatTime(audio.duration);
+  }
+});
+
+audio.addEventListener("ended", () => {
+  const next = (currentTrackIdx + 1) % CATALOG.length;
+  playTrack(next);
+});
+
+btnPlay.addEventListener("click", togglePlay);
+btnPrev.addEventListener("click", () => {
+  const prev = (currentTrackIdx - 1 + CATALOG.length) % CATALOG.length;
+  playTrack(prev);
+});
+btnNext.addEventListener("click", () => {
+  const next = (currentTrackIdx + 1) % CATALOG.length;
+  playTrack(next);
+});
+progressWrap.addEventListener("click", e => {
+  if (!audio.duration) return;
+  const rect = progressWrap.getBoundingClientRect();
+  const ratio = (e.clientX - rect.left) / rect.width;
+  audio.currentTime = ratio * audio.duration;
+});
+
+/* ============================================
+   FLOOR UI RENDERING
+   ============================================ */
+const floorPanel = document.getElementById("floor-panel");
+
+let shopFilter = "all"; /* "all", "original", "ai", "collab" or genre name */
+
+function renderShop() {
+  const genres = [...new Set(CATALOG.map(t => t.genre))];
+  let html = '<div class="shop-header"><div class="vinyl-icon"></div> RECORD SHOP</div>';
+  html += '<div class="floor-desc">ラックからレコードを選んで試聴できます。</div>';
+
+  /* Filter tabs */
+  html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">';
+  html += `<span class="tag" data-filter="all" style="cursor:pointer;${shopFilter==='all'?'background:rgba(212,175,55,.3);':''}">ALL</span>`;
+  html += `<span class="tag" data-filter="original" style="cursor:pointer;color:#d4af37;${shopFilter==='original'?'background:rgba(212,175,55,.3);':''}">ORIGINAL</span>`;
+  html += `<span class="tag" data-filter="ai" style="cursor:pointer;color:#22d3ee;border-color:rgba(34,211,238,.3);${shopFilter==='ai'?'background:rgba(34,211,238,.3);':''}">AI</span>`;
+  html += `<span class="tag" data-filter="collab" style="cursor:pointer;color:#a78bfa;border-color:rgba(167,139,250,.3);${shopFilter==='collab'?'background:rgba(167,139,250,.3);':''}">COLLAB</span>`;
+  html += `<span class="tag" data-filter="band" style="cursor:pointer;color:#ff6b35;border-color:rgba(255,107,53,.3);${shopFilter==='band'?'background:rgba(255,107,53,.3);':''}">BAND</span>`;
+  html += `<span class="tag" data-filter="shugyo" style="cursor:pointer;color:#4ade80;border-color:rgba(74,222,128,.3);${shopFilter==='shugyo'?'background:rgba(74,222,128,.3);':''}">SHUGYO</span>`;
+  genres.forEach(g => {
+    html += `<span class="tag" data-filter="genre:${g}" style="cursor:pointer;${shopFilter===('genre:'+g)?'background:rgba(212,175,55,.3);':''}">${g}</span>`;
+  });
+  html += '</div>';
+
+  const visibleCatalog = window._recordsFullAccess ? CATALOG : CATALOG.filter(t => t.status === "public");
+  const filtered = visibleCatalog.filter(t => {
+    if (shopFilter === "all") return true;
+    if (["original","ai","collab","band","shugyo"].includes(shopFilter)) return t.origin === shopFilter;
+    if (shopFilter.startsWith("genre:")) return t.genre === shopFilter.slice(6);
+    return true;
+  });
+
+  filtered.forEach(t => {
+    const i = CATALOG.indexOf(t);
+    const playing = i === currentTrackIdx;
+    const oColor = ORIGIN_COLORS[t.origin] || "#d4af37";
+    const oLabel = ORIGIN_LABELS[t.origin] || "?";
+    const noFile = !t.file;
+    html += `<div class="record-card ${playing ? 'playing' : ''}" data-idx="${i}" style="${noFile?'opacity:0.6;':''}">
+      <div class="record-cover"><div class="vinyl"></div>${noFile?'<div style="position:absolute;font-size:.45rem;color:#888;bottom:2px;font-family:Orbitron">VAULT</div>':''}</div>
+      <div class="record-info">
+        <div class="record-title">${t.title}</div>
+        <div class="record-artist">${t.artist}</div>
+        <div style="display:flex;gap:4px;align-items:center;margin-top:4px">
+          <span class="record-cat">${t.cat}</span>
+          <span class="tag" style="color:${oColor};border-color:${oColor}40">${oLabel}</span>
+          <span class="tag">${t.genre}</span>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  if (filtered.length === 0) {
+    html += '<div style="text-align:center;color:#666;padding:20px;font-size:.75rem">No tracks in this category</div>';
+  }
+  return html;
+}
+
+function renderCatalog() {
+  let html = '<div class="shop-header"><div class="vinyl-icon"></div> CATALOG</div>';
+  html += '<div class="floor-desc">全楽曲のメタデータ一覧。タグとカタログ番号で管理。</div>';
+  const visCat = window._recordsFullAccess ? CATALOG : CATALOG.filter(t => t.status === "public");
+  html += '<table class="catalog-table"><thead><tr><th>#</th><th>TITLE</th><th>TYPE</th><th>STATUS</th><th>YEAR</th><th>CAT</th></tr></thead><tbody>';
+  visCat.forEach((t, i) => {
+    const oColor = ORIGIN_COLORS[t.origin] || "#d4af37";
+    const oLabel = ORIGIN_LABELS[t.origin] || "?";
+    const sc = STATUS_COLORS[t.status] || "#888";
+    const sl = STATUS_LABELS[t.status] || "?";
+    const roleText = t.origin === "ai" ? "Prod." : t.origin === "band" ? "Band" : t.origin === "shugyo" ? "Shugyo" : "Artist";
+    html += `<tr class="record-row" data-idx="${i}" style="cursor:pointer">
+      <td style="color:#d4af37">${String(i+1).padStart(2,'0')}</td>
+      <td>${t.title}<div style="font-size:.5rem;color:#666">${t.artist} (${roleText})</div></td>
+      <td><span class="tag" style="color:${oColor};border-color:${oColor}40">${oLabel}</span></td>
+      <td><span class="tag" style="color:${sc};border-color:${sc}40">${sl}</span></td>
+      <td style="font-size:.6rem;color:#888">${t.year}</td>
+      <td style="color:#d4af37;font-size:.55rem">${t.cat}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+function renderVault() {
+  const originals = CATALOG.filter(t => t.origin === "original");
+  const aiTracks = CATALOG.filter(t => t.origin === "ai");
+  const bandTracks = CATALOG.filter(t => t.origin === "band" || t.origin === "shugyo");
+  let html = '<div class="shop-header"><div class="vinyl-icon"></div> VAULT</div>';
+  html += '<div class="floor-desc">マスター音源の金庫室。全 ' + CATALOG.length + ' トラック管理中。</div>';
+  /* Stats */
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">';
+  [{label:"ORIGINAL",count:originals.length,color:"#d4af37"},{label:"AI PROD.",count:aiTracks.length,color:"#22d3ee"},{label:"BAND/EGG",count:bandTracks.length,color:"#ff6b35"},{label:"TOTAL",count:CATALOG.length,color:"#fff"}].forEach(s => {
+    html += `<div style="text-align:center;padding:12px 0;background:rgba(255,255,255,.03);border-radius:8px;border:1px solid ${s.color}20">
+      <div style="font-family:Orbitron;font-size:1.5rem;color:${s.color}">${s.count}</div>
+      <div style="font-size:.5rem;color:#888;font-family:Orbitron;letter-spacing:1px;margin-top:2px">${s.label}</div>
+    </div>`;
+  });
+  html += '</div>';
+  /* Vinyl grid */
+  html += '<div style="display:flex;flex-wrap:wrap;gap:5px;justify-content:center">';
+  CATALOG.forEach(t => {
+    const oc = ORIGIN_COLORS[t.origin] || "#d4af37";
+    html += `<div style="width:44px;height:44px;border-radius:50%;background:radial-gradient(circle,#1a1a1a 22%,#2a2a3a 23%,#1a1a2a 47%,#2a2a3a 48%,#111 100%);display:flex;align-items:center;justify-content:center;border:1px solid ${oc}40;position:relative;cursor:default" title="${t.title} (${t.origin})">
+      <div style="width:8px;height:8px;border-radius:50%;background:${oc}"></div>
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderMastering() {
+  let html = '<div class="shop-header"><div class="vinyl-icon"></div> MASTERING SUITE</div>';
+  html += '<div class="floor-desc">バージョン履歴＆タイムライン。制作日・リミックス日を記録。</div>';
+  CATALOG.forEach(t => {
+    const sc = STATUS_COLORS[t.status] || "#888";
+    const sl = STATUS_LABELS[t.status] || "?";
+    const oc = ORIGIN_COLORS[t.origin] || "#d4af37";
+    html += `<div style="padding:10px 8px;border-bottom:1px solid rgba(212,175,55,.08)">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="font-family:Orbitron;font-size:.55rem;color:#d4af37;min-width:55px">${t.cat}</span>
+        <span style="flex:1;font-size:.75rem;font-weight:700;color:#f5e6a3">${t.title}</span>
+        <span style="font-size:.5rem;padding:2px 6px;border-radius:4px;background:${sc}15;color:${sc};border:1px solid ${sc}30">${sl}</span>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center;margin-bottom:4px">
+        <span style="font-size:.55rem;color:#888">${t.artist} · ${t.year}</span>
+        <span class="tag" style="color:${oc};border-color:${oc}40">${ORIGIN_LABELS[t.origin]}</span>
+      </div>`;
+    /* Timeline */
+    if (t.versions && t.versions.length > 0) {
+      html += '<div style="margin-top:6px;padding-left:12px;border-left:2px solid rgba(212,175,55,.2)">';
+      t.versions.forEach(v => {
+        const typeColors = {original:"#d4af37",demo:"#888",eq:"#22d3ee",remix:"#a78bfa",karaoke:"#4ade80",recording:"#ff6b35",band:"#ff6b35",lyrics:"#888"};
+        const tc = typeColors[v.type] || "#888";
+        html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;position:relative">
+          <div style="position:absolute;left:-16px;width:6px;height:6px;border-radius:50%;background:${tc}"></div>
+          <span style="font-family:Orbitron;font-size:.5rem;color:${tc};min-width:70px">${v.date}</span>
+          <span style="font-size:.6rem;color:#ccc">${v.note}</span>
+        </div>`;
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+  });
+  return html;
+}
+
+function renderAR() {
+  let html = '<div class="shop-header"><div class="vinyl-icon"></div> A&amp;R OFFICE</div>';
+  html += '<div class="floor-desc">アーティスト＆レパートリー。リリース計画と配信管理。</div>';
+  html += '<div style="padding:16px 0;text-align:center">';
+  html += '<div style="font-family:Orbitron;font-size:.7rem;color:#d4af37;letter-spacing:2px;margin-bottom:12px">RELEASE PIPELINE</div>';
+  const genres = {};
+  CATALOG.forEach(t => { genres[t.genre] = (genres[t.genre] || 0) + 1; });
+  Object.entries(genres).forEach(([g, c]) => {
+    const pct = Math.round(c / CATALOG.length * 100);
+    html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="width:70px;text-align:right;font-size:.6rem;color:#888">${g}</div>
+      <div style="flex:1;height:8px;background:rgba(212,175,55,.1);border-radius:4px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:linear-gradient(90deg,#d4af37,#f5e6a3);border-radius:4px"></div>
+      </div>
+      <div style="font-family:Orbitron;font-size:.6rem;color:#d4af37;width:30px">${c}</div>
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderRooftop() {
+  let html = '<div class="shop-header"><div class="vinyl-icon"></div> ROOFTOP LOUNGE</div>';
+  html += '<div class="floor-desc">夜景を眺めながら全曲シャッフル再生。</div>';
+  html += '<div style="text-align:center;padding:24px 0">';
+  html += '<div class="ctrl-btn play-btn" id="shuffle-all" style="width:64px;height:64px;font-size:24px;margin:0 auto;border-color:#d4af37">&#9654;</div>';
+  html += '<div style="font-family:Orbitron;font-size:.6rem;color:#888;margin-top:12px;letter-spacing:2px">SHUFFLE ALL</div>';
+  html += '</div>';
+  html += '<div style="font-size:.7rem;color:#666;text-align:center;margin-top:8px">ALL ' + CATALOG.length + ' TRACKS</div>';
+  return html;
+}
+
+const floorRenderers = {
+  b1: renderVault,
+  f1: renderShop,
+  f2: renderCatalog,
+  f3: renderMastering,
+  f4: renderAR,
+  rf: renderRooftop
+};
+
+/* ============================================
+   FLOOR SELECTION
+   ============================================ */
+let selectedFloor = null;
+const floorListEl = document.getElementById("floor-list");
+
+FLOORS.slice().reverse().forEach(fd => {
+  const btn = document.createElement("div");
+  btn.className = "floor-btn";
+  btn.textContent = fd.floor;
+  btn.dataset.floorId = fd.id;
+  btn.addEventListener("click", () => selectFloor(fd));
+  floorListEl.appendChild(btn);
+});
+
+function selectFloor(fd) {
+  selectedFloor = fd;
+  document.querySelectorAll(".floor-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.floorId === fd.id)
+  );
+
+  const render = floorRenderers[fd.id];
+  floorPanel.innerHTML = render ? render() : "";
+  floorPanel.classList.add("active");
+
+  /* Attach click handlers */
+  floorPanel.querySelectorAll(".record-card").forEach(card => {
+    card.addEventListener("click", () => playTrack(parseInt(card.dataset.idx)));
+  });
+  floorPanel.querySelectorAll(".record-row").forEach(row => {
+    row.addEventListener("click", () => playTrack(parseInt(row.dataset.idx)));
+  });
+  /* Filter tabs */
+  floorPanel.querySelectorAll("[data-filter]").forEach(tab => {
+    tab.addEventListener("click", e => {
+      e.stopPropagation();
+      shopFilter = tab.dataset.filter;
+      selectFloor(fd); /* re-render */
+    });
+  });
+  const shuffleBtn = floorPanel.querySelector("#shuffle-all");
+  if (shuffleBtn) {
+    shuffleBtn.addEventListener("click", () => {
+      const idx = Math.floor(Math.random() * CATALOG.length);
+      playTrack(idx);
+    });
+  }
+
+  animCam(fd.y + 2);
+  controls.autoRotate = false;
+}
+
+function animCam(ty) {
+  const sy = controls.target.y, st = performance.now();
+  function tick(now) {
+    const t = Math.min((now - st) / 800, 1);
+    const e = 1 - Math.pow(1 - t, 3);
+    controls.target.y = sy + (ty - sy) * e;
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ============================================
+   RAYCASTING
+   ============================================ */
+const rc = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const tooltip = document.getElementById("tooltip");
+
+canvas.addEventListener("pointermove", e => {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  rc.setFromCamera(mouse, camera);
+  const hits = rc.intersectObjects(floorMeshes.map(f => f.mesh));
+  if (hits.length > 0) {
+    const fd = hits[0].object.userData.floorData;
+    tooltip.style.display = "block";
+    tooltip.textContent = fd.floor + " \u2014 " + fd.label;
+    tooltip.style.left = (e.clientX + 15) + "px";
+    tooltip.style.top = (e.clientY - 10) + "px";
+    canvas.style.cursor = "pointer";
+  } else {
+    tooltip.style.display = "none";
+    canvas.style.cursor = "grab";
+  }
+});
+
+canvas.addEventListener("click", e => {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  rc.setFromCamera(mouse, camera);
+  const hits = rc.intersectObjects(floorMeshes.map(f => f.mesh));
+  if (hits.length > 0) selectFloor(hits[0].object.userData.floorData);
+});
+
+canvas.addEventListener("touchend", e => {
+  const t = e.changedTouches && e.changedTouches[0];
+  if (!t) return;
+  mouse.x = (t.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(t.clientY / innerHeight) * 2 + 1;
+  rc.setFromCamera(mouse, camera);
+  const hits = rc.intersectObjects(floorMeshes.map(f => f.mesh));
+  if (hits.length > 0) selectFloor(hits[0].object.userData.floorData);
+});
+
+/* Close panel when clicking empty space */
+canvas.addEventListener("pointerdown", e => {
+  setTimeout(() => {
+    mouse.x = (e.clientX / innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+    rc.setFromCamera(mouse, camera);
+    const hits = rc.intersectObjects(floorMeshes.map(f => f.mesh));
+    if (hits.length === 0 && !e.target.closest("#floor-panel") && !e.target.closest("#floor-list")) {
+      floorPanel.classList.remove("active");
+      document.querySelectorAll(".floor-btn").forEach(b => b.classList.remove("active"));
+      selectedFloor = null;
+    }
+  }, 50);
+});
+
+/* ============================================
+   HIGHLIGHT RINGS
+   ============================================ */
+const hlMeshes = [];
+FLOORS.forEach(fd => {
+  const rm = new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(4, 4.5, 32), rm);
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = fd.y + 0.2;
+  BG.add(ring);
+  hlMeshes.push({ ring, floorData: fd, mat: rm });
+});
+
+/* ============================================
+   ANIMATION LOOP
+   ============================================ */
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+  controls.update();
+
+  /* Vinyl rotation on roof */
+  vinylGroup.rotation.y = t * 0.3;
+
+  /* Gold particles float */
+  floatPart.rotation.y = t * 0.015;
+  const pp = floatPart.geometry.attributes.position;
+  for (let i = 0; i < pp.count; i++) {
+    pp.array[i*3 + 1] += Math.sin(t + i) * 0.002;
+  }
+  pp.needsUpdate = true;
+
+  /* Highlight rings */
+  hlMeshes.forEach(h => {
+    const tgt = (selectedFloor && selectedFloor.id === h.floorData.id) ? 0.35 : 0;
+    h.mat.opacity += (tgt - h.mat.opacity) * 0.05;
+    if (selectedFloor && selectedFloor.id === h.floorData.id) {
+      h.ring.scale.set(1 + 0.04 * Math.sin(t * 3), 1, 1 + 0.04 * Math.sin(t * 3));
+    }
+  });
+
+  /* Window emissive pulse */
+  BG.traverse(ch => {
+    if (ch.material && ch.material.emissiveIntensity !== undefined && ch.material.emissive) {
+      ch.material.emissiveIntensity = 0.2 + 0.1 * Math.sin(t * 0.5 + ch.position.y * 0.1);
+    }
+  });
+
+  /* Base ring pulse */
+  baseRingMat.opacity = 0.2 + 0.1 * Math.sin(t * 1.5);
+
+  /* Top glow pulse */
+  topGlow.intensity = 0.6 + 0.3 * Math.sin(t * 1.2);
+
+  renderer.render(scene, camera);
+}
+
+/* ============================================
+   RESIZE
+   ============================================ */
+window.addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* ============================================
+   LOADING
+   ============================================ */
+const lf = document.getElementById("load-fill");
+let lp = 0;
+function fakeLoad() {
+  lp += (100 - lp) * 0.08;
+  lf.style.width = lp + "%";
+  if (lp < 98) requestAnimationFrame(fakeLoad);
+  else {
+    lf.style.width = "100%";
+    setTimeout(() => {
+      document.getElementById("loading").classList.add("fade");
+      setTimeout(() => { document.getElementById("loading").style.display = "none"; }, 800);
+    }, 300);
+  }
+}
+fakeLoad();
+animate();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+========================================
+  INTERIM — GraceVox Original Song
+  Grace of Touch Terminal Release
+========================================
+
+【曲名】Interim（インテリム）
+【アーティスト】Grace of Touch
+【コンセプト】声が文字になる前の揺らぎ。確定と不確定の境界線。GraceVoxから生まれた曲。
+【ジャンル】Cyberpunk Electro / Space Ambient Pop
+【BPM】88
+【Key】Dm (D minor)
+【長さ】5:00
+
+========================================
+  LYRICS — 歌詞
+========================================
+
+[Intro - 0:00-0:30]
+(ターミナル起動音、タイプ音、マイク接続のクリック音)
+(シンセパッドがゆっくり立ち上がる)
+
+[Verse 1 - 0:30-1:15]
+薄い文字が 画面を泳ぐ
+まだ確定しない 僕の言葉
+ターミナルの光 顔を照らす
+深宇宙の中 声を放つ
+
+考えてる途中の その隙間に
+本当の気持ちが 隠れてる
+「えーと」も「あの」も
+全部 僕の呼吸だから
+
+[Pre-Chorus - 1:15-1:35]
+消さないで まだ揺れてるから
+正解なんて 軌道に乗ってから決まるもの
+
+[Chorus - 1:35-2:15]
+Interim — 確定する前の この一瞬が
+Interim — 僕らしさの 全てだった
+薄い文字が 濃くなる瞬間に
+声は 光になる
+
+(We are all interim
+ Between the voice and the word
+ Between the launch and the stars)
+
+[Verse 2 - 2:15-3:00]
+言い直した 何度も何度も
+同じ想いを 違う周波数で
+AIは整えて きれいにするけど
+ノイズの中にこそ 真実がある
+
+宇宙の雑音 コズミックレイの中で
+それでも君は 僕の声を拾った
+完璧じゃなくていい
+途中のままでいい
+
+[Pre-Chorus - 3:00-3:15]
+消さないで まだ考えてるから
+答えなんて 声にしてから見つけるもの
+
+[Bridge - 3:15-3:50]
+(声紋波形のようなシンセ、ピッチ解析音)
+
+声紋は嘘をつかない
+今日の僕の周波数
+少し低い? 少し震えてる?
+「お疲れかもしれません」って
+画面が優しく 教えてくれる
+
+でも声を出す 出し続ける
+それが 生きてる証明だから
+Launch Sequence — Initiated
+
+[Final Chorus - 3:50-4:30]
+Interim — 確定する前の この世界で
+Interim — 僕らは皆 途中のまま 宇宙を漂ってる
+薄い文字が いつか 誰かに届く時
+声は 未来になる
+
+(We are all interim
+ Every word a small launch
+ Every breath a countdown
+ 3... 2... 1...)
+
+[Outro - 4:30-5:00]
+(シンセが宇宙に溶けていく)
+(タイプ音が遠くなる)
+(最後にマイク停止のクリック音)
+(...interim...interim...)
+(TRANSMISSION COMPLETE)
+
+========================================
+  GEMINI MUSIC GENERATION PROMPT
+========================================
+
+Create a 5-minute cyberpunk electronic ambient pop track titled "Interim".
+
+This song is for a space terminal interface (Grace of Touch Terminal) - imagine the aesthetic of a holographic cockpit floating through deep space, with cyan terminal text glowing in the dark.
+
+Style: Cyberpunk ambient pop meets space electronica. Think Blade Runner 2049 soundtrack meets Radiohead's "Kid A" meets Interstellar. Japanese vocals with English phrases.
+
+BPM: 88, Key: Dm (D minor)
+
+Detailed structure:
+
+INTRO (0:00-0:30):
+- Sound design: terminal boot sequence, soft keyboard clicks, microphone activation pop
+- Slowly building synth pad (warm analog, slightly detuned)
+- Sub-bass pulse like a heartbeat
+- Atmosphere: floating in space, screens powering on
+
+VERSE 1 (0:30-1:15):
+- Whispered Japanese vocals, intimate and close-mic'd
+- Minimal piano (Rhodes-like, with subtle tape saturation)
+- Pulsing sub-bass (808-style but soft)
+- Glitchy vocal artifacts floating in the stereo field
+- Light hi-hat pattern, almost imperceptible
+- Lyrics theme: uncertain words on a screen, voice in deep space
+
+PRE-CHORUS (1:15-1:35):
+- Vocals layer and harmonize
+- Arpeggiated synth (analog-style, 16th notes)
+- Building tension, filter sweep opening up
+- Drums start to emerge (electronic kit, compressed)
+
+CHORUS (1:35-2:15):
+- Full electronic drums enter (punchy kick, crisp snare, shimmering cymbals)
+- Powerful vocal melody, double-tracked
+- Thick synth chord stabs (saw wave + square wave layered)
+- The "confirmation" moment - everything becomes clear and bold
+- English phrases mixed in: "We are all interim"
+- Cymbal crashes on transitions
+- Bass drops to root note, powerful and grounding
+
+VERSE 2 (2:15-3:00):
+- Return to minimal but with more electronic texture
+- Vinyl crackle, voice memo quality processing on some vocal layers
+- Add cosmic noise (filtered white noise = cosmic ray sounds)
+- Lyrics theme: repeating/correcting yourself, noise contains truth
+
+BRIDGE (3:15-3:50):
+- Complete breakdown - voice waveform as sound
+- Pitch-shifting vocals (like analyzing a voiceprint)
+- Spectral analysis tones (sine waves at specific frequencies)
+- Clinical/scientific atmosphere mixed with emotional vulnerability
+- Spoken word section: "声紋は嘘をつかない" (voiceprints don't lie)
+- Build with countdown: "3... 2... 1..."
+
+FINAL CHORUS (3:50-4:30):
+- Everything together, maximum intensity
+- Add orchestral synth strings (lush, cinematic)
+- Triumphant but melancholic - beautiful sadness
+- Extra vocal harmonies, choir-like pads
+- Lyrics theme: we are all interim, voices become the future
+
+OUTRO (4:30-5:00):
+- Deconstruct back to interim state
+- Vocals dissolve into infinite reverb
+- Elements drop out one by one
+- Final typing sounds growing distant
+- Microphone click off
+- Silence
+
+Key sonic elements:
+- Glitch effects on vocals representing uncertainty (interim state)
+- Clean-to-bold transitions representing 薄い→濃い text confirmation
+- Terminal/computer sound design throughout
+- Voice memo / phone quality vocal layers for intimacy
+- Pitch analysis tones in bridge (voiceprint/声紋 reference)
+- Keyboard clicking and mouse sounds as subtle percussion
+- Space ambience (cosmic noise, distant radio signals)
+- Cyan/blue mood in the production (if that makes sense sonically - cold but beautiful)
+
+Mood progression:
+Intro: Awakening, alone in space
+Verse: Vulnerable, uncertain, searching
+Chorus: Clarity, power, confirmation
+Bridge: Scientific wonder, self-discovery
+Final: Acceptance, hope, launch into the unknown
+Outro: Return to beautiful uncertainty
+
+Reference tracks for vibe:
+- Radiohead "Everything In Its Right Place"
+- M83 "Midnight City"
+- Ólafur Arnalds "Near Light"
+- Hans Zimmer "Cornfield Chase" (Interstellar)
+- Ryuichi Sakamoto "Merry Christmas Mr. Lawrence"
+
+Language: Japanese vocals with English phrases
+Vocal style: Intimate whisper in verses, powerful and clear in choruses
+
+========================================
+  CREDITS
+========================================
+Written by: Grace of Touch Co. / Yuuichi Onozaki
+Concept: Born from GraceVox (voice-to-text app) interim text display
+Produced with: Gemini AI Music Generation
+(c) 2026 Grace of Touch Co. All rights reserved.

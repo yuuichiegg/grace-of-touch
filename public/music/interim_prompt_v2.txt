@@ -1,0 +1,214 @@
+========================================
+  INTERIM v2 — GraceVox Original Song
+  Grace of Touch Terminal Release
+========================================
+
+CONCEPT: GraceVoxで体験した「雑音の中でも声を拾える」「途中の言葉でも捕まえる」という感覚を曲にする。ロケットエンジンの轟音の中で交わされる管制官との通信。宇宙の静寂と雑踏の対比。確定しない言葉の美しさ。
+
+GENRE: Space Cyberpunk / Electronic Rock
+BPM: 92
+KEY: Em (E minor)
+LENGTH: 5:30
+
+========================================
+  GEMINI PROMPT (Copy this)
+========================================
+
+Create a 5:30 electronic rock track titled "Interim" for a space terminal interface.
+
+CONCEPT: A song about voices cutting through noise. In a rocket launch control room, surrounded by engine roar and alarm sounds, one voice reaches through. The beauty of unfinished words, uncertain thoughts that still matter. Technology that catches your voice even in chaos.
+
+GENRE: Space cyberpunk electronic rock. Heavy synths with rock guitars. Like if Muse produced a track with Daft Punk in a space station.
+
+BPM: 92, KEY: Em
+
+STRUCTURE:
+
+INTRO (0:00-0:35):
+- Start with static noise, radio frequency scanning sounds
+- A distant voice trying to speak through interference
+- Heavy sub-bass drop, rocket engine rumble builds
+- Drums kick in - electronic with live-feel intensity
+- Guitar riff emerges from the noise - distorted but melodic
+
+VERSE 1 (0:35-1:25):
+- Driving electronic beat with rock energy
+- Vocals: confident but intimate, speaking over chaos
+- Lyrics theme: speaking into the void, words appearing on screen letter by letter
+- Background: engine noise, typing sounds, digital glitches woven into the beat
+- Bass guitar + synth bass in unison, heavy and grounding
+- Japanese vocals with English hooks
+
+VERSE 1 LYRICS:
+画面に浮かぶ 薄い文字たち
+エンジン音の中 声を張り上げる
+ノイズだらけの この世界で
+それでも君は 僕を聞き取った
+
+雑踏の中 音楽の中
+叫ばなくても 届く声がある
+テクノロジーが 拾い上げた
+まだ確定しない 僕の本音を
+
+PRE-CHORUS (1:25-1:45):
+- Build with layered guitars and synth arpeggios
+- Drums intensify - double kick pattern
+- Vocal harmonies stack up
+
+PRE-CHORUS LYRICS:
+途中でもいい 完璧じゃなくても
+この声は 止まらない
+
+CHORUS (1:45-2:25):
+- Full power - guitars, synths, drums all at maximum
+- Anthemic vocal melody - singalong quality
+- Stadium-sized reverb on vocals
+- Synth brass stabs on the downbeat
+- This is the "confirmation" moment - interim becomes final
+
+CHORUS LYRICS:
+Interim — 雑音の中でも 聞こえてる
+Interim — 途中の言葉でも 届いてる
+エンジンが轟く この宇宙で
+声は光より 速く飛ぶ
+
+(Through the noise, through the fire)
+(Every word, every sound)
+(Interim — we are the signal)
+(In a world of noise)
+
+VERSE 2 (2:25-3:10):
+- Pull back slightly - more electronic, less guitar
+- Vocals become more reflective
+- Add vocoder/auto-tune effect on some phrases
+- Piano enters - contrast to the heavy production
+- Lyrics theme: voice reveals who you are, voiceprint never lies
+
+VERSE 2 LYRICS:
+声紋は嘘をつかない
+今日の周波数が 昨日と違う
+少し低い声は 疲れた証
+少し震える声は 本気の証
+
+百の言語を 超えていく
+言葉がわからなくても
+声のトーンが 全てを語る
+Interim — まだ途中の僕らを
+
+PRE-CHORUS 2 (3:10-3:25):
+消さないで まだ揺れてるから
+この周波数は 僕だけのもの
+
+BRIDGE (3:25-4:05):
+- Breakdown - strip everything away
+- Only a heartbeat-like kick drum and distant synth pad
+- Spoken word section over minimal instrumentation
+- Voice processing: radio communication style (lo-fi, crackling)
+- Build slowly with each line
+- Countdown sequence integrated into the music
+
+BRIDGE LYRICS (spoken/half-sung):
+Mission Control — do you copy?
+...
+ノイズの海の中で
+たった一つの声を拾うために
+3ソースを比較する
+スナップショット
+ファイナル
+そして今この瞬間
+
+(Building intensity)
+Launch sequence — initiated
+3... 2... 1...
+
+FINAL CHORUS (4:05-4:50):
+- MAXIMUM POWER - everything hits at once
+- Add orchestral strings (cinematic, Hans Zimmer style)
+- Double-tracked vocals with choir pad
+- Guitar solo interweaved with vocal melody
+- Triumphant, emotional, overwhelming
+
+FINAL CHORUS LYRICS:
+Interim — 雑音の中でも 聞こえてる
+Interim — 途中の言葉でも 届いてる
+百の言語 千の声紋
+全ての声は 未来になる
+
+(We are all interim)
+(Between the noise and the truth)
+(Between the launch and the stars)
+(Your voice — is the signal)
+
+OUTRO (4:50-5:30):
+- Gradual deconstruction
+- Guitars fade, synths dissolve into space ambience
+- Final vocal line with massive reverb, floating in space
+- Engine sounds transform into peaceful cosmic hum
+- Radio static returns briefly
+- Last sound: a single keystroke (copy complete)
+- Silence
+
+OUTRO LYRICS:
+コピー完了...
+(whispered, with infinite reverb)
+...interim...
+
+========================================
+  PRODUCTION NOTES
+========================================
+
+KEY SONIC ELEMENTS:
+- Radio static / frequency scanning as a recurring motif
+- Rocket engine rumble as sub-bass texture
+- Keyboard typing sounds as percussion layer
+- Digital glitch effects on vocals (interim → final transition)
+- Voice through noise — use bandpass filter on vocals in verses, open up in chorus
+- 3-source motif: play the same melodic phrase 3 ways (clean/distorted/processed) simultaneously in chorus
+
+VOCAL PROCESSING:
+- Verse: close-mic, intimate, slight compression
+- Pre-chorus: add room reverb, double-track
+- Chorus: stadium reverb, harmonies, power
+- Bridge: radio communication filter (bandpass 300-3000Hz, add crackle)
+- Outro: infinite reverb tail, whispered
+
+GUITAR TONES:
+- Verse: clean with slight overdrive, delay
+- Chorus: full distortion, wall of sound, two guitars panned L/R
+- Bridge: clean arpeggios, tremolo
+- Solo: singing lead tone, wah-wah, delay
+
+REFERENCE TRACKS:
+- Muse "Supermassive Black Hole" (driving electronic rock energy)
+- Daft Punk "Contact" (space launch chaos)
+- Linkin Park "In The End" (electronic + rock fusion, emotional weight)
+- Hans Zimmer "No Time for Caution" (Interstellar, building tension)
+- Radiohead "Idioteque" (electronic urgency)
+- ONE OK ROCK "The Beginning" (Japanese rock intensity)
+
+LANGUAGE: Japanese vocals with English phrases/hooks
+MOOD PROGRESSION: Chaos → Focus → Power → Reflection → Transcendence
+
+========================================
+  CREDITS
+========================================
+Title: Interim
+Artist: Grace of Touch
+Written by: Grace of Touch Co. / Yuuichi Onozaki
+Concept: Born from GraceVox — the world's first interim-state voice copy technology
+Produced with: Gemini AI Music Generation
+
+The song celebrates:
+- Voice recognition through noise (BGM playing during recording)
+- Interim copy technology (copying unfinished words)
+- Voiceprint analysis (voice reveals health and emotion)
+- The beauty of being unfinished, uncertain, in-between
+
+(c) 2026 Grace of Touch Co. All rights reserved.
+Patent Pending: Interim Copy Technology
+
+========================================
+  SHORT PROMPT (if character limited)
+========================================
+
+Electronic rock, 92 BPM, Em. Space cyberpunk. Japanese vocals with English hooks. About a voice cutting through rocket engine noise. Heavy synths + distorted guitars. Verse: intimate vocals over driving beat. Chorus: anthemic, powerful - "Interim, through the noise I can hear you." Bridge: spoken word countdown "3, 2, 1" building to massive final chorus with orchestral strings. Ends with whispered "copy complete" in space reverb. References: Muse + Daft Punk + Hans Zimmer. Theme: unfinished words matter, technology catches your voice in chaos.

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
 <meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
-<title>Grace of TOUCH - MEGA ROCKET EXPLORER v73</title>
+<title>Grace of TOUCH - MEGA ROCKET EXPLORER v72</title>
 <!-- © 2024-2026 Grace of Touch Co. All rights reserved. Unauthorized copying prohibited. -->
 <script>
 (function(){
@@ -266,7 +266,7 @@
 <!-- UI Layer -->
 <div id="ui-layer">
   <div class="header">
-    <div style="font-size:10px;opacity:0.5;">MEGA ROCKET v73<br>STATUS: <span id="net-status" style="color:#ffcc00;">SOLO</span></div>
+    <div style="font-size:10px;opacity:0.5;">MEGA ROCKET v72<br>STATUS: <span id="net-status" style="color:#ffcc00;">SOLO</span></div>
     <div id="vitals">
       <div class="vital-row"><span>ID:</span><span id="my-name-val">AWAITING</span></div>
       <div class="vital-row"><span>PEERS:</span><span id="peer-val">0</span></div>
@@ -306,7 +306,7 @@
     <canvas id="vt-spectrogram" style="width:100%;height:100%;display:block;"></canvas>
     <div id="vt-pitch-display" style="position:absolute;top:2px;right:6px;font-size:9px;color:rgba(0,216,255,0.8);font-family:'Courier New',monospace;text-shadow:0 0 4px rgba(0,216,255,0.5);"></div>
   </div>
-  <div id="vt-text" style="min-height:60px;max-height:250px;overflow-y:auto;padding:10px;background:rgba(0,0,0,0.4);border:1px solid rgba(0,216,255,0.15);border-radius:6px;font-size:13px;color:var(--term-color);line-height:1.6;margin-bottom:8px;user-select:text;-webkit-user-select:text;">
+  <div id="vt-text" style="min-height:50px;max-height:120px;overflow-y:auto;padding:8px;background:rgba(0,0,0,0.4);border:1px solid rgba(0,216,255,0.15);border-radius:6px;font-size:13px;color:var(--term-color);line-height:1.6;margin-bottom:8px;user-select:text;-webkit-user-select:text;">
     <span style="color:var(--term-dim);font-style:italic;">&#127908; マイクボタンで音声入力</span>
   </div>
   <div style="display:flex;gap:12px;align-items:center;justify-content:center;">
@@ -508,7 +508,7 @@
 // 4. Replace YOUR_ values below with your project config
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",
-  authDomain: "grace-of-touch.web.app",
+  authDomain: "grace-of-touch.firebaseapp.com",
   databaseURL: "https://grace-of-touch-default-rtdb.firebaseio.com",
   projectId: "grace-of-touch",
   storageBucket: "grace-of-touch.firebasestorage.app",
@@ -979,28 +979,13 @@ const Rocket3D = {
     }
     this.boosterGroup.add(this._smokeGroup);
 
-    // === UPPER STAGE (h=40, r=9) — v73: 9 engine bells matching PlayerShip ===
+    // === UPPER STAGE (h=40, r=9) ===
     const uBody=new THREE.Mesh(new THREE.CylinderGeometry(9,9,40,24),bodyMat);
     uBody.position.y=20;this.upperGroup.add(uBody);
     const nose=new THREE.Mesh(new THREE.ConeGeometry(9,16,24),bodyMat);
     nose.position.y=48;this.upperGroup.add(nose);
-    // Engine section (tapered 9→7)
-    const uEngSec=new THREE.Mesh(new THREE.CylinderGeometry(9,7,8,24),darkMat);
-    uEngSec.position.y=-4;this.upperGroup.add(uEngSec);
-    // 3 main Raptor engine bells (center cluster)
-    for(let i=-1;i<=1;i++){
-      const uBell=new THREE.Mesh(new THREE.ConeGeometry(2.2,6,12,1,true),darkMat);
-      uBell.rotation.x=Math.PI;uBell.position.set(i*2.8,-8-3,0);
-      this.upperGroup.add(uBell);
-    }
-    // 6 outer ring engines
-    for(let a=0;a<6;a++){
-      const angle=a*Math.PI/3+Math.PI/6;
-      const ux=Math.cos(angle)*5.2, uz=Math.sin(angle)*5.2;
-      const uBellO=new THREE.Mesh(new THREE.ConeGeometry(1.5,5,10,1,true),darkMat);
-      uBellO.rotation.x=Math.PI;uBellO.position.set(ux,-8-2.5,uz);
-      this.upperGroup.add(uBellO);
-    }
+    const uBell=new THREE.Mesh(new THREE.ConeGeometry(5,8,12,1,true),darkMat);
+    uBell.rotation.x=Math.PI;uBell.position.y=-4;this.upperGroup.add(uBell);
 
     // Upper flame (6 cross-planes + glow)
     const ufMat=new THREE.ShaderMaterial({uniforms:{time:{value:0},thrust:{value:0},color:{value:new THREE.Color(0xffdd88)}},vertexShader:FLAME_VS,fragmentShader:FLAME_FS,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
@@ -1196,7 +1181,7 @@ const LaunchSequence = {
     this.phase='countdown';this.phaseIdx=0;this.phaseTimer=0;this.totalTime=0;
     this.rocketY=0;this.rocketVelY=0;this.separated=false;
     this.boosterY=0;this.boosterVelY=0;this.upperY=0;this.upperVelY=0;
-    this.boosterReturnX=0;this._mechaCatchLogged=false;this._flipFinsLogged=false;this._boosterFlipStartY=undefined;this._handoffDone=false;
+    this.boosterReturnX=0;this._mechaCatchLogged=false;this._flipFinsLogged=false;this._boosterFlipStartY=undefined;
     this._dummyCam=App.camera.clone();
     document.getElementById('launch-btn').disabled=true;
     document.getElementById('launch-start-panel').classList.add('hidden');
@@ -1416,23 +1401,10 @@ const LaunchSequence = {
         this.upperVelY+=dt*15;this.upperY+=this.upperVelY*dt;
         Rocket3D.upperFlameUni.thrust.value=Math.max(0,1.0-progress);
         break;
-      case 'HANDOFF': {
-        Rocket3D.upperFlameUni.thrust.value=Math.max(0,1.0-progress*4);
+      case 'HANDOFF':
+        Rocket3D.upperFlameUni.thrust.value=0;
         this.upperVelY*=0.95;this.upperY+=this.upperVelY*dt;
-        // v73: Seamless transition — teleport player to upper stage position at end
-        if(progress>0.8&&!this._handoffDone){
-          this._handoffDone=true;
-          const upperWorldY=-30+this.upperY;
-          App.camera.position.set(0,upperWorldY+48*S,5);
-          App.camera.lookAt(0,upperWorldY,0);
-          App._fpsCamPos.copy(App.camera.position);
-          // Hide upper stage 3D model (player is now "inside" it)
-          if(Rocket3D.upperGroup)Rocket3D.upperGroup.visible=false;
-          Logger.log("HANDOFF COMPLETE — YOU ARE NOW ABOARD THE STARSHIP");
-          Logger.log("PRESS [V] TO SWITCH CAMERA: FPS / 3RD PERSON / COCKPIT / CABIN");
-        }
         break;
-      }
     }
 
     // Update 3D positions
@@ -1556,15 +1528,11 @@ const LaunchSequence = {
     this._stackingStarted=false;
     this._stackAttached=false;
     this._readyMsgShown=false;
-    this._handoffDone=false;
     document.getElementById('countdown-hud').classList.remove('visible');
     document.getElementById('launch-start-panel').classList.add('hidden');
     document.getElementById('chat-container').style.display='flex';
     // Remove upper stage (deep space) but keep booster + pad + Mechazilla
-    if(Rocket3D.upperGroup){
-      Rocket3D.upperGroup.visible=true; // restore visibility for next cycle
-      if(Rocket3D.upperGroup.parent===App.scene)App.scene.remove(Rocket3D.upperGroup);
-    }
+    if(Rocket3D.upperGroup&&Rocket3D.upperGroup.parent===App.scene)App.scene.remove(Rocket3D.upperGroup);
     Logger.log(`BOOSTER SECURED — CYCLE #${this._cycleCount}`);
     Logger.log("NEXT LAUNCH IN 30 SECONDS...");
     // Activate explore mode after first launch cycle
@@ -1903,17 +1871,10 @@ keys:{w:false,a:false,s:false,d:false,e:false,q:false,c:false,Shift:false,ArrowU
 // Pinch zoom
 _pinchActive:false,_pinchDist0:0,pinchDelta:0,
 init(){window.addEventListener('keydown',e=>{const k=this._codeMap[e.code];if(k)this.keys[k]=true;if((e.code==='KeyV'||e.code==='KeyC')&&!e.repeat)App.toggleCamMode();if(e.code==='Digit1'&&!e.repeat){this._stickMode=1;this._lastNormalMode=1;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='MODE 1 (JP)');Logger.log('CONTROLLER: MODE 1 (JP)');}if(e.code==='Digit2'&&!e.repeat){this._stickMode=2;this._lastNormalMode=2;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='MODE 2 (US)');Logger.log('CONTROLLER: MODE 2 (US)');}if(e.code==='Digit3'&&!e.repeat){this._stickMode=3;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='ORBIT 360');Logger.log('CONTROLLER: ORBIT 360');if(!this._orbitTarget){const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(App.camera.quaternion);this._orbitTarget=App.camera.position.clone().addScaledVector(fwd,this._orbitDist);}}if(e.code==='Digit4'&&!e.repeat){this._stickMode=4;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='FPV');Logger.log('CONTROLLER: FPV');}});window.addEventListener('keyup',e=>{const k=this._codeMap[e.code];if(k)this.keys[k]=false;});const cv=document.getElementById('webgl-canvas');
-// Mouse — Left-click drag to look around (cursor always visible)
-this._pointerLocked=false;
-window.addEventListener('mousemove',e=>{
-  if(this.isPointerDown){
-    this.look.x+=(e.clientX-this.pointerPos.x)*0.45;
-    this.look.y+=(e.clientY-this.pointerPos.y)*0.45;
-    this.pointerPos={x:e.clientX,y:e.clientY};
-  }
-});
-cv.addEventListener('mousedown',e=>{if(e.button===0){this.isPointerDown=true;this.pointerPos={x:e.clientX,y:e.clientY};}});
-window.addEventListener('mouseup',e=>{if(e.button===0)this.isPointerDown=false;});
+// Mouse — always active (orbit camera during launch, FPS in explore)
+cv.addEventListener('mousedown',e=>{this.isPointerDown=true;this.pointerPos={x:e.clientX,y:e.clientY};});
+window.addEventListener('mousemove',e=>{if(!this.isPointerDown)return;this.look.x+=(e.clientX-this.pointerPos.x)*0.45;this.look.y+=(e.clientY-this.pointerPos.y)*0.45;this.pointerPos={x:e.clientX,y:e.clientY};});
+window.addEventListener('mouseup',()=>{this.isPointerDown=false;});
 // Wheel — always active (zoom during launch, boost in explore)
 cv.addEventListener('wheel',e=>{e.preventDefault();this.wheelBoost+=-e.deltaY*0.008;},{passive:false});
 // Touch
@@ -1995,18 +1956,13 @@ update(){
   // Keyboard input: WASD=move, Arrows=up-down/yaw, Q/E=roll
   let roll=0;
   if(this._stickMode===3){
-    // Orbit mode: mouse drag also controls yaw/pitch
-    if(this.look.x!==0||this.look.y!==0){
-      this._orbitYaw+=this.look.x*0.005;
-      this._orbitPitch=Math.max(-Math.PI*0.35,Math.min(Math.PI*0.45,this._orbitPitch+this.look.y*0.005));
-    }
     // Orbit mode keyboard: arrows orbit around target
     if(this.keys.ArrowUp)this._orbitPitch=Math.min(Math.PI*0.45,this._orbitPitch+0.02); // look down (pitch up)
-    if(this.keys.ArrowDown)this._orbitPitch=Math.max(-Math.PI*0.35,this._orbitPitch-0.02); // look up (pitch down)
+    if(this.keys.ArrowDown)this._orbitPitch=Math.max(0.05,this._orbitPitch-0.02); // look up (pitch down)
     if(this.keys.ArrowLeft)this._orbitYaw-=0.03;  // orbit left
     if(this.keys.ArrowRight)this._orbitYaw+=0.03;  // orbit right
-    if(this.keys.w||wb<-0.01)this._orbitDist=Math.max(10,this._orbitDist-1-wb*20); // zoom in (key+wheel)
-    if(this.keys.s||wb>0.01)this._orbitDist=Math.min(500,this._orbitDist+1+wb*20); // zoom out (key+wheel)
+    if(this.keys.w)this._orbitDist=Math.max(10,this._orbitDist-1); // zoom in
+    if(this.keys.s)this._orbitDist=Math.min(500,this._orbitDist+1); // zoom out
     if(this.keys.a)u=1;   // raise target
     if(this.keys.d)u=-1;  // lower target
   }else{
@@ -2044,14 +2000,14 @@ update(){
     if(prevMode===1){
       // L: pitch+yaw, R: distance+height
       this._orbitYaw+=sL.dx*0.04;
-      this._orbitPitch=Math.max(-Math.PI*0.35,Math.min(Math.PI*0.45,this._orbitPitch+sL.dy*0.03));
+      this._orbitPitch=Math.max(0.05,Math.min(Math.PI*0.45,this._orbitPitch+sL.dy*0.03));
       this._orbitDist=Math.max(10,Math.min(500,this._orbitDist+sR.dy*2));
       if(this._orbitTarget)this._orbitTarget.y+=sR.dx*0.5;
     }else{
       // L: distance+yaw, R: pitch+height
       this._orbitYaw+=sL.dx*0.04;
       this._orbitDist=Math.max(10,Math.min(500,this._orbitDist+sL.dy*2));
-      this._orbitPitch=Math.max(-Math.PI*0.35,Math.min(Math.PI*0.45,this._orbitPitch+sR.dy*0.03));
+      this._orbitPitch=Math.max(0.05,Math.min(Math.PI*0.45,this._orbitPitch+sR.dy*0.03));
       if(this._orbitTarget)this._orbitTarget.y+=sR.dx*0.5;
     }
   }else if(this._stickMode===4){
@@ -4104,129 +4060,94 @@ const PlayerShip={
 
   create(scene){
     this.group=new THREE.Group();
-    // v73: Hull matches Rocket3D.upperGroup exactly (r=9, h=40, same materials)
-    const hullMat=new THREE.MeshBasicMaterial({color:0xe8e8e8});
-    const darkMat=new THREE.MeshBasicMaterial({color:0x1a1a1a});
+    // v72: Starship-style hull matching RocketCabin exterior
+    const hullMat=new THREE.MeshStandardMaterial({color:0x8899aa,metalness:0.7,roughness:0.25});
+    const darkMat=new THREE.MeshStandardMaterial({color:0x445566,metalness:0.6,roughness:0.3});
     const bellMat=new THREE.MeshStandardMaterial({color:0x222233,metalness:0.9,roughness:0.15});
 
-    // Main fuselage cylinder (r=9, h=40 — matches upperGroup)
-    const fuse=new THREE.Mesh(new THREE.CylinderGeometry(9,9,40,24),hullMat);
+    // Main fuselage cylinder (matches cabin: radius 7, length 40)
+    const fuse=new THREE.Mesh(new THREE.CylinderGeometry(7,7,40,16),hullMat);
     fuse.rotation.x=Math.PI/2;
     this.group.add(fuse);
-    // Nose cone (r=9, h=16 — matches upperGroup)
-    const nose=new THREE.Mesh(new THREE.ConeGeometry(9,16,24),hullMat);
-    nose.position.z=-28;nose.rotation.x=-Math.PI/2;
+    // Nose cone (tip points FORWARD = -Z)
+    const nose=new THREE.Mesh(new THREE.ConeGeometry(7,14,16),hullMat);
+    nose.position.z=-27;nose.rotation.x=-Math.PI/2;
     this.group.add(nose);
-    // Engine section (tapered 9→7, length 8)
-    const engSec=new THREE.Mesh(new THREE.CylinderGeometry(9,7,8,24),darkMat);
+    // Engine section (tapered 7→5.5, length 8) — FLAT rear end
+    const engSec=new THREE.Mesh(new THREE.CylinderGeometry(7,5.5,8,16),darkMat);
     engSec.rotation.x=Math.PI/2;engSec.position.z=24;
     this.group.add(engSec);
-    // Engine base plate
-    const basePlate=new THREE.Mesh(new THREE.CircleGeometry(7,24),darkMat);
-    basePlate.position.z=28;
+    // Engine base plate (flat rear cap)
+    const basePlate=new THREE.Mesh(new THREE.CircleGeometry(5.5,16),darkMat);
+    basePlate.rotation.x=0;basePlate.position.z=28;
     this.group.add(basePlate);
-    // Interstage ring (dark band — matches upperGroup)
-    const iRing=new THREE.Mesh(new THREE.CylinderGeometry(9.2,9.2,2,24),darkMat);
-    iRing.rotation.x=Math.PI/2;iRing.position.z=-18;
-    this.group.add(iRing);
 
     // === RAPTOR ENGINE BELLS (3 main + 6 outer ring = 9 total) ===
-    // 3 main Raptor engines (large, center cluster — scaled for r=9)
+    // 3 main Raptor engines (large, center cluster)
     for(let i=-1;i<=1;i++){
-      const bell=new THREE.Mesh(new THREE.CylinderGeometry(1.0,2.2,6,12),bellMat);
-      bell.rotation.x=Math.PI/2;bell.position.set(i*2.8,0,31);
+      const bell=new THREE.Mesh(new THREE.CylinderGeometry(0.8,1.8,5,12),bellMat);
+      bell.rotation.x=Math.PI/2;bell.position.set(i*2.2,0,30.5);
       this.group.add(bell);
-      const rim=new THREE.Mesh(new THREE.TorusGeometry(2.2,0.18,8,16),
+      // Nozzle rim (glowing ring)
+      const rim=new THREE.Mesh(new THREE.TorusGeometry(1.8,0.15,8,16),
         new THREE.MeshBasicMaterial({color:0x334466}));
-      rim.position.set(i*2.8,0,34);
+      rim.position.set(i*2.2,0,33);
       this.group.add(rim);
     }
-    // 6 outer ring engines (arranged at r=5.2 around perimeter)
+    // 6 outer ring engines (smaller, arranged around perimeter)
     for(let a=0;a<6;a++){
       const angle=a*Math.PI/3+Math.PI/6;
-      const ex=Math.sin(angle)*5.2, ey=Math.cos(angle)*5.2;
-      const bell=new THREE.Mesh(new THREE.CylinderGeometry(0.6,1.5,5,10),bellMat);
+      const ex=Math.sin(angle)*4.2, ey=Math.cos(angle)*4.2;
+      const bell=new THREE.Mesh(new THREE.CylinderGeometry(0.5,1.2,4,10),bellMat);
       bell.rotation.x=Math.PI/2;bell.position.set(ex,ey,30);
       this.group.add(bell);
     }
 
-    // === EXHAUST FLAMES — FLAME_FS Shader (rear-view optimized for 3rd person) ===
+    // === EXHAUST FLAMES (additive blending, animated) ===
     this._flameGroup=new THREE.Group();
-    const shipFlameMat=new THREE.ShaderMaterial({
-      uniforms:{time:{value:0},thrust:{value:0.7},color:{value:new THREE.Color(0xffdd88)}},
-      vertexShader:FLAME_VS,fragmentShader:FLAME_FS,
-      transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide
-    });
-    this._shipFlameUniforms=shipFlameMat.uniforms;
+    const flameMat=new THREE.MeshBasicMaterial({color:0x4488ff,transparent:true,opacity:0.5,blending:THREE.AdditiveBlending,depthWrite:false});
+    const flameCoreMat=new THREE.MeshBasicMaterial({color:0xaaccff,transparent:true,opacity:0.7,blending:THREE.AdditiveBlending,depthWrite:false});
+    const flameOuterMat=new THREE.MeshBasicMaterial({color:0xff6622,transparent:true,opacity:0.3,blending:THREE.AdditiveBlending,depthWrite:false});
 
-    // --- VERTICAL cross-planes (visible from behind AND side) ---
-    // These stand upright in XZ plane, extending along +Z from engines
-    const sfw=14,sfHeights=[38,32,35,28,40,30,36,26];
-    for(let i=0;i<8;i++){
-      const fh=sfHeights[i];
-      const fm=new THREE.Mesh(new THREE.PlaneGeometry(sfw,fh),shipFlameMat);
-      // Planes stand vertically, rotated around Z axis for fan pattern
-      fm.rotation.z=(i/8)*Math.PI;
-      fm.position.z=fh/2+1; // extend backward from engines
-      this._flameGroup.add(fm);
+    // Main flames (3 engines — bright blue-white core + outer orange)
+    this._flames=[];
+    for(let i=-1;i<=1;i++){
+      // Inner core flame (bright blue-white)
+      const core=new THREE.Mesh(new THREE.ConeGeometry(1.5,18,8),flameCoreMat);
+      core.rotation.x=Math.PI/2;core.position.set(i*2.2,0,42);
+      core.userData.isFlame=true;
+      this._flameGroup.add(core);
+      this._flames.push(core);
+      // Mid flame (blue)
+      const mid=new THREE.Mesh(new THREE.ConeGeometry(2.2,25,8),flameMat);
+      mid.rotation.x=Math.PI/2;mid.position.set(i*2.2,0,45);
+      mid.userData.isFlame=true;
+      this._flameGroup.add(mid);
+      this._flames.push(mid);
+      // Outer flame (orange glow — afterburn)
+      const outer=new THREE.Mesh(new THREE.ConeGeometry(3.0,30,6),flameOuterMat);
+      outer.rotation.x=Math.PI/2;outer.position.set(i*2.2,0,48);
+      outer.userData.isFlame=true;
+      this._flameGroup.add(outer);
+      this._flames.push(outer);
     }
+    // Merged exhaust plume (large, all engines combined)
+    const plume=new THREE.Mesh(new THREE.ConeGeometry(4.5,40,8),
+      new THREE.MeshBasicMaterial({color:0x2244aa,transparent:true,opacity:0.15,blending:THREE.AdditiveBlending,depthWrite:false}));
+    plume.rotation.x=Math.PI/2;plume.position.z=52;
+    plume.userData.isFlame=true;
+    this._flameGroup.add(plume);
+    this._flames.push(plume);
 
-    // --- LARGE nozzle glow discs (face camera — bright circles from behind) ---
-    const shipGlowMat=new THREE.ShaderMaterial({
-      uniforms:{thrust:shipFlameMat.uniforms.thrust,glowColor:{value:new THREE.Color(0.85,0.9,1.0)}},
-      vertexShader:GLOW_VS,fragmentShader:GLOW_FS,
-      transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide
-    });
-    // Nozzle exit disc (bright, directly at engine exit — faces backward)
-    const gP1=new THREE.Mesh(new THREE.PlaneGeometry(16,16),shipGlowMat);
-    gP1.position.z=1;
-    this._flameGroup.add(gP1);
-    // Second glow disc (slightly downstream, rotated 45°)
-    const gP2=new THREE.Mesh(new THREE.PlaneGeometry(12,12),shipGlowMat);
-    gP2.position.z=6;gP2.rotation.z=Math.PI/4;
-    this._flameGroup.add(gP2);
-    // Mid-plume glow disc (orange-warm)
-    const shipGlowMat2=new THREE.ShaderMaterial({
-      uniforms:{thrust:shipFlameMat.uniforms.thrust,glowColor:{value:new THREE.Color(1.0,0.6,0.15)}},
-      vertexShader:GLOW_VS,fragmentShader:GLOW_FS,
-      transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide
-    });
-    const gP3=new THREE.Mesh(new THREE.PlaneGeometry(10,10),shipGlowMat2);
-    gP3.position.z=14;
-    this._flameGroup.add(gP3);
-    // Far downstream glow (faint, wide)
-    const gP4=new THREE.Mesh(new THREE.PlaneGeometry(18,18),shipGlowMat2);
-    gP4.position.z=22;gP4.rotation.z=Math.PI/6;
-    this._flameGroup.add(gP4);
-
-    // --- Exhaust cones (visible from any angle) ---
-    // Inner bright blue-white core cone
-    const coreConeMat=new THREE.MeshBasicMaterial({color:0xbbccff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
-    this._shipExhaustCone=new THREE.Mesh(new THREE.ConeGeometry(3,22,12,1,true),coreConeMat);
-    this._shipExhaustCone.rotation.x=-Math.PI/2;this._shipExhaustCone.position.z=12;
-    this._flameGroup.add(this._shipExhaustCone);
-    // Mid exhaust cone (wider, yellow-white)
-    const midConeMat=new THREE.MeshBasicMaterial({color:0xeedd88,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
-    this._shipMidCone=new THREE.Mesh(new THREE.ConeGeometry(6,35,12,1,true),midConeMat);
-    this._shipMidCone.rotation.x=-Math.PI/2;this._shipMidCone.position.z=18;
-    this._flameGroup.add(this._shipMidCone);
-    // Outer exhaust haze (widest, orange-red)
-    const outerConeMat=new THREE.MeshBasicMaterial({color:0xff6633,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
-    this._shipOuterCone=new THREE.Mesh(new THREE.ConeGeometry(10,20,12,1,true),outerConeMat);
-    this._shipOuterCone.rotation.x=-Math.PI/2;this._shipOuterCone.position.z=10;
-    this._flameGroup.add(this._shipOuterCone);
-
-    // Position flame group at engine exit, pointing +Z (backward in ship space)
-    this._flameGroup.position.z=34;
     this.group.add(this._flameGroup);
 
-    // Engine point lights (Raptor: bluer, brighter)
-    this._engineLight=new THREE.PointLight(0xccbbff,0,120);
-    this._engineLight.position.set(0,0,40);
-    this.group.add(this._engineLight);
-    this._engineWarm=new THREE.PointLight(0xff6622,0,60);
-    this._engineWarm.position.set(0,0,50);
-    this.group.add(this._engineWarm);
+    // Engine point lights (warm + blue)
+    const engineLight=new THREE.PointLight(0x4488ff,2.0,60);
+    engineLight.position.set(0,0,35);
+    this.group.add(engineLight);
+    const engineWarm=new THREE.PointLight(0xff6622,0.8,40);
+    engineWarm.position.set(0,0,45);
+    this.group.add(engineWarm);
 
     // Rotate entire ship 180° so engines face camera (-Z direction = behind player)
     // This way the default camera offset (-Z) sees the engines + flames
@@ -4256,17 +4177,22 @@ const PlayerShip={
     this.group.rotateX(this._tiltX);
     this.group.rotateZ(this._tiltZ);
 
-    // Flame animation — FLAME_FS shader driven (SpaceX Raptor plume)
+    // Flame animation — always visible, flicker + scale with speed
     const now=performance.now()*0.001;
-    if(this._shipFlameUniforms){
-      this._shipFlameUniforms.time.value=now;
-      const thrustVal=Math.max(0.5,Math.min(1.0,0.3+speed*2.5));
-      this._shipFlameUniforms.thrust.value=thrustVal;
-      if(this._shipExhaustCone)this._shipExhaustCone.material.opacity=thrustVal*0.65;
-      if(this._shipMidCone)this._shipMidCone.material.opacity=thrustVal*0.45;
-      if(this._shipOuterCone)this._shipOuterCone.material.opacity=thrustVal*0.2;
-      if(this._engineLight)this._engineLight.intensity=thrustVal*10.0;
-      if(this._engineWarm)this._engineWarm.intensity=thrustVal*4.0;
+    if(this._flames){
+      const thrust=Math.max(0.5, Math.min(1.0, 0.5+speed*2)); // minimum 50% visibility
+      for(let i=0;i<this._flames.length;i++){
+        const f=this._flames[i];
+        const flicker=0.8+Math.sin(now*15+i*2.7)*0.2;
+        const layer=i%3; // 0=core, 1=mid, 2=outer
+        const baseOpacity=layer===0?0.8:layer===1?0.6:0.35;
+        f.material.opacity=baseOpacity*thrust*flicker;
+        // Flame length pulses
+        const scaleXY=0.9+thrust*0.3+Math.sin(now*10+i*1.5)*0.1;
+        const scaleZ=0.7+thrust*0.5+Math.sin(now*8+i*2.0)*0.2;
+        f.scale.set(scaleXY*flicker, scaleXY*flicker, scaleZ);
+      }
+      // Flame group visible when ship is visible
       this._flameGroup.visible=this.group.visible;
     }
   },
@@ -4822,52 +4748,6 @@ const SpaceElevator={
       cityGroup.add(tree);
     }
 
-    // Terminal Pandas (3) — lightweight MeshBasicMaterial only, no extra lights
-    const pandaWhite=new THREE.MeshBasicMaterial({color:0xdddddd});
-    const pandaBlack=new THREE.MeshBasicMaterial({color:0x111111});
-    const pandaPink=new THREE.MeshBasicMaterial({color:0x332222});
-    this._terminalPandas=[];
-    const pandaSpots=[{x:-25,z:30},{x:30,z:-20},{x:-10,z:-35}];
-    for(const spot of pandaSpots){
-      const pg=new THREE.Group();
-      // Body (white ellipsoid)
-      const body=new THREE.Mesh(new THREE.SphereGeometry(1.8,8,6),pandaWhite);
-      body.scale.set(1,0.8,0.7);body.position.y=1.8;pg.add(body);
-      // Head
-      const head=new THREE.Mesh(new THREE.SphereGeometry(1.2,8,6),pandaWhite);
-      head.position.set(0,3.2,0.8);pg.add(head);
-      // Ears (black)
-      const earL=new THREE.Mesh(new THREE.SphereGeometry(0.4,4,4),pandaBlack);
-      earL.position.set(-0.7,4.2,0.6);pg.add(earL);
-      const earR=new THREE.Mesh(new THREE.SphereGeometry(0.4,4,4),pandaBlack);
-      earR.position.set(0.7,4.2,0.6);pg.add(earR);
-      // Eye patches
-      const eyeL=new THREE.Mesh(new THREE.SphereGeometry(0.35,4,4),pandaBlack);
-      eyeL.position.set(-0.4,3.3,1.7);pg.add(eyeL);
-      const eyeR=new THREE.Mesh(new THREE.SphereGeometry(0.35,4,4),pandaBlack);
-      eyeR.position.set(0.4,3.3,1.7);pg.add(eyeR);
-      // Nose
-      const nose=new THREE.Mesh(new THREE.SphereGeometry(0.15,4,4),pandaPink);
-      nose.position.set(0,3.0,1.9);pg.add(nose);
-      // Arms (black)
-      const armL=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.3,1.8,4),pandaBlack);
-      armL.position.set(-1.5,1.8,0);armL.rotation.z=0.4;pg.add(armL);
-      const armR=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.3,1.8,4),pandaBlack);
-      armR.position.set(1.5,1.8,0);armR.rotation.z=-0.4;pg.add(armR);
-      // Legs (black)
-      const legL=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.35,1.2,4),pandaBlack);
-      legL.position.set(-0.6,0.6,0);pg.add(legL);
-      const legR=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.35,1.2,4),pandaBlack);
-      legR.position.set(0.6,0.6,0);pg.add(legR);
-      pg.position.set(spot.x,4.0,spot.z);
-      pg.userData._walkAngle=Math.random()*Math.PI*2;
-      pg.userData._walkSpeed=0.15+Math.random()*0.1;
-      pg.userData._idleTimer=0;
-      pg.userData._isIdle=false;
-      cityGroup.add(pg);
-      this._terminalPandas.push(pg);
-    }
-
     // City lights (subtle)
     const cityLight=new THREE.PointLight(0xffeecc,0.6,120);
     cityLight.position.set(0,30,0);
@@ -4979,31 +4859,6 @@ const SpaceElevator={
         if(d2>5000){p.userData._walkAngle=a+Math.PI+Math.random()*0.5;}
         // Occasional direction change
         if(Math.random()<0.005)p.userData._walkAngle+=Math.random()*1-0.5;
-      });
-    }
-    // Animate terminal pandas — wander + idle behavior
-    if(this._terminalPandas){
-      const t=now*0.001;
-      this._terminalPandas.forEach(pg=>{
-        const ud=pg.userData;
-        if(ud._isIdle){
-          ud._idleTimer-=dt;
-          // Sitting animation — gentle sway
-          pg.rotation.z=Math.sin(t*0.8)*0.05;
-          if(ud._idleTimer<=0){ud._isIdle=false;ud._walkAngle+=Math.random()*2-1;}
-        }else{
-          const a=ud._walkAngle,s=ud._walkSpeed;
-          pg.position.x+=Math.cos(a)*s*dt;
-          pg.position.z+=Math.sin(a)*s*dt;
-          pg.rotation.y=-a+Math.PI/2;
-          // Waddle animation
-          pg.rotation.z=Math.sin(t*3)*0.08;
-          const d2=pg.position.x*pg.position.x+pg.position.z*pg.position.z;
-          if(d2>4000){ud._walkAngle=a+Math.PI+Math.random()*0.5;}
-          // Random idle (sit down and rest)
-          if(Math.random()<0.002){ud._isIdle=true;ud._idleTimer=3+Math.random()*5;pg.rotation.z=0;}
-          if(Math.random()<0.008)ud._walkAngle+=Math.random()*1.5-0.75;
-        }
       });
     }
   }
@@ -5703,7 +5558,7 @@ const App={
   themes:{cyber:{pt:0x00d8ff,bg:0x020510,uiColor:'#00d8ff',uiDim:'#0077aa'},crimson:{pt:0xff3344,bg:0x0a0101,uiColor:'#ff3344',uiDim:'#aa2233'},deepsea:{pt:0x00ffcc,bg:0x01080a,uiColor:'#00ffcc',uiDim:'#0088aa'},solar:{pt:0xffaa22,bg:0x080402,uiColor:'#ffaa22',uiDim:'#aa6600'}},
 
   init(){
-    Logger.log("MEGA ROCKET EXPLORER v73 BOOTING...");
+    Logger.log("MEGA ROCKET EXPLORER v70 BOOTING...");
     this.scene=new THREE.Scene();
     this.camera=new THREE.PerspectiveCamera(78,window.innerWidth/window.innerHeight,0.5,800000);
     this.camera.position.set(25,-18,35);this.camera.lookAt(0,-28,0);
@@ -6005,8 +5860,8 @@ const App={
       this.cameraEuler.x-=inp.look.y*this.lookSens;
       this.cameraEuler.x=Math.max(-Math.PI*0.499,Math.min(Math.PI*0.499,this.cameraEuler.x));
       // Roll (Q/E keys)
-      if(inp.roll)this.cameraEuler.z-=inp.roll*0.05;
-      else this.cameraEuler.z*=0.93; // auto-level when Q/E not pressed
+      if(inp.roll)this.cameraEuler.z-=inp.roll*0.03;
+      this.cameraEuler.z*=0.95; // auto-level roll
       this.camera.quaternion.setFromEuler(this.cameraEuler);
       this._fwd.set(0,0,-1).applyQuaternion(this.camera.quaternion);
       this._rgt.set(1,0,0).applyQuaternion(this.camera.quaternion);
