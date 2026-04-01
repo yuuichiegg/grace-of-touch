@@ -1756,6 +1756,67 @@ function addPortals(cfg, path) {
   const endPt = path.getPointAt(0.999);
   const endLight = new THREE.PointLight(0xaabbcc, 1.5, 30);
   endLight.position.copy(endPt); endLight.position.y += 3; tunnelGroup.add(endLight);
+
+  // ─── ドローンポート（離着陸パッド） ───
+  const padY = startPt.y - cfg.radius + 0.25;
+  const padMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.8, metalness: 0.3 });
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.1, 32), padMat);
+  pad.position.set(startPt.x - 3, padY, startPt.z - 4);
+  pad.receiveShadow = true; tunnelGroup.add(pad);
+  // パッドのH印
+  const hMat = new THREE.MeshBasicMaterial({ color: 0x00ccff });
+  const hBar1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.8), hMat);
+  hBar1.position.set(pad.position.x, padY + 0.06, pad.position.z);
+  tunnelGroup.add(hBar1);
+  const hBar2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.3), hMat);
+  hBar2.position.set(pad.position.x - 0.25, padY + 0.06, pad.position.z); tunnelGroup.add(hBar2);
+  const hBar3 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.3), hMat);
+  hBar3.position.set(pad.position.x + 0.25, padY + 0.06, pad.position.z); tunnelGroup.add(hBar3);
+  // パッド外周リング
+  const ringGeo = new THREE.RingGeometry(1.3, 1.5, 32);
+  const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ccff, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.position.set(pad.position.x, padY + 0.07, pad.position.z);
+  ring.rotation.x = -Math.PI / 2; tunnelGroup.add(ring);
+  // パッドLEDライト
+  const padLight = new THREE.PointLight(0x00ccff, 1.0, 8);
+  padLight.position.set(pad.position.x, padY + 0.5, pad.position.z);
+  tunnelGroup.add(padLight);
+
+  // ─── 三角コーン（立ち入り管理措置） ───
+  const coneMat = new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.6 });
+  const coneStripeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+  const conePositions = [
+    [startPt.x - 1.5, startPt.z - 2],
+    [startPt.x + 1.5, startPt.z - 2],
+    [startPt.x - 2.5, startPt.z - 3],
+    [startPt.x + 2.5, startPt.z - 3],
+    [startPt.x - 1.0, startPt.z - 5],
+    [startPt.x + 1.0, startPt.z - 5],
+  ];
+  conePositions.forEach(([cx, cz]) => {
+    // コーン本体
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.5, 8), coneMat);
+    cone.position.set(cx, padY + 0.25, cz); tunnelGroup.add(cone);
+    // 白ストライプ
+    const stripe = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.08, 8), coneStripeMat);
+    stripe.position.set(cx, padY + 0.35, cz); tunnelGroup.add(stripe);
+    // ベースプレート
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, 0.3),
+      new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.8 }));
+    base.position.set(cx, padY + 0.02, cz); tunnelGroup.add(base);
+  });
+  // コーン間のバリケードテープ
+  for (let i = 0; i < conePositions.length - 1; i += 2) {
+    const [ax, az] = conePositions[i], [bx, bz] = conePositions[i+1];
+    const dx = bx - ax, dz = bz - az;
+    const len = Math.sqrt(dx*dx + dz*dz);
+    const tape = new THREE.Mesh(new THREE.BoxGeometry(len, 0.03, 0.005),
+      new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.7 }));
+    tape.position.set((ax+bx)/2, padY + 0.35, (az+bz)/2);
+    tape.rotation.y = Math.atan2(dz, dx);
+    tunnelGroup.add(tape);
+  }
 }
 
 function addVentilation(cfg, path) {

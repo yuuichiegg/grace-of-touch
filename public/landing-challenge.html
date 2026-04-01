@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Landing Challenge - </title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #F0F4F8;
+            color: #334155;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #app-root {
+             height: calc(var(--vh, 1vh) * 100);
+        }
+        .content-card {
+            background-color: #FFFFFF;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            padding: 1.5rem;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        #game-section > .content-card {
+            overflow: hidden; /* Prevent card itself from scrolling */
+        }
+        #landing-game-canvas {
+            border-radius: 1rem;
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .canvas-container {
+             position: relative;
+             width: 100%;
+             max-width: 1024px;
+             aspect-ratio: 16 / 10;
+             margin: 0 auto;
+             flex-shrink: 0;
+        }
+        .base-btn {
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            border-radius: 9999px;
+            font-weight: bold;
+            padding: 0.75rem 1.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+         .base-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #94a3b8;
+        }
+        .icon-option, .control-option {
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+        }
+        .icon-option.selected, .control-option.selected {
+            border-color: #3B82F6;
+            background-color: #eff6ff;
+            transform: scale(1.1);
+        }
+        .d-pad-btn {
+            background-color: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            font-size: 1.5rem;
+            color: rgba(255, 255, 255, 0.8);
+            user-select: none;
+            touch-action: manipulation;
+            transition: all 0.2s;
+        }
+        .d-pad-btn:active {
+            background-color: rgba(255, 255, 255, 0.4);
+            transform: scale(0.95);
+        }
+        #joystick-base {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+        }
+        #joystick-stick {
+            background-color: rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        #achievement-popup {
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+        #achievement-popup.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+             body {
+                align-items: flex-start;
+            }
+            #app-root {
+                padding: 0;
+            }
+             .content-card {
+                border-radius: 0;
+                padding: 1rem;
+                justify-content: flex-start;
+            }
+            #game-section > .content-card {
+                padding: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center p-4">
+    <div id="app-root" class="w-full max-w-2xl mx-auto">
+        <!-- Section for selecting the aircraft icon -->
+        <section id="icon-selection-section" class="flex items-center justify-center h-full">
+            <div class="content-card text-center max-w-md">
+                <h1 class="text-3xl font-bold text-slate-800">機体を選択</h1>
+                <div id="icon-options-container" class="grid grid-cols-3 gap-6 my-8">
+                    <button data-icon="✈️" class="icon-option p-6 bg-slate-100 rounded-xl text-5xl hover:bg-slate-200" aria-label="飛行機を選択">✈️</button>
+                    <button data-icon="🚗" class="icon-option p-6 bg-slate-100 rounded-xl text-5xl hover:bg-slate-200" aria-label="車を選択">🚗</button>
+                    <button data-icon="🛸" class="icon-option p-6 bg-slate-100 rounded-xl text-5xl hover:bg-slate-200" aria-label="UFOを選択">🛸</button>
+                </div>
+                <button id="next-to-control-btn" class="base-btn bg-blue-600 text-white w-full text-base" disabled>次へ</button>
+            </div>
+        </section>
+
+        <!-- Section for selecting the control method -->
+        <section id="control-selection-section" class="hidden h-full flex items-center justify-center">
+             <div class="content-card text-center max-w-md">
+                <h1 class="text-3xl font-bold text-slate-800">操作方法を選択</h1>
+                <div id="control-options-container" class="grid grid-cols-2 gap-6 my-8">
+                    <button data-control="dpad" class="control-option p-6 bg-slate-100 rounded-xl text-lg hover:bg-slate-200" aria-label="ボタン操作を選択">ボタン</button>
+                    <button data-control="joystick" class="control-option p-6 bg-slate-100 rounded-xl text-lg hover:bg-slate-200" aria-label="スライド操作を選択">スライド</button>
+                </div>
+                <button id="start-game-btn" class="base-btn bg-blue-600 text-white w-full text-base" disabled>ゲーム開始</button>
+            </div>
+        </section>
+
+        <!-- Section for the main game -->
+        <section id="game-section" class="hidden h-full">
+            <div class="content-card relative">
+                 <!-- Achievement Popup -->
+                <div id="achievement-popup" class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black bg-opacity-80 text-white p-4 rounded-xl shadow-lg opacity-0 scale-90 pointer-events-none z-10">
+                    <div class="text-4xl" id="popup-badge-icon"></div>
+                    <div class="font-bold mt-2 text-lg" id="popup-badge-title"></div>
+                    <div class="text-sm">達成！</div>
+                </div>
+
+                <!-- Game Canvas Area -->
+                <div class="canvas-container">
+                    <canvas id="landing-game-canvas" data-tokyo-tower-color="#F15B40" data-skytree-color="#E6ECEF" data-asakusa-color="#C41E3A"></canvas>
+                </div>
+                
+                <!-- Game UI -->
+                <div class="flex flex-col flex-grow justify-end min-h-0">
+                    <!-- Controller Area -->
+                    <div id="controller-area" class="mt-4 h-48 bg-slate-800 rounded-lg p-4 relative flex-shrink-0">
+                        <!-- D-Pad Controls -->
+                        <div id="d-pad-controls" class="hidden w-full h-full flex justify-between items-center px-4">
+                            <div class="flex flex-col gap-2"><button id="d-pad-up" class="d-pad-btn w-20 h-20">▲</button><button id="d-pad-down" class="d-pad-btn w-20 h-20">▼</button></div>
+                            <div class="flex gap-2"><button id="d-pad-left" class="d-pad-btn w-20 h-20">◀</button><button id="d-pad-right" class="d-pad-btn w-20 h-20">▶</button></div>
+                        </div>
+
+                        <!-- Joystick Controls -->
+                        <div id="joystick-controls" class="hidden w-full h-full flex justify-center items-center">
+                            <div id="joystick-base" class="w-36 h-36 relative"><div id="joystick-stick" class="w-20 h-20"></div></div>
+                        </div>
+                    </div>
+
+                    <!-- Info and Action Area -->
+                    <div id="info-area" class="text-center mt-4 flex-grow overflow-y-auto">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="text-left">
+                                <p class="text-xl font-bold">成功: <span id="landing-count">0</span> 回</p>
+                                <p class="text-xl font-bold">スコア: <span id="total-score">0</span></p>
+                            </div>
+                            <div class="flex flex-col items-end space-y-2">
+                                 <button id="landing-game-next-btn" class="base-btn bg-blue-500 text-white hidden text-base py-2 px-4 whitespace-nowrap">次のミッションへ</button>
+                                 <button id="back-to-selection-btn" class="base-btn bg-slate-500 text-white py-2 px-4 text-base whitespace-nowrap">機体選択に戻る</button>
+                            </div>
+                        </div>
+
+                        <div id="mission-result-area" class="text-base font-semibold text-left p-3 space-y-1 overflow-hidden min-h-[6rem]"></div>
+                        
+                        <div id="badge-guide-area" class="mt-3 text-sm text-slate-600 p-3 border-t text-left">
+                            <h3 class="font-bold text-center mb-2 text-lg">アチーブメント</h3>
+                            <div id="badge-list" class="space-y-1"></div>
+                        </div>
+                        
+                        <p id="version-info" class="text-xs text-slate-400 mt-4"></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            let selectedIcon = '✈️';
+            let selectedControl = 'dpad';
+
+            const ui = {
+                iconSelection: document.getElementById('icon-selection-section'),
+                controlSelection: document.getElementById('control-selection-section'),
+                game: document.getElementById('game-section'),
+                iconOptions: document.getElementById('icon-options-container'),
+                nextToControlBtn: document.getElementById('next-to-control-btn'),
+                controlOptions: document.getElementById('control-options-container'),
+                startGameBtn: document.getElementById('start-game-btn'),
+                backToSelectionBtn: document.getElementById('back-to-selection-btn'),
+                missionResult: document.getElementById('mission-result-area'),
+            };
+
+            const switchView = (target) => {
+                [ui.iconSelection, ui.controlSelection, ui.game].forEach(section => {
+                    section.classList.toggle('hidden', section !== target);
+                });
+            };
+
+            ui.iconOptions.addEventListener('click', (e) => {
+                const btn = e.target.closest('.icon-option');
+                if (btn) {
+                    ui.iconOptions.querySelectorAll('.icon-option').forEach(el => el.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    selectedIcon = btn.dataset.icon;
+                    ui.nextToControlBtn.disabled = false;
+                }
+            });
+
+            ui.nextToControlBtn.addEventListener('click', () => switchView(ui.controlSelection));
+
+            ui.controlOptions.addEventListener('click', (e) => {
+                const btn = e.target.closest('.control-option');
+                if (btn) {
+                    ui.controlOptions.querySelectorAll('.control-option').forEach(el => el.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    selectedControl = btn.dataset.control;
+                    ui.startGameBtn.disabled = false;
+                }
+            });
+
+            ui.startGameBtn.addEventListener('click', () => {
+                switchView(ui.game);
+                try {
+                    gameModule.start(selectedIcon, selectedControl);
+                } catch (err) {
+                    console.error('Failed to start game:', err);
+                    ui.missionResult.innerHTML = `<p class="text-red-500">ゲームの開始に失敗しました。</p>`;
+                }
+            });
+
+            ui.backToSelectionBtn.addEventListener('click', () => {
+                gameModule.stop();
+                switchView(ui.iconSelection);
+            });
+        });
+
+        const gameModule = (() => {
+            const CONFIG = {
+                PHYSICS: { GRAVITY: 0.05, THRUST: 0.1, SIDE_THRUST: 0.08, DRAG: 0.98, WIND: 0.03 },
+                PLAYER: { WIDTH: 52, HEIGHT: 35 },
+                LANDING_PAD: { WIDTH: 175, HEIGHT: 35 },
+                SUCCESS_CONDITIONS: { MAX_VY: 2, MAX_VX: 1.5 },
+                SCORING: { BASE: 500, SOFTNESS_MULTIPLIER: 1000, PRECISION_MULTIPLIER: 20, TIME_BONUS_FACTOR: 15000 },
+                BADGES: {
+                    feather: { icon: '🪶', title: 'フェザーランディング', description: '速度 < 0.5で着地', earned: false, condition: (s, p, d) => s < 0.5 },
+                    bullseye: { icon: '🎯', title: 'ブルズアイ', description: '中心誤差 < 5で着地', earned: false, condition: (s, p, d) => p < 5 },
+                    speedster: { icon: '⚡️', title: 'スピードスター', description: '8秒未満でクリア', earned: false, condition: (s, p, d) => d < 8 }
+                },
+                THEMES: ['tokyo-tower', 'skytree', 'asakusa']
+            };
+
+            let state = {}, dom = {}, animationFrameId = null, popupTimeoutId = null, isInitialized = false;
+            let bgCanvas, bgCtx;
+
+            const audioManager = {
+                audioCtx: null, motorSound: null, windSound: null,
+                init() { try { this.audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { console.warn('AudioContext not supported'); } },
+                resume() { if (this.audioCtx && this.audioCtx.state === 'suspended') this.audioCtx.resume(); },
+                createSound(type, volume, freq = 60) {
+                    if (!this.audioCtx) return { stop: () => {} };
+                    const gainNode = this.audioCtx.createGain();
+                    gainNode.gain.value = volume;
+                    let source;
+                    if (type === 'motor') {
+                        source = this.audioCtx.createOscillator();
+                        source.type = 'sawtooth';
+                        source.frequency.setValueAtTime(freq, this.audioCtx.currentTime);
+                    } else { // wind
+                        const buffer = this.audioCtx.createBuffer(1, this.audioCtx.sampleRate, this.audioCtx.sampleRate);
+                        const data = buffer.getChannelData(0);
+                        for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+                        source = this.audioCtx.createBufferSource();
+                        source.buffer = buffer;
+                        source.loop = true;
+                    }
+                    source.connect(gainNode).connect(this.audioCtx.destination);
+                    source.start();
+                    return { stop: () => source.stop() };
+                },
+                startSounds(theme) {
+                    this.resume();
+                    this.stopSounds();
+                    this.motorSound = this.createSound('motor', 0.05);
+                    this.windSound = this.createSound('wind', theme === 'asakusa' ? 0.1 : 0.05);
+                },
+                stopSounds() {
+                    if (this.motorSound) this.motorSound.stop();
+                    if (this.windSound) this.windSound.stop();
+                }
+            };
+
+            const setupDOM = () => {
+                dom = {
+                    canvas: document.getElementById('landing-game-canvas'),
+                    ctx: document.getElementById('landing-game-canvas').getContext('2d'),
+                    countEl: document.getElementById('landing-count'),
+                    scoreEl: document.getElementById('total-score'),
+                    resultArea: document.getElementById('mission-result-area'),
+                    badgeList: document.getElementById('badge-list'),
+                    nextBtn: document.getElementById('landing-game-next-btn'),
+                    versionInfo: document.getElementById('version-info'),
+                    popup: {
+                        el: document.getElementById('achievement-popup'),
+                        icon: document.getElementById('popup-badge-icon'),
+                        title: document.getElementById('popup-badge-title'),
+                    },
+                };
+                bgCanvas = document.createElement('canvas');
+                bgCtx = bgCanvas.getContext('2d');
+            };
+
+            const resizeCanvas = () => {
+                if (!dom.canvas) return;
+                const dpr = window.devicePixelRatio || 1;
+                const rect = dom.canvas.getBoundingClientRect();
+                dom.canvas.width = rect.width * dpr;
+                dom.canvas.height = rect.height * dpr;
+                dom.ctx.scale(dpr, dpr);
+                bgCanvas.width = dom.canvas.width;
+                bgCanvas.height = dom.canvas.height;
+                bgCtx.scale(dpr, dpr);
+            };
+
+            const initialize = () => {
+                if (isInitialized) return;
+                setupDOM();
+                audioManager.init();
+                setupControls();
+                dom.nextBtn.addEventListener('click', startMission);
+                window.addEventListener('resize', () => {
+                    resizeCanvas();
+                    if(state.isGameOver === false) drawBackground();
+                });
+                const today = new Date();
+                dom.versionInfo.textContent = `v.5.0 - ${today.getFullYear()}/${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}`;
+                isInitialized = true;
+            };
+
+            const startMission = () => {
+                clearTimeout(popupTimeoutId);
+                dom.popup.el.classList.remove('show');
+                resizeCanvas();
+                
+                const dpr = window.devicePixelRatio || 1;
+                const canvasWidth = dom.canvas.width / dpr;
+                const canvasHeight = dom.canvas.height / dpr;
+
+                state = {
+                    ...state,
+                    player: { icon: state.player.icon, x: 50, y: 50, vx: 0, vy: 0, width: CONFIG.PLAYER.WIDTH, height: CONFIG.PLAYER.HEIGHT, direction: 1 },
+                    landingPad: { x: Math.random() * (canvasWidth - CONFIG.LANDING_PAD.WIDTH), y: canvasHeight - CONFIG.LANDING_PAD.HEIGHT, width: CONFIG.LANDING_PAD.WIDTH, height: CONFIG.LANDING_PAD.HEIGHT },
+                    theme: CONFIG.THEMES[Math.floor(Math.random() * CONFIG.THEMES.length)],
+                    missionStartTime: Date.now(),
+                    isGameOver: false
+                };
+
+                dom.resultArea.innerHTML = '';
+                dom.nextBtn.classList.add('hidden');
+                document.getElementById('d-pad-controls').classList.toggle('hidden', state.controlType !== 'dpad');
+                document.getElementById('joystick-controls').classList.toggle('hidden', state.controlType !== 'joystick');
+                
+                audioManager.startSounds(state.theme);
+                drawBackground();
+
+                cancelAnimationFrame(animationFrameId);
+                gameLoop();
+            };
+
+            const gameLoop = () => {
+                if (state.isGameOver) return;
+                updateState();
+                render();
+                animationFrameId = requestAnimationFrame(gameLoop);
+            };
+
+            const updateState = () => {
+                const p = state.player;
+                const { GRAVITY, THRUST, SIDE_THRUST, DRAG, WIND } = CONFIG.PHYSICS;
+
+                if (state.controls.x > 0.1) p.direction = -1;
+                if (state.controls.x < -0.1) p.direction = 1;
+
+                p.vy += GRAVITY + state.controls.y * THRUST;
+                p.vx += state.controls.x * SIDE_THRUST + (state.theme === 'asakusa' ? WIND : 0);
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= DRAG;
+                
+                const dpr = window.devicePixelRatio || 1;
+                const canvasWidth = dom.canvas.width / dpr;
+                const canvasHeight = dom.canvas.height / dpr;
+                
+                if (p.x < 0 || p.x + p.width > canvasWidth || p.y < 0) return handleGameOver("範囲外です！");
+                if (p.y + p.height > canvasHeight) return handleGameOver("墜落しました！");
+
+                const pad = state.landingPad;
+                const isOverPad = p.x > pad.x && p.x + p.width < pad.x + pad.width;
+                const isAtAltitude = p.y + p.height >= pad.y;
+                const isSlow = Math.abs(p.vy) < CONFIG.SUCCESS_CONDITIONS.MAX_VY && Math.abs(p.vx) < CONFIG.SUCCESS_CONDITIONS.MAX_VX;
+
+                if (isOverPad && isAtAltitude && isSlow) handleSuccess();
+            };
+            
+            const drawBackground = () => {
+                const dpr = window.devicePixelRatio || 1;
+                const width = bgCanvas.width / dpr;
+                const height = bgCanvas.height / dpr;
+                const ctx = bgCtx;
+                ctx.clearRect(0, 0, width, height);
+                const canvasEl = dom.canvas;
+
+                if (state.theme === 'tokyo-tower') {
+                    const sky = ctx.createLinearGradient(0, 0, 0, height);
+                    sky.addColorStop(0, '#87CEEB'); sky.addColorStop(1, '#E0F2FE');
+                    ctx.fillStyle = sky; ctx.fillRect(0, 0, width, height);
+                    
+                    const towerColor = canvasEl.dataset.tokyoTowerColor || '#F15B40';
+                    const towerBaseX = width * 0.2;
+                    const towerHeight = height * 0.7;
+                    const towerBaseWidth = width * 0.15;
+                    const towerTopWidth = width * 0.02;
+
+                    ctx.fillStyle = towerColor;
+                    ctx.beginPath();
+                    ctx.moveTo(towerBaseX - towerBaseWidth / 2, height);
+                    ctx.lineTo(towerBaseX + towerBaseWidth / 2, height);
+                    ctx.lineTo(towerBaseX + towerTopWidth / 2, height - towerHeight);
+                    ctx.lineTo(towerBaseX - towerTopWidth / 2, height - towerHeight);
+                    ctx.closePath();
+                    ctx.fill();
+
+                } else if (state.theme === 'skytree') {
+                    ctx.fillStyle = '#0c0a1e'; ctx.fillRect(0, 0, width, height);
+                    for(let i=0; i<150; i++) {
+                        ctx.fillStyle = `rgba(255, 255, 255, ${Math.random()})`;
+                        ctx.beginPath(); ctx.arc(Math.random() * width, Math.random() * height, Math.random() * 2, 0, Math.PI * 2); ctx.fill();
+                    }
+                     const towerColor = canvasEl.dataset.skytreeColor || '#E6ECEF';
+                    const towerBaseX = width * 0.75;
+                    const towerHeight = height * 0.85;
+                    const towerBaseWidth = width * 0.1;
+                    
+                    ctx.fillStyle = towerColor;
+                    ctx.beginPath();
+                    ctx.moveTo(towerBaseX - towerBaseWidth / 2, height);
+                    ctx.lineTo(towerBaseX + towerBaseWidth / 2, height);
+                    ctx.lineTo(towerBaseX, height - towerHeight);
+                    ctx.closePath();
+                    ctx.fill();
+
+                } else if (state.theme === 'asakusa') {
+                    const sky = ctx.createLinearGradient(0, 0, 0, height);
+                    sky.addColorStop(0, '#FF4500'); sky.addColorStop(1, '#FFB7C5');
+                    ctx.fillStyle = sky; ctx.fillRect(0, 0, width, height);
+                    
+                    const gateColor = canvasEl.dataset.asakusaColor || '#C41E3A';
+                    const gateX = width * 0.7;
+                    const gateWidth = width * 0.2;
+                    const gateHeight = height * 0.3;
+                    
+                    ctx.fillStyle = gateColor;
+                    ctx.fillRect(gateX, height - gateHeight, gateWidth, gateHeight * 0.8); // Pillars
+                    ctx.fillRect(gateX - gateWidth * 0.1, height - gateHeight, gateWidth * 1.2, gateHeight * 0.2); // Roof base
+                    ctx.beginPath(); // Roof top
+                    ctx.moveTo(gateX - gateWidth * 0.2, height - gateHeight);
+                    ctx.lineTo(gateX + gateWidth * 1.2, height - gateHeight);
+                    ctx.lineTo(gateX + gateWidth, height - gateHeight * 1.3);
+                    ctx.lineTo(gateX, height - gateHeight * 1.3);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            };
+            
+            const render = () => {
+                const dpr = window.devicePixelRatio || 1;
+                const width = dom.canvas.width / dpr;
+                const height = dom.canvas.height / dpr;
+                const ctx = dom.ctx;
+
+                ctx.clearRect(0, 0, width, height);
+                ctx.drawImage(bgCanvas, 0, 0, bgCanvas.width, bgCanvas.height, 0, 0, width, height);
+                
+                ctx.fillStyle = "#4ade80";
+                ctx.fillRect(state.landingPad.x, state.landingPad.y, state.landingPad.width, state.landingPad.height);
+                
+                const p = state.player;
+                ctx.save();
+                ctx.translate(p.x + p.width / 2, p.y + p.height / 2);
+                ctx.scale(p.direction, 1);
+                ctx.font = `${p.width}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(p.icon, 0, 0);
+                ctx.restore();
+            };
+
+            const renderBadgeGuide = () => {
+                dom.badgeList.innerHTML = Object.values(CONFIG.BADGES).map(badge => `
+                    <div class="flex items-center p-1 rounded-md ${badge.earned ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-500 opacity-80'}">
+                        <span class="text-xl w-8 text-center">${badge.icon}</span>
+                        <div><span class="font-bold">${badge.title}</span><span class="text-xs block">${badge.description}</span></div>
+                    </div>`).join('');
+            };
+
+            const showPopup = (badge) => {
+                clearTimeout(popupTimeoutId);
+                dom.popup.icon.textContent = badge.icon;
+                dom.popup.title.textContent = badge.title;
+                dom.popup.el.classList.add('show');
+                popupTimeoutId = setTimeout(() => dom.popup.el.classList.remove('show'), 2500);
+            };
+
+            const handleGameOver = (msg) => {
+                state.isGameOver = true;
+                audioManager.stopSounds();
+                dom.resultArea.innerHTML = `<p class="text-red-500 font-bold">${msg}</p>`;
+                dom.nextBtn.textContent = "リトライ";
+                dom.nextBtn.classList.remove('hidden');
+            };
+
+            const handleSuccess = () => {
+                state.isGameOver = true;
+                audioManager.stopSounds();
+                state.missionCount++;
+
+                const p = state.player, pad = state.landingPad;
+                const speed = Math.abs(p.vy);
+                const precision = Math.abs((p.x + p.width / 2) - (pad.x + pad.width / 2));
+                const duration = (Date.now() - state.missionStartTime) / 1000;
+                
+                const { BASE, SOFTNESS_MULTIPLIER, PRECISION_MULTIPLIER, TIME_BONUS_FACTOR } = CONFIG.SCORING;
+                const score = {
+                    softness: Math.max(0, Math.floor((CONFIG.SUCCESS_CONDITIONS.MAX_VY / 2 - speed) * SOFTNESS_MULTIPLIER)),
+                    precision: Math.max(0, Math.floor((pad.width / 2 - precision) * PRECISION_MULTIPLIER)),
+                    time: Math.max(0, Math.floor(TIME_BONUS_FACTOR / duration))
+                };
+                const missionScore = BASE + score.softness + score.precision + score.time;
+                state.totalScore += missionScore;
+
+                dom.countEl.textContent = state.missionCount;
+                dom.scoreEl.textContent = state.totalScore;
+                dom.resultArea.innerHTML = `<p>基本スコア: ${BASE}p</p><p>ソフト: ${score.softness}p</p><p>精密: ${score.precision}p</p><p>タイム: ${score.time}p</p><p class="font-bold text-blue-600">計: ${missionScore}p</p>`;
+
+                let newBadge = false;
+                Object.values(CONFIG.BADGES).forEach(badge => {
+                    if (!badge.earned && badge.condition(speed, precision, duration)) {
+                        badge.earned = true; newBadge = true; showPopup(badge);
+                    }
+                });
+                if (newBadge) renderBadgeGuide();
+
+                dom.nextBtn.textContent = "次のミッションへ";
+                dom.nextBtn.classList.remove('hidden');
+            };
+            
+            function setupControls() {
+                 state.controls = { x: 0, y: 0 };
+                // D-Pad
+                const dPadMap = {'d-pad-up': {y:-1}, 'd-pad-down':{y:1}, 'd-pad-left':{x:-1}, 'd-pad-right':{x:1}};
+                Object.entries(dPadMap).forEach(([id, mapping]) => {
+                    const btn = document.getElementById(id);
+                    if (!btn) return;
+                    const setControl = (isActive) => (e) => {
+                        e.preventDefault();
+                        if (mapping.x !== undefined) state.controls.x = isActive ? mapping.x : 0;
+                        if (mapping.y !== undefined) state.controls.y = isActive ? mapping.y : 0;
+                    };
+                    ['mousedown', 'touchstart'].forEach(evt => btn.addEventListener(evt, setControl(true), { passive: false }));
+                    ['mouseup', 'mouseleave', 'touchend'].forEach(evt => btn.addEventListener(evt, setControl(false)));
+                });
+                
+                // Joystick
+                const stickBase = document.getElementById('joystick-base');
+                const stick = document.getElementById('joystick-stick');
+                let stickStartPos = {x:0, y:0}, baseRect;
+                const handleStickMove = (e) => {
+                    e.preventDefault();
+                    if (!baseRect) return;
+                    const touch = e.touches ? e.touches[0] : e;
+                    const dx = touch.clientX - stickStartPos.x, dy = touch.clientY - stickStartPos.y;
+                    const maxDist = baseRect.width / 4;
+                    const dist = Math.min(maxDist, Math.hypot(dx, dy));
+                    const angle = Math.atan2(dy, dx);
+                    
+                    stick.style.transform = `translate(-50%, -50%) translate(${dist * Math.cos(angle)}px, ${dist * Math.sin(angle)}px)`;
+                    state.controls.x = (dist * Math.cos(angle)) / maxDist;
+                    state.controls.y = (dist * Math.sin(angle)) / maxDist;
+                };
+
+                const endStickMove = () => {
+                    window.removeEventListener('mousemove', handleStickMove);
+                    window.removeEventListener('touchmove', handleStickMove);
+                    stick.style.transform = `translate(-50%, -50%)`;
+                    state.controls.x = 0; state.controls.y = 0;
+                };
+
+                const startStickMove = (e) => {
+                    baseRect = stickBase.getBoundingClientRect();
+                    stickStartPos = { x: baseRect.left + baseRect.width / 2, y: baseRect.top + baseRect.height / 2 };
+                    window.addEventListener('mousemove', handleStickMove, { passive: false });
+                    window.addEventListener('touchmove', handleStickMove, { passive: false });
+                    window.addEventListener('mouseup', endStickMove, { once: true });
+                    window.addEventListener('touchend', endStickMove, { once: true });
+                }
+                stickBase.addEventListener('mousedown', startStickMove);
+                stickBase.addEventListener('touchstart', startStickMove, { passive: false });
+            }
+
+            return {
+                start: (icon, controlType) => {
+                    initialize();
+                    state.player = { icon };
+                    state.controlType = controlType;
+                    state.totalScore = 0;
+                    state.missionCount = 0;
+                    Object.values(CONFIG.BADGES).forEach(b => b.earned = false);
+                    renderBadgeGuide();
+                    dom.countEl.textContent = '0';
+                    dom.scoreEl.textContent = '0';
+                    startMission();
+                },
+                stop: () => {
+                    cancelAnimationFrame(animationFrameId);
+                    state.isGameOver = true;
+                    audioManager.stopSounds();
+                }
+            };
+        })();
+    </script>
+    <script>
+        // Fix for 100vh on mobile
+        const setVh = () => {
+            document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+        };
+        window.addEventListener('resize', setVh);
+        window.addEventListener('orientationchange', setVh);
+        setVh();
+    </script>
+</body>
+</html>
+
+```2025/09/12 0:19:06 JST
+
+## Reference
+
+[Activity Link](https://myaccount.google.com/activitycontrols)
+

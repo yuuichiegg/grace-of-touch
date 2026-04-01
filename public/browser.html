@@ -451,11 +451,24 @@ function buildNewTabPage() {
     </div>`
   ).join('');
 
-  // Living World & Entertainment
-  const otherApps = [
+  // Games & Entertainment
+  const gameApps = [
+    { icon:'🎮', title:'Sky Journey', desc:'フライトゲーム', url:'/sky-journey.html' },
+    { icon:'🛬', title:'Landing', desc:'着地チャレンジ', url:'/landing-challenge.html' },
     { icon:'🐼', title:'Panda World', desc:'リビングワールド', url:'/pandaworld.html' },
-    { icon:'🛰️', title:'Terminal', desc:'ホーム', url:'/index.html' },
-    { icon:'🏢', title:'Tower', desc:'AIオフィス', url:'/tower.html' },
+  ];
+  const gameHTML = gameApps.map(a =>
+    `<div class="ntp-shortcut" data-url="${escapeAttr(a.url)}" style="gap:4px;">
+      <div class="ntp-shortcut-icon" style="border-color:rgba(255,107,157,.3);background:rgba(255,107,157,.06);font-size:22px;">${a.icon}</div>
+      <div class="ntp-shortcut-label" style="color:#ff6b9d;font-size:10px;">${escapeHTML(a.title)}</div>
+      <div style="font-size:8px;color:var(--text2);opacity:.6;">${a.desc}</div>
+    </div>`
+  ).join('');
+
+  // System & Utilities
+  const otherApps = [
+    { icon:'🛰️', title:'Terminal', url:'/index.html' },
+    { icon:'🏢', title:'Tower', url:'/tower.html' },
   ];
   const otherHTML = otherApps.map(a =>
     `<div class="ntp-shortcut" data-url="${escapeAttr(a.url)}">
@@ -500,7 +513,11 @@ function buildNewTabPage() {
         <div class="ntp-shortcuts" style="gap:12px;">${infraHTML}</div>
       </div>
       <div style="width:min(540px,92%);margin-bottom:16px;">
-        <div style="font-family:'Orbitron',monospace;font-size:9px;color:var(--accent);letter-spacing:.15em;margin-bottom:8px;opacity:.5;">WORLD</div>
+        <div style="font-family:'Orbitron',monospace;font-size:10px;color:#ff6b9d;letter-spacing:.15em;margin-bottom:10px;">🎮 GAMES</div>
+        <div class="ntp-shortcuts" style="gap:12px;">${gameHTML}</div>
+      </div>
+      <div style="width:min(540px,92%);margin-bottom:16px;">
+        <div style="font-family:'Orbitron',monospace;font-size:9px;color:var(--accent);letter-spacing:.15em;margin-bottom:8px;opacity:.5;">SYSTEM</div>
         <div class="ntp-shortcuts">${otherHTML}</div>
       </div>
       <div style="width:min(540px,92%);margin-bottom:16px;">

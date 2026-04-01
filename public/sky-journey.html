@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sky Journey | Grace Games</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans JP', sans-serif; background-color: #F0F4F8; color: #334155; }
+        .app-container { transition: opacity 0.5s ease-in-out; }
+        .section-hidden { display: none; }
+        .base-btn { transition: all 0.3s ease; border: none; cursor: pointer; }
+        .lang-btn.active { background-color: #3B82F6; color: #FFFFFF; transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); }
+        .content-card { background-color: #FFFFFF; border-radius: 16px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08); }
+        #signature-pad { border: 2px dashed #93C5FD; border-radius: 8px; cursor: crosshair; }
+        .consent-item { display: block; background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 1rem; border-radius: 8px; margin-bottom: 0.75rem; cursor: pointer; transition: background-color 0.2s; }
+        .consent-item:has(input:checked) { background-color: #DBEAFE; border-color: #60A5FA; }
+        .consent-item input { display: none; }
+        .consent-item .checkbox-icon { font-style: normal; display: inline-block; width: 1.25em; height: 1.25em; border: 2px solid #9CA3AF; border-radius: 4px; text-align: center; line-height: 1.25em; margin-right: 0.5em; vertical-align: middle; }
+        .consent-item input:checked + .checkbox-icon::before { content: '✔'; color: #3B82F6; }
+        #game-canvas { background: linear-gradient(#87CEEB, #E0F2FE); border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.1); cursor: pointer; }
+        .choice-btn { background-color: #3B82F6; color: white; font-size: 1.25rem; padding: 2rem; border-radius: 12px; transition: all 0.2s ease; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
+        .choice-btn:hover { transform: translateY(-4px); box-shadow: 0 8px 12px rgba(0,0,0,0.15); }
+        .quiz-option { border: 2px solid #E2E8F0; }
+        .quiz-option:hover { background-color: #F1F5F9; }
+        .quiz-option.selected { border-color: #3B82F6; background-color: #DBEAFE; }
+        .quiz-option.correct { border-color: #22C55E; background-color: #DCFCE7; }
+        .quiz-option.incorrect { border-color: #EF4444; background-color: #FEE2E2; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4 bg-slate-100">
+
+    <div id="app-root" class="w-full max-w-2xl mx-auto">
+
+        <!-- 1. 多言語ガイドセクション -->
+        <section id="guide-section" class="app-container">
+            <header class="text-center mb-8"><h1 class="text-3xl md:text-4xl font-bold text-slate-800">Sky Journey</h1><p class="text-lg text-slate-500 mt-2">多言語音声ガイド</p></header>
+            <div class="flex flex-wrap justify-center gap-2 md:gap-4 mb-8" id="language-selector">
+                <button data-lang="ja" class="lang-btn base-btn active text-sm md:text-base font-bold py-2 px-4 rounded-full bg-white shadow-md">日本語</button>
+                <button data-lang="en" class="lang-btn base-btn text-sm md:text-base font-bold py-2 px-4 rounded-full bg-white shadow-md">英語</button>
+                <button data-lang="zh-cn" class="lang-btn base-btn text-sm md:text-base font-bold py-2 px-4 rounded-full bg-white shadow-md">中国語(簡)</button>
+                <button data-lang="zh-tw" class="lang-btn base-btn text-sm md:text-base font-bold py-2 px-4 rounded-full bg-white shadow-md">中国語(繁)</button>
+                <button data-lang="ko" class="lang-btn base-btn text-sm md:text-base font-bold py-2 px-4 rounded-full bg-white shadow-md">韓国語</button>
+            </div>
+            <div class="content-card p-6 md:p-8"><h2 id="content-title" class="text-2xl font-bold mb-4 text-blue-500"></h2><p id="content-body" class="leading-relaxed"></p></div>
+            <div class="text-center mt-8"><button id="to-consent-btn" class="base-btn bg-blue-500 text-white font-bold py-3 px-8 rounded-full shadow-lg hover:bg-blue-600 transform hover:scale-105">体験同意に進む</button></div>
+        </section>
+
+        <!-- 2. 同意書セクション -->
+        <section id="consent-section" class="app-container section-hidden">
+            <header class="text-center mb-8"><h1 class="text-3xl md:text-4xl font-bold text-slate-800">VR体験 同意書</h1><p class="text-lg text-slate-500 mt-2">全ての項目をご確認の上、ご署名ください</p></header>
+            <div class="content-card p-6 md:p-8">
+                <div id="consent-items-container" class="max-h-64 overflow-y-auto pr-2">
+                    <label class="consent-item"><input type="checkbox" name="consent"><i class="checkbox-icon"></i><span>安全に関するご注意: VR体験は乗り物酔いに似た症状を引き起こすことがあります。体調に不安のある方はお控えください。</span></label>
+                    <label class="consent-item"><input type="checkbox" name="consent"><i class="checkbox-icon"></i><span>個人情報の取り扱い: 取得した個人情報はサービスの改善目的以外には使用しません。</span></label>
+                    <label class="consent-item"><input type="checkbox" name="consent"><i class="checkbox-icon"></i><span>免責事項: 体験中の気分の不快、所持品の紛失・破損について、当社は責任を負いかねます。</span></label>
+                    <label class="consent-item"><input type="checkbox" name="consent"><i class="checkbox-icon"></i><span>機器の取り扱い: VRゴーグルやコントローラーは丁寧にお取り扱いください。破損させた場合、弁償を求めることがあります。</span></label>
+                </div>
+                <div id="signature-area" class="mt-6 hidden"><label class="block text-sm font-medium text-slate-700 mb-2">署名欄:</label><canvas id="signature-pad" class="w-full h-40 bg-slate-50"></canvas></div>
+                <div class="flex justify-center items-center gap-4 mt-6">
+                    <button id="clear-signature-btn" class="base-btn bg-slate-300 text-slate-700 font-bold py-3 px-6 rounded-full hover:bg-slate-400">書き直す</button>
+                    <button id="submit-consent-btn" class="base-btn bg-blue-500 text-white font-bold py-3 px-6 rounded-full hover:bg-blue-600 disabled:bg-slate-400 disabled:cursor-not-allowed" disabled>同意して署名する</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. コンテンツ選択セクション -->
+        <section id="choice-section" class="app-container section-hidden">
+            <header class="text-center mb-8"><h1 class="text-3xl md:text-4xl font-bold text-slate-800">ありがとうございます！</h1><p class="text-lg text-slate-500 mt-2">準備ができるまで、コンテンツをお楽しみください</p></header>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <button id="to-game-btn" class="choice-btn">✈️<br>ミニゲームで遊ぶ</button>
+                <button id="to-quiz-btn" class="choice-btn">❓<br>クイズに挑戦</button>
+            </div>
+        </section>
+
+        <!-- 4. ミニゲームセクション -->
+        <section id="game-section" class="app-container section-hidden">
+            <header class="text-center mb-6"><h1 class="text-3xl font-bold text-slate-800">スカイジャーニー</h1><p class="text-slate-500">クリックで上昇！ビルをよけよう</p></header>
+            <div class="relative w-full max-w-md mx-auto aspect-video"><canvas id="game-canvas"></canvas></div>
+            <div class="text-center mt-4"><p class="text-xl">スコア: <span id="game-score" class="font-bold">0</span></p><button id="game-back-btn" class="base-btn mt-2 bg-slate-500 text-white py-2 px-4 rounded-full">選択画面に戻る</button></div>
+        </section>
+
+        <!-- 5. クイズセクション -->
+        <section id="quiz-section" class="app-container section-hidden">
+            <header class="text-center mb-6"><h1 class="text-3xl font-bold text-slate-800">空飛ぶクルマクイズ</h1></header>
+            <div id="quiz-container" class="content-card p-6 md:p-8">
+                <p id="quiz-question" class="text-lg font-semibold mb-4 text-center"></p>
+                <div id="quiz-options" class="grid grid-cols-1 gap-3"></div>
+                <div id="quiz-feedback" class="mt-4 text-center font-bold"></div>
+                <button id="quiz-next-btn" class="base-btn w-full mt-4 bg-blue-500 text-white font-bold py-3 rounded-full hover:bg-blue-600 hidden">次の問題へ</button>
+            </div>
+            <div class="text-center mt-4"><button id="quiz-back-btn" class="base-btn bg-slate-500 text-white py-2 px-4 rounded-full">選択画面に戻る</button></div>
+        </section>
+
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const sections = {
+            guide: document.getElementById('guide-section'),
+            consent: document.getElementById('consent-section'),
+            choice: document.getElementById('choice-section'),
+            game: document.getElementById('game-section'),
+            quiz: document.getElementById('quiz-section'),
+        };
+        let activeModules = {};
+
+        function switchSection(targetSectionId) {
+            Object.values(sections).forEach(s => s.classList.add('section-hidden'));
+            sections[targetSectionId].classList.remove('section-hidden');
+
+            Object.values(activeModules).forEach(m => m.stop && m.stop());
+            
+            const moduleMap = { game: gameModule, quiz: quizModule };
+            if (moduleMap[targetSectionId]) {
+                moduleMap[targetSectionId].start();
+                activeModules[targetSectionId] = moduleMap[targetSectionId];
+            }
+        }
+
+        // --- 1. ガイドモジュール ---
+        const guideModule = (() => {
+            const guideData = {'ja': { title: '空飛ぶクルマVR飛行', body: 'シミュレーターで東京の空をドライブしませんか？リアルなプロペラ音を活かした本格的な体験ができます。未来のフライトをお楽しみください。'},'en':{title:'Flying Car VR Experience',body:'Experience a realistic flight with authentic propeller sounds. Enjoy this glimpse into the future of flying.'},'zh-cn':{title:'飞行汽车 VR飞行',body:'结合真实机体开发的技术，以及实地录制的螺旋桨声音，带来身临其境的体验。'},'zh-tw':{title:'空飛車 VR飛行',body:'結合實際機體開發的技術，以及真實錄製的螺旋槳聲音，帶來逼真的體驗。'},'ko':{title:'플라잉카 VR 비행',body:'실제 기체 개발로 쌓은 노하우와, 직접 녹음한 리얼한 프로펠러 소리를 살려, 더욱 사실적인 체험이 가능합니다.'}};
+            const titleEl = document.getElementById('content-title'), bodyEl = document.getElementById('content-body');
+            document.getElementById('language-selector').addEventListener('click', e => {
+                if (e.target.tagName !== 'BUTTON') return;
+                const lang = e.target.dataset.lang, data = guideData[lang];
+                if(data) { titleEl.textContent = data.title; bodyEl.textContent = data.body; }
+                document.querySelectorAll('#language-selector .lang-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+            });
+            document.getElementById('to-consent-btn').addEventListener('click', () => switchSection('consent'));
+            titleEl.textContent = guideData.ja.title; bodyEl.textContent = guideData.ja.body;
+        })();
+
+        // --- 2. 同意書モジュール ---
+        const consentModule = (() => {
+            const container = document.getElementById('consent-items-container'), checkboxes = container.querySelectorAll('input[type="checkbox"]');
+            const signatureArea = document.getElementById('signature-area'), submitBtn = document.getElementById('submit-consent-btn');
+            const canvas = document.getElementById('signature-pad'), ctx = canvas.getContext('2d');
+            let drawing = false, isSigned = false;
+
+            function checkCompletion() {
+                const allChecked = [...checkboxes].every(c => c.checked);
+                const isScrolledToEnd = container.scrollHeight - container.scrollTop <= container.clientHeight + 20;
+                if (allChecked && isScrolledToEnd) {
+                    signatureArea.classList.remove('hidden');
+                    submitBtn.disabled = !isSigned;
+                } else {
+                    signatureArea.classList.add('hidden');
+                    submitBtn.disabled = true;
+                }
+            }
+
+            function resizeCanvas() {
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                canvas.width = canvas.offsetWidth * ratio; canvas.height = canvas.offsetHeight * ratio;
+                ctx.scale(ratio, ratio);
+            }
+            const getPos = (e) => {
+                const rect = canvas.getBoundingClientRect(), evt = e.touches ? e.touches[0] : e;
+                return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+            };
+            const startDrawing = (e) => { e.preventDefault(); drawing = true; isSigned = true; checkCompletion(); const pos = getPos(e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); };
+            const draw = (e) => { if (!drawing) return; e.preventDefault(); const pos = getPos(e); ctx.lineTo(pos.x, pos.y); ctx.strokeStyle = '#334155'; ctx.lineWidth = 2; ctx.stroke(); };
+            const stopDrawing = () => drawing = false;
+            const clear = () => { ctx.clearRect(0, 0, canvas.width, canvas.height); isSigned = false; checkCompletion(); };
+
+            container.addEventListener('change', checkCompletion);
+            container.addEventListener('scroll', checkCompletion);
+            canvas.addEventListener('mousedown', startDrawing); canvas.addEventListener('mousemove', draw); canvas.addEventListener('mouseup', stopDrawing); canvas.addEventListener('mouseout', stopDrawing);
+            canvas.addEventListener('touchstart', startDrawing, { passive: false }); canvas.addEventListener('touchmove', draw, { passive: false }); canvas.addEventListener('touchend', stopDrawing);
+            document.getElementById('clear-signature-btn').addEventListener('click', clear);
+            submitBtn.addEventListener('click', () => { if(isSigned) switchSection('choice'); });
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+        })();
+
+        // --- 3. コンテンツ選択モジュール ---
+        document.getElementById('to-game-btn').addEventListener('click', () => switchSection('game'));
+        document.getElementById('to-quiz-btn').addEventListener('click', () => switchSection('quiz'));
+        document.getElementById('game-back-btn').addEventListener('click', () => switchSection('choice'));
+        document.getElementById('quiz-back-btn').addEventListener('click', () => switchSection('choice'));
+
+        // --- 4. ゲームモジュール ---
+        const gameModule = (() => {
+            const canvas = document.getElementById('game-canvas'), ctx = canvas.getContext('2d'), scoreEl = document.getElementById('game-score');
+            let w, h, player, obstacles, frame, score, animationId;
+            const gravity = 0.2, lift = -4;
+
+            function init() {
+                w = canvas.width = canvas.parentElement.clientWidth; h = canvas.height = canvas.parentElement.clientHeight;
+                player = { x: w * 0.2, y: h / 2, width: w*0.1, height: w*0.05, velocity: 0 };
+                obstacles = []; frame = 0; score = 0; scoreEl.textContent = 0;
+            }
+
+            function loop() {
+                ctx.clearRect(0, 0, w, h);
+                // Player
+                player.velocity += gravity; player.y += player.velocity;
+                ctx.fillStyle = '#F59E0B'; ctx.fillRect(player.x, player.y, player.width, player.height); // Simplified car shape
+                if (player.y > h || player.y < 0) { stop(); return; } // Game Over
+                // Obstacles
+                if (frame % 100 === 0) {
+                    const gap = h * 0.4; const topHeight = Math.random() * (h - gap);
+                    obstacles.push({ x: w, y: 0, width: 30, height: topHeight });
+                    obstacles.push({ x: w, y: topHeight + gap, width: 30, height: h - topHeight - gap });
+                }
+                obstacles.forEach(o => { o.x -= 2; ctx.fillStyle = '#475569'; ctx.fillRect(o.x, o.y, o.width, o.height); });
+                // Collision
+                obstacles.forEach(o => { if (player.x < o.x + o.width && player.x + player.width > o.x && player.y < o.y + o.height && player.y + player.height > o.y) { stop(); return; } });
+                // Score
+                if (obstacles.length > 0 && obstacles[0].x < player.x && !obstacles[0].scored) { score++; scoreEl.textContent = score; obstacles[0].scored = true; }
+                obstacles = obstacles.filter(o => o.x + o.width > 0);
+                frame++;
+                animationId = requestAnimationFrame(loop);
+            }
+            function jump() { player.velocity = lift; }
+            function start() { init(); loop(); canvas.addEventListener('click', jump); }
+            function stop() { cancelAnimationFrame(animationId); canvas.removeEventListener('click', jump); }
+            return { start, stop };
+        })();
+        
+        // --- 5. クイズモジュール ---
+        const quizModule = (() => {
+            const quizData = [ { q: "空飛ぶクルマの動力源として一般的なのは？", o: ["ガソリン", "電気", "人力"], a: 1 }, { q: "日本で初の有人デモフライト成功年は？", o: ["2018年", "2020年", "2022年"], a: 1 }, { q: "空飛ぶクルマの別名は？", o: ["エアモビリティ", "スカイカー", "両方"], a: 2 } ];
+            const questionEl = document.getElementById('quiz-question'), optionsEl = document.getElementById('quiz-options');
+            const feedbackEl = document.getElementById('quiz-feedback'), nextBtn = document.getElementById('quiz-next-btn');
+            let currentQ = 0, score = 0, answered = false;
+            
+            function showQuestion() {
+                answered = false;
+                const data = quizData[currentQ];
+                questionEl.textContent = `第${currentQ + 1}問: ${data.q}`;
+                optionsEl.innerHTML = data.o.map((opt, i) => `<button data-index="${i}" class="quiz-option p-3 rounded-lg text-left">${opt}</button>`).join('');
+                feedbackEl.textContent = '';
+                nextBtn.classList.add('hidden');
+            }
+            function handleAnswer(e) {
+                if (answered || !e.target.matches('.quiz-option')) return;
+                answered = true;
+                const selectedIndex = parseInt(e.target.dataset.index);
+                const correctIndex = quizData[currentQ].a;
+                if (selectedIndex === correctIndex) {
+                    feedbackEl.textContent = '正解！'; feedbackEl.style.color = '#16A34A'; score++;
+                } else {
+                    feedbackEl.textContent = '不正解…'; feedbackEl.style.color = '#DC2626';
+                }
+                [...optionsEl.children].forEach((btn, i) => {
+                    btn.classList.add(i === correctIndex ? 'correct' : (i === selectedIndex ? 'incorrect' : ''));
+                });
+                nextBtn.classList.remove('hidden');
+            }
+            function nextQuestion() {
+                currentQ++;
+                if (currentQ < quizData.length) { showQuestion(); } else {
+                    questionEl.textContent = `終了！あなたのスコアは ${score}/${quizData.length} でした。`;
+                    optionsEl.innerHTML = ''; feedbackEl.textContent = ''; nextBtn.textContent = 'もう一度挑戦';
+                    nextBtn.onclick = () => { start(); }; // Reset
+                }
+            }
+            function start() {
+                currentQ = 0; score = 0;
+                showQuestion();
+                nextBtn.textContent = '次の問題へ';
+                nextBtn.onclick = nextQuestion;
+                optionsEl.onclick = handleAnswer;
+            }
+            return { start, stop: () => {} };
+        })();
+    });
+    </script>
+</body>
+</html>
+```2025/09/07 10:12:56 JST
+
+## Reference
+
+[Activity Link](https://myaccount.google.com/activitycontrols)
+
