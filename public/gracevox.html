@@ -615,33 +615,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       <canvas id="recVoicePrintCanvas" style="width:100%;height:56px;display:block;border-top:1px solid rgba(255,255,255,0.05);"></canvas>
       <button id="vizModeBtn" onclick="cycleVizMode()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.5);border:1px solid var(--border);color:var(--text-dim);font-size:9px;padding:2px 6px;border-radius:4px;cursor:pointer;z-index:2;">波形+声紋</button>
     </div>
-    <!-- Player bar (visible when a track is selected) -->
-    <div id="trackPlayer" style="display:none;padding:8px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-        <button class="track-btn" onclick="playerToggle()" id="playerPlayBtn" style="width:32px;height:32px;font-size:15px;">&#9654;</button>
-        <div style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;">
-          <span id="playerTrackName" style="font-size:11px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span id="playerTime" style="font-size:10px;color:var(--text-dim);font-family:'Courier New',monospace;min-width:36px;">0:00</span>
-            <div id="waveWrap" style="flex:1;position:relative;height:56px;border-radius:4px;overflow:hidden;touch-action:none;">
-              <canvas id="playerWaveCanvas" style="width:100%;height:100%;cursor:pointer;display:block;"></canvas>
-              <!-- Trim handles (drag to adjust) -->
-              <div id="trimLeft" class="trim-handle" style="left:0%;"><div class="trim-grip"></div></div>
-              <div id="trimRight" class="trim-handle" style="right:0%;"><div class="trim-grip"></div></div>
-              <div id="trimOverlayL" class="trim-overlay" style="left:0;width:0%;"></div>
-              <div id="trimOverlayR" class="trim-overlay" style="right:0;width:0%;"></div>
-            </div>
-            <span id="playerDur" style="font-size:10px;color:var(--text-dim);font-family:'Courier New',monospace;min-width:36px;text-align:right;">0:00</span>
-          </div>
-        </div>
-      </div>
-      <!-- Trim info + action -->
-      <div id="trimControls" style="display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-dim);">
-        <span id="trimRange" style="flex:1;text-align:center;">ハンドルをドラッグしてトリミング</span>
-        <button class="track-btn" onclick="resetTrim()" title="リセット" style="font-size:9px;width:auto;padding:0 8px;height:24px;border-radius:4px;">↺</button>
-        <button class="track-btn" onclick="applyTrim()" title="トリミング実行" style="font-size:9px;width:auto;padding:0 8px;height:24px;border-radius:4px;color:var(--accent);border-color:var(--accent);">✂ 切出</button>
-      </div>
-    </div>
+    <!-- Player bar removed — each track has inline waveform + play button -->
     <div class="history-content" id="trackList" style="padding:6px 10px;min-height:80px;">
       <div class="history-empty" id="trackEmpty">録音するとここにトラックが表示されます</div>
     </div>
@@ -4030,18 +4004,16 @@ function openPlayer(idx){
   const tr=_tracks[idx];
   if(!tr) return;
   _playerTrackIdx=idx;
-  _trimStart=0;_trimEnd=tr.dur;
-  document.getElementById('trackPlayer').style.display='block';
-  document.getElementById('playerTrackName').textContent=tr.name;
-  document.getElementById('playerDur').textContent=_fmtTime(tr.dur);
-  document.getElementById('playerTime').textContent='0:00';
-  document.getElementById('playerPlayBtn').innerHTML='&#9654;';
-  _updateTrimHandles();
-  // Highlight active track
-  document.querySelectorAll('.track-item').forEach((el,i)=>{
-    el.style.borderColor=i===idx?'var(--accent)':'';
+  // Highlight active track + auto-play
+  document.querySelectorAll('.track-item').forEach(el=>{
+    el.style.borderColor='';
   });
-  // Generate waveform
+  const el=document.getElementById('track-'+idx);
+  if(el) el.style.borderColor='var(--accent)';
+  // Quick play the selected track
+  const btn=el?.querySelector('.track-btn');
+  if(btn) quickPlay(idx, btn);
+  // Generate waveform if not cached
   _generateWaveform(idx);
 }
 
