@@ -29,6 +29,12 @@
     "rooms": {
       ".read": true,
       ".write": true
+    },
+    "pichan": {
+      ".read": true,
+      "$uid": {
+        ".write": true
+      }
     }
   }
 }

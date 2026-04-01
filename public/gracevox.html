@@ -3020,6 +3020,84 @@ function scheduleNextWander() {
 }
 scheduleNextWander();
 
+// ─── ぴーちゃん × Firebase Realtime DB 連携 ───
+// Mac mini pi-agent や他デバイスからぴーちゃんの状態を読み書き可能
+const _pichanDbRef = (function(){
+  try{
+    if(!firebase.apps.length) return null;
+    const db = firebase.database();
+    const uid = fbAuth.currentUser?.uid || 'anon_' + Date.now().toString(36);
+    return db.ref('pichan/' + uid);
+  }catch(e){ return null; }
+})();
+
+// 状態をDBに同期（スキン変更・タップ・状態変化時）
+function _syncPichanToDb(){
+  if(!_pichanDbRef) return;
+  try{
+    _pichanDbRef.update({
+      skin: _pichanSkin,
+      state: _pichanState,
+      tapCount: _pichanTapCount,
+      lastActivity: firebase.database.ServerValue.TIMESTAMP,
+      device: /iPad|iPhone/.test(navigator.userAgent) ? 'ios' : 'desktop',
+      app: 'gracevox'
+    });
+  }catch(e){}
+}
+
+// 状態変化時にDB同期
+const _origUpdatePichanState = updatePichanState;
+updatePichanState = function(state){
+  _origUpdatePichanState(state);
+  _syncPichanToDb();
+};
+
+// スキン変更時にDB同期
+const _origTogglePichanSkin = togglePichanSkin;
+togglePichanSkin = function(){
+  _origTogglePichanSkin();
+  _syncPichanToDb();
+};
+
+// ログイン後にDB参照を更新
+fbAuth.onAuthStateChanged((user) => {
+  if(user && _pichanDbRef){
+    try{
+      const db = firebase.database();
+      const ref = db.ref('pichan/' + user.uid);
+      // 初回同期
+      ref.update({
+        skin: _pichanSkin,
+        state: _pichanState,
+        displayName: user.displayName || '',
+        lastActivity: firebase.database.ServerValue.TIMESTAMP,
+        device: /iPad|iPhone/.test(navigator.userAgent) ? 'ios' : 'desktop'
+      });
+    }catch(e){}
+  }
+});
+
+// pi-agentからの指令を受信（Mac miniから着せ替えやメッセージ送信）
+if(_pichanDbRef){
+  try{
+    _pichanDbRef.child('command').on('value', (snap) => {
+      const cmd = snap.val();
+      if(!cmd || !cmd.action) return;
+      if(cmd.action === 'changeSkin' && cmd.skin && PICHAN_SKINS[cmd.skin]){
+        _pichanSkin = cmd.skin;
+        localStorage.setItem('gv_pichan_skin', _pichanSkin);
+        updatePichanState(_pichanState);
+      }
+      if(cmd.action === 'message' && cmd.text){
+        showAiBubble(cmd.text, cmd.tag || 'ガレリア🖥️');
+      }
+      // コマンド処理済み → 削除
+      _pichanDbRef.child('command').remove();
+    });
+  }catch(e){}
+}
+
 function pichanTap() {
   _pichanTapCount++;
   _pichanPaused = true; // pause wandering while interacting
