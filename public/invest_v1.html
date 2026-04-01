@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="(c) 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>Invest Dashboard - Grace of Touch</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0a0e1a;color:#e0e8f0;font-family:'Noto Sans JP',sans-serif;min-height:100vh;}
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:#0a0e1a;}
+::-webkit-scrollbar-thumb{background:rgba(0,255,255,0.3);border-radius:3px;}
+.orbitron{font-family:'Orbitron',monospace;}
+.glow-text{text-shadow:0 0 10px rgba(0,255,255,0.5),0 0 20px rgba(0,255,255,0.2);}
+.card{background:rgba(15,20,40,0.8);border:1px solid rgba(0,255,255,0.1);border-radius:12px;backdrop-filter:blur(10px);}
+.card:hover{border-color:rgba(0,255,255,0.25);}
+.btn-primary{background:linear-gradient(135deg,rgba(0,255,255,0.15),rgba(0,255,255,0.05));border:1px solid rgba(0,255,255,0.3);color:#00ffff;border-radius:8px;cursor:pointer;transition:all 0.2s;}
+.btn-primary:hover{background:rgba(0,255,255,0.2);border-color:rgba(0,255,255,0.5);}
+.btn-danger{background:rgba(255,60,60,0.1);border:1px solid rgba(255,60,60,0.3);color:#ff6060;border-radius:8px;cursor:pointer;transition:all 0.2s;}
+.btn-danger:hover{background:rgba(255,60,60,0.2);}
+input,select{background:rgba(15,20,40,0.9);border:1px solid rgba(0,255,255,0.15);color:#e0e8f0;border-radius:6px;padding:8px 12px;font-family:'Noto Sans JP',sans-serif;font-size:14px;outline:none;transition:border-color 0.2s;}
+input:focus,select:focus{border-color:rgba(0,255,255,0.5);}
+.tab-active{background:rgba(0,255,255,0.15);border-color:rgba(0,255,255,0.5);color:#00ffff;}
+.gain{color:#00ff88;}
+.loss{color:#ff4060;}
+.market-ticker{animation:tickerScroll 30s linear infinite;}
+@keyframes tickerScroll{0%{transform:translateX(0);}100%{transform:translateX(-50%);}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+// ==================== STORAGE ====================
+const STORAGE_KEY = 'grace_invest_data';
+const HISTORY_KEY = 'grace_invest_history';
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { holdings: [], transactions: [] };
+}
+
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return [];
+}
+
+function saveHistory(history) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+}
+
+// ==================== FORMATTERS ====================
+function fmtJPY(n) {
+  if (n == null || isNaN(n)) return '\u00a50';
+  const abs = Math.abs(n);
+  if (abs >= 1e8) return (n < 0 ? '-' : '') + '\u00a5' + (abs / 1e8).toFixed(2) + '億';
+  if (abs >= 1e4) return (n < 0 ? '-' : '') + '\u00a5' + (abs / 1e4).toFixed(1) + '万';
+  return '\u00a5' + n.toLocaleString('ja-JP', { maximumFractionDigits: 0 });
+}
+
+function fmtPct(n) {
+  if (n == null || isNaN(n)) return '0.00%';
+  return (n >= 0 ? '+' : '') + n.toFixed(2) + '%';
+}
+
+function fmtNum(n, digits = 4) {
+  if (n == null || isNaN(n)) return '0';
+  return Number(n).toLocaleString('ja-JP', { maximumFractionDigits: digits });
+}
+
+// ==================== CATEGORY CONFIG ====================
+const CATEGORIES = [
+  { id: 'stock', label: '株式', icon: '📈' },
+  { id: 'crypto', label: '仮想通貨', icon: '₿' },
+  { id: 'forex', label: '為替', icon: '💱' },
+  { id: 'fund', label: '投資信託', icon: '🏦' },
+];
+
+// CoinGecko ID mapping
+const CRYPTO_MAP = {
+  'BTC': 'bitcoin', 'ETH': 'ethereum', 'XRP': 'ripple', 'SOL': 'solana',
+  'ADA': 'cardano', 'DOGE': 'dogecoin', 'DOT': 'polkadot', 'MATIC': 'matic-network',
+  'AVAX': 'avalanche-2', 'LINK': 'chainlink', 'SHIB': 'shiba-inu', 'LTC': 'litecoin',
+};
+
+// ==================== PRICE FETCHING ====================
+async function fetchCryptoPrices(symbols) {
+  const ids = symbols.map(s => CRYPTO_MAP[s.toUpperCase()] || s.toLowerCase()).filter(Boolean);
+  if (!ids.length) return {};
+  try {
+    const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(',')}&vs_currencies=jpy&include_24hr_change=true`);
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    const result = {};
+    for (const [sym, geckoId] of Object.entries(CRYPTO_MAP)) {
+      if (data[geckoId]) {
+        result[sym] = { price: data[geckoId].jpy, change24h: data[geckoId].jpy_24h_change || 0 };
+      }
+    }
+    // Also check direct IDs
+    for (const id of ids) {
+      if (data[id] && !Object.values(result).find(r => r.price === data[id].jpy)) {
+        const sym = Object.entries(CRYPTO_MAP).find(([k,v]) => v === id)?.[0] || id.toUpperCase();
+        result[sym] = { price: data[id].jpy, change24h: data[id].jpy_24h_change || 0 };
+      }
+    }
+    return result;
+  } catch(e) {
+    console.warn('Crypto fetch failed:', e);
+    return {};
+  }
+}
+
+async function fetchForexRates() {
+  try {
+    const res = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    const jpy = data.rates.JPY || 150;
+    return {
+      'USD/JPY': jpy,
+      'EUR/JPY': jpy * (1 / (data.rates.EUR || 0.92)),
+      'GBP/JPY': jpy * (1 / (data.rates.GBP || 0.79)),
+      'AUD/JPY': jpy * (1 / (data.rates.AUD || 1.53)),
+      'CHF/JPY': jpy * (1 / (data.rates.CHF || 0.88)),
+    };
+  } catch(e) {
+    console.warn('Forex fetch failed:', e);
+    return { 'USD/JPY': 150, 'EUR/JPY': 163, 'GBP/JPY': 190, 'AUD/JPY': 98, 'CHF/JPY': 170 };
+  }
+}
+
+// ==================== CHART COMPONENTS ====================
+function PieChart({ data, size = 200 }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !data.length) return;
+    const ctx = canvas.getContext('2d');
+    const w = size * 2; // retina
+    canvas.width = w; canvas.height = w;
+    ctx.clearRect(0, 0, w, w);
+    const total = data.reduce((s, d) => s + d.value, 0);
+    if (total <= 0) return;
+    const cx = w / 2, cy = w / 2, r = w * 0.38;
+    let angle = -Math.PI / 2;
+    const colors = ['#00ffff', '#00ff88', '#ff6090', '#ffaa00', '#8866ff', '#ff4060', '#44bbff', '#88ff44'];
+    data.forEach((d, i) => {
+      const slice = (d.value / total) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, angle, angle + slice);
+      ctx.closePath();
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.globalAlpha = 0.7;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#0a0e1a';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      // Label
+      if (d.value / total > 0.05) {
+        const mid = angle + slice / 2;
+        const lx = cx + Math.cos(mid) * r * 0.65;
+        const ly = cy + Math.sin(mid) * r * 0.65;
+        ctx.fillStyle = '#fff';
+        ctx.font = `bold ${w * 0.035}px 'Noto Sans JP'`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(d.label, lx, ly - w * 0.02);
+        ctx.font = `${w * 0.028}px 'Noto Sans JP'`;
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.fillText(((d.value / total) * 100).toFixed(1) + '%', lx, ly + w * 0.025);
+      }
+      angle += slice;
+    });
+    // Center hole (donut)
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 0.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#0a0e1a';
+    ctx.fill();
+    // Center text
+    ctx.fillStyle = '#00ffff';
+    ctx.font = `bold ${w * 0.04}px Orbitron`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(fmtJPY(total), cx, cy);
+  }, [data, size]);
+  return <canvas ref={canvasRef} style={{ width: size, height: size }} />;
+}
+
+function LineChart({ data, width = 400, height = 160 }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || data.length < 2) return;
+    const ctx = canvas.getContext('2d');
+    const w = width * 2, h = height * 2;
+    canvas.width = w; canvas.height = h;
+    ctx.clearRect(0, 0, w, h);
+    const values = data.map(d => d.value);
+    const min = Math.min(...values) * 0.98;
+    const max = Math.max(...values) * 1.02;
+    const range = max - min || 1;
+    const padX = 60, padY = 30, padB = 40;
+    const chartW = w - padX * 2, chartH = h - padY - padB;
+    // Grid lines
+    ctx.strokeStyle = 'rgba(0,255,255,0.06)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = padY + chartH * (i / 4);
+      ctx.beginPath(); ctx.moveTo(padX, y); ctx.lineTo(padX + chartW, y); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.font = `${w * 0.02}px 'Noto Sans JP'`;
+      ctx.textAlign = 'right';
+      ctx.fillText(fmtJPY(max - (range * i / 4)), padX - 8, y + 5);
+    }
+    // Line
+    const gradient = ctx.createLinearGradient(0, padY, 0, padY + chartH);
+    const lastVal = values[values.length - 1];
+    const firstVal = values[0];
+    const isGain = lastVal >= firstVal;
+    gradient.addColorStop(0, isGain ? 'rgba(0,255,136,0.3)' : 'rgba(255,64,96,0.3)');
+    gradient.addColorStop(1, 'rgba(10,14,26,0)');
+    ctx.beginPath();
+    data.forEach((d, i) => {
+      const x = padX + (i / (data.length - 1)) * chartW;
+      const y = padY + chartH - ((d.value - min) / range) * chartH;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = isGain ? '#00ff88' : '#ff4060';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    // Fill area
+    const lastX = padX + chartW;
+    const lastY = padY + chartH - ((values[values.length - 1] - min) / range) * chartH;
+    ctx.lineTo(lastX, padY + chartH);
+    ctx.lineTo(padX, padY + chartH);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    // Date labels
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = `${w * 0.018}px 'Noto Sans JP'`;
+    ctx.textAlign = 'center';
+    const step = Math.max(1, Math.floor(data.length / 6));
+    for (let i = 0; i < data.length; i += step) {
+      const x = padX + (i / (data.length - 1)) * chartW;
+      ctx.fillText(data[i].date?.slice(5) || '', x, padY + chartH + 25);
+    }
+  }, [data, width, height]);
+  return <canvas ref={canvasRef} style={{ width, height, maxWidth: '100%' }} />;
+}
+
+// ==================== MAIN APP ====================
+function App() {
+  const [data, setData] = useState(loadData);
+  const [history, setHistory] = useState(loadHistory);
+  const [activeTab, setActiveTab] = useState('stock');
+  const [prices, setPrices] = useState({});
+  const [forexRates, setForexRates] = useState({});
+  const [marketData, setMarketData] = useState({});
+  const [showAddHolding, setShowAddHolding] = useState(false);
+  const [showAddTx, setShowAddTx] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [showImportExport, setShowImportExport] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [view, setView] = useState('dashboard'); // dashboard, transactions, settings
+
+  // Save data on change
+  useEffect(() => { saveData(data); }, [data]);
+  useEffect(() => { saveHistory(history); }, [history]);
+
+  // Fetch prices
+  const fetchAllPrices = useCallback(async () => {
+    // Crypto
+    const cryptoHoldings = data.holdings.filter(h => h.category === 'crypto');
+    const cryptoSymbols = [...new Set(cryptoHoldings.map(h => h.ticker))];
+    // Always fetch BTC/ETH for market overview
+    const allCryptoSymbols = [...new Set([...cryptoSymbols, 'BTC', 'ETH'])];
+    const cryptoPrices = await fetchCryptoPrices(allCryptoSymbols);
+
+    // Forex
+    const fxRates = await fetchForexRates();
+
+    setPrices(prev => ({ ...prev, ...cryptoPrices }));
+    setForexRates(fxRates);
+    setMarketData({ crypto: cryptoPrices, forex: fxRates });
+    setLastUpdate(new Date().toLocaleTimeString('ja-JP'));
+
+    // Record daily history
+    recordDailyHistory(data.holdings, cryptoPrices, fxRates);
+  }, [data.holdings]);
+
+  useEffect(() => {
+    fetchAllPrices();
+    const interval = setInterval(fetchAllPrices, 60000);
+    return () => clearInterval(interval);
+  }, [fetchAllPrices]);
+
+  function recordDailyHistory(holdings, cryptoPrices, fxRates) {
+    const today = new Date().toISOString().slice(0, 10);
+    const totalValue = calcTotalValue(holdings, cryptoPrices, fxRates);
+    setHistory(prev => {
+      const existing = prev.find(h => h.date === today);
+      let next;
+      if (existing) {
+        next = prev.map(h => h.date === today ? { ...h, value: totalValue } : h);
+      } else {
+        next = [...prev, { date: today, value: totalValue }].slice(-90);
+      }
+      return next;
+    });
+  }
+
+  function getCurrentPrice(holding) {
+    if (holding.category === 'crypto' && prices[holding.ticker]) {
+      return prices[holding.ticker].price;
+    }
+    if (holding.category === 'forex' && forexRates[holding.ticker]) {
+      return forexRates[holding.ticker];
+    }
+    return holding.currentPrice || holding.avgPrice || 0;
+  }
+
+  function calcTotalValue(holdings, cryptoPrices, fxRates) {
+    return holdings.reduce((sum, h) => {
+      let price;
+      if (h.category === 'crypto' && cryptoPrices?.[h.ticker]) {
+        price = cryptoPrices[h.ticker].price;
+      } else if (h.category === 'forex' && fxRates?.[h.ticker]) {
+        price = fxRates[h.ticker];
+      } else {
+        price = h.currentPrice || h.avgPrice || 0;
+      }
+      return sum + (h.quantity * price);
+    }, 0);
+  }
+
+  // Computed values
+  const totalValue = useMemo(() => {
+    return data.holdings.reduce((sum, h) => sum + h.quantity * getCurrentPrice(h), 0);
+  }, [data.holdings, prices, forexRates]);
+
+  const totalCost = useMemo(() => {
+    return data.holdings.reduce((sum, h) => sum + h.quantity * h.avgPrice, 0);
+  }, [data.holdings]);
+
+  const totalGainLoss = totalValue - totalCost;
+  const totalGainLossPct = totalCost > 0 ? (totalGainLoss / totalCost) * 100 : 0;
+
+  const pieData = useMemo(() => {
+    const groups = {};
+    data.holdings.forEach(h => {
+      const cat = CATEGORIES.find(c => c.id === h.category);
+      const label = cat ? cat.label : h.category;
+      if (!groups[label]) groups[label] = 0;
+      groups[label] += h.quantity * getCurrentPrice(h);
+    });
+    return Object.entries(groups).filter(([,v]) => v > 0).map(([label, value]) => ({ label, value }));
+  }, [data.holdings, prices, forexRates]);
+
+  const lineData = useMemo(() => {
+    if (history.length < 2) {
+      // Generate dummy data if no history
+      const today = new Date();
+      return Array.from({ length: 7 }, (_, i) => ({
+        date: new Date(today - (6 - i) * 86400000).toISOString().slice(0, 10),
+        value: totalValue || 0,
+      }));
+    }
+    return history.slice(-30);
+  }, [history, totalValue]);
+
+  // CRUD
+  function addHolding(holding) {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    setData(prev => ({ ...prev, holdings: [...prev.holdings, { ...holding, id }] }));
+    setShowAddHolding(false);
+  }
+
+  function updateHolding(id, updates) {
+    setData(prev => ({
+      ...prev,
+      holdings: prev.holdings.map(h => h.id === id ? { ...h, ...updates } : h),
+    }));
+    setEditingId(null);
+  }
+
+  function deleteHolding(id) {
+    if (!confirm('この保有資産を削除しますか？')) return;
+    setData(prev => ({ ...prev, holdings: prev.holdings.filter(h => h.id !== id) }));
+  }
+
+  function addTransaction(tx) {
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const newTx = { ...tx, id, createdAt: new Date().toISOString() };
+    setData(prev => {
+      const newTxs = [...prev.transactions, newTx];
+      // Recalculate average price for the affected holding
+      const holdings = recalcHoldings(prev.holdings, newTxs, tx);
+      return { holdings, transactions: newTxs };
+    });
+    setShowAddTx(false);
+  }
+
+  function recalcHoldings(holdings, transactions, newTx) {
+    const existing = holdings.find(h => h.ticker === newTx.ticker && h.category === newTx.category);
+    if (newTx.type === 'buy') {
+      if (existing) {
+        const newQty = existing.quantity + newTx.quantity;
+        const newCost = (existing.quantity * existing.avgPrice + newTx.quantity * newTx.price);
+        const newAvg = newQty > 0 ? newCost / newQty : 0;
+        return holdings.map(h => h.id === existing.id ? { ...h, quantity: newQty, avgPrice: newAvg } : h);
+      } else {
+        const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        return [...holdings, {
+          id, ticker: newTx.ticker, name: newTx.name || newTx.ticker,
+          category: newTx.category, quantity: newTx.quantity,
+          avgPrice: newTx.price, currentPrice: newTx.price,
+        }];
+      }
+    } else { // sell
+      if (existing) {
+        const newQty = Math.max(0, existing.quantity - newTx.quantity);
+        if (newQty === 0) return holdings.filter(h => h.id !== existing.id);
+        return holdings.map(h => h.id === existing.id ? { ...h, quantity: newQty } : h);
+      }
+      return holdings;
+    }
+  }
+
+  function deleteTransaction(id) {
+    if (!confirm('この取引を削除しますか？')) return;
+    setData(prev => ({ ...prev, transactions: prev.transactions.filter(t => t.id !== id) }));
+  }
+
+  // Import/Export
+  function exportJSON() {
+    const blob = new Blob([JSON.stringify({ ...data, history }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `invest_backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
+  function importJSON(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        if (imported.holdings) setData({ holdings: imported.holdings, transactions: imported.transactions || [] });
+        if (imported.history) setHistory(imported.history);
+        alert('インポート完了');
+      } catch(err) { alert('JSONの解析に失敗しました: ' + err.message); }
+    };
+    reader.readAsText(file);
+  }
+
+  function importCSV(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const lines = ev.target.result.split('\n').filter(l => l.trim());
+        if (lines.length < 2) { alert('CSVデータが不足しています'); return; }
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const txs = [];
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(c => c.trim());
+          if (cols.length < 4) continue;
+          // Try to detect columns: date, ticker/pair, side(buy/sell), amount, price
+          const dateIdx = headers.findIndex(h => h.includes('date') || h.includes('日'));
+          const typeIdx = headers.findIndex(h => h.includes('type') || h.includes('種別') || h.includes('side'));
+          const amountIdx = headers.findIndex(h => h.includes('amount') || h.includes('数量') || h.includes('quantity'));
+          const priceIdx = headers.findIndex(h => h.includes('price') || h.includes('価格') || h.includes('rate'));
+          const tickerIdx = headers.findIndex(h => h.includes('ticker') || h.includes('通貨') || h.includes('pair') || h.includes('symbol'));
+
+          const tx = {
+            date: cols[dateIdx >= 0 ? dateIdx : 0] || new Date().toISOString().slice(0,10),
+            ticker: (cols[tickerIdx >= 0 ? tickerIdx : 1] || 'BTC').toUpperCase(),
+            type: (cols[typeIdx >= 0 ? typeIdx : 2] || 'buy').toLowerCase().includes('sell') ? 'sell' : 'buy',
+            quantity: parseFloat(cols[amountIdx >= 0 ? amountIdx : 3]) || 0,
+            price: parseFloat(cols[priceIdx >= 0 ? priceIdx : 4]) || 0,
+            category: 'crypto',
+            name: cols[tickerIdx >= 0 ? tickerIdx : 1] || 'BTC',
+          };
+          if (tx.quantity > 0 && tx.price > 0) txs.push(tx);
+        }
+        if (txs.length === 0) { alert('有効な取引データが見つかりませんでした'); return; }
+        // Process each transaction
+        let currentHoldings = [...data.holdings];
+        let currentTxs = [...data.transactions];
+        txs.forEach(tx => {
+          const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+          currentTxs.push({ ...tx, id, createdAt: new Date().toISOString() });
+          currentHoldings = recalcHoldings(currentHoldings, currentTxs, tx);
+        });
+        setData({ holdings: currentHoldings, transactions: currentTxs });
+        alert(`${txs.length}件の取引をインポートしました`);
+      } catch(err) { alert('CSVの解析に失敗しました: ' + err.message); }
+    };
+    reader.readAsText(file);
+  }
+
+  // Filter holdings by tab
+  const filteredHoldings = data.holdings.filter(h => h.category === activeTab);
+
+  return (
+    <div className="min-h-screen pb-8">
+      {/* Header */}
+      <header className="sticky top-0 z-50 backdrop-blur-lg" style={{ background: 'rgba(10,14,26,0.9)', borderBottom: '1px solid rgba(0,255,255,0.1)' }}>
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <a href="index.html" className="text-gray-500 hover:text-cyan-400 transition text-sm" title="ポータルに戻る">← PORTAL</a>
+            <h1 className="orbitron text-lg md:text-xl font-bold glow-text" style={{ color: '#00ffff' }}>INVEST DASHBOARD</h1>
+          </div>
+          <div className="flex items-center gap-2 text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            {lastUpdate && <span>更新: {lastUpdate}</span>}
+            <button onClick={fetchAllPrices} className="btn-primary px-2 py-1 text-xs">更新</button>
+          </div>
+        </div>
+        {/* Market Ticker */}
+        <div className="overflow-hidden" style={{ borderTop: '1px solid rgba(0,255,255,0.05)', height: 28 }}>
+          <div className="flex items-center gap-8 px-4 py-1 text-xs whitespace-nowrap market-ticker" style={{ width: 'max-content' }}>
+            {marketData.crypto?.BTC && <span>BTC {fmtJPY(marketData.crypto.BTC.price)} <span className={marketData.crypto.BTC.change24h >= 0 ? 'gain' : 'loss'}>{fmtPct(marketData.crypto.BTC.change24h)}</span></span>}
+            {marketData.crypto?.ETH && <span>ETH {fmtJPY(marketData.crypto.ETH.price)} <span className={marketData.crypto.ETH.change24h >= 0 ? 'gain' : 'loss'}>{fmtPct(marketData.crypto.ETH.change24h)}</span></span>}
+            {forexRates['USD/JPY'] && <span>USD/JPY {fmtNum(forexRates['USD/JPY'], 2)}</span>}
+            {forexRates['EUR/JPY'] && <span>EUR/JPY {fmtNum(forexRates['EUR/JPY'], 2)}</span>}
+            {/* Duplicate for seamless scroll */}
+            {marketData.crypto?.BTC && <span>BTC {fmtJPY(marketData.crypto.BTC.price)} <span className={marketData.crypto.BTC.change24h >= 0 ? 'gain' : 'loss'}>{fmtPct(marketData.crypto.BTC.change24h)}</span></span>}
+            {marketData.crypto?.ETH && <span>ETH {fmtJPY(marketData.crypto.ETH.price)} <span className={marketData.crypto.ETH.change24h >= 0 ? 'gain' : 'loss'}>{fmtPct(marketData.crypto.ETH.change24h)}</span></span>}
+            {forexRates['USD/JPY'] && <span>USD/JPY {fmtNum(forexRates['USD/JPY'], 2)}</span>}
+            {forexRates['EUR/JPY'] && <span>EUR/JPY {fmtNum(forexRates['EUR/JPY'], 2)}</span>}
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 mt-6">
+        {/* Navigation */}
+        <div className="flex gap-2 mb-6 text-sm">
+          {[['dashboard','ダッシュボード'],['transactions','取引履歴'],['settings','設定']].map(([v, label]) => (
+            <button key={v} onClick={() => setView(v)}
+              className={`px-4 py-2 rounded-lg border transition ${view === v ? 'tab-active' : 'border-gray-700 text-gray-400 hover:border-gray-500'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {view === 'dashboard' && (
+          <>
+            {/* Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="card p-5">
+                <div className="text-xs text-gray-500 mb-1">総資産評価額</div>
+                <div className="orbitron text-2xl font-bold glow-text" style={{ color: '#00ffff' }}>{fmtJPY(totalValue)}</div>
+              </div>
+              <div className="card p-5">
+                <div className="text-xs text-gray-500 mb-1">総投資額</div>
+                <div className="text-xl font-bold text-gray-300">{fmtJPY(totalCost)}</div>
+              </div>
+              <div className="card p-5">
+                <div className="text-xs text-gray-500 mb-1">損益</div>
+                <div className={`text-xl font-bold ${totalGainLoss >= 0 ? 'gain' : 'loss'}`}>
+                  {fmtJPY(totalGainLoss)} <span className="text-sm">({fmtPct(totalGainLossPct)})</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Charts */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="card p-5">
+                <h3 className="orbitron text-sm font-bold mb-3" style={{ color: 'rgba(0,255,255,0.7)' }}>資産配分</h3>
+                <div className="flex justify-center">
+                  {pieData.length > 0 ? <PieChart data={pieData} size={200} /> : (
+                    <div className="text-gray-600 text-sm py-16">資産を追加してください</div>
+                  )}
+                </div>
+              </div>
+              <div className="card p-5">
+                <h3 className="orbitron text-sm font-bold mb-3" style={{ color: 'rgba(0,255,255,0.7)' }}>資産推移 (30日)</h3>
+                <div className="flex justify-center">
+                  <LineChart data={lineData} width={380} height={180} />
+                </div>
+              </div>
+            </div>
+
+            {/* Category Tabs + Holdings Table */}
+            <div className="card p-5 mb-6">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <div className="flex gap-2">
+                  {CATEGORIES.map(cat => (
+                    <button key={cat.id} onClick={() => setActiveTab(cat.id)}
+                      className={`px-3 py-1.5 rounded-lg border text-sm transition ${activeTab === cat.id ? 'tab-active' : 'border-gray-700 text-gray-400 hover:border-gray-500'}`}>
+                      {cat.icon} {cat.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => { setShowAddHolding(true); setEditingId(null); }} className="btn-primary px-3 py-1.5 text-sm">+ 資産追加</button>
+                  <button onClick={() => setShowAddTx(true)} className="btn-primary px-3 py-1.5 text-sm">+ 取引追加</button>
+                </div>
+              </div>
+
+              {/* Holdings Table */}
+              {filteredHoldings.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-gray-500 border-b border-gray-800">
+                        <th className="text-left py-2 px-2">資産名</th>
+                        <th className="text-right py-2 px-2">数量</th>
+                        <th className="text-right py-2 px-2">平均取得</th>
+                        <th className="text-right py-2 px-2">現在価格</th>
+                        <th className="text-right py-2 px-2">評価額</th>
+                        <th className="text-right py-2 px-2">損益</th>
+                        <th className="text-right py-2 px-2">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredHoldings.map(h => {
+                        const curPrice = getCurrentPrice(h);
+                        const value = h.quantity * curPrice;
+                        const gl = value - h.quantity * h.avgPrice;
+                        const glPct = h.avgPrice > 0 ? ((curPrice - h.avgPrice) / h.avgPrice) * 100 : 0;
+                        return (
+                          <tr key={h.id} className="border-b border-gray-800/50 hover:bg-white/5">
+                            <td className="py-3 px-2">
+                              <div className="font-medium">{h.name || h.ticker}</div>
+                              <div className="text-xs text-gray-500">{h.ticker}</div>
+                            </td>
+                            <td className="text-right py-3 px-2">{fmtNum(h.quantity, 6)}</td>
+                            <td className="text-right py-3 px-2">{fmtJPY(h.avgPrice)}</td>
+                            <td className="text-right py-3 px-2">{fmtJPY(curPrice)}</td>
+                            <td className="text-right py-3 px-2 font-medium">{fmtJPY(value)}</td>
+                            <td className={`text-right py-3 px-2 ${gl >= 0 ? 'gain' : 'loss'}`}>
+                              <div>{fmtJPY(gl)}</div>
+                              <div className="text-xs">{fmtPct(glPct)}</div>
+                            </td>
+                            <td className="text-right py-3 px-2">
+                              <div className="flex gap-1 justify-end">
+                                <button onClick={() => setEditingId(h.id)} className="btn-primary px-2 py-1 text-xs">編集</button>
+                                <button onClick={() => deleteHolding(h.id)} className="btn-danger px-2 py-1 text-xs">削除</button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-12 text-gray-600">
+                  <div className="text-3xl mb-3">{CATEGORIES.find(c => c.id === activeTab)?.icon}</div>
+                  <p>{CATEGORIES.find(c => c.id === activeTab)?.label}の保有資産がありません</p>
+                  <p className="text-xs mt-1">「+ 資産追加」または「+ 取引追加」で追加してください</p>
+                </div>
+              )}
+            </div>
+
+            {/* Market Overview Widget */}
+            <div className="card p-5 mb-6">
+              <h3 className="orbitron text-sm font-bold mb-3" style={{ color: 'rgba(0,255,255,0.7)' }}>マーケット概況</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {marketData.crypto?.BTC && (
+                  <div className="p-3 rounded-lg" style={{ background: 'rgba(255,170,0,0.05)', border: '1px solid rgba(255,170,0,0.15)' }}>
+                    <div className="text-xs text-gray-500">Bitcoin</div>
+                    <div className="font-bold">{fmtJPY(marketData.crypto.BTC.price)}</div>
+                    <div className={`text-xs ${marketData.crypto.BTC.change24h >= 0 ? 'gain' : 'loss'}`}>{fmtPct(marketData.crypto.BTC.change24h)} (24h)</div>
+                  </div>
+                )}
+                {marketData.crypto?.ETH && (
+                  <div className="p-3 rounded-lg" style={{ background: 'rgba(100,100,255,0.05)', border: '1px solid rgba(100,100,255,0.15)' }}>
+                    <div className="text-xs text-gray-500">Ethereum</div>
+                    <div className="font-bold">{fmtJPY(marketData.crypto.ETH.price)}</div>
+                    <div className={`text-xs ${marketData.crypto.ETH.change24h >= 0 ? 'gain' : 'loss'}`}>{fmtPct(marketData.crypto.ETH.change24h)} (24h)</div>
+                  </div>
+                )}
+                {forexRates['USD/JPY'] && (
+                  <div className="p-3 rounded-lg" style={{ background: 'rgba(0,255,255,0.05)', border: '1px solid rgba(0,255,255,0.15)' }}>
+                    <div className="text-xs text-gray-500">USD/JPY</div>
+                    <div className="font-bold">{fmtNum(forexRates['USD/JPY'], 2)}</div>
+                    <div className="text-xs text-gray-500">為替レート</div>
+                  </div>
+                )}
+                {forexRates['EUR/JPY'] && (
+                  <div className="p-3 rounded-lg" style={{ background: 'rgba(0,255,136,0.05)', border: '1px solid rgba(0,255,136,0.15)' }}>
+                    <div className="text-xs text-gray-500">EUR/JPY</div>
+                    <div className="font-bold">{fmtNum(forexRates['EUR/JPY'], 2)}</div>
+                    <div className="text-xs text-gray-500">為替レート</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Next Steps */}
+            <div className="card p-5">
+              <h3 className="orbitron text-sm font-bold mb-3" style={{ color: 'rgba(0,255,255,0.7)' }}>次のステップ</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-400">
+                <div className="p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  <div className="font-medium text-gray-300 mb-1">Step 2: アラート機能</div>
+                  <p>目標価格到達時の通知、損切りライン設定、ポートフォリオリバランス提案</p>
+                </div>
+                <div className="p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  <div className="font-medium text-gray-300 mb-1">Step 3: 分析ツール</div>
+                  <p>リスク指標（シャープレシオ等）、相関分析、セクター別パフォーマンス</p>
+                </div>
+                <div className="p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  <div className="font-medium text-gray-300 mb-1">Step 4: 自動連携</div>
+                  <p>取引所API連携（coincheck, bitFlyer）、自動取引履歴取込</p>
+                </div>
+                <div className="p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  <div className="font-medium text-gray-300 mb-1">Step 5: 税務レポート</div>
+                  <p>確定申告用損益計算、総平均法/移動平均法選択、年間取引報告書</p>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {view === 'transactions' && (
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="orbitron text-sm font-bold" style={{ color: 'rgba(0,255,255,0.7)' }}>取引履歴</h3>
+              <button onClick={() => setShowAddTx(true)} className="btn-primary px-3 py-1.5 text-sm">+ 取引追加</button>
+            </div>
+            {data.transactions.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-gray-500 border-b border-gray-800">
+                      <th className="text-left py-2 px-2">日付</th>
+                      <th className="text-left py-2 px-2">種別</th>
+                      <th className="text-left py-2 px-2">資産</th>
+                      <th className="text-right py-2 px-2">数量</th>
+                      <th className="text-right py-2 px-2">価格</th>
+                      <th className="text-right py-2 px-2">合計</th>
+                      <th className="text-right py-2 px-2">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...data.transactions].reverse().map(tx => (
+                      <tr key={tx.id} className="border-b border-gray-800/50 hover:bg-white/5">
+                        <td className="py-2 px-2">{tx.date}</td>
+                        <td className="py-2 px-2">
+                          <span className={`px-2 py-0.5 rounded text-xs ${tx.type === 'buy' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+                            {tx.type === 'buy' ? '購入' : '売却'}
+                          </span>
+                        </td>
+                        <td className="py-2 px-2">{tx.name || tx.ticker}</td>
+                        <td className="text-right py-2 px-2">{fmtNum(tx.quantity, 6)}</td>
+                        <td className="text-right py-2 px-2">{fmtJPY(tx.price)}</td>
+                        <td className="text-right py-2 px-2 font-medium">{fmtJPY(tx.quantity * tx.price)}</td>
+                        <td className="text-right py-2 px-2">
+                          <button onClick={() => deleteTransaction(tx.id)} className="btn-danger px-2 py-1 text-xs">削除</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-600">
+                <p>取引履歴がありません</p>
+                <p className="text-xs mt-1">「+ 取引追加」で最初の取引を記録しましょう</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === 'settings' && (
+          <div className="card p-5">
+            <h3 className="orbitron text-sm font-bold mb-4" style={{ color: 'rgba(0,255,255,0.7)' }}>データ管理</h3>
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-3">
+                <button onClick={exportJSON} className="btn-primary px-4 py-2 text-sm">JSONエクスポート</button>
+                <label className="btn-primary px-4 py-2 text-sm cursor-pointer">
+                  JSONインポート
+                  <input type="file" accept=".json" onChange={importJSON} className="hidden" />
+                </label>
+                <label className="btn-primary px-4 py-2 text-sm cursor-pointer">
+                  CSVインポート
+                  <input type="file" accept=".csv" onChange={importCSV} className="hidden" />
+                </label>
+              </div>
+              <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                <h4 className="text-sm font-medium text-gray-300 mb-2">CSVフォーマット</h4>
+                <p className="text-xs text-gray-500 mb-2">coincheck等の取引履歴CSVに対応。以下のカラムを含むCSVを読み込めます:</p>
+                <code className="text-xs" style={{ color: 'rgba(0,255,255,0.6)' }}>date, ticker, type(buy/sell), quantity, price</code>
+              </div>
+              <div className="p-4 rounded-lg border border-red-900/30" style={{ background: 'rgba(255,60,60,0.03)' }}>
+                <h4 className="text-sm font-medium text-red-400 mb-2">データリセット</h4>
+                <p className="text-xs text-gray-500 mb-3">全データを削除します。この操作は元に戻せません。</p>
+                <button onClick={() => {
+                  if (!confirm('本当に全データを削除しますか？この操作は元に戻せません。')) return;
+                  setData({ holdings: [], transactions: [] });
+                  setHistory([]);
+                }} className="btn-danger px-4 py-2 text-sm">全データ削除</button>
+              </div>
+              <div className="p-4 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                <h4 className="text-sm font-medium text-gray-300 mb-2">データ統計</h4>
+                <div className="grid grid-cols-2 gap-2 text-xs text-gray-400">
+                  <div>保有資産数: {data.holdings.length}</div>
+                  <div>取引件数: {data.transactions.length}</div>
+                  <div>履歴日数: {history.length}</div>
+                  <div>カテゴリ数: {new Set(data.holdings.map(h => h.category)).size}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Add Holding Modal */}
+      {showAddHolding && <AddHoldingModal onAdd={addHolding} onClose={() => setShowAddHolding(false)} category={activeTab} />}
+
+      {/* Edit Holding Modal */}
+      {editingId && <EditHoldingModal holding={data.holdings.find(h => h.id === editingId)} onUpdate={updateHolding} onClose={() => setEditingId(null)} />}
+
+      {/* Add Transaction Modal */}
+      {showAddTx && <AddTransactionModal onAdd={addTransaction} onClose={() => setShowAddTx(false)} />}
+    </div>
+  );
+}
+
+// ==================== MODALS ====================
+function AddHoldingModal({ onAdd, onClose, category }) {
+  const [form, setForm] = useState({ ticker: '', name: '', quantity: '', avgPrice: '', currentPrice: '', category });
+  const update = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  function submit(e) {
+    e.preventDefault();
+    if (!form.ticker || !form.quantity || !form.avgPrice) { alert('必須項目を入力してください'); return; }
+    onAdd({
+      ticker: form.ticker.toUpperCase(),
+      name: form.name || form.ticker.toUpperCase(),
+      quantity: parseFloat(form.quantity),
+      avgPrice: parseFloat(form.avgPrice),
+      currentPrice: parseFloat(form.currentPrice) || parseFloat(form.avgPrice),
+      category: form.category,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
+      <form onSubmit={submit} onClick={e => e.stopPropagation()} className="card p-6 w-full max-w-md">
+        <h3 className="orbitron text-sm font-bold mb-4" style={{ color: '#00ffff' }}>資産追加</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">カテゴリ</label>
+            <select value={form.category} onChange={e => update('category', e.target.value)} className="w-full">
+              {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">ティッカー / シンボル *</label>
+            <input value={form.ticker} onChange={e => update('ticker', e.target.value)} placeholder="例: BTC, 7203, USD/JPY" className="w-full" required />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">表示名</label>
+            <input value={form.name} onChange={e => update('name', e.target.value)} placeholder="例: ビットコイン, トヨタ" className="w-full" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">数量 *</label>
+              <input type="number" step="any" value={form.quantity} onChange={e => update('quantity', e.target.value)} placeholder="0.5" className="w-full" required />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">平均取得価格 (JPY) *</label>
+              <input type="number" step="any" value={form.avgPrice} onChange={e => update('avgPrice', e.target.value)} placeholder="5000000" className="w-full" required />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">現在価格 (JPY) — 仮想通貨/為替は自動取得</label>
+            <input type="number" step="any" value={form.currentPrice} onChange={e => update('currentPrice', e.target.value)} placeholder="自動取得の場合は空欄" className="w-full" />
+          </div>
+        </div>
+        <div className="flex gap-2 mt-5 justify-end">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-400 border border-gray-700 rounded-lg hover:border-gray-500 transition">キャンセル</button>
+          <button type="submit" className="btn-primary px-4 py-2 text-sm">追加</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function EditHoldingModal({ holding, onUpdate, onClose }) {
+  const [form, setForm] = useState({
+    name: holding?.name || '',
+    quantity: holding?.quantity?.toString() || '',
+    avgPrice: holding?.avgPrice?.toString() || '',
+    currentPrice: holding?.currentPrice?.toString() || '',
+  });
+  if (!holding) return null;
+  const update = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  function submit(e) {
+    e.preventDefault();
+    onUpdate(holding.id, {
+      name: form.name || holding.ticker,
+      quantity: parseFloat(form.quantity) || 0,
+      avgPrice: parseFloat(form.avgPrice) || 0,
+      currentPrice: parseFloat(form.currentPrice) || 0,
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
+      <form onSubmit={submit} onClick={e => e.stopPropagation()} className="card p-6 w-full max-w-md">
+        <h3 className="orbitron text-sm font-bold mb-4" style={{ color: '#00ffff' }}>編集: {holding.ticker}</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">表示名</label>
+            <input value={form.name} onChange={e => update('name', e.target.value)} className="w-full" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">数量</label>
+              <input type="number" step="any" value={form.quantity} onChange={e => update('quantity', e.target.value)} className="w-full" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">平均取得価格</label>
+              <input type="number" step="any" value={form.avgPrice} onChange={e => update('avgPrice', e.target.value)} className="w-full" />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">現在価格 (手動設定)</label>
+            <input type="number" step="any" value={form.currentPrice} onChange={e => update('currentPrice', e.target.value)} className="w-full" />
+          </div>
+        </div>
+        <div className="flex gap-2 mt-5 justify-end">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-400 border border-gray-700 rounded-lg hover:border-gray-500 transition">キャンセル</button>
+          <button type="submit" className="btn-primary px-4 py-2 text-sm">更新</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function AddTransactionModal({ onAdd, onClose }) {
+  const [form, setForm] = useState({
+    date: new Date().toISOString().slice(0, 10),
+    ticker: '', name: '', category: 'crypto',
+    type: 'buy', quantity: '', price: '',
+  });
+  const update = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  function submit(e) {
+    e.preventDefault();
+    if (!form.ticker || !form.quantity || !form.price) { alert('必須項目を入力してください'); return; }
+    onAdd({
+      date: form.date,
+      ticker: form.ticker.toUpperCase(),
+      name: form.name || form.ticker.toUpperCase(),
+      category: form.category,
+      type: form.type,
+      quantity: parseFloat(form.quantity),
+      price: parseFloat(form.price),
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
+      <form onSubmit={submit} onClick={e => e.stopPropagation()} className="card p-6 w-full max-w-md">
+        <h3 className="orbitron text-sm font-bold mb-4" style={{ color: '#00ffff' }}>取引追加</h3>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">日付 *</label>
+              <input type="date" value={form.date} onChange={e => update('date', e.target.value)} className="w-full" required />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">種別 *</label>
+              <select value={form.type} onChange={e => update('type', e.target.value)} className="w-full">
+                <option value="buy">購入 (Buy)</option>
+                <option value="sell">売却 (Sell)</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">カテゴリ</label>
+              <select value={form.category} onChange={e => update('category', e.target.value)} className="w-full">
+                {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">ティッカー *</label>
+              <input value={form.ticker} onChange={e => update('ticker', e.target.value)} placeholder="BTC" className="w-full" required />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">表示名</label>
+            <input value={form.name} onChange={e => update('name', e.target.value)} placeholder="ビットコイン" className="w-full" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">数量 *</label>
+              <input type="number" step="any" value={form.quantity} onChange={e => update('quantity', e.target.value)} placeholder="0.1" className="w-full" required />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">価格 (JPY) *</label>
+              <input type="number" step="any" value={form.price} onChange={e => update('price', e.target.value)} placeholder="5000000" className="w-full" required />
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2 mt-5 justify-end">
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-400 border border-gray-700 rounded-lg hover:border-gray-500 transition">キャンセル</button>
+          <button type="submit" className="btn-primary px-4 py-2 text-sm">追加</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// ==================== RENDER ====================
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

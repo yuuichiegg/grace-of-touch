@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<title>GraceVox インストールガイド</title>
+<link rel="icon" type="image/svg+xml" href="img/gracevox-icon.svg">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box;}
+  :root{--bg:#0a0a0f;--surface:#12121a;--border:#1e1e2e;--text:#e8e8f0;--dim:#6b6b80;--accent:#6c5ce7;--cyan:#22d3ee;}
+  body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+
+  /* Header */
+  .header{text-align:center;padding:40px 20px 20px;position:relative;}
+  .header h1{font-size:28px;font-weight:900;letter-spacing:-0.5px;}
+  .header h1 span{background:linear-gradient(135deg,#6c5ce7,#22d3ee);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .header p{color:var(--dim);font-size:13px;margin-top:8px;line-height:1.6;}
+  .header .badge{display:inline-block;background:rgba(108,92,231,0.15);border:1px solid rgba(108,92,231,0.3);color:var(--accent);font-size:11px;padding:4px 14px;border-radius:20px;margin-top:12px;letter-spacing:0.05em;}
+
+  /* Slide container */
+  .slides{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:0;padding:20px 0;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .slides::-webkit-scrollbar{display:none;}
+
+  .slide{flex:0 0 85vw;max-width:380px;scroll-snap-align:center;margin:0 8px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px 20px;display:flex;flex-direction:column;gap:16px;position:relative;}
+  .slide:first-child{margin-left:max(8px,calc((100vw - 380px)/2));}
+  .slide:last-child{margin-right:max(8px,calc((100vw - 380px)/2));}
+
+  .step-num{position:absolute;top:-14px;left:20px;background:var(--accent);color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;box-shadow:0 2px 12px rgba(108,92,231,0.4);}
+
+  .slide-title{font-size:18px;font-weight:700;margin-top:8px;}
+
+  .slide-visual{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:20px;display:flex;align-items:center;justify-content:center;min-height:180px;position:relative;overflow:hidden;}
+
+  /* Phone mockup */
+  .phone{width:160px;height:280px;border:3px solid #444;border-radius:28px;background:#1a1a2e;position:relative;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.5);}
+  .phone .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:80px;height:22px;background:#000;border-radius:0 0 14px 14px;z-index:5;}
+  .phone .screen{padding:28px 8px 8px;height:100%;display:flex;flex-direction:column;gap:4px;font-size:7px;color:#aaa;}
+
+  /* Safari bar mockup */
+  .safari-bar{background:#2a2a3a;border-radius:8px;padding:4px 8px;font-size:6px;color:#888;text-align:center;display:flex;align-items:center;gap:4px;}
+  .safari-bar .lock{color:#2ecc71;font-size:7px;}
+
+  /* Share button highlight */
+  .share-icon{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border:2px solid var(--cyan);border-radius:8px;color:var(--cyan);font-size:16px;animation:pulse 2s ease infinite;}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(34,211,238,0.4);}50%{box-shadow:0 0 0 8px rgba(34,211,238,0);}}
+
+  /* Menu item mockup */
+  .menu-item{background:rgba(108,92,231,0.1);border:1px solid rgba(108,92,231,0.3);border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);}
+  .menu-item .icon{font-size:18px;}
+  .menu-item.highlight{background:rgba(108,92,231,0.2);border-color:var(--accent);box-shadow:0 0 12px rgba(108,92,231,0.2);}
+
+  /* Home screen mockup */
+  .home-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:4px;}
+  .app-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;}
+  .app-icon.gracevox{background:linear-gradient(135deg,#1a1035,#0d0d1a);border:1px solid rgba(108,92,231,0.5);box-shadow:0 0 8px rgba(108,92,231,0.3);}
+  .app-label{font-size:5px;text-align:center;color:#aaa;margin-top:1px;}
+
+  .slide-desc{font-size:13px;color:var(--dim);line-height:1.7;}
+  .slide-desc strong{color:var(--text);}
+  .slide-desc .key{display:inline-block;background:rgba(108,92,231,0.15);border:1px solid rgba(108,92,231,0.3);color:var(--accent);padding:1px 8px;border-radius:4px;font-size:12px;font-weight:700;}
+
+  /* Arrow hint */
+  .arrow-hint{position:absolute;top:50%;right:-6px;transform:translateY(-50%);color:var(--dim);font-size:24px;animation:slideRight 1.5s ease infinite;}
+  @keyframes slideRight{0%,100%{opacity:0.3;transform:translateY(-50%) translateX(0);}50%{opacity:0.8;transform:translateY(-50%) translateX(4px);}}
+
+  /* Dots */
+  .dots{display:flex;justify-content:center;gap:8px;padding:16px;}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:all 0.3s;}
+  .dot.active{background:var(--accent);width:24px;border-radius:4px;}
+
+  /* CTA */
+  .cta{text-align:center;padding:20px;margin:0 20px 40px;background:var(--surface);border:1px solid var(--border);border-radius:16px;}
+  .cta a{display:inline-block;background:linear-gradient(135deg,#6c5ce7,#22d3ee);color:#fff;text-decoration:none;padding:14px 32px;border-radius:12px;font-weight:700;font-size:15px;letter-spacing:0.05em;box-shadow:0 4px 16px rgba(108,92,231,0.3);transition:transform 0.2s;}
+  .cta a:active{transform:scale(0.96);}
+  .cta p{color:var(--dim);font-size:11px;margin-top:10px;line-height:1.5;}
+
+  /* Footer */
+  .footer{text-align:center;padding:20px;color:var(--dim);font-size:10px;border-top:1px solid var(--border);}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>GraceVox</span> を<br>ホーム画面に追加</h1>
+  <p>App Store不要。3ステップでアプリ化。<br>声だけで文字を生み出す、新しい体験。</p>
+  <div class="badge">無料 / アカウント不要 / すぐ使える</div>
+</div>
+
+<!-- Slides -->
+<div class="slides" id="slides">
+
+  <!-- Step 1 -->
+  <div class="slide">
+    <div class="step-num">1</div>
+    <div class="slide-title">Safariで開く</div>
+    <div class="slide-visual">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="safari-bar">
+            <span class="lock">&#128274;</span>
+            grace-of-touch.web.app
+          </div>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;">
+            <div style="font-size:20px;">&#127908;</div>
+            <div style="font-size:9px;font-weight:bold;color:#6c5ce7;">GraceVox</div>
+            <div style="font-size:6px;color:#666;">Voice Print Never Lies</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:4px 8px;background:#1a1a2a;border-radius:6px;">
+            <span style="font-size:10px;">&#9664;</span>
+            <span style="font-size:10px;">&#9654;</span>
+            <div class="share-icon" style="width:18px;height:18px;font-size:10px;border-width:1.5px;">&#9741;</div>
+            <span style="font-size:10px;">&#9744;</span>
+            <span style="font-size:10px;">&#9776;</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-desc">
+      iPhoneの <strong>Safari</strong> でGraceVoxを開きます。<br>
+      画面下の <span class="key">&#9741; 共有ボタン</span> をタップ。
+    </div>
+    <div class="arrow-hint">&#8250;</div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="slide">
+    <div class="step-num">2</div>
+    <div class="slide-title">ホーム画面に追加</div>
+    <div class="slide-visual">
+      <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
+        <div class="menu-item"><span class="icon">&#128279;</span>リンクをコピー</div>
+        <div class="menu-item"><span class="icon">&#128172;</span>メッセージ</div>
+        <div class="menu-item highlight"><span class="icon">&#10133;</span><strong>ホーム画面に追加</strong></div>
+        <div class="menu-item"><span class="icon">&#128278;</span>ブックマークに追加</div>
+      </div>
+    </div>
+    <div class="slide-desc">
+      共有メニューをスクロールして<br>
+      <span class="key">&#10133; ホーム画面に追加</span> を選択。
+    </div>
+    <div class="arrow-hint">&#8250;</div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="slide">
+    <div class="step-num">3</div>
+    <div class="slide-title">完了！</div>
+    <div class="slide-visual">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="screen" style="padding-top:32px;">
+          <div class="home-grid">
+            <div style="text-align:center;"><div class="app-icon" style="background:#2a2a3a;">&#128247;</div><div class="app-label">カメラ</div></div>
+            <div style="text-align:center;"><div class="app-icon" style="background:#2ecc71;">&#128222;</div><div class="app-label">電話</div></div>
+            <div style="text-align:center;"><div class="app-icon" style="background:#3498db;">&#9993;</div><div class="app-label">メール</div></div>
+            <div style="text-align:center;"><div class="app-icon" style="background:#e74c3c;">&#127911;</div><div class="app-label">ミュージック</div></div>
+            <div style="text-align:center;"><div class="app-icon" style="background:#f39c12;">&#9881;</div><div class="app-label">設定</div></div>
+            <div style="text-align:center;"><div class="app-icon" style="background:#9b59b6;">&#128247;</div><div class="app-label">写真</div></div>
+            <div style="text-align:center;">
+              <div class="app-icon gracevox" style="animation:pulse 2s ease infinite;">&#127908;</div>
+              <div class="app-label" style="color:#6c5ce7;font-weight:bold;">GraceVox</div>
+            </div>
+            <div style="text-align:center;"><div class="app-icon" style="background:#1abc9c;">&#128176;</div><div class="app-label">Safari</div></div>
+          </div>
+          <div style="flex:1;"></div>
+          <div style="text-align:center;font-size:7px;color:#6c5ce7;padding:4px;">&#10003; ホーム画面に追加されました</div>
+        </div>
+      </div>
+    </div>
+    <div class="slide-desc">
+      ホーム画面にGraceVoxのアイコンが出現。<br>
+      タップするだけで<strong>アプリのように起動</strong>。<br>
+      <span style="color:var(--cyan);font-size:11px;">&#9733; アドレスバーなしの全画面表示</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- Dots -->
+<div class="dots" id="dots">
+  <div class="dot active"></div>
+  <div class="dot"></div>
+  <div class="dot"></div>
+</div>
+
+<!-- CTA -->
+<div class="cta">
+  <a href="gracevox.html">GraceVox を開く &#127908;</a>
+  <p>Safari で開いて、共有 → ホーム画面に追加<br>
+  App Store不要・無料・アカウント登録なし</p>
+</div>
+
+<div class="footer">
+  &copy; 2024-2026 Grace of Touch Co.<br>
+  Voice Print Never Lies
+</div>
+
+<script>
+// Slide dot tracking
+const slides=document.getElementById('slides');
+const dots=document.querySelectorAll('.dot');
+slides.addEventListener('scroll',()=>{
+  const idx=Math.round(slides.scrollLeft/(slides.scrollWidth/3));
+  dots.forEach((d,i)=>d.classList.toggle('active',i===idx));
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>App Icons — Grace of Touch</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #0a0a0f;
+    color: #e0e0e8;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 60px;
+    padding: 40px 20px;
+  }
+
+  h1 {
+    font-size: 14px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: #666;
+    font-weight: 400;
+  }
+
+  .icons-row {
+    display: flex;
+    gap: 60px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  .icon-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .icon-wrap {
+    width: 192px;
+    height: 192px;
+    border-radius: 42px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: pointer;
+  }
+  .icon-wrap:hover {
+    transform: scale(1.05) translateY(-4px);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.6), 0 4px 12px rgba(0,0,0,0.4);
+  }
+
+  .icon-wrap svg { display: block; width: 100%; height: 100%; }
+
+  .icon-label {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    color: #aaa;
+  }
+
+  .icon-desc {
+    font-size: 11px;
+    color: #555;
+    max-width: 200px;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  .sizes-row {
+    display: flex;
+    gap: 24px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .size-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .size-item span {
+    font-size: 10px;
+    color: #444;
+    letter-spacing: 0.1em;
+  }
+  .size-item .mini-wrap {
+    border-radius: 22%;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+</style>
+</head>
+<body>
+
+<h1>Grace of Touch — App Icons</h1>
+
+<div class="icons-row">
+  <!-- GraceVox Icon -->
+  <div class="icon-card">
+    <div class="icon-wrap">
+      <svg id="gracevox-icon" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="gv-bg" cx="50%" cy="40%" r="70%">
+            <stop offset="0%" stop-color="#1a1035"/>
+            <stop offset="50%" stop-color="#0d0d1a"/>
+            <stop offset="100%" stop-color="#06060c"/>
+          </radialGradient>
+          <linearGradient id="gv-wave" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#6c5ce7"/>
+            <stop offset="30%" stop-color="#a855f7"/>
+            <stop offset="60%" stop-color="#22d3ee"/>
+            <stop offset="100%" stop-color="#06b6d4"/>
+          </linearGradient>
+          <linearGradient id="gv-fade" x1="0%" y1="100%" x2="0%" y2="0%">
+            <stop offset="0%" stop-color="#333345" stop-opacity="0.8"/>
+            <stop offset="40%" stop-color="#6c5ce7" stop-opacity="0.4"/>
+            <stop offset="100%" stop-color="#6c5ce7" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="gv-spec" x1="0%" y1="100%" x2="0%" y2="0%">
+            <stop offset="0%" stop-color="#1a0533" stop-opacity="0.8"/>
+            <stop offset="25%" stop-color="#6c5ce7" stop-opacity="0.6"/>
+            <stop offset="50%" stop-color="#22d3ee" stop-opacity="0.7"/>
+            <stop offset="100%" stop-color="#ffffff" stop-opacity="0.3"/>
+          </linearGradient>
+          <filter id="gv-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+            <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+          </filter>
+          <filter id="gv-soft" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6"/>
+          </filter>
+          <filter id="gv-key-dissolve" x="-10%" y="-10%" width="120%" height="120%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1"/>
+          </filter>
+        </defs>
+
+        <!-- Background -->
+        <rect width="192" height="192" fill="url(#gv-bg)"/>
+
+        <!-- Spectrogram columns (background texture) -->
+        <g opacity="0.3">
+          <rect x="10" y="30" width="3" height="100" rx="1.5" fill="url(#gv-spec)" opacity="0.4"/>
+          <rect x="16" y="45" width="3" height="70" rx="1.5" fill="url(#gv-spec)" opacity="0.6"/>
+          <rect x="22" y="28" width="3" height="105" rx="1.5" fill="url(#gv-spec)" opacity="0.5"/>
+          <rect x="28" y="40" width="3" height="80" rx="1.5" fill="url(#gv-spec)" opacity="0.7"/>
+          <rect x="34" y="35" width="3" height="90" rx="1.5" fill="url(#gv-spec)" opacity="0.45"/>
+          <rect x="155" y="38" width="3" height="85" rx="1.5" fill="url(#gv-spec)" opacity="0.5"/>
+          <rect x="161" y="32" width="3" height="95" rx="1.5" fill="url(#gv-spec)" opacity="0.4"/>
+          <rect x="167" y="42" width="3" height="75" rx="1.5" fill="url(#gv-spec)" opacity="0.55"/>
+          <rect x="173" y="48" width="3" height="65" rx="1.5" fill="url(#gv-spec)" opacity="0.35"/>
+        </g>
+
+        <!-- ═══ KEYBOARD KEYS (bottom) dissolving upward into voice waves ═══ -->
+        <!-- Row 3 (bottom, most solid): ZXCV... -->
+        <g opacity="0.55">
+          <rect x="28" y="158" width="14" height="12" rx="2.5" fill="none" stroke="#4a4a6a" stroke-width="1"/>
+          <rect x="46" y="158" width="14" height="12" rx="2.5" fill="none" stroke="#4a4a6a" stroke-width="1"/>
+          <rect x="64" y="158" width="14" height="12" rx="2.5" fill="none" stroke="#4a4a6a" stroke-width="1"/>
+          <rect x="82" y="158" width="28" height="12" rx="2.5" fill="none" stroke="#4a4a6a" stroke-width="1"/>
+          <rect x="114" y="158" width="14" height="12" rx="2.5" fill="none" stroke="#4a4a6a" stroke-width="1"/>
+          <rect x="132" y="158" width="14" height="12" rx="2.5" fill="none" stroke="#4a4a6a" stroke-width="1"/>
+          <rect x="150" y="158" width="14" height="12" rx="2.5" fill="none" stroke="#4a4a6a" stroke-width="1"/>
+        </g>
+        <!-- Row 2 (middle, fading): ASDF... -->
+        <g opacity="0.35">
+          <rect x="24" y="142" width="14" height="12" rx="2.5" fill="none" stroke="#5a5a7a" stroke-width="0.8"/>
+          <rect x="42" y="142" width="14" height="12" rx="2.5" fill="none" stroke="#5a5a7a" stroke-width="0.8"/>
+          <rect x="60" y="142" width="14" height="12" rx="2.5" fill="none" stroke="#5a5a7a" stroke-width="0.8"/>
+          <rect x="78" y="142" width="14" height="12" rx="2.5" fill="none" stroke="#5a5a7a" stroke-width="0.8"/>
+          <rect x="96" y="142" width="14" height="12" rx="2.5" fill="none" stroke="#5a5a7a" stroke-width="0.8"/>
+          <rect x="114" y="142" width="14" height="12" rx="2.5" fill="none" stroke="#5a5a7a" stroke-width="0.8"/>
+          <rect x="132" y="142" width="14" height="12" rx="2.5" fill="none" stroke="#5a5a7a" stroke-width="0.8"/>
+          <rect x="150" y="142" width="14" height="12" rx="2.5" fill="none" stroke="#5a5a7a" stroke-width="0.8"/>
+        </g>
+        <!-- Row 1 (top, dissolving): QWER... becoming particles -->
+        <g opacity="0.18" filter="url(#gv-key-dissolve)">
+          <rect x="20" y="126" width="13" height="11" rx="2.5" fill="none" stroke="#6c5ce7" stroke-width="0.7"/>
+          <rect x="37" y="126" width="13" height="11" rx="2.5" fill="none" stroke="#6c5ce7" stroke-width="0.7"/>
+          <rect x="54" y="125" width="13" height="11" rx="3" fill="none" stroke="#7c6cf7" stroke-width="0.6"/>
+          <rect x="71" y="124" width="13" height="11" rx="3.5" fill="none" stroke="#8c7cf7" stroke-width="0.5"/>
+          <rect x="88" y="122" width="13" height="11" rx="4" fill="none" stroke="#9c8cf7" stroke-width="0.4"/>
+          <rect x="105" y="121" width="13" height="10" rx="4.5" fill="none" stroke="#a78bfa" stroke-width="0.3"/>
+          <rect x="122" y="120" width="12" height="10" rx="5" fill="none" stroke="#a78bfa" stroke-width="0.25"/>
+          <rect x="139" y="119" width="11" height="9" rx="5" fill="none" stroke="#b79bfa" stroke-width="0.2"/>
+          <rect x="155" y="118" width="10" height="8" rx="5" fill="none" stroke="#c7abfa" stroke-width="0.15"/>
+        </g>
+
+        <!-- Particles rising from dissolving keys (transition zone) -->
+        <g opacity="0.4">
+          <circle cx="40" cy="118" r="1.5" fill="#6c5ce7"/>
+          <circle cx="58" cy="112" r="1.2" fill="#7c6cf7"/>
+          <circle cx="75" cy="108" r="1.8" fill="#a855f7"/>
+          <circle cx="92" cy="104" r="1.0" fill="#22d3ee"/>
+          <circle cx="110" cy="110" r="1.4" fill="#a78bfa"/>
+          <circle cx="128" cy="106" r="1.6" fill="#6c5ce7"/>
+          <circle cx="145" cy="114" r="1.1" fill="#22d3ee"/>
+          <circle cx="55" cy="105" r="0.8" fill="#ffffff" opacity="0.6"/>
+          <circle cx="100" cy="98" r="0.9" fill="#ffffff" opacity="0.5"/>
+          <circle cx="135" cy="100" r="1.0" fill="#a855f7" opacity="0.5"/>
+        </g>
+
+        <!-- ═══ VOICE WAVE (center hero — born from dissolved keyboard) ═══ -->
+        <!-- Outer glow -->
+        <path d="M 16,78 Q 36,48 58,78 Q 72,102 96,55 Q 118,20 136,78 Q 152,115 176,78"
+              fill="none" stroke="url(#gv-wave)" stroke-width="8" stroke-linecap="round"
+              filter="url(#gv-soft)" opacity="0.45"/>
+        <!-- Main wave -->
+        <path d="M 16,78 Q 36,46 58,78 Q 72,104 96,52 Q 118,16 136,78 Q 152,118 176,78"
+              fill="none" stroke="url(#gv-wave)" stroke-width="3.5" stroke-linecap="round"
+              filter="url(#gv-glow)"/>
+        <!-- Secondary wave -->
+        <path d="M 16,78 Q 34,58 56,78 Q 70,96 96,64 Q 120,36 138,78 Q 154,108 176,78"
+              fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-linecap="round" opacity="0.45"
+              filter="url(#gv-glow)"/>
+        <!-- Tertiary wave -->
+        <path d="M 16,78 Q 38,66 60,78 Q 76,88 96,70 Q 116,52 138,78 Q 155,96 176,78"
+              fill="none" stroke="#22d3ee" stroke-width="1" stroke-linecap="round" opacity="0.3"/>
+
+        <!-- Peak recording dot -->
+        <circle cx="96" cy="52" r="3.5" fill="#ffffff" opacity="0.9"/>
+        <circle cx="96" cy="52" r="6" fill="#a855f7" opacity="0.3"/>
+
+        <!-- Text appearing from voice (top area) — the output -->
+        <g opacity="0.22" font-family="'DM Sans', sans-serif" fill="#22d3ee">
+          <text x="30" y="28" font-size="7" letter-spacing="0.15em">あ い う</text>
+          <text x="96" y="20" font-size="8" letter-spacing="0.12em" text-anchor="middle" fill="#a78bfa">声 → 文字</text>
+          <text x="140" y="30" font-size="6" letter-spacing="0.15em" fill="#6c5ce7">A B C</text>
+        </g>
+
+        <!-- Bottom text -->
+        <text x="168" y="180" font-family="'DM Sans', sans-serif" font-size="10" font-weight="700"
+              fill="#6c5ce7" opacity="0.45" text-anchor="end" letter-spacing="0.06em">Vox</text>
+
+        <!-- Corner accents -->
+        <circle cx="16" cy="16" r="2" fill="#6c5ce7" opacity="0.25"/>
+        <circle cx="176" cy="16" r="2" fill="#22d3ee" opacity="0.25"/>
+      </svg>
+    </div>
+    <div class="icon-label">GraceVox</div>
+    <div class="icon-desc">Voice-to-Text with Voice Print Visualizer — "Voice Print Never Lies"</div>
+  </div>
+
+  <!-- TrackForge Icon -->
+  <div class="icon-card">
+    <div class="icon-wrap">
+      <svg id="trackforge-icon" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <!-- Background: dark forge with warm embers -->
+          <radialGradient id="tf-bg" cx="50%" cy="60%" r="65%">
+            <stop offset="0%" stop-color="#1a1008"/>
+            <stop offset="60%" stop-color="#0f0a04"/>
+            <stop offset="100%" stop-color="#080604"/>
+          </radialGradient>
+
+          <!-- Forge glow gradient -->
+          <radialGradient id="tf-ember" cx="50%" cy="70%" r="50%">
+            <stop offset="0%" stop-color="#ff8c00" stop-opacity="0.15"/>
+            <stop offset="100%" stop-color="#ff8c00" stop-opacity="0"/>
+          </radialGradient>
+
+          <!-- Track waveform gradient -->
+          <linearGradient id="tf-wave1" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#f59e0b"/>
+            <stop offset="50%" stop-color="#f97316"/>
+            <stop offset="100%" stop-color="#ef4444"/>
+          </linearGradient>
+
+          <linearGradient id="tf-wave2" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#fbbf24"/>
+            <stop offset="50%" stop-color="#f59e0b"/>
+            <stop offset="100%" stop-color="#d97706"/>
+          </linearGradient>
+
+          <linearGradient id="tf-wave3" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#fcd34d"/>
+            <stop offset="100%" stop-color="#fbbf24"/>
+          </linearGradient>
+
+          <linearGradient id="tf-anvil" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#9ca3af"/>
+            <stop offset="100%" stop-color="#4b5563"/>
+          </linearGradient>
+
+          <filter id="tf-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur"/>
+            <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+          </filter>
+
+          <filter id="tf-spark" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
+          </filter>
+        </defs>
+
+        <!-- Background -->
+        <rect width="192" height="192" fill="url(#tf-bg)"/>
+
+        <!-- Ember glow -->
+        <rect width="192" height="192" fill="url(#tf-ember)"/>
+
+        <!-- Track lanes (horizontal lines) -->
+        <g opacity="0.15">
+          <line x1="20" y1="42" x2="172" y2="42" stroke="#f59e0b" stroke-width="0.5"/>
+          <line x1="20" y1="72" x2="172" y2="72" stroke="#f59e0b" stroke-width="0.5"/>
+          <line x1="20" y1="102" x2="172" y2="102" stroke="#f59e0b" stroke-width="0.5"/>
+          <line x1="20" y1="132" x2="172" y2="132" stroke="#f59e0b" stroke-width="0.5"/>
+        </g>
+
+        <!-- Track 1: Bold main waveform (vocals/podcast) -->
+        <g filter="url(#tf-glow)">
+          <path d="M 20,42 l4,-8 l3,12 l4,-15 l3,18 l4,-10 l3,14 l4,-20 l3,22 l4,-12 l3,16 l4,-18 l3,20 l4,-8 l3,14 l4,-22 l3,24 l4,-14 l3,18 l4,-10 l3,12 l4,-16 l3,20 l4,-6 l3,10 l4,-14 l3,16 l4,-8 l3,12 l4,-18 l3,20 l4,-12 l3,14 l4,-10 l3,8 l4,-14 l3,16 l4,-6"
+                fill="none" stroke="url(#tf-wave1)" stroke-width="2.5" stroke-linecap="round"/>
+        </g>
+
+        <!-- Track 2: Mid waveform (guitar/instruments) -->
+        <g filter="url(#tf-glow)">
+          <path d="M 20,72 l5,-4 l4,6 l5,-8 l4,10 l5,-5 l4,8 l5,-12 l4,14 l5,-6 l4,10 l5,-8 l4,12 l5,-4 l4,8 l5,-14 l4,16 l5,-8 l4,10 l5,-6 l4,8 l5,-10 l4,12 l5,-4 l4,6 l5,-8 l4,10 l5,-6"
+                fill="none" stroke="url(#tf-wave2)" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+        </g>
+
+        <!-- Track 3: Light waveform (BGM/ambient) -->
+        <g>
+          <path d="M 20,102 l6,-3 l5,4 l6,-6 l5,7 l6,-4 l5,5 l6,-8 l5,9 l6,-5 l5,6 l6,-7 l5,8 l6,-3 l5,5 l6,-9 l5,10 l6,-5"
+                fill="none" stroke="url(#tf-wave3)" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+        </g>
+
+        <!-- Track 4: Percussion dots -->
+        <g opacity="0.5">
+          <circle cx="28" cy="132" r="2" fill="#f59e0b"/>
+          <circle cx="44" cy="132" r="3" fill="#f97316"/>
+          <circle cx="56" cy="132" r="1.5" fill="#fbbf24"/>
+          <circle cx="72" cy="132" r="3" fill="#f97316"/>
+          <circle cx="88" cy="132" r="2" fill="#f59e0b"/>
+          <circle cx="100" cy="132" r="3" fill="#f97316"/>
+          <circle cx="116" cy="132" r="1.5" fill="#fbbf24"/>
+          <circle cx="128" cy="132" r="3" fill="#f97316"/>
+          <circle cx="144" cy="132" r="2" fill="#f59e0b"/>
+          <circle cx="160" cy="132" r="3" fill="#f97316"/>
+        </g>
+
+        <!-- Anvil silhouette (forge symbol, centered bottom) -->
+        <g transform="translate(96, 162)" opacity="0.4">
+          <!-- Anvil body -->
+          <path d="M -16,0 L -12,-8 L -6,-8 L -6,-14 L 6,-14 L 6,-8 L 12,-8 L 16,0 Z"
+                fill="url(#tf-anvil)"/>
+          <!-- Anvil horn -->
+          <path d="M -6,-14 Q -14,-16 -18,-12" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round"/>
+          <!-- Hammer spark -->
+          <circle cx="0" cy="-18" r="2" fill="#fbbf24" filter="url(#tf-spark)"/>
+        </g>
+
+        <!-- Sparks (forge aesthetic) -->
+        <g filter="url(#tf-spark)">
+          <circle cx="82" cy="148" r="1.5" fill="#fcd34d" opacity="0.7"/>
+          <circle cx="110" cy="144" r="1" fill="#fbbf24" opacity="0.5"/>
+          <circle cx="75" cy="152" r="1" fill="#f59e0b" opacity="0.6"/>
+          <circle cx="118" cy="150" r="1.5" fill="#fcd34d" opacity="0.5"/>
+        </g>
+
+        <!-- Play button triangle (subtle, center) -->
+        <g transform="translate(96, 86)" opacity="0.12">
+          <polygon points="-8,-10 -8,10 10,0" fill="#f59e0b"/>
+        </g>
+
+        <!-- Text hint -->
+        <text x="174" y="178" font-family="'DM Sans', sans-serif" font-size="10" font-weight="700"
+              fill="#f59e0b" opacity="0.4" text-anchor="end" letter-spacing="0.08em">TF</text>
+
+        <!-- Corner ember dots -->
+        <circle cx="16" cy="16" r="1.5" fill="#f59e0b" opacity="0.3"/>
+        <circle cx="176" cy="16" r="1.5" fill="#d97706" opacity="0.25"/>
+      </svg>
+    </div>
+    <div class="icon-label">TrackForge</div>
+    <div class="icon-desc">Music Production / Podcast / DTM — Forge your sound, prove your craft</div>
+  </div>
+</div>
+
+<!-- Size variations -->
+<h1 style="margin-top: 20px;">Size Variations</h1>
+<div class="icons-row">
+  <div style="display:flex;flex-direction:column;gap:20px;align-items:center;">
+    <div class="icon-label" style="font-size:12px;">GraceVox</div>
+    <div class="sizes-row">
+      <div class="size-item">
+        <div class="mini-wrap" style="width:180px;height:180px;"><svg viewBox="0 0 192 192"><use href="#gracevox-icon"/></svg></div>
+        <span>180px</span>
+      </div>
+      <div class="size-item">
+        <div class="mini-wrap" style="width:120px;height:120px;"><svg viewBox="0 0 192 192"><use href="#gracevox-icon"/></svg></div>
+        <span>120px</span>
+      </div>
+      <div class="size-item">
+        <div class="mini-wrap" style="width:60px;height:60px;"><svg viewBox="0 0 192 192"><use href="#gracevox-icon"/></svg></div>
+        <span>60px</span>
+      </div>
+      <div class="size-item">
+        <div class="mini-wrap" style="width:40px;height:40px;"><svg viewBox="0 0 192 192"><use href="#gracevox-icon"/></svg></div>
+        <span>40px</span>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:20px;align-items:center;">
+    <div class="icon-label" style="font-size:12px;">TrackForge</div>
+    <div class="sizes-row">
+      <div class="size-item">
+        <div class="mini-wrap" style="width:180px;height:180px;"><svg viewBox="0 0 192 192"><use href="#trackforge-icon"/></svg></div>
+        <span>180px</span>
+      </div>
+      <div class="size-item">
+        <div class="mini-wrap" style="width:120px;height:120px;"><svg viewBox="0 0 192 192"><use href="#trackforge-icon"/></svg></div>
+        <span>120px</span>
+      </div>
+      <div class="size-item">
+        <div class="mini-wrap" style="width:60px;height:60px;"><svg viewBox="0 0 192 192"><use href="#trackforge-icon"/></svg></div>
+        <span>60px</span>
+      </div>
+      <div class="size-item">
+        <div class="mini-wrap" style="width:40px;height:40px;"><svg viewBox="0 0 192 192"><use href="#trackforge-icon"/></svg></div>
+        <span>40px</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

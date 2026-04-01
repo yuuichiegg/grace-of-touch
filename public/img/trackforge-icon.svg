@@ -1,0 +1,126 @@
+<svg id="trackforge-icon" viewBox="0 0 192 192" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <!-- Background: dark forge with warm embers -->
+          <radialGradient id="tf-bg" cx="50%" cy="60%" r="65%">
+            <stop offset="0%" stop-color="#1a1008"/>
+            <stop offset="60%" stop-color="#0f0a04"/>
+            <stop offset="100%" stop-color="#080604"/>
+          </radialGradient>
+
+          <!-- Forge glow gradient -->
+          <radialGradient id="tf-ember" cx="50%" cy="70%" r="50%">
+            <stop offset="0%" stop-color="#ff8c00" stop-opacity="0.15"/>
+            <stop offset="100%" stop-color="#ff8c00" stop-opacity="0"/>
+          </radialGradient>
+
+          <!-- Track waveform gradient -->
+          <linearGradient id="tf-wave1" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#f59e0b"/>
+            <stop offset="50%" stop-color="#f97316"/>
+            <stop offset="100%" stop-color="#ef4444"/>
+          </linearGradient>
+
+          <linearGradient id="tf-wave2" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#fbbf24"/>
+            <stop offset="50%" stop-color="#f59e0b"/>
+            <stop offset="100%" stop-color="#d97706"/>
+          </linearGradient>
+
+          <linearGradient id="tf-wave3" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#fcd34d"/>
+            <stop offset="100%" stop-color="#fbbf24"/>
+          </linearGradient>
+
+          <linearGradient id="tf-anvil" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#9ca3af"/>
+            <stop offset="100%" stop-color="#4b5563"/>
+          </linearGradient>
+
+          <filter id="tf-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur"/>
+            <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+          </filter>
+
+          <filter id="tf-spark" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2"/>
+          </filter>
+        </defs>
+
+        <!-- Background -->
+        <rect width="192" height="192" fill="url(#tf-bg)"/>
+
+        <!-- Ember glow -->
+        <rect width="192" height="192" fill="url(#tf-ember)"/>
+
+        <!-- Track lanes (horizontal lines) -->
+        <g opacity="0.15">
+          <line x1="20" y1="42" x2="172" y2="42" stroke="#f59e0b" stroke-width="0.5"/>
+          <line x1="20" y1="72" x2="172" y2="72" stroke="#f59e0b" stroke-width="0.5"/>
+          <line x1="20" y1="102" x2="172" y2="102" stroke="#f59e0b" stroke-width="0.5"/>
+          <line x1="20" y1="132" x2="172" y2="132" stroke="#f59e0b" stroke-width="0.5"/>
+        </g>
+
+        <!-- Track 1: Bold main waveform (vocals/podcast) -->
+        <g filter="url(#tf-glow)">
+          <path d="M 20,42 l4,-8 l3,12 l4,-15 l3,18 l4,-10 l3,14 l4,-20 l3,22 l4,-12 l3,16 l4,-18 l3,20 l4,-8 l3,14 l4,-22 l3,24 l4,-14 l3,18 l4,-10 l3,12 l4,-16 l3,20 l4,-6 l3,10 l4,-14 l3,16 l4,-8 l3,12 l4,-18 l3,20 l4,-12 l3,14 l4,-10 l3,8 l4,-14 l3,16 l4,-6"
+                fill="none" stroke="url(#tf-wave1)" stroke-width="2.5" stroke-linecap="round"/>
+        </g>
+
+        <!-- Track 2: Mid waveform (guitar/instruments) -->
+        <g filter="url(#tf-glow)">
+          <path d="M 20,72 l5,-4 l4,6 l5,-8 l4,10 l5,-5 l4,8 l5,-12 l4,14 l5,-6 l4,10 l5,-8 l4,12 l5,-4 l4,8 l5,-14 l4,16 l5,-8 l4,10 l5,-6 l4,8 l5,-10 l4,12 l5,-4 l4,6 l5,-8 l4,10 l5,-6"
+                fill="none" stroke="url(#tf-wave2)" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
+        </g>
+
+        <!-- Track 3: Light waveform (BGM/ambient) -->
+        <g>
+          <path d="M 20,102 l6,-3 l5,4 l6,-6 l5,7 l6,-4 l5,5 l6,-8 l5,9 l6,-5 l5,6 l6,-7 l5,8 l6,-3 l5,5 l6,-9 l5,10 l6,-5"
+                fill="none" stroke="url(#tf-wave3)" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+        </g>
+
+        <!-- Track 4: Percussion dots -->
+        <g opacity="0.5">
+          <circle cx="28" cy="132" r="2" fill="#f59e0b"/>
+          <circle cx="44" cy="132" r="3" fill="#f97316"/>
+          <circle cx="56" cy="132" r="1.5" fill="#fbbf24"/>
+          <circle cx="72" cy="132" r="3" fill="#f97316"/>
+          <circle cx="88" cy="132" r="2" fill="#f59e0b"/>
+          <circle cx="100" cy="132" r="3" fill="#f97316"/>
+          <circle cx="116" cy="132" r="1.5" fill="#fbbf24"/>
+          <circle cx="128" cy="132" r="3" fill="#f97316"/>
+          <circle cx="144" cy="132" r="2" fill="#f59e0b"/>
+          <circle cx="160" cy="132" r="3" fill="#f97316"/>
+        </g>
+
+        <!-- Anvil silhouette (forge symbol, centered bottom) -->
+        <g transform="translate(96, 162)" opacity="0.4">
+          <!-- Anvil body -->
+          <path d="M -16,0 L -12,-8 L -6,-8 L -6,-14 L 6,-14 L 6,-8 L 12,-8 L 16,0 Z"
+                fill="url(#tf-anvil)"/>
+          <!-- Anvil horn -->
+          <path d="M -6,-14 Q -14,-16 -18,-12" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round"/>
+          <!-- Hammer spark -->
+          <circle cx="0" cy="-18" r="2" fill="#fbbf24" filter="url(#tf-spark)"/>
+        </g>
+
+        <!-- Sparks (forge aesthetic) -->
+        <g filter="url(#tf-spark)">
+          <circle cx="82" cy="148" r="1.5" fill="#fcd34d" opacity="0.7"/>
+          <circle cx="110" cy="144" r="1" fill="#fbbf24" opacity="0.5"/>
+          <circle cx="75" cy="152" r="1" fill="#f59e0b" opacity="0.6"/>
+          <circle cx="118" cy="150" r="1.5" fill="#fcd34d" opacity="0.5"/>
+        </g>
+
+        <!-- Play button triangle (subtle, center) -->
+        <g transform="translate(96, 86)" opacity="0.12">
+          <polygon points="-8,-10 -8,10 10,0" fill="#f59e0b"/>
+        </g>
+
+        <!-- Text hint -->
+        <text x="174" y="178" font-family="'DM Sans', sans-serif" font-size="10" font-weight="700"
+              fill="#f59e0b" opacity="0.4" text-anchor="end" letter-spacing="0.08em">TF</text>
+
+        <!-- Corner ember dots -->
+        <circle cx="16" cy="16" r="1.5" fill="#f59e0b" opacity="0.3"/>
+        <circle cx="176" cy="16" r="1.5" fill="#d97706" opacity="0.25"/>
+      </svg>
