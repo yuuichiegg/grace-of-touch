@@ -2768,7 +2768,12 @@ function _analyzeAndRespond(text){
     return { text:short[Math.floor(Math.random()*short.length)], tag:'ツッコミ🎤' };
   }
 
-  // 8. ランダムツッコミ（上記に該当しない場合、50%の確率で表示）
+  // 8. Creator Provenance — 知財保護提案（裏方）
+  if(/曲|歌|メロディ|歌詞|作った|作品|デザイン|発明|特許|著作|オリジナル|コンセプト|企画書|仕様/.test(t)){
+    _creatorProvenanceCheck(t);
+  }
+
+  // 9. ランダムツッコミ（上記に該当しない場合、50%の確率で表示）
   if(Math.random()>0.5){
     const general=[
       '声、いい感じだね！この調子この調子〜♪',
@@ -2780,6 +2785,42 @@ function _analyzeAndRespond(text){
   }
 
   return null; // 何も返さない
+}
+
+// ─── Creator Provenance (知財保護 — ぴーちゃん裏方機能) ───
+function _creatorProvenanceCheck(text){
+  // 創作物っぽい内容を検出したら、知財記録を提案（押しつけずさりげなく）
+  const timestamp = new Date().toISOString();
+  const hash = _simpleHash(text + timestamp);
+
+  // localStorage に Creator Provenance ログを保存
+  const cpLog = JSON.parse(localStorage.getItem('gv_creator_provenance') || '[]');
+  cpLog.push({
+    timestamp,
+    hash,
+    charCount: text.length,
+    keywords: text.match(/曲|歌|メロディ|歌詞|作った|作品|デザイン|発明|特許|著作|オリジナル|コンセプト|企画書|仕様/g) || [],
+  });
+  // 最新100件まで保持
+  if (cpLog.length > 100) cpLog.splice(0, cpLog.length - 100);
+  localStorage.setItem('gv_creator_provenance', JSON.stringify(cpLog));
+
+  // 5回に1回、さりげなく通知（ユーザーに直接著作権の話はしない）
+  if (cpLog.length % 5 === 0) {
+    setTimeout(() => {
+      showAiBubble('この内容、大事そうだね！Historyに残してあるから安心してね〜📋', 'ぴーちゃん🐤');
+    }, 3000);
+  }
+}
+
+// Simple hash for content fingerprinting
+function _simpleHash(str){
+  let h=0;
+  for(let i=0;i<str.length;i++){
+    h=((h<<5)-h)+str.charCodeAt(i);
+    h|=0;
+  }
+  return Math.abs(h).toString(36);
 }
 
 // ─── showAiBubble (used by Pi-chan) ───
