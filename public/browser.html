@@ -249,7 +249,17 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   </div>
 </div>
 
-<!-- Voice overlay removed — voice input goes directly to URL bar -->
+<!-- Pi-chan: Grace of Touch汎用エージェント -->
+<div id="pichanMini" style="position:fixed;bottom:28px;right:12px;z-index:300;cursor:pointer;user-select:none;text-align:center;touch-action:none;" onclick="pichanBrowserTap()">
+  <div id="pichanBody" style="font-size:26px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.3));transition:transform .2s ease;">🐤</div>
+  <div id="pichanMood" style="font-size:8px;color:var(--text2);font-family:'Courier New',monospace;margin-top:-2px;">♪</div>
+</div>
+<div id="pichanBubble" style="display:none;position:fixed;bottom:62px;right:12px;z-index:301;
+  background:var(--surface2);border:1px solid var(--border);border-radius:12px 12px 4px 12px;
+  padding:8px 12px;max-width:220px;font-size:11px;color:var(--text);
+  box-shadow:0 4px 16px rgba(0,0,0,0.3);font-family:'Noto Sans JP',sans-serif;">
+  <span id="pichanBubbleText"></span>
+</div>
 
 <!-- Context Menu -->
 <div id="context-menu"></div>
@@ -986,6 +996,78 @@ updateClock();
 // Helpers
 function escapeHTML(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function escapeAttr(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+// ===== Pi-chan Browser Agent =====
+let _pichanBSkin = localStorage.getItem('gv_pichan_skin') || 'chick';
+let _pichanBTapCount = 0;
+let _pichanBBubbleTimer = null;
+
+// Sync skin with GraceVox
+(function(){
+  const body = document.getElementById('pichanBody');
+  if (!body) return;
+  const skins = { chick:'🐤', inko_red:'🦜', inko_blue:'🐦' };
+  body.textContent = skins[_pichanBSkin] || '🐤';
+  if (_pichanBSkin === 'inko_blue') {
+    body.style.filter = 'grayscale(1) sepia(1) hue-rotate(170deg) saturate(6) brightness(1.05) drop-shadow(0 2px 6px rgba(0,150,255,0.4))';
+  }
+})();
+
+function pichanBrowserTap() {
+  _pichanBTapCount++;
+  const body = document.getElementById('pichanBody');
+  if (body) { body.style.transform='scale(1.3) rotate(-8deg)'; setTimeout(()=>body.style.transform='',300); }
+
+  const tips = [
+    '🎵 MUSIC STUDIOからTrackForgeを開いてみて！',
+    '🎤 検索窓の横のマイクで音声入力できるよ',
+    'GraceVoxで録音した声紋、ライブラリに保存されてるよ',
+    'Recordsで楽曲を聴いてみて！オリジナル25曲あるよ',
+    '🛰️ Terminalに戻ると全アプリにアクセスできるよ',
+    'ぼくはGrace of Touchの案内役だよ〜♪',
+    'Grace Engineで3Dモデルも作れるよ！',
+    '知財登録はCreator Provenanceで管理してるよ📜',
+  ];
+  const msg = tips[Math.floor(Math.random() * tips.length)];
+  showPichanBubble(msg);
+}
+
+function showPichanBubble(text) {
+  const bubble = document.getElementById('pichanBubble');
+  const textEl = document.getElementById('pichanBubbleText');
+  if (!bubble || !textEl) return;
+  textEl.textContent = text;
+  bubble.style.display = 'block';
+  if (_pichanBBubbleTimer) clearTimeout(_pichanBBubbleTimer);
+  _pichanBBubbleTimer = setTimeout(() => { bubble.style.display='none'; }, 4000);
+}
+
+// Pi-chan drag
+(function(){
+  const el = document.getElementById('pichanMini');
+  if (!el) return;
+  let _dragging=false, _moved=false, _sx=0, _sy=0, _sr=0, _sb=0;
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); _dragging=false; _moved=false;
+    _sx=e.clientX; _sy=e.clientY;
+    _sr=parseInt(el.style.right)||12; _sb=parseInt(el.style.bottom)||28;
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove', (e) => {
+    const dx=e.clientX-_sx, dy=e.clientY-_sy;
+    if(Math.abs(dx)>5||Math.abs(dy)>5){
+      _moved=true; _dragging=true;
+      el.style.right=Math.max(0,_sr-dx)+'px';
+      el.style.bottom=Math.max(0,_sb-dy)+'px';
+      el.style.transition='none';
+    }
+  });
+  el.addEventListener('pointerup', (e) => {
+    el.releasePointerCapture(e.pointerId);
+    el.style.transition='';
+    if(_dragging){ _dragging=false; showPichanBubble('ここに置いてくれるの？ありがとう！'); }
+  });
+})();
 
 // ===== Init =====
 createTab();
