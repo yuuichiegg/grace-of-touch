@@ -7,6 +7,28 @@
         ".read": true,
         ".write": true
       }
+    },
+    "presence": {
+      ".read": true,
+      "$page": {
+        "$uid": {
+          ".write": true
+        }
+      }
+    },
+    "stats": {
+      ".read": true,
+      "$page": {
+        "$type": {
+          "$key": {
+            ".write": true
+          }
+        }
+      }
+    },
+    "rooms": {
+      ".read": true,
+      ".write": true
     }
   }
 }
