@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover"/>
+<title>Resonance Drum — Grace of Touch</title>
+<!-- © 2024-2026 Grace of Touch Co. -->
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#020510;font-family:'Courier New',monospace;touch-action:none;color:#e0e8f0}
+#cc{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1}
+#hud{position:fixed;top:12px;left:16px;z-index:100;font-size:clamp(9px,1.8vw,12px);color:#00d8ff;pointer-events:none;text-shadow:0 0 8px rgba(0,216,255,.4)}
+#hud .label{color:#5a7a8a;font-size:clamp(8px,1.5vw,10px)}
+#ui{position:fixed;bottom:0;left:0;width:100%;z-index:100;
+  background:rgba(2,5,16,.92);backdrop-filter:blur(12px);
+  border-top:1px solid rgba(0,216,255,.15);
+  padding:12px 16px max(16px,calc(env(safe-area-inset-bottom)+8px));
+  display:flex;flex-direction:column;gap:10px;user-select:none}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.title{font-size:clamp(11px,2vw,14px);font-weight:700;color:#00d8ff;letter-spacing:1px}
+.btn{padding:8px 18px;border-radius:6px;border:1px solid rgba(0,216,255,.3);
+  background:rgba(0,216,255,.08);color:#00d8ff;font-size:clamp(10px,1.8vw,12px);
+  font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;-webkit-tap-highlight-color:transparent}
+.btn:active,.btn.on{background:rgba(0,216,255,.25);border-color:#00d8ff;box-shadow:0 0 12px rgba(0,216,255,.3)}
+.btn.stop{color:#ff4466;border-color:rgba(255,68,102,.3);background:rgba(255,68,102,.08)}
+.btn.stop:active,.btn.stop.on{background:rgba(255,68,102,.25);border-color:#ff4466}
+.slider-group{display:flex;align-items:center;gap:8px;flex:1;min-width:120px}
+.slider-label{font-size:clamp(8px,1.5vw,10px);color:#5a7a8a;white-space:nowrap;text-transform:uppercase;letter-spacing:1px}
+.speed-val{color:#00d8ff;font-weight:bold;min-width:28px;text-align:right;font-size:clamp(10px,1.8vw,12px)}
+input[type=range]{flex:1;accent-color:#00d8ff;height:3px;background:#1a2a3a;border-radius:2px;cursor:pointer}
+select{background:#0a1520;color:#00d8ff;border:1px solid rgba(0,216,255,.2);border-radius:4px;padding:4px 8px;font-size:clamp(9px,1.6vw,11px);font-family:inherit;cursor:pointer;outline:none}
+.opts{display:flex;gap:14px;flex-wrap:wrap}
+.opts label{display:flex;align-items:center;gap:5px;font-size:clamp(9px,1.6vw,11px);cursor:pointer;color:#7a8a9a}
+.opts label input{width:13px;height:13px;accent-color:#00d8ff}
+.back-link{position:fixed;top:12px;right:16px;z-index:100;color:#5a7a8a;font-size:clamp(10px,1.8vw,12px);text-decoration:none;padding:6px 12px;border:1px solid rgba(0,216,255,.15);border-radius:4px;background:rgba(2,5,16,.8);transition:all .2s}
+.back-link:hover{color:#00d8ff;border-color:#00d8ff}
+</style>
+</head>
+<body>
+<canvas id="cc"></canvas>
+
+<div id="hud">
+  <div class="label">GRACE OF TOUCH</div>
+  <div>RESONANCE DRUM STAND</div>
+  <div id="hud-status" style="margin-top:6px"><span class="label">STATUS:</span> IDLE</div>
+  <div id="hud-tone" style="margin-top:2px"><span class="label">TONE:</span> —</div>
+</div>
+
+<a href="tower.html" class="back-link">← TOWER</a>
+
+<div id="ui">
+  <div class="row">
+    <div class="title">RESONANCE DRUM</div>
+    <div style="display:flex;gap:8px;margin-left:auto">
+      <button id="spinBtn" class="btn" onclick="toggleSpin()">▶ PLAY</button>
+    </div>
+  </div>
+  <div class="row">
+    <div class="slider-group">
+      <span class="slider-label">Speed</span>
+      <input type="range" min="0.2" max="4.0" step="0.1" value="1.2" oninput="setSpeed(this.value)"/>
+      <span class="speed-val" id="spv">1.2</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span class="slider-label">Size</span>
+      <select id="sizeSel" onchange="changeSize(this.value)">
+        <option value="S">Small (22x13cm)</option>
+        <option value="L">Large (25x18cm)</option>
+      </select>
+    </div>
+    <div class="opts">
+      <label><input type="checkbox" id="sndChk" checked onchange="toggleSound()"/> Sound</label>
+      <label><input type="checkbox" id="cutChk" onchange="updateView()"/> X-Ray</label>
+      <label><input type="checkbox" id="printChk" onchange="togglePrintMode()"/> Print</label>
+      <button id="dlBtn" class="btn" style="display:none;padding:4px 10px;font-size:10px" onclick="exportCurrentPlateSTL()">STL</button>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from 'three';
+
+// ══════════════════════════════
+// AUDIO ENGINE (Web Audio API)
+// ══════════════════════════════
+const AC = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+const NOTE_FREQS = [196.00, 220.00, 246.94, 293.66, 329.63, 392.00, 440.00, 493.88];
+const NOTE_NAMES = ['G3','A3','B3','D4','E4','G4','A4','B4'];
+let lastTongueIdx = -1;
+
+function initAudio(){
+  if(!audioCtx){ audioCtx = new AC(); audioCtx.resume(); }
+}
+
+function playTongueNote(idx){
+  if(!audioCtx) return;
+  const freq = NOTE_FREQS[idx % 8];
+  const t = audioCtx.currentTime;
+  // Metallic sine + harmonic overtone
+  const osc1 = audioCtx.createOscillator();
+  osc1.type = 'sine'; osc1.frequency.setValueAtTime(freq, t);
+  const osc2 = audioCtx.createOscillator();
+  osc2.type = 'sine'; osc2.frequency.setValueAtTime(freq * 2.76, t); // Inharmonic overtone
+  const g1 = audioCtx.createGain();
+  g1.gain.setValueAtTime(0, t);
+  g1.gain.linearRampToValueAtTime(0.6, t + 0.005);
+  g1.gain.exponentialRampToValueAtTime(0.01, t + 2.5);
+  const g2 = audioCtx.createGain();
+  g2.gain.setValueAtTime(0, t);
+  g2.gain.linearRampToValueAtTime(0.15, t + 0.003);
+  g2.gain.exponentialRampToValueAtTime(0.01, t + 1.2);
+  osc1.connect(g1); g1.connect(audioCtx.destination);
+  osc2.connect(g2); g2.connect(audioCtx.destination);
+  osc1.start(t); osc1.stop(t + 2.5);
+  osc2.start(t); osc2.stop(t + 1.2);
+  // Update HUD
+  document.getElementById('hud-tone').innerHTML = `<span class="label">TONE:</span> ${NOTE_NAMES[idx%8]} (${freq.toFixed(1)}Hz)`;
+}
+
+// ══════════════════════════════
+// RENDERER & SCENE
+// ══════════════════════════════
+const canvas = document.getElementById('cc');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false, powerPreference:'default'});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setClearColor(0x020510, 1.0);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x020510);
+scene.fog = new THREE.FogExp2(0x020510, 0.0012);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 1, 5000);
+
+// Lighting — cyber theme
+scene.add(new THREE.AmbientLight(0x1a2a4a, 0.8));
+const sun = new THREE.DirectionalLight(0xeef4ff, 0.9);
+sun.position.set(100,200,100); sun.castShadow=true; sun.shadow.mapSize.set(1024,1024); scene.add(sun);
+const rim = new THREE.DirectionalLight(0x00d8ff, 0.4);
+rim.position.set(-80,60,-100); scene.add(rim);
+scene.add(new THREE.HemisphereLight(0x0a1a3a, 0x020510, 0.5));
+
+// Grid — terminal style
+const grid = new THREE.GridHelper(900, 90, 0x0a2a3a, 0x061520);
+grid.position.y = -20; scene.add(grid);
+
+// ══════════════════════════════
+// MATERIALS
+// ══════════════════════════════
+const AM = [];
+function M(hex, op=1.0){
+  const m = new THREE.MeshStandardMaterial({color:new THREE.Color(hex),roughness:0.4,metalness:0.1,transparent:op<1,opacity:op,side:THREE.DoubleSide,clippingPlanes:[],clipShadows:true});
+  AM.push({m,baseOp:op}); return m;
+}
+function Mm(hex,r=0.25,mt=0.78){
+  const m = new THREE.MeshStandardMaterial({color:new THREE.Color(hex),roughness:r,metalness:mt,side:THREE.DoubleSide});
+  AM.push({m,baseOp:1.0}); return m;
+}
+function GlowM(hex){
+  return new THREE.MeshBasicMaterial({color:new THREE.Color(hex),transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending});
+}
+
+function add(geo,mat,grp,x=0,y=0,z=0,rx=0,ry=0,rz=0){
+  const m=new THREE.Mesh(geo,mat);
+  m.position.set(x,y,z);m.rotation.set(rx,ry,rz);
+  m.castShadow=true;m.receiveShadow=true;grp.add(m);return m;
+}
+
+// ══════════════════════════════
+// TONGUE CUT GEOMETRY
+// ══════════════════════════════
+function createUTongue(grp,x,y,z,rotY){
+  const tG=new THREE.Group();
+  tG.position.set(x,y,z);tG.rotation.y=rotY;tG.rotation.z=0.2;grp.add(tG);
+  const mT=Mm(0xcbd5e1,0.4,0.2);
+  add(new THREE.BoxGeometry(1.5,2,20),mT,tG,-6,0,0);
+  add(new THREE.BoxGeometry(1.5,2,20),mT,tG,6,0,0);
+  const arc=add(new THREE.TorusGeometry(6,0.75,4,16,Math.PI),mT,tG,0,0,-10);
+  arc.rotation.x=Math.PI/2;arc.scale.z=2;
+}
+
+// ══════════════════════════════
+// MODEL CONSTRUCTION
+// ══════════════════════════════
+const SIZES = { S:{dR:110,dH:130}, L:{dR:125,dH:180} };
+let currentPreset = "S";
+
+const root = new THREE.Group(); root.position.y = -20; scene.add(root);
+let baseG, rotG, hndG, grG, drumGrp;
+
+const mG=M(0x00d8ff);const mDG=M(0x006688);const mFr=Mm(0x1a2a3a,0.5,0.4);
+const mMt=Mm(0x7a8a9a);const mDkMt=Mm(0x2a3a4a);const mGold=Mm(0x00d8ff,0.2,0.92);
+const mHorn=M(0x00eebb);const mWood=M(0x4a3020);const mDrum=M(0xf1f5f9,0.95);
+const mTng=Mm(0x00a8d8,0.35,0.65);const mJoint=M(0xff4466);const mBasin=Mm(0x0a1520,0.6,0.2);
+
+function buildModel(){
+  if(baseG)root.remove(baseG); if(rotG)root.remove(rotG); if(hndG)root.remove(hndG); if(grG)root.remove(grG);
+  baseG=new THREE.Group();root.add(baseG);
+  rotG=new THREE.Group();root.add(rotG);
+  hndG=new THREE.Group();root.add(hndG);
+  grG=new THREE.Group();root.add(grG);
+
+  const{dR,dH}=SIZES[currentPreset];
+  const oR=100+(dR-110);
+  const gearBoxY=60, footHeight=4;
+  const hubR=32, legW=12, legDist=oR-10;
+
+  // Hub
+  const hubGrp=new THREE.Group();hubGrp.position.set(0,gearBoxY,0);baseG.add(hubGrp);
+  const hubH=40;
+  const hTopPts=[new THREE.Vector2(9.5,-2),new THREE.Vector2(hubR,-2),new THREE.Vector2(hubR,2),new THREE.Vector2(9.5,2)];
+  add(new THREE.LatheGeometry(hTopPts,16),mDkMt,hubGrp,0,hubH/2-2);
+  add(new THREE.CylinderGeometry(hubR,hubR,4,16),mDkMt,hubGrp,0,-(hubH/2-2));
+  const pH=hubH-8;
+  for(let i=0;i<3;i++){
+    const a=((i+0.5)/3)*Math.PI*2;
+    const px=Math.cos(a)*(hubR-6),pz=Math.sin(a)*(hubR-6);
+    if(i===0){const gap=12,h2=(pH-gap)/2;add(new THREE.CylinderGeometry(4,4,h2,8),mDkMt,hubGrp,px,gap/2+h2/2,pz);add(new THREE.CylinderGeometry(4,4,h2,8),mDkMt,hubGrp,px,-(gap/2+h2/2),pz);}
+    else{add(new THREE.CylinderGeometry(4,4,pH,8),mDkMt,hubGrp,px,0,pz);}
+  }
+  const hubTubePts=[new THREE.Vector2(9.5,-(hubH-8)/2),new THREE.Vector2(14,-(hubH-8)/2),new THREE.Vector2(14,(hubH-8)/2),new THREE.Vector2(9.5,(hubH-8)/2)];
+  add(new THREE.LatheGeometry(hubTubePts,16),mDkMt,hubGrp);
+
+  // Legs with ball joint mounts
+  const legOffset=0.1;
+  const legH=(gearBoxY-footHeight)/(0.5-legOffset);
+  for(let i=0;i<3;i++){
+    const a=(i/3)*Math.PI*2;
+    const lGrp=new THREE.Group();baseG.add(lGrp);
+    const innerR=hubR-8,armLen=legDist-innerR;
+    add(new THREE.BoxGeometry(armLen,10,10),mFr,lGrp,Math.cos(a)*(innerR+armLen/2),gearBoxY,Math.sin(a)*(innerR+armLen/2),0,-a,0);
+    add(new THREE.BoxGeometry(6,6,6),mJoint,lGrp,Math.cos(a)*(hubR+2),gearBoxY,Math.sin(a)*(hubR+2),0,-a,0);
+    add(new THREE.BoxGeometry(legW,legH,legW),mFr,lGrp,Math.cos(a)*legDist,gearBoxY+legH*legOffset,Math.sin(a)*legDist,0,-a,0);
+    add(new THREE.CylinderGeometry(12,12,footHeight,16),mG,lGrp,Math.cos(a)*legDist,footHeight/2,Math.sin(a)*legDist);
+    const mountY=gearBoxY+legH*legOffset+legH/2;
+    const mx=Math.cos(a)*legDist,mz=Math.sin(a)*legDist;
+    add(new THREE.CylinderGeometry(8,8,4,6),mGold,lGrp,mx,mountY+2,mz,0,-a,0);
+    add(new THREE.CylinderGeometry(3,3,12,8),mMt,lGrp,mx,mountY+6,mz);
+    add(new THREE.CylinderGeometry(10,8,6,16),mMt,lGrp,mx,mountY+12,mz);
+    const ballY=mountY+18;
+    add(new THREE.SphereGeometry(6,32,32),Mm(0x8aaacc,0.4,0.9),lGrp,mx,ballY,mz);
+    const sockPts=[];
+    sockPts.push(new THREE.Vector2(0,12),new THREE.Vector2(8,11),new THREE.Vector2(16,13),new THREE.Vector2(20,14),new THREE.Vector2(20,-3),new THREE.Vector2(7,-3));
+    for(let j=0;j<=10;j++){const y=-3+(9*j/10);sockPts.push(new THREE.Vector2(Math.sqrt(6.5*6.5-y*y),y));}
+    sockPts.push(new THREE.Vector2(0,6));
+    add(new THREE.LatheGeometry(sockPts,32),mG,lGrp,mx,ballY,mz);
+  }
+
+  // Drum body
+  const socketPeakY=gearBoxY+legH*legOffset+legH/2+18+14;
+  const drumContactAngle=Math.asin(Math.min(legDist/dR,1));
+  const drumY=socketPeakY+(dH*0.385)*Math.cos(drumContactAngle);
+  drumGrp=new THREE.Group();baseG.add(drumGrp);
+  const mProp=Mm(0x00aa88,0.35,0.65); // Cyber teal metallic
+  const topPts=[],botPts=[],steps=24;
+  for(let i=0;i<=steps;i++){const t=i/steps,ang=t*Math.PI*0.5;topPts.push(new THREE.Vector2(dR*Math.sin(ang),(dH*0.485)*Math.cos(ang)));}
+  for(let i=0;i<=steps;i++){const t=i/steps,hR=20,startAng=Math.asin(hR/dR),curAng=startAng+t*((Math.PI*0.5)-startAng);botPts.push(new THREE.Vector2(dR*Math.sin(curAng),-(dH*0.385)*Math.cos(curAng)));}
+  add(new THREE.LatheGeometry(topPts,64),mProp,drumGrp,0,drumY,0);
+  add(new THREE.LatheGeometry(botPts,64),mProp,drumGrp,0,drumY,0);
+  const rimG=add(new THREE.TorusGeometry(dR,2,8,64),mDkMt,drumGrp,0,drumY,0);rimG.rotation.x=Math.PI/2;
+  // Tongues
+  for(let i=0;i<8;i++){
+    const ang=(i/8)*Math.PI*2,rPos=dR*0.55,hPos=(dH*0.485)*Math.sqrt(1-(rPos/dR)**2);
+    createUTongue(drumGrp,Math.cos(ang)*rPos,drumY+hPos,Math.sin(ang)*rPos,-ang-Math.PI/2);
+  }
+
+  // Vertical shaft
+  const shaftTopY=socketPeakY-5;
+  const shaftH=shaftTopY-gearBoxY;
+  const vShaftGrp=new THREE.Group();rotG.add(vShaftGrp);
+  vShaftGrp.position.set(0,gearBoxY+shaftH/2,0);
+  add(new THREE.CylinderGeometry(8,8,shaftH-12,24),mMt,vShaftGrp);
+  add(new THREE.CylinderGeometry(7,7,6,6),mMt,vShaftGrp,0,(shaftH-12)/2+3,0);
+  add(new THREE.CylinderGeometry(7,7,6,6),mMt,vShaftGrp,0,-(shaftH-12)/2-3,0);
+
+  // Coupler
+  add(new THREE.CylinderGeometry(18,18,6,24),mGold,rotG,0,shaftTopY-6);
+
+  // Arm + horn
+  const armY=gearBoxY+shaftH*0.6,armLen=38;
+  const elbow=add(new THREE.CylinderGeometry(12,12,16,24),mDkMt,rotG,0,armY);elbow.rotation.x=Math.PI/2;
+  add(new THREE.CylinderGeometry(12,12,armLen,24,1,true),mDkMt,rotG,armLen/2,armY,0,0,0,Math.PI/2);
+  add(new THREE.BoxGeometry(20,10,14),mDkMt,rotG,-15,armY);
+  const hGrp=new THREE.Group();hGrp.position.set(armLen,armY,0);hGrp.rotation.z=-Math.PI/2;rotG.add(hGrp);
+  const hPts=[new THREE.Vector2(8,0),new THREE.Vector2(10,8),new THREE.Vector2(16,25),new THREE.Vector2(14,25),new THREE.Vector2(8,8),new THREE.Vector2(6,0)];
+  add(new THREE.LatheGeometry(hPts,32),mHorn,hGrp);
+  initSoundWaves(hGrp);
+
+  // Bearing + handle system
+  const hDist=oR+25;
+  const bearingTubePts=[new THREE.Vector2(6,-8),new THREE.Vector2(15,-8),new THREE.Vector2(15,8),new THREE.Vector2(6,8)];
+  add(new THREE.LatheGeometry(bearingTubePts,16),mMt,baseG,hDist,gearBoxY,0,0,0,Math.PI/2);
+  add(new THREE.CylinderGeometry(12,12,footHeight,16),mG,baseG,hDist,footHeight/2,0);
+  const bearingLegH=gearBoxY-footHeight;
+  add(new THREE.BoxGeometry(16,bearingLegH,16),mFr,baseG,hDist,footHeight+bearingLegH/2,0);
+  const barStart=38,barLen=hDist-barStart;
+  add(new THREE.BoxGeometry(barLen/2,12,12),mFr,baseG,barStart+barLen/4,gearBoxY);
+  add(new THREE.BoxGeometry(barLen/2,12,12),mFr,baseG,barStart+barLen*3/4,gearBoxY);
+  const rib=add(new THREE.CylinderGeometry(10,3,20,4),mFr,baseG,hDist-20,gearBoxY-15,0);
+  rib.rotation.z=Math.PI/4;
+
+  // Gears
+  const dGear=new THREE.Group();dGear.position.set(0,gearBoxY,0);rotG.add(dGear);
+  add(new THREE.CylinderGeometry(14,14,5,24),mGold,dGear);
+  add(new THREE.CylinderGeometry(14.2,14.2,5.2,6),mDkMt,dGear);
+  const gearX=24;
+  const dnGear=new THREE.Group();dnGear.position.set(gearX,0,0);grG.position.set(0,gearBoxY,0);grG.add(dnGear);
+  add(new THREE.CylinderGeometry(10,10,5,24),mGold,dnGear,0,0,0,0,0,Math.PI/2);
+  add(new THREE.CylinderGeometry(10.2,10.2,5.2,6),mDkMt,dnGear,0,0,0,0,0,Math.PI/2);
+  add(new THREE.CylinderGeometry(5,5,hDist-gearX,6),mMt,grG,(gearX+hDist)/2,0,0,0,0,Math.PI/2);
+
+  // Handle
+  hndG.position.set(hDist,gearBoxY,0);
+  add(new THREE.CylinderGeometry(6,6,50,16),mMt,hndG,5,0,0,0,0,Math.PI/2);
+  add(new THREE.CylinderGeometry(8,8,6,16),mDkMt,hndG,14.5,0,0,0,0,Math.PI/2);
+  add(new THREE.BoxGeometry(8,28,10),mFr,hndG,19.5,12,0);
+  add(new THREE.CylinderGeometry(5,5,34,16),mWood,hndG,40.5,24,0,0,0,Math.PI/2);
+  add(new THREE.CylinderGeometry(4,4,10,6),mGold,hndG,19.5,0,0,0,0,Math.PI/2);
+  add(new THREE.SphereGeometry(7,16,16),M(0x4a2010),hndG,57.5,24,0);
+}
+
+// ══════════════════════════════
+// SOUND WAVES (Visual)
+// ══════════════════════════════
+let soundWaves=[];
+function initSoundWaves(grp){
+  soundWaves=[];
+  for(let i=0;i<4;i++){
+    const g=new THREE.TorusGeometry(8+i*2,0.6,6,24);
+    const m=GlowM(0x00d8ff);
+    const ms=new THREE.Mesh(g,m);
+    ms.position.set(0,35,0);ms.rotation.x=Math.PI/2;ms.visible=false;grp.add(ms);
+    soundWaves.push({mesh:ms,mat:m,offset:i/4});
+  }
+}
+
+// Print parts tracking
+let printParts = [];
+
+buildModel();
+
+// Build plate (180x180mm A1 mini)
+const plateSize=180;
+const pGeo=new THREE.PlaneGeometry(plateSize,plateSize);
+const pMat=new THREE.MeshBasicMaterial({color:0x00d8ff,transparent:true,opacity:0.1,side:THREE.DoubleSide});
+const buildPlate=new THREE.Mesh(pGeo,pMat);
+buildPlate.rotation.x=-Math.PI/2;buildPlate.position.y=0.5;buildPlate.visible=false;scene.add(buildPlate);
+const pFrame=new THREE.BoxHelper(new THREE.Mesh(new THREE.BoxGeometry(plateSize,2,plateSize)),0x00d8ff);
+pFrame.position.y=1;pFrame.visible=false;scene.add(pFrame);
+
+// STL Exporter
+function exportSTL(meshes,filename){
+  const H=80,TC=4,TS=50;let triCount=0;
+  meshes.forEach(mesh=>{if(!mesh.visible)return;const g=mesh.geometry;if(g.index)triCount+=g.index.count/3;else triCount+=g.attributes.position.count/3;});
+  const buf=new ArrayBuffer(H+TC+triCount*TS),v=new DataView(buf);v.setUint32(H,triCount,true);let o=H+TC;
+  const v1=new THREE.Vector3(),v2=new THREE.Vector3(),v3=new THREE.Vector3();
+  meshes.forEach(mesh=>{if(!mesh.visible)return;const g=mesh.geometry;mesh.updateMatrixWorld();const mx=mesh.matrixWorld;const pos=g.attributes.position;const idx=g.index;const cnt=idx?idx.count:pos.count;
+  for(let i=0;i<cnt;i+=3){const i1=idx?idx.getX(i):i,i2=idx?idx.getX(i+1):i+1,i3=idx?idx.getX(i+2):i+2;
+  v1.fromBufferAttribute(pos,i1).applyMatrix4(mx);v2.fromBufferAttribute(pos,i2).applyMatrix4(mx);v3.fromBufferAttribute(pos,i3).applyMatrix4(mx);
+  const cb=new THREE.Vector3().subVectors(v2,v1),ab=new THREE.Vector3().subVectors(v3,v1);cb.cross(ab).normalize();
+  [cb.x,cb.y,cb.z,v1.x,v1.y,v1.z,v2.x,v2.y,v2.z,v3.x,v3.y,v3.z].forEach(val=>{v.setFloat32(o,val,true);o+=4;});o+=4;v.setUint16(o,0,true);o+=2;}});
+  const blob=new Blob([buf],{type:'application/octet-stream'}),link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=filename;link.click();
+}
+
+// ══════════════════════════════
+// CONTROLS
+// ══════════════════════════════
+let spinning=false, speed=1.2, angle=0, soundOn=true, sndT=0;
+const CLIP=new THREE.Plane(new THREE.Vector3(0,0,1),10);
+const hudStatus=document.getElementById('hud-status');
+
+window.toggleSpin=()=>{
+  initAudio(); // iOS unlock on user gesture
+  spinning=!spinning;
+  const b=document.getElementById('spinBtn');
+  b.textContent=spinning?'■ STOP':'▶ PLAY';
+  b.classList.toggle('on',spinning);
+  b.classList.toggle('stop',spinning);
+  hudStatus.innerHTML=`<span class="label">STATUS:</span> ${spinning?'SPINNING':'IDLE'}`;
+};
+window.setSpeed=v=>{speed=parseFloat(v);document.getElementById('spv').textContent=speed.toFixed(1);};
+window.toggleSound=()=>{soundOn=document.getElementById('sndChk').checked;};
+window.changeSize=preset=>{currentPreset=preset;buildModel();if(window.updateView)window.updateView();};
+let printMode=false;
+window.updateView=()=>{
+  const cut=document.getElementById('cutChk').checked;
+  renderer.localClippingEnabled=cut;
+  CLIP.constant=0;CLIP.normal.set(0,0,-1);
+  AM.forEach(({m,baseOp})=>{m.clippingPlanes=cut?[CLIP]:[];m.transparent=cut||baseOp<1;m.opacity=cut?0.25:baseOp;m.needsUpdate=true;});
+};
+window.togglePrintMode=()=>{
+  printMode=document.getElementById('printChk').checked;
+  const btn=document.getElementById('spinBtn');
+  const dl=document.getElementById('dlBtn');
+  if(printMode){
+    document.getElementById('cutChk').checked=false;updateView();
+    spinning=false;btn.classList.remove('on','stop');btn.textContent='▶ PLAY';btn.disabled=true;
+    dl.style.display='inline-block';
+    buildPlate.visible=true;pFrame.visible=true;
+    if(drumGrp)drumGrp.visible=false;
+    rotG.rotation.set(0,0,0);hndG.rotation.set(0,0,0);grG.rotation.set(0,0,0);
+    hudStatus.innerHTML='<span class="label">STATUS:</span> PRINT MODE (180x180mm)';
+  }else{
+    btn.disabled=false;dl.style.display='none';
+    buildPlate.visible=false;pFrame.visible=false;
+    if(drumGrp)drumGrp.visible=true;
+    hudStatus.innerHTML='<span class="label">STATUS:</span> IDLE';angle=0;
+  }
+};
+window.exportCurrentPlateSTL=()=>{
+  const meshes=[];
+  root.traverse(child=>{if(child.isMesh&&child.visible)meshes.push(child);});
+  exportSTL(meshes,'ResonanceDrum_Stand.stl');
+};
+
+// Camera — spherical with damping
+const sph={theta:0.5,phi:1.1,r:450},tgt=new THREE.Vector3(0,50,0);
+function applyCam(){camera.position.set(tgt.x+sph.r*Math.sin(sph.phi)*Math.sin(sph.theta),tgt.y+sph.r*Math.cos(sph.phi),tgt.z+sph.r*Math.sin(sph.phi)*Math.cos(sph.theta));camera.lookAt(tgt);}
+let drag=false,rDrag=false,px=0,py=0;
+canvas.addEventListener('pointerdown',e=>{drag=true;rDrag=e.button===2;px=e.clientX;py=e.clientY;});
+window.addEventListener('pointerup',()=>drag=false);
+window.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-px,dy=e.clientY-py;px=e.clientX;py=e.clientY;if(rDrag){tgt.y+=dy*.2;}else{sph.theta-=dx*.005;sph.phi=Math.max(.1,Math.min(Math.PI/1.5,sph.phi+dy*.005));}applyCam();});
+canvas.addEventListener('wheel',e=>{sph.r=Math.max(100,Math.min(1000,sph.r+e.deltaY*.5));applyCam();},{passive:true});
+let p0=0;
+canvas.addEventListener('touchstart',e=>{e.preventDefault();if(e.touches.length===1){px=e.touches[0].clientX;py=e.touches[0].clientY;}else{const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;p0=Math.sqrt(dx*dx+dy*dy);}},{passive:false});
+canvas.addEventListener('touchmove',e=>{e.preventDefault();if(e.touches.length===1){const dx=e.touches[0].clientX-px,dy=e.touches[0].clientY-py;px=e.touches[0].clientX;py=e.touches[0].clientY;sph.theta-=dx*.005;sph.phi=Math.max(.1,Math.min(Math.PI/1.5,sph.phi+dy*.005));applyCam();}else{const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY,d=Math.sqrt(dx*dx+dy*dy);sph.r=Math.max(100,Math.min(1000,sph.r-(d-p0)));p0=d;applyCam();}},{passive:false});
+applyCam();
+
+// ══════════════════════════════
+// ANIMATION LOOP
+// ══════════════════════════════
+let dSph={theta:sph.theta,phi:sph.phi,r:sph.r};
+let last=performance.now();
+const tongueInterval=1.0; // Trigger note every N seconds based on speed
+let tongueTimer=0;
+
+(function loop(){
+  requestAnimationFrame(loop);
+  const now=performance.now(),dt=Math.min((now-last)/1000,.05);last=now;
+
+  // Camera damping
+  const damp=0.15;
+  dSph.theta+=(sph.theta-dSph.theta)*damp;
+  dSph.phi+=(sph.phi-dSph.phi)*damp;
+  dSph.r+=(sph.r-dSph.r)*damp;
+  camera.position.set(tgt.x+dSph.r*Math.sin(dSph.phi)*Math.sin(dSph.theta),tgt.y+dSph.r*Math.cos(dSph.phi),tgt.z+dSph.r*Math.sin(dSph.phi)*Math.cos(dSph.theta));
+  camera.lookAt(tgt);
+
+  if(spinning){
+    angle+=dt*speed*Math.PI*2;
+    if(rotG)rotG.rotation.y=angle*(10/14);
+    if(hndG)hndG.rotation.x=-angle;
+    if(grG)grG.rotation.x=-angle;
+
+    // Trigger tongue notes based on rotation
+    if(soundOn && audioCtx){
+      const tongueAngle=(angle%(Math.PI*2))/(Math.PI*2)*8;
+      const currentIdx=Math.floor(tongueAngle)%8;
+      if(currentIdx!==lastTongueIdx){
+        lastTongueIdx=currentIdx;
+        playTongueNote(currentIdx);
+      }
+    }
+
+    // Visual sound waves
+    if(soundOn){
+      sndT+=dt*speed*2.0;
+      soundWaves.forEach(w=>{const ph=(sndT+w.offset)%1.5;if(ph<1){w.mesh.visible=true;w.mesh.scale.setScalar(0.5+ph*1.8);w.mat.opacity=(1-ph)*0.7;}else{w.mesh.visible=false;}});
+    }
+  }else{
+    soundWaves.forEach(w=>w.mesh.visible=false);
+    lastTongueIdx=-1;
+  }
+  renderer.render(scene,camera);
+})();
+
+window.addEventListener('resize',()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
+
+// DevTools抑止
+document.addEventListener('contextmenu',e=>e.preventDefault());
+</script>
+</body>
+</html>
