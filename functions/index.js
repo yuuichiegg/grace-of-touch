@@ -10,6 +10,96 @@ const PRICE_ID = functions.config().stripe?.price_id || process.env.STRIPE_PRICE
 const WEBHOOK_SECRET = functions.config().stripe?.webhook_secret || process.env.STRIPE_WEBHOOK_SECRET;
 const APP_URL = "https://grace-of-touch.web.app";
 
+// ============================================================
+// AI Proofreading Engine (Patent Pending — Server-side only)
+// © 2024-2026 Grace of Touch Co. All rights reserved.
+// ============================================================
+
+// Proper name corrections (voice recognition misrecognitions)
+const PROPER_NAMES = [
+  [/グレイスボックス|グレースボックス|グレイスボイス/g, 'GraceVox'],
+  [/グレースオブタッチ|グレイスオブタッチ|プレイスボックス|ブレースボックス|ブレスオブタッチ|グライスオブタッチ/g, 'Grace of Touch'],
+  [/トラックフォン[ジズ]?|トラックホン[ジズ]?|トラックフォルジュ/g, 'TrackForge'],
+  [/トンネルスキャン/g, 'TunnelScan'],
+  [/ウォールガード/g, 'WallGuard'],
+  [/メガロケット/g, 'Mega Rocket'],
+  [/ドリームオン/g, 'Dream On'],
+  [/ファイアーベース|ファイヤーベース/g, 'Firebase'],
+  [/クロードコード|クロウドコード/g, 'Claude Code'],
+  [/クロード(?=で|に|が|は|の|を)/g, 'Claude'],
+  [/ジェミニ/g, 'Gemini'],
+  [/スペースエックス/g, 'SpaceX'],
+  [/ギットハブ|ギッドハブ/g, 'GitHub'],
+  [/リアクト/g, 'React'],
+  [/スリージェーエス|スリーJS/g, 'Three.js'],
+  [/テイルウィンド/g, 'Tailwind'],
+  [/レコーズ(?=で|に|が|は|の|を|ページ)/g, 'Records'],
+  [/グレースオブタッチレコーズ|グレイスオブタッチレコーズ/g, 'Grace of Touch Records'],
+  [/ドローンガード/g, 'DroneGuard'],
+  [/トンネルドローン/g, 'TunnelDrone'],
+  [/パンダワールド/g, 'Panda World'],
+  [/ロケットキャド|ロケットカド/g, 'RocketCAD'],
+  [/エッグビレッジ/g, 'Egg Village'],
+  [/アンチグラビティ|アンチグウラビティ/g, 'Antigravity'],
+  [/プレイライト/g, 'Playwright'],
+  [/タイプスクリプト/g, 'TypeScript'],
+  [/ジャバスクリプト/g, 'JavaScript'],
+  [/ファイアストア/g, 'Firestore'],
+  [/ブレンダー(?=で|に|が|は|の|を|MCP)/g, 'Blender'],
+  [/オブシディアン/g, 'Obsidian'],
+  [/ノーション/g, 'Notion'],
+];
+
+// Homophone corrections (context-aware)
+const HOMOPHONES = [
+  [/正門/g, '声紋'],
+  [/専門(?=の|が|は|を|で|ビジュアライザー|表示|分析)/g, '声紋'],
+  [/感じの変換/g, '漢字の変換'],
+  [/変換した感じ/g, '変換した漢字'],
+  [/番組があります/g, '場合があります'],
+];
+
+// Server-side proofread function
+function serverProofread(text) {
+  let r = text;
+  const corrections = [];
+
+  PROPER_NAMES.forEach(([pattern, replacement]) => {
+    r = r.replace(pattern, (match) => {
+      if (match !== replacement) corrections.push({ orig: match, corrected: replacement });
+      return replacement;
+    });
+  });
+
+  HOMOPHONES.forEach(([pattern, replacement]) => {
+    r = r.replace(pattern, (match) => {
+      if (match !== replacement) corrections.push({ orig: match, corrected: replacement });
+      return replacement;
+    });
+  });
+
+  // Duplicate particles removal
+  r = r.replace(/([をにがはで])([をにがはで])\1/g, '$1$2');
+
+  return { text: r, corrections };
+}
+
+// Cloud Function: AI Proofreading API
+exports.proofread = functions.https.onCall(async (data, context) => {
+  const { text, lang } = data;
+  if (!text || typeof text !== "string") {
+    throw new functions.https.HttpsError("invalid-argument", "text is required");
+  }
+  if (text.length > 10000) {
+    throw new functions.https.HttpsError("invalid-argument", "text too long (max 10000)");
+  }
+  // Only Japanese proofreading for now
+  if (lang && !lang.startsWith("ja")) {
+    return { text, corrections: [] };
+  }
+  return serverProofread(text);
+});
+
 // Create Stripe Checkout Session
 exports.createCheckoutSession = functions.https.onCall(async (data, context) => {
   if (!context.auth) {

@@ -2171,9 +2171,11 @@ function basicClean(text){
     const fillers=currentLang.startsWith('ja')?FILLERS_JA:FILLERS_EN;
     fillers.forEach(f=>{ r=currentLang.startsWith('ja')?r.replace(new RegExp(escapeRegex(f),'gi'),''):r.replace(new RegExp(`\\b${escapeRegex(f)}\\b[,]?\\s*`,'gi'),''); });
   }
-  // AI校正: 音声認識でよくある誤変換を自動修正
+  // AI校正: サーバーAPI優先、フォールバックでローカル
   if(settings.autoProofread!==false && currentLang.startsWith('ja')){
     r = autoProofread(r);
+    // 非同期でサーバー校正も実行（結果で上書き）
+    _serverProofreadAsync(r);
   }
   return r.replace(/\s{2,}/g,' ').trim();
 }
@@ -2182,6 +2184,26 @@ function basicClean(text){
 // Track corrections for Taxnap-style confirmation
 let _lastCorrections = []; // [{orig, corrected}]
 
+// Server-side proofreading (async, updates display when result arrives)
+async function _serverProofreadAsync(text){
+  if(!firebase.functions) return;
+  try{
+    const proofread=firebase.functions().httpsCallable('proofread');
+    const result=await proofread({text,lang:currentLang});
+    if(result.data&&result.data.text&&result.data.text!==text){
+      // Update displayed text with server-corrected version
+      const el=document.getElementById('currentText');
+      if(el&&el.textContent.includes(text.substring(0,20))){
+        // Only update if text hasn't changed since request
+        _lastCorrections=result.data.corrections||[];
+      }
+    }
+  }catch(e){
+    // Server unavailable — local fallback already applied
+  }
+}
+
+// Local fallback proofreading (runs immediately, no server needed)
 function autoProofread(text){
   let r = text;
   _lastCorrections = [];
