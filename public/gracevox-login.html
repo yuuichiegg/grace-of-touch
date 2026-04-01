@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GraceVox Login</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:-apple-system,BlinkMacSystemFont,sans-serif; background:#0a0a0f; color:#e0e0e8; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .card { background:#12121a; border:1px solid #1e1e2e; border-radius:16px; padding:32px; max-width:400px; width:100%; text-align:center; }
+  h1 { font-size:20px; margin-bottom:8px; } h1 span { color:#6c5ce7; }
+  p { font-size:13px; color:#6b6b80; margin-bottom:24px; line-height:1.6; }
+  .btn { display:block; width:100%; padding:14px; border:none; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; margin-bottom:12px; }
+  .btn-google { background:#fff; color:#333; }
+  .btn-back { background:transparent; border:1px solid #1e1e2e; color:#6b6b80; font-size:13px; }
+  .status { margin-top:16px; font-size:13px; color:#2ecc71; display:none; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Grace<span>Vox</span> Login</h1>
+  <p>Googleアカウントでログインすると<br>PWAに自動的に反映されます</p>
+  <button class="btn btn-google" onclick="doLogin()">Googleでログイン</button>
+  <button class="btn btn-back" onclick="window.close()">閉じる</button>
+  <div class="status" id="status"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script>
+firebase.initializeApp({apiKey:"AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",authDomain:"grace-of-touch.firebaseapp.com",projectId:"grace-of-touch"});
+
+async function doLogin(){
+  try{
+    const provider=new firebase.auth.GoogleAuthProvider();
+    const result=await firebase.auth().signInWithPopup(provider);
+    const st=document.getElementById('status');
+    st.style.display='block';
+    st.textContent='ログイン成功: '+result.user.displayName+'　PWAに戻ってください';
+  }catch(e){
+    alert('ログインエラー: '+e.message);
+  }
+}
+</script>
+</body>
+</html>

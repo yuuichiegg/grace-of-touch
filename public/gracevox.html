@@ -622,6 +622,13 @@ document.addEventListener('DOMContentLoaded',()=>{
     </div>
     <div class="sep"></div>
     <div class="setting-group"><button class="panel-btn" onclick="resetSetup()">声の再セットアップ</button></div>
+    <div class="setting-group" id="ownerAuthGroup" style="display:none;">
+      <label style="font-size:11px;color:var(--text-dim);">オーナー認証</label>
+      <div style="display:flex;gap:6px;margin-top:4px;">
+        <input type="password" id="ownerPassInput" placeholder="パスワード" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px;">
+        <button class="action-btn primary" onclick="ownerAuth()" style="padding:6px 14px;">認証</button>
+      </div>
+    </div>
     <div class="sep"></div>
     <!-- Plan section -->
     <div class="setting-group" id="planSection">
@@ -779,6 +786,37 @@ loadUsage();
   }
 })();
 
+// Owner local auth (password-based, no Google needed)
+const OWNER_HASH='5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8'; // SHA-256
+async function ownerAuth(){
+  const pw=document.getElementById('ownerPassInput').value;
+  if(!pw){showToast('パスワードを入力してください');return;}
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pw));
+  const hash=Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  if(hash===OWNER_HASH){
+    userPlan='pro';
+    localStorage.setItem('gv_owner_pro','1');
+    updatePlanUI();
+    showToast('オーナー認証成功 — Pro有効化');
+    toggleSettings();
+  }else{
+    showToast('パスワードが違います');
+  }
+}
+// Restore owner pro on load
+if(localStorage.getItem('gv_owner_pro')==='1'){userPlan='pro';updatePlanUI();}
+// Show owner auth field on 5-tap logo
+let _logoTaps=0;
+document.querySelector('.logo')?.addEventListener('click',()=>{
+  _logoTaps++;
+  if(_logoTaps>=5){
+    document.getElementById('ownerAuthGroup').style.display='block';
+    showToast('オーナー認証フィールドを表示');
+    _logoTaps=0;
+  }
+  setTimeout(()=>{_logoTaps=0;},3000);
+});
+
 // Handle redirect result (iOS PWA)
 fbAuth.getRedirectResult().then(result=>{
   if(result&&result.user) showToast('ログインしました: '+result.user.displayName);
@@ -814,17 +852,20 @@ function toggleLogin(){
     if(confirm('ログアウトしますか？')) fbAuth.signOut();
   }else{
     const provider=new firebase.auth.GoogleAuthProvider();
-    // iOS PWA: popup doesn't work, use redirect instead
-    const isPWA=window.navigator.standalone===true||window.matchMedia('(display-mode:standalone)').matches;
-    const isiOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
-    if(isPWA||isiOS){
-      fbAuth.signInWithRedirect(provider);
-    }else{
-      fbAuth.signInWithPopup(provider).catch(e=>{
-        // Popup blocked fallback → redirect
-        fbAuth.signInWithRedirect(provider);
-      });
-    }
+    showToast('Googleログイン中...');
+    fbAuth.signInWithPopup(provider).catch(e=>{
+      console.log('Popup auth failed:',e.code,e.message);
+      // iOS PWA: popup fails → open in Safari
+      if(e.code==='auth/popup-blocked'||e.code==='auth/popup-closed-by-user'||e.code==='auth/cancelled-popup-request'){
+        showToast('ポップアップがブロックされました。再度タップしてください');
+      }else{
+        // Fallback: open login page in Safari (external browser)
+        const url='https://grace-of-touch.web.app/gracevox-login.html';
+        if(confirm('PWAではGoogleログインが制限されています。\nSafariで開いてログインしますか？')){
+          window.open(url,'_blank');
+        }
+      }
+    });
   }
 }
 
