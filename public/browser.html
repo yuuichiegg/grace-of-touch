@@ -18,6 +18,11 @@
 })();
 </script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>">
+<link rel="manifest" href="/manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Grace Browser">
+<meta name="theme-color" content="#00e5ff">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+JP:wght@300;400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -1381,6 +1386,54 @@ function showPichanBubble(text) {
     if(_dragging){ _dragging=false; showPichanBubble('ここに置いてくれるの？ありがとう！'); }
   });
 })();
+
+// ===== Pi-Agent SSE Connection =====
+(function(){
+  let sse=null, retryTimer=null;
+  const AGENT_URL='http://localhost:3334';
+  function connectSSE(){
+    if(sse){sse.close();sse=null;}
+    try{
+      sse=new EventSource(AGENT_URL+'/events/stream');
+      sse.onopen=()=>{
+        const mood=document.getElementById('pichanMood');
+        if(mood)mood.textContent='🟢';
+        showPichanBubble('pi-agentに接続したよ！');
+      };
+      sse.onmessage=(e)=>{
+        try{
+          const d=JSON.parse(e.data);
+          if(d.type==='connected')return;
+          if(d.type==='health:ok')return;
+          if(d.type==='keepalive')return;
+          // Show event to user via pichan bubble
+          const msgs={
+            'task:done':'タスク完了！',
+            'ssd:file:new':'新しいファイルを検出したよ📁',
+            'ip:asset:created':'知財アセットを記録したよ📋',
+            'health:fail':'⚠️ システムに問題が発生...',
+            'health:recover':'システム復旧したよ！',
+            'system:panic':'🚨 緊急事態発生！',
+            'system:calm':'平常運転に戻ったよ✨',
+          };
+          const msg=msgs[d.type]||('📡 '+d.type);
+          showPichanBubble(msg);
+        }catch(_){}
+      };
+      sse.onerror=()=>{
+        sse.close();sse=null;
+        const mood=document.getElementById('pichanMood');
+        if(mood)mood.textContent='💤';
+        retryTimer=setTimeout(connectSSE,15000);
+      };
+    }catch(_){retryTimer=setTimeout(connectSSE,15000);}
+  }
+  // Auto-connect after page load
+  setTimeout(connectSSE,2000);
+})();
+
+// ===== Service Worker =====
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw-browser.js').catch(()=>{});}
 
 // ===== Init =====
 createTab();

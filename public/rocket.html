@@ -1266,50 +1266,96 @@ const LaunchSequence = {
 
   update(dt){
     if(this.phase==='standby'||this.phase==='explore')return;
-    // cycle_wait: 0-15s rest, 15-25s stacking animation, 25-30s countdown display, then launch
+    // cycle_wait: elevator descent → arm open → stacking → ready
     if(this.phase==='cycle_wait'){
       this._cycleTimer+=dt;
       const t=this._cycleTimer;
-      // Phase 1 (0-15s): Rest — booster secured, show status
-      if(t<15){
-        if(t>2&&!this._stackMsgShown){
+
+      // Phase 1 (0-3s): Rest — booster caught, show elevator
+      if(t<3){
+        if(t>1&&!this._stackMsgShown){
           this._stackMsgShown=true;
-          Logger.log("PREPARING UPPER STAGE FOR NEXT MISSION...");
+          Logger.log("BOOSTER SECURED IN CHOPSTICK ARMS");
+          Mechazilla.elevator.visible=true;
+          Mechazilla.elevatorY=24;
+          Mechazilla.elevator.position.y=24;
+          // Clear any rotation from flip phase
+          if(Rocket3D.fullStack)Rocket3D.fullStack.rotation.set(0,0,0);
         }
       }
-      // Phase 2 (15-25s): Upper stage stacking animation
-      else if(t<25){
-        const stackProgress=(t-15)/10; // 0→1 over 10 seconds
-        if(!this._stackingStarted){
-          this._stackingStarted=true;
-          // Reset booster to pad, bring upper stage above
+      // Phase 2 (3-13s): Elevator descent — yellow bar lowers booster to pad
+      else if(t<13){
+        if(!this._elevStarted){
+          this._elevStarted=true;
+          Logger.log("ELEVATOR DESCENT — LOWERING BOOSTER TO PAD");
+        }
+        const elevProg=(t-3)/10;
+        const elevEase=elevProg<0.5?2*elevProg*elevProg:1-Math.pow(-2*elevProg+2,2)/2;
+        const elevY=THREE.MathUtils.lerp(24,2,elevEase);
+        Mechazilla.elevator.position.y=elevY;
+        Mechazilla.elevatorY=elevY;
+        Mechazilla.armL.position.y=elevY;
+        Mechazilla.armR.position.y=elevY;
+        const catchY=7.45,padY=0;
+        const bY=THREE.MathUtils.lerp(catchY,padY,elevEase);
+        // Direct position update (cycle_wait returns early, skips normal update)
+        Rocket3D.fullStack.position.set(this.boosterReturnX,-30+bY,0);
+        Rocket3D.flameUniforms.thrust.value=0;
+      }
+      // Phase 3 (13-15s): Arms open, booster on pad
+      else if(t<15){
+        if(!this._armsOpening){
+          this._armsOpening=true;
+          Logger.log("LANDING MOUNT SECURED — RELEASING CHOPSTICK ARMS");
+        }
+        const openProg=(t-13)/2;
+        const openZ=THREE.MathUtils.lerp(1.8,4.0,openProg);
+        Mechazilla.armL.position.z=openZ;
+        Mechazilla.armR.position.z=-openZ;
+        Mechazilla.catchProgress=Math.max(0,1-openProg);
+      }
+      // Phase 4 (15-17s): Elevator + arms retract upward
+      else if(t<17){
+        if(!this._elevRetracting){
+          this._elevRetracting=true;
           Rocket3D.fullStack.position.set(0,-30,0);
           Rocket3D.fullStack.rotation.set(0,0,0);
           Rocket3D.fullStack.scale.setScalar(S);
-          // Reset fins closed, legs tucked
           this._flipFinsLogged=false;
           Rocket3D.finDeploy=0;Rocket3D.gridFins.forEach(f=>{f.rotation.z=Math.PI/2;});
           Rocket3D.legDeploy=0;Rocket3D.landingLegs.forEach(l=>{l.rotation.z=0.08;});
-          Rocket3D.flameUniforms.thrust.value=0;
           if(Rocket3D._exhaustCone)Rocket3D._exhaustCone.material.opacity=0;
           if(Rocket3D._exhaustHaze)Rocket3D._exhaustHaze.material.opacity=0;
           if(Rocket3D._flameLight)Rocket3D._flameLight.intensity=0;
+        }
+        const retProg=(t-15)/2;
+        const retY=THREE.MathUtils.lerp(2,24,retProg);
+        Mechazilla.elevator.position.y=retY;
+        Mechazilla.armL.position.y=retY;
+        Mechazilla.armR.position.y=retY;
+        Mechazilla.armL.position.z=4.0;
+        Mechazilla.armR.position.z=-4.0;
+      }
+      // Phase 5 (17-27s): Upper stage stacking
+      else if(t<27){
+        if(!this._stackingStarted){
+          this._stackingStarted=true;
+          Mechazilla.elevator.visible=false;
           Mechazilla.resetArms();
-          // Place upper stage high above, to be lowered by crane
+          Mechazilla.armL.position.y=24;
+          Mechazilla.armR.position.y=24;
           Rocket3D.upperGroup.position.set(0,-30+150*S,0);
           Rocket3D.upperGroup.scale.setScalar(S);
           if(Rocket3D.upperGroup.parent!==App.scene)App.scene.add(Rocket3D.upperGroup);
           Rocket3D.upperFlameUni.thrust.value=0;
           Logger.log("CRANE LIFTING UPPER STAGE INTO POSITION...");
         }
-        // Smoothly lower upper stage onto booster (from 150 → 70 in local coords)
-        // Only animate position while still in scene (not yet attached to fullStack)
+        const stackProgress=(t-17)/10;
         if(!this._stackAttached){
           const stackEase=stackProgress<0.5?2*stackProgress*stackProgress:1-Math.pow(-2*stackProgress+2,2)/2;
           const upperLocalY=THREE.MathUtils.lerp(150,70,stackEase);
           Rocket3D.upperGroup.position.set(0,-30+upperLocalY*S,0);
         }
-        // At the end, re-attach to fullStack
         if(stackProgress>0.95&&!this._stackAttached){
           this._stackAttached=true;
           if(Rocket3D.upperGroup.parent===App.scene)App.scene.remove(Rocket3D.upperGroup);
@@ -1319,7 +1365,7 @@ const LaunchSequence = {
           Logger.log("UPPER STAGE MATED — VEHICLE STACKING COMPLETE");
         }
       }
-      // Phase 3 (25-30s): Ready for manual relaunch
+      // Phase 6 (27+): Ready for manual relaunch
       else{
         if(!this._readyMsgShown){
           this._readyMsgShown=true;
@@ -1632,6 +1678,9 @@ const LaunchSequence = {
     this._cycleTimer=0;
     this._cycleCount++;
     this._stackMsgShown=false;
+    this._elevStarted=false;
+    this._armsOpening=false;
+    this._elevRetracting=false;
     this._stackingStarted=false;
     this._stackAttached=false;
     this._readyMsgShown=false;
