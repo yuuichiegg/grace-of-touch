@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
 <meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
-<title>Grace of TOUCH - MEGA ROCKET EXPLORER v74</title>
+<title>Grace of TOUCH - MEGA ROCKET EXPLORER v73</title>
 <!-- © 2024-2026 Grace of Touch Co. All rights reserved. Unauthorized copying prohibited. -->
 <script>
 (function(){
@@ -616,28 +616,28 @@ void main(){
   // X-shaped shock structures at diamond intersections
   float xShock=pow(max(0.0,sin(y*mdSpacing)),6.0)*smoothstep(baseW*0.6,baseW*0.15,x)*smoothstep(0.0,baseW*0.15,x)*(1.0-y*0.5)*tipFade*0.4;
 
-  // ── Color ramp: Realistic launch plume (2026-04-02 reference: crewed lunar mission) ──
-  // Based on actual launch footage: brilliant white-yellow core → orange edges → residual smoke
-  vec3 cUltraWhite=vec3(2.8,2.7,2.4);   // extreme core: incandescent white at nozzle
-  vec3 cDeepBlue=vec3(0.6,0.7,2.0);     // faint blue inner shimmer (combustion zone)
-  vec3 cPurple=vec3(0.8,0.35,1.4);      // purple transition (ionization)
-  vec3 cBlue=vec3(0.8,1.0,1.6);         // pale blue accent
-  vec3 cWhite=vec3(2.5,2.3,2.0);        // blazing white-yellow
-  vec3 cPaleYel=vec3(2.2,1.8,0.7);      // bright pale yellow (dominant in real footage)
-  vec3 cYel=vec3(2.0,1.4,0.25);         // deep golden yellow
-  vec3 cOra=vec3(1.8,0.8,0.1);          // bright orange (very visible in photos)
-  vec3 cRed=vec3(1.2,0.25,0.08);        // deep orange-red
-  vec3 cViolet=vec3(0.6,0.15,0.25);     // dark red tips
-  vec3 cSmoke=vec3(0.4,0.25,0.15);      // warm exhaust residue (beige tint)
+  // ── Color ramp: SpaceX Raptor (LOX/methane) — distinctly bluer than RP-1 ──
+  // Raptor burns at ~3600K chamber temp. Methane exhaust: CO2 + H2O → pale blue/transparent
+  vec3 cUltraWhite=vec3(2.2,2.1,2.5);   // extreme core: blue-white at nozzle
+  vec3 cDeepBlue=vec3(0.4,0.5,2.5);     // methane-blue inner core
+  vec3 cPurple=vec3(0.7,0.25,1.8);      // purple transition zone (N2 ionization)
+  vec3 cBlue=vec3(0.6,0.9,2.0);         // blue-white
+  vec3 cWhite=vec3(2.0,1.9,1.8);        // blazing white
+  vec3 cPaleYel=vec3(1.8,1.5,0.8);      // pale yellow (CO2 emission)
+  vec3 cYel=vec3(1.6,1.1,0.12);         // deep yellow
+  vec3 cOra=vec3(1.5,0.6,0.06);         // deep orange
+  vec3 cRed=vec3(1.0,0.15,0.05);        // crimson
+  vec3 cViolet=vec3(0.55,0.1,0.3);      // violet-red tips
+  vec3 cSmoke=vec3(0.3,0.15,0.10);      // faint exhaust residue
 
-  // Realistic gradient: white core → yellow → orange → red (warmer overall)
+  // Raptor color gradient: bluer overall, transitions later to warm
   vec3 col=cWhite;
-  col=mix(col,cPaleYel,smoothstep(0.03,0.12,y));
-  col=mix(col,cYel,smoothstep(0.12,0.24,y));
-  col=mix(col,cOra,smoothstep(0.24,0.40,y));
-  col=mix(col,cRed,smoothstep(0.40,0.55,y));
-  col=mix(col,cViolet,smoothstep(0.55,0.70,y));
-  col=mix(col,cSmoke,smoothstep(0.70,0.90,y));
+  col=mix(col,cPaleYel,smoothstep(0.05,0.18,y));
+  col=mix(col,cYel,smoothstep(0.18,0.30,y));
+  col=mix(col,cOra,smoothstep(0.30,0.45,y));
+  col=mix(col,cRed,smoothstep(0.45,0.60,y));
+  col=mix(col,cViolet,smoothstep(0.60,0.75,y));
+  col=mix(col,cSmoke,smoothstep(0.75,0.93,y));
 
   // Turbulent color patches — purple/blue swirls in mid-flame (afterburning pockets)
   float colorNoise=fbm(vec2(x*5.5+time*2.5,y*9.0-time*12.0));
@@ -646,11 +646,11 @@ void main(){
   col=mix(col,cBlue*1.2,colorNoise2*0.15*smoothstep(0.05,0.25,y)*smoothstep(0.5,0.15,y));
   col+=color*0.02;
 
-  // ── Brilliant white-yellow core glow (matching real launch footage) ──
-  col=mix(col,cPaleYel*2.0,core*0.55);
-  col=mix(col,cWhite*2.5,innerCore*0.75);
-  col=mix(col,cUltraWhite*1.8,ultraCore);
-  col+=cWhite*innerCore*0.5;
+  // ── Blue-white core glow (Raptor methane signature — much more blue than Merlin) ──
+  col=mix(col,cBlue*2.2,core*0.65);
+  col=mix(col,cDeepBlue*2.8,innerCore*0.85);
+  col=mix(col,cUltraWhite*1.5,ultraCore);
+  col+=cWhite*innerCore*0.6;
 
   // Purple/violet shimmer at outer edge (recombination radiation)
   float edgePurple=smoothstep(baseW-0.06,baseW+0.18,x)*taper*tipFade*0.35;
@@ -872,7 +872,7 @@ const Rocket3D = {
       this._flameGroup.add(fm);
     }
     // Large exhaust glow (nozzle exit bloom — brighter, bluer for Raptor methane)
-    const glowMat=new THREE.ShaderMaterial({uniforms:{thrust:flameMat.uniforms.thrust,glowColor:{value:new THREE.Color(1.0,0.9,0.6)}},vertexShader:GLOW_VS,fragmentShader:GLOW_FS,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+    const glowMat=new THREE.ShaderMaterial({uniforms:{thrust:flameMat.uniforms.thrust,glowColor:{value:new THREE.Color(0.8,0.85,1.0)}},vertexShader:GLOW_VS,fragmentShader:GLOW_FS,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
     const glowPlane=new THREE.Mesh(new THREE.PlaneGeometry(28,28),glowMat);
     glowPlane.position.y=-3;glowPlane.rotation.x=-Math.PI/2;
     this._flameGroup.add(glowPlane);
@@ -886,12 +886,12 @@ const Rocket3D = {
     glowPlane3.position.y=-20;glowPlane3.rotation.x=-Math.PI/2;
     this._flameGroup.add(glowPlane3);
     // Inner exhaust cone (bright blue-white core — Raptor signature)
-    const coneMatInner=new THREE.MeshBasicMaterial({color:0xffeebb,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
+    const coneMatInner=new THREE.MeshBasicMaterial({color:0xbbccff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
     this._exhaustConeInner=new THREE.Mesh(new THREE.ConeGeometry(3.5,28,12,1,true),coneMatInner);
     this._exhaustConeInner.rotation.x=Math.PI;this._exhaustConeInner.position.y=-14;
     this._flameGroup.add(this._exhaustConeInner);
     // Mid exhaust cone (pale yellow — longer)
-    const coneMat=new THREE.MeshBasicMaterial({color:0xffcc66,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
+    const coneMat=new THREE.MeshBasicMaterial({color:0xeedd88,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
     this._exhaustCone=new THREE.Mesh(new THREE.ConeGeometry(7,38,12,1,true),coneMat);
     this._exhaustCone.rotation.x=Math.PI;this._exhaustCone.position.y=-18;
     this._flameGroup.add(this._exhaustCone);
@@ -935,17 +935,14 @@ const Rocket3D = {
     }
     this.boosterGroup.add(this._smokeGroup);
 
-    // v74: Engine glow light (warm white-yellow — matching real launch footage)
-    this._flameLight=new THREE.PointLight(0xffeebb,0,350);
+    // Engine glow light (Raptor methane: bluer white, brighter, longer range)
+    this._flameLight=new THREE.PointLight(0xccbbff,0,220);
     this._flameLight.position.set(0,-15,0);
     this.boosterGroup.add(this._flameLight);
-    // v74: Secondary ground illumination (wide, warm, lights up smoke)
-    this._groundLight=new THREE.PointLight(0xffddaa,0,500);
-    this._groundLight.position.set(0,-5,0);
-    this.boosterGroup.add(this._groundLight);
 
-    // v74: Mach diamond structures (warm white-yellow — matching real footage)
-    const machInnerMat=new THREE.MeshBasicMaterial({color:0xffeedd,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
+    // v71: SpaceX-style Mach diamond structures (more prominent, bluer)
+    // Inner bright shock cone (blue-white — SpaceX methane signature)
+    const machInnerMat=new THREE.MeshBasicMaterial({color:0x99bbff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
     this._machInnerCone=new THREE.Mesh(new THREE.ConeGeometry(2.5,18,10,6,true),machInnerMat);
     this._machInnerCone.rotation.x=Math.PI;this._machInnerCone.position.y=-12;
     this._flameGroup.add(this._machInnerCone);
@@ -965,40 +962,18 @@ const Rocket3D = {
     this._heatShimmer.rotation.x=Math.PI/2;this._heatShimmer.position.y=-2;
     this._flameGroup.add(this._heatShimmer);
 
-    // v74: Realistic smoke system (200 particles — massive billowing column + ground spread)
-    // Reference: 2026-04-02 crewed lunar mission launch footage
+    // v70: Enhanced smoke particle system (80 particles, more turbulence)
     this._smokeParticles=[];
     this._smokeGroup=new THREE.Group();
     const smokeGeo=new THREE.SphereGeometry(1,6,6);
-    for(let i=0;i<200;i++){
-      const isColumn=i<60;    // Column smoke — rises and stays in the air
-      const isGround=i>=60&&i<120; // Ground spread — billows outward
-      const isExhaust=i>=120;  // Nozzle exhaust — immediate plume
-      const smokeMat=new THREE.MeshBasicMaterial({
-        color:isColumn?0xd4c8b0:isGround?0xc8bca0:0x999080,  // beige/cream tones
-        transparent:true,opacity:0,depthWrite:false
-      });
+    for(let i=0;i<80;i++){
+      const smokeMat=new THREE.MeshBasicMaterial({color:0x888888,transparent:true,opacity:0,depthWrite:false});
       const smoke=new THREE.Mesh(smokeGeo,smokeMat);
-      const spread=isColumn?15:isGround?30:8;
-      smoke.position.set(
-        (Math.random()-0.5)*spread,
-        isColumn?(-3-Math.random()*8):isGround?(-1-Math.random()*2):(-10-Math.random()*6),
-        (Math.random()-0.5)*spread
-      );
-      smoke.scale.setScalar(0.3);
-      smoke.userData={
-        vel:new THREE.Vector3(
-          (Math.random()-0.5)*(isGround?1.2:isColumn?0.5:0.3),
-          isColumn?(0.3+Math.random()*0.8):isGround?(-0.05+Math.random()*0.15):(-0.8-Math.random()*1.5),
-          (Math.random()-0.5)*(isGround?1.2:isColumn?0.5:0.3)
-        ),
-        life:Math.random()*2,
-        maxLife:isColumn?(8+Math.random()*12):isGround?(6+Math.random()*8):(1.5+Math.random()*2.5),
-        baseScale:isColumn?(3+Math.random()*5):isGround?(4+Math.random()*6):(0.8+Math.random()*2),
-        turbFreq:1+Math.random()*2,
-        turbAmp:isColumn?0.03:isGround?0.05:0.02,
-        type:isColumn?'column':isGround?'ground':'exhaust'
-      };
+      smoke.position.set((Math.random()-0.5)*10,-10-Math.random()*50,(Math.random()-0.5)*10);
+      smoke.scale.setScalar(0.5+Math.random()*3);
+      smoke.userData={vel:new THREE.Vector3((Math.random()-0.5)*0.4,-0.5-Math.random()*2.0,(Math.random()-0.5)*0.4),
+        life:Math.random(),maxLife:2+Math.random()*4,baseScale:0.5+Math.random()*3,
+        turbFreq:1+Math.random()*3,turbAmp:0.03+Math.random()*0.08};
       this._smokeGroup.add(smoke);
       this._smokeParticles.push(smoke);
     }
@@ -1329,14 +1304,7 @@ const LaunchSequence = {
         document.getElementById('countdown-hud').classList.remove('visible');
         if(progress<0.1){SFXSystem.playLiftoff();
           if(window.parent!==window)window.parent.postMessage({type:'ROCKET_PHASE',phase:'LIFTOFF',cycle:this._cycleCount},'*');
-          // Device vibration on liftoff (mobile)
-          if(navigator.vibrate)navigator.vibrate([100,50,200,50,300]);
         }
-        // v74: Intense camera shake during liftoff (rumble effect)
-        {const liftShake=Math.max(0,1-progress*1.5);
-        App.camera.position.x+=Math.sin(this.totalTime*50)*0.15*liftShake;
-        App.camera.position.y+=Math.sin(this.totalTime*38)*0.08*liftShake;
-        App.camera.position.z+=Math.cos(this.totalTime*44)*0.12*liftShake;}
         break;
       case 'MAX-Q':
         this.rocketVelY+=dt*12;
@@ -1492,70 +1460,49 @@ const LaunchSequence = {
     Rocket3D.flameUniforms.time.value=t;
     Rocket3D.upperFlameUni.time.value=t;
     const bThrust=Rocket3D.flameUniforms.thrust.value;
-    if(Rocket3D._flameLight)Rocket3D._flameLight.intensity=bThrust*15.0;
-    if(Rocket3D._groundLight)Rocket3D._groundLight.intensity=bThrust*8.0;
+    if(Rocket3D._flameLight)Rocket3D._flameLight.intensity=bThrust*10.0;
     if(Rocket3D._exhaustConeInner)Rocket3D._exhaustConeInner.material.opacity=bThrust*0.7;
     if(Rocket3D._exhaustCone)Rocket3D._exhaustCone.material.opacity=bThrust*0.55;
     if(Rocket3D._exhaustHaze)Rocket3D._exhaustHaze.material.opacity=bThrust*0.25;
 
-    // v74: Realistic smoke update — massive billowing column + ground spread
+    // v70: Enhanced smoke particles update (more turbulence, larger spread)
     if(Rocket3D._smokeParticles){
       const st=performance.now()*0.001;
       Rocket3D._smokeParticles.forEach((s,si)=>{
         const d=s.userData;
-        const lifeSpeed=d.type==='exhaust'?0.4:d.type==='ground'?0.12:0.08;
-        d.life+=dt*lifeSpeed;
-        if(d.life>d.maxLife||(bThrust<0.01&&d.type==='exhaust')){
+        d.life+=dt*(d.isLarge?0.15:0.3);
+        if(d.life>d.maxLife||(bThrust<0.01&&!d.isLarge)){
           d.life=0;
-          const spread=d.type==='column'?15:d.type==='ground'?30:8;
-          s.position.set(
-            (Math.random()-0.5)*spread,
-            d.type==='column'?(-3-Math.random()*8):d.type==='ground'?(-1-Math.random()*2):(-10-Math.random()*6),
-            (Math.random()-0.5)*spread
-          );
-          d.vel.set(
-            (Math.random()-0.5)*(d.type==='ground'?1.2:d.type==='column'?0.5:0.3),
-            d.type==='column'?(0.3+Math.random()*0.8):d.type==='ground'?(-0.05+Math.random()*0.15):(-0.8-Math.random()*1.5),
-            (Math.random()-0.5)*(d.type==='ground'?1.2:d.type==='column'?0.5:0.3)
-          );
+          const spread=d.isLarge?25:12;
+          s.position.set((Math.random()-0.5)*spread,d.isLarge?(-2-Math.random()*3):(-8-Math.random()*6),(Math.random()-0.5)*spread);
           s.scale.setScalar(d.baseScale*0.3);
           s.material.opacity=0;
-        }else if(bThrust>0.01||d.type!=='exhaust'){
+        }else if(bThrust>0.01||d.isLarge){
           const progress=d.life/d.maxLife;
           s.position.add(d.vel);
           // Turbulence
           d.vel.x+=Math.sin(st*d.turbFreq+si*1.7)*d.turbAmp;
           d.vel.z+=Math.cos(st*d.turbFreq*0.8+si*2.3)*d.turbAmp;
-          if(d.type==='column'){
-            // Column smoke: rises steadily, expands slowly, stays in the air
-            d.vel.y+=0.005; // steady upward drift
-            d.vel.x*=1.003;d.vel.z*=1.003;
-            s.scale.setScalar(d.baseScale*(1+progress*6));
-            const fade=progress<0.08?progress*12:progress<0.5?1.0:Math.max(0,(1-progress)*2.0);
-            s.material.opacity=fade*Math.min(1,bThrust+0.2)*0.45;
-            // Beige/cream color that fades to light gray
-            const r=0.83-progress*0.1, g=0.78-progress*0.12, b=0.68-progress*0.1;
-            s.material.color.setRGB(r,g,b);
-          }else if(d.type==='ground'){
-            // Ground clouds: spread outward horizontally, billow massively
-            d.vel.x*=1.012;d.vel.z*=1.012;
-            d.vel.y+=0.001;
-            d.vel.x+=(Math.random()-0.5)*0.15;
-            d.vel.z+=(Math.random()-0.5)*0.15;
-            s.scale.setScalar(d.baseScale*(1+progress*10));
-            const fade=progress<0.06?progress*16:progress<0.4?1.0:Math.max(0,(1-progress)*1.7);
-            s.material.opacity=fade*Math.min(1,bThrust+0.3)*0.40;
-            // Warm beige at start → light gray as it cools
-            const r=0.80-progress*0.15, g=0.74-progress*0.15, b=0.62-progress*0.1;
-            s.material.color.setRGB(r,g,b);
+          d.vel.x+=(Math.random()-0.5)*(d.isLarge?0.1:0.06);
+          d.vel.z+=(Math.random()-0.5)*(d.isLarge?0.1:0.06);
+          if(d.isLarge){
+            // Ground clouds: spread out wide, rise slowly, persist long
+            d.vel.x*=1.008;d.vel.z*=1.008;
+            d.vel.y+=0.003; // gentle upward drift
+            s.scale.setScalar(d.baseScale*(1+progress*8));
+            const fade=progress<0.1?progress*10:progress<0.6?1.0:Math.max(0,(1-progress)*2.5);
+            s.material.opacity=fade*Math.min(1,bThrust+0.3)*0.35;
+            const gray=0.85-progress*0.2;
+            s.material.color.setRGB(gray,gray,gray*0.95);
           }else{
-            // Nozzle exhaust: fast, thin, warm-tinted
+            // Nozzle exhaust: faster, thinner, orange tint
             d.vel.x*=1.002;d.vel.z*=1.002;
             s.scale.setScalar(d.baseScale*(1+progress*5));
             const fade=progress<0.08?progress*12.5:Math.max(0,1-progress*1.05);
-            s.material.opacity=fade*bThrust*0.40;
-            const r=0.70-progress*0.3, g=0.60-progress*0.35, b=0.50-progress*0.3;
-            s.material.color.setRGB(r+0.1,g,b);
+            s.material.opacity=fade*bThrust*0.35;
+            const gray=0.75-progress*0.45;
+            const warm=progress<0.15?0.15*(1-progress/0.15):0;
+            s.material.color.setRGB(gray+warm,gray,gray*0.85);
           }
         }
       });
@@ -3029,7 +2976,6 @@ const EarthLife={
     this._initFishSchools();
     this._initOceanCurrents();
     this._initBirds();
-    this._initPichan(); // v74: ピーちゃん — GraceVoxバディが自然に環境に溶け込む
     this._initSeasons();
     this._initStarConstellations(scene);
     scene.add(this.group);
@@ -3208,113 +3154,6 @@ const EarthLife={
     });
   },
 
-  // v74: ピーちゃん — GraceVoxのバディが地球上に自然に存在する
-  _initPichan(){
-    this._pichans=[];
-    const pichanColor=0xf0c020; // GraceVoxのピーちゃんカラー（黄色）
-    const beakColor=0xff8800;
-    const eyeColor=0x222222;
-
-    const createPichan=(scale)=>{
-      const g=new THREE.Group();
-      // 体（丸い）
-      const body=new THREE.Mesh(new THREE.SphereGeometry(0.6,8,8),new THREE.MeshBasicMaterial({color:pichanColor}));
-      body.scale.set(1,0.9,0.85);g.add(body);
-      // 頭
-      const head=new THREE.Mesh(new THREE.SphereGeometry(0.45,8,8),new THREE.MeshBasicMaterial({color:pichanColor}));
-      head.position.set(0,0.55,0.15);g.add(head);
-      // 目（左右）
-      const eyeGeo=new THREE.SphereGeometry(0.08,6,6);const eyeMat=new THREE.MeshBasicMaterial({color:eyeColor});
-      const eyeL=new THREE.Mesh(eyeGeo,eyeMat);eyeL.position.set(-0.18,0.6,0.42);g.add(eyeL);
-      const eyeR=new THREE.Mesh(eyeGeo,eyeMat);eyeR.position.set(0.18,0.6,0.42);g.add(eyeR);
-      // くちばし
-      const beak=new THREE.Mesh(new THREE.ConeGeometry(0.12,0.25,6),new THREE.MeshBasicMaterial({color:beakColor}));
-      beak.rotation.x=Math.PI/2;beak.position.set(0,0.48,0.55);g.add(beak);
-      // 翼（左右）
-      const wingGeo=new THREE.PlaneGeometry(0.5,0.35);const wingMat=new THREE.MeshBasicMaterial({color:0xd4a810,side:THREE.DoubleSide});
-      const wingL=new THREE.Mesh(wingGeo,wingMat);wingL.position.set(-0.55,0.1,0);wingL.rotation.z=0.3;g.add(wingL);
-      const wingR=new THREE.Mesh(wingGeo,wingMat);wingR.position.set(0.55,0.1,0);wingR.rotation.z=-0.3;g.add(wingR);
-      // 尾
-      const tail=new THREE.Mesh(new THREE.PlaneGeometry(0.3,0.4),new THREE.MeshBasicMaterial({color:0xd4a810,side:THREE.DoubleSide}));
-      tail.position.set(0,0.1,-0.55);tail.rotation.x=-0.3;g.add(tail);
-      g.scale.setScalar(scale);
-      g.userData._wingL=wingL;g.userData._wingR=wingR;g.userData._head=head;
-      return g;
-    };
-
-    // ピーちゃん配置: 世界各地に5羽（自然に紛れ込む）
-    const placements=[
-      // 枝に止まっている（山岳地帯）
-      {lat:35.3,lng:138.7,alt:12,state:'perched',label:'富士山麓'},
-      {lat:27.9,lng:86.9,alt:14,state:'perched',label:'ヒマラヤ'},
-      // 空を飛んでいる（渡り鳥のように）
-      {lat:30,lng:120,alt:25,state:'flying',route:[[35,115],[28,125],[22,130],[15,135]],speed:0.012},
-      // 水辺に浮かんでいる
-      {lat:-33.8,lng:151.2,alt:4,state:'floating',label:'シドニー湾'},
-      {lat:45.4,lng:-75.7,alt:4,state:'floating',label:'オタワ川'},
-    ];
-
-    placements.forEach(p=>{
-      const pichan=createPichan(0.7);
-      const pos=this._latLngToPos(p.lat,p.lng,p.alt);
-      pichan.position.copy(pos);
-      // 地表に対して正しい向きに
-      const up=pos.clone().sub(this.earthCenter).normalize();
-      const fwd=new THREE.Vector3(0,0,1).applyQuaternion(this.earthQuat);
-      const m4=new THREE.Matrix4().lookAt(new THREE.Vector3(),fwd,up);
-      pichan.quaternion.setFromRotationMatrix(m4);
-      pichan.userData._state=p.state;
-      pichan.userData._phase=Math.random()*Math.PI*2;
-      pichan.userData._up=up;
-      if(p.route){pichan.userData._route=p.route;pichan.userData._speed=p.speed;pichan.userData._progress=Math.random();}
-      this.group.add(pichan);
-      this._pichans.push(pichan);
-    });
-  },
-
-  _updatePichans(now){
-    if(!this._pichans)return;
-    this._pichans.forEach(p=>{
-      const d=p.userData;
-      d._phase+=0.05;
-      const wingL=d._wingL,wingR=d._wingR,head=d._head;
-
-      if(d._state==='flying'){
-        // 飛行中: 翼をバタバタ + ルートに沿って移動
-        if(wingL)wingL.rotation.z=0.3+Math.sin(d._phase*2)*0.5;
-        if(wingR)wingR.rotation.z=-0.3-Math.sin(d._phase*2)*0.5;
-        if(d._route){
-          d._progress+=d._speed*0.001;if(d._progress>1)d._progress=0;
-          const pos=this._getRoutePosition(d._route,d._progress,25);
-          const nextPos=this._getRoutePosition(d._route,Math.min(1,d._progress+0.01),25);
-          p.position.copy(pos);
-          const dir=nextPos.clone().sub(pos).normalize();
-          const up=pos.clone().sub(this.earthCenter).normalize();
-          if(dir.length()>0.01){const m=new THREE.Matrix4().lookAt(new THREE.Vector3(),dir,up);p.quaternion.setFromRotationMatrix(m);}
-        }
-      }else if(d._state==='perched'){
-        // 枝に止まっている: 翼を畳む、たまに首をかしげる
-        if(wingL)wingL.rotation.z=0.5;
-        if(wingR)wingR.rotation.z=-0.5;
-        if(head){
-          head.rotation.z=Math.sin(now*0.8+d._phase)*0.15;
-          head.rotation.x=Math.sin(now*0.5+d._phase*1.3)*0.08;
-        }
-        // 軽い体の揺れ
-        p.children[0].position.y=Math.sin(now*1.2+d._phase)*0.03;
-      }else if(d._state==='floating'){
-        // 水面に浮かんでいる: ゆったり上下に揺れる
-        if(wingL)wingL.rotation.z=0.6;
-        if(wingR)wingR.rotation.z=-0.6;
-        const up=d._up;
-        p.position.add(up.clone().multiplyScalar(Math.sin(now*0.6+d._phase)*0.008));
-        // ゆっくり回転（水面で向きが変わる）
-        p.rotateOnWorldAxis(up,Math.sin(now*0.3+d._phase)*0.002);
-        if(head){head.rotation.z=Math.sin(now*0.4+d._phase)*0.1;}
-      }
-    });
-  },
-
   _initSeasons(){
     this._seasonGroup=new THREE.Group();
     const month=new Date().getMonth();
@@ -3489,8 +3328,6 @@ const EarthLife={
         if(dir.length()>0.01){const m=new THREE.Matrix4().lookAt(new THREE.Vector3(),dir,up);bird.quaternion.setFromRotationMatrix(m);}
       });
     });
-    // Pichans (ピーちゃん)
-    this._updatePichans(now);
     // Seasons
     this._seasonParticles.forEach(p=>{
       if(p.userData._type==='sakura'){
@@ -4364,12 +4201,12 @@ const PlayerShip={
 
     // --- Exhaust cones (visible from any angle) ---
     // Inner bright blue-white core cone
-    const coreConeMat=new THREE.MeshBasicMaterial({color:0xffeebb,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
+    const coreConeMat=new THREE.MeshBasicMaterial({color:0xbbccff,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
     this._shipExhaustCone=new THREE.Mesh(new THREE.ConeGeometry(3,22,12,1,true),coreConeMat);
     this._shipExhaustCone.rotation.x=-Math.PI/2;this._shipExhaustCone.position.z=12;
     this._flameGroup.add(this._shipExhaustCone);
     // Mid exhaust cone (wider, yellow-white)
-    const midConeMat=new THREE.MeshBasicMaterial({color:0xffcc66,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
+    const midConeMat=new THREE.MeshBasicMaterial({color:0xeedd88,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
     this._shipMidCone=new THREE.Mesh(new THREE.ConeGeometry(6,35,12,1,true),midConeMat);
     this._shipMidCone.rotation.x=-Math.PI/2;this._shipMidCone.position.z=18;
     this._flameGroup.add(this._shipMidCone);
