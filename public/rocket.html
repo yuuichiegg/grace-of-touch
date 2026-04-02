@@ -1886,7 +1886,7 @@ const SFXSystem={ctx:null,masterGain:null,_ambientOsc:null,_initialized:false,
 _rumbleOsc1:null,_rumbleOsc2:null,_rumbleGain:null,_roarSource:null,_roarGain:null,_roarFilter:null,
 _engineThrust:0,_prevSpeed:0,
 init(){const s=()=>{if(this._initialized)return;this._initialized=true;this.ctx=new(window.AudioContext||window.webkitAudioContext)();this.masterGain=this.ctx.createGain();this.masterGain.gain.value=parseFloat(document.getElementById('vol-slider').value);this.masterGain.connect(this.ctx.destination);this._setupAmbient();this._setupEngineRumble();this._setupEngineRoar();window.removeEventListener('mousedown',s);window.removeEventListener('touchstart',s);};window.addEventListener('mousedown',s);window.addEventListener('touchstart',s,{passive:true});},
-init_launch(){if(this._initialized)return;this._initialized=true;this.ctx=new(window.AudioContext||window.webkitAudioContext)();this.masterGain=this.ctx.createGain();this.masterGain.gain.value=parseFloat(document.getElementById('vol-slider').value);this.masterGain.connect(this.ctx.destination);this._setupAmbient();this._setupEngineRumble();this._setupEngineRoar();},
+init_launch(){if(this._initialized)return;this._initialized=true;try{this.ctx=new(window.AudioContext||window.webkitAudioContext)();this.masterGain=this.ctx.createGain();this.masterGain.gain.value=parseFloat(document.getElementById('vol-slider')?.value||0.4);this.masterGain.connect(this.ctx.destination);this._setupAmbient();this._setupEngineRumble();this._setupEngineRoar();}catch(e){console.warn('SFX init failed:',e);}},
 setVolume(v){if(this.masterGain)this.masterGain.gain.setTargetAtTime(v,this.ctx.currentTime,0.05);},
 _setupAmbient(){const sz=this.ctx.sampleRate*2,buf=this.ctx.createBuffer(1,sz,this.ctx.sampleRate),d=buf.getChannelData(0);for(let i=0;i<sz;i++)d[i]=Math.random()*2-1;const ns=this.ctx.createBufferSource();ns.buffer=buf;ns.loop=true;const flt=this.ctx.createBiquadFilter();flt.type='lowpass';flt.frequency.value=180;const ng=this.ctx.createGain();ng.gain.value=0.04;ns.connect(flt);flt.connect(ng);ng.connect(this.masterGain);ns.start();const osc=this.ctx.createOscillator();osc.type='sine';osc.frequency.value=38;const og=this.ctx.createGain();og.gain.value=0.06;osc.connect(og);og.connect(this.masterGain);osc.start();this._ambientOsc=osc;},
 // v70: Low frequency engine rumble (40-80Hz dual oscillator)
@@ -1912,7 +1912,7 @@ _setupEngineRoar(){
   this._roarSource.connect(this._roarFilter);this._roarFilter.connect(this._roarGain);this._roarGain.connect(this.masterGain);
   this._roarSource.start();
 },
-playCountdownBeep(n){if(!this.ctx)return;this._click(this.ctx.currentTime,n===0?880:440,n===0?0.3:0.15,n===0?0.4:0.12);},
+playCountdownBeep(n){try{if(!this.ctx)return;this._click(this.ctx.currentTime,n===0?880:440,n===0?0.3:0.15,n===0?0.4:0.12);}catch(e){}},
 playLiftoff(){if(!this.ctx||this._liftoffPlayed)return;this._liftoffPlayed=true;const sz=this.ctx.sampleRate*3,buf=this.ctx.createBuffer(1,sz,this.ctx.sampleRate),d=buf.getChannelData(0);for(let i=0;i<sz;i++)d[i]=Math.random()*2-1;const ns=this.ctx.createBufferSource();ns.buffer=buf;ns.loop=true;const flt=this.ctx.createBiquadFilter();flt.type='lowpass';flt.frequency.setValueAtTime(80,this.ctx.currentTime);flt.frequency.linearRampToValueAtTime(800,this.ctx.currentTime+8);const eg=this.ctx.createGain();eg.gain.value=0;eg.gain.linearRampToValueAtTime(0.5,this.ctx.currentTime+0.5);eg.gain.setTargetAtTime(0.1,this.ctx.currentTime+12,3);ns.connect(flt);flt.connect(eg);eg.connect(this.masterGain);ns.start();},
 _click(ct,f,g,dur){const o=this.ctx.createOscillator(),gn=this.ctx.createGain();o.type='sine';o.frequency.value=f;gn.gain.setValueAtTime(g,ct);gn.gain.exponentialRampToValueAtTime(0.0001,ct+dur);o.connect(gn);gn.connect(this.masterGain);o.start(ct);o.stop(ct+dur);},
 // v70: Enhanced setSpeed with Doppler-like shift and engine thrust coupling
@@ -3255,7 +3255,7 @@ const EarthLife={
     ];
 
     placements.forEach(p=>{
-      const pichan=createPichan(0.7);
+      const pichan=createPichan(1.2); // v75: サイズ拡大（ディスパッチレビュー: 0.7では小さすぎ）
       const pos=this._latLngToPos(p.lat,p.lng,p.alt);
       pichan.position.copy(pos);
       // 地表に対して正しい向きに
