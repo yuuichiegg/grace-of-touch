@@ -260,10 +260,29 @@
 <div id="scanline" style="display:none;"></div>
 <script>function toggleScanline(v){document.getElementById('scanline').style.display=v==='on'?'block':'none';localStorage.setItem('scanline_pref',v);}</script>
 
+<!-- Boarding Pass Overlay -->
+<div id="boarding-overlay">
+  <div id="boarding-pass">
+    <button id="bp-close-btn">&times;</button>
+    <div class="bp-header">GRACE OF TOUCH SPACEPORT</div>
+    <div class="bp-title">&#127756; BOARDING PASS</div>
+    <div class="bp-route">EARTH &rarr; MOON &rarr; EARTH</div>
+    <div class="bp-qr">🚀</div>
+    <div class="bp-info"><span class="bp-info-label">FLIGHT</span><span class="bp-info-val" id="bp-flight">GRT-001</span></div>
+    <div class="bp-info"><span class="bp-info-label">GATE</span><span class="bp-info-val">A-1 PACIFIC</span></div>
+    <div class="bp-info"><span class="bp-info-label">SEAT</span><span class="bp-info-val" id="bp-seat">1A</span></div>
+    <div class="bp-info"><span class="bp-info-label">PASSENGER</span><span class="bp-info-val">EXPLORER</span></div>
+    <div class="bp-countdown" id="bp-timer">--:--</div>
+    <div class="bp-countdown-sub">TIME TO DEPARTURE</div>
+    <button id="bp-board-btn" disabled>PROCEED TO LAUNCH PAD</button>
+  </div>
+</div>
+
 <!-- Launch Start Panel (replaces SVG overlay) -->
 <div id="launch-start-panel">
   <div id="mission-title">MEGA ROCKET EXPLORER</div>
   <div id="mission-sub">GRACE OF TOUCH SPACEPORT — PACIFIC OCEAN</div>
+  <button id="ticket-btn" style="background:rgba(255,204,0,0.1);border:1px solid rgba(255,204,0,0.5);color:#ffcc00;font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.15em;padding:10px 24px;border-radius:20px;cursor:pointer;text-shadow:0 0 6px #ffcc00;box-shadow:0 0 15px rgba(255,204,0,0.15);transition:all 0.3s;pointer-events:auto;margin-bottom:8px;display:block;">&#127915; GET BOARDING PASS</button>
   <button id="launch-btn">LAUNCH SEQUENCE START</button>
   <div style="margin-top:8px;font-size:9px;color:rgba(0,216,255,0.4);font-family:'Courier New',monospace;letter-spacing:0.1em;">V/C: CAMERA MODE &nbsp; WASD: MOVE &nbsp; MOUSE: LOOK</div>
 </div>
@@ -887,8 +906,8 @@ const Rocket3D = {
     this.flameUniforms=flameMat.uniforms;
     this._flameGroup=new THREE.Group();
     // 12 cross-planes with VARIED heights — SpaceX-scale violent plume (longer than v70)
-    const fw=9*2.0;
-    const flameHeights=[72,60,68,55,75,58,65,52,70,56,63,50];
+    const fw=9*2.5; // v75: 炎を太く
+    const flameHeights=[95,80,90,72,98,76,85,68,92,74,82,66]; // v75: 炎を30%長く
     for(let i=0;i<12;i++){
       const fh=flameHeights[i];
       const fm=new THREE.Mesh(new THREE.PlaneGeometry(fw,fh),flameMat);
@@ -990,38 +1009,38 @@ const Rocket3D = {
     this._heatShimmer.rotation.x=Math.PI/2;this._heatShimmer.position.y=-2;
     this._flameGroup.add(this._heatShimmer);
 
-    // v74: Realistic smoke system (200 particles — massive billowing column + ground spread)
-    // Reference: 2026-04-02 crewed lunar mission launch footage
+    // v75: Massive smoke system (300 particles — towering column + ground tsunami)
+    // Reference: 2026-04-02 crewed lunar mission launch — enormous beige smoke pillar
     this._smokeParticles=[];
     this._smokeGroup=new THREE.Group();
     const smokeGeo=new THREE.SphereGeometry(1,6,6);
-    for(let i=0;i<200;i++){
-      const isColumn=i<60;    // Column smoke — rises and stays in the air
-      const isGround=i>=60&&i<120; // Ground spread — billows outward
-      const isExhaust=i>=120;  // Nozzle exhaust — immediate plume
+    for(let i=0;i<300;i++){
+      const isColumn=i<100;    // Column smoke — massive rising pillar
+      const isGround=i>=100&&i<200; // Ground spread — tsunami of smoke
+      const isExhaust=i>=200;  // Nozzle exhaust — hot plume
       const smokeMat=new THREE.MeshBasicMaterial({
-        color:isColumn?0xd4c8b0:isGround?0xc8bca0:0x999080,  // beige/cream tones
+        color:isColumn?0xddd0b8:isGround?0xd0c4a8:0xaa9878,  // warmer beige/cream
         transparent:true,opacity:0,depthWrite:false
       });
       const smoke=new THREE.Mesh(smokeGeo,smokeMat);
-      const spread=isColumn?15:isGround?30:8;
+      const spread=isColumn?20:isGround?40:10;
       smoke.position.set(
         (Math.random()-0.5)*spread,
-        isColumn?(-3-Math.random()*8):isGround?(-1-Math.random()*2):(-10-Math.random()*6),
+        isColumn?(-2-Math.random()*6):isGround?(-1-Math.random()*2):(-8-Math.random()*8),
         (Math.random()-0.5)*spread
       );
-      smoke.scale.setScalar(0.3);
+      smoke.scale.setScalar(0.5);
       smoke.userData={
         vel:new THREE.Vector3(
-          (Math.random()-0.5)*(isGround?1.2:isColumn?0.5:0.3),
-          isColumn?(0.3+Math.random()*0.8):isGround?(-0.05+Math.random()*0.15):(-0.8-Math.random()*1.5),
-          (Math.random()-0.5)*(isGround?1.2:isColumn?0.5:0.3)
+          (Math.random()-0.5)*(isGround?2.0:isColumn?0.8:0.5),
+          isColumn?(0.8+Math.random()*1.5):isGround?(-0.02+Math.random()*0.2):(-1.2-Math.random()*2.0),
+          (Math.random()-0.5)*(isGround?2.0:isColumn?0.8:0.5)
         ),
-        life:Math.random()*2,
-        maxLife:isColumn?(8+Math.random()*12):isGround?(6+Math.random()*8):(1.5+Math.random()*2.5),
-        baseScale:isColumn?(3+Math.random()*5):isGround?(4+Math.random()*6):(0.8+Math.random()*2),
+        life:Math.random()*1.5,
+        maxLife:isColumn?(6+Math.random()*10):isGround?(5+Math.random()*7):(1.0+Math.random()*2.0),
+        baseScale:isColumn?(5+Math.random()*8):isGround?(6+Math.random()*10):(1.5+Math.random()*3),
         turbFreq:1+Math.random()*2,
-        turbAmp:isColumn?0.03:isGround?0.05:0.02,
+        turbAmp:isColumn?0.06:isGround?0.08:0.03,
         type:isColumn?'column':isGround?'ground':'exhaust'
       };
       this._smokeGroup.add(smoke);
@@ -1229,6 +1248,72 @@ const Mechazilla = {
   }
 };
 
+// ══════════════════════════════════════════════
+// BoardingPass — Ticket Experience Engine
+// ══════════════════════════════════════════════
+const BoardingPass={
+  _timer:null,_countdown:30,_ready:false,_flightNum:1,
+
+  init(){
+    const ticketBtn=document.getElementById('ticket-btn');
+    const boardBtn=document.getElementById('bp-board-btn');
+    const closeBtn=document.getElementById('bp-close-btn');
+    if(ticketBtn)ticketBtn.addEventListener('click',()=>this.issuePass());
+    if(boardBtn)boardBtn.addEventListener('click',()=>this.board());
+    if(closeBtn)closeBtn.addEventListener('click',()=>this.close());
+  },
+
+  issuePass(){
+    const overlay=document.getElementById('boarding-overlay');
+    overlay.classList.add('visible');
+    // Generate flight info
+    this._flightNum=Math.floor(Math.random()*999)+1;
+    document.getElementById('bp-flight').textContent='GRT-'+String(this._flightNum).padStart(3,'0');
+    const seats=['1A','1B','2A','2B','3A','3B','4A','4B'];
+    document.getElementById('bp-seat').textContent=seats[Math.floor(Math.random()*seats.length)];
+    // Start countdown
+    this._countdown=30;
+    this._ready=false;
+    document.getElementById('bp-board-btn').disabled=true;
+    document.getElementById('bp-board-btn').textContent='BOARDING IN PROGRESS...';
+    Logger.log('BOARDING PASS ISSUED — FLIGHT GRT-'+String(this._flightNum).padStart(3,'0'));
+    if(this._timer)clearInterval(this._timer);
+    this._timer=setInterval(()=>this._tick(),1000);
+  },
+
+  _tick(){
+    this._countdown--;
+    const m=Math.floor(this._countdown/60);
+    const s=this._countdown%60;
+    document.getElementById('bp-timer').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    if(this._countdown<=10&&!this._ready){
+      this._ready=true;
+      document.getElementById('bp-board-btn').disabled=false;
+      document.getElementById('bp-board-btn').textContent='PROCEED TO LAUNCH PAD';
+      Logger.log('BOARDING CALL — PLEASE PROCEED TO GATE A-1');
+    }
+    if(this._countdown<=0){
+      clearInterval(this._timer);
+      this._timer=null;
+      document.getElementById('bp-timer').textContent='NOW';
+      document.getElementById('bp-board-btn').textContent='BOARD NOW — FINAL CALL';
+      Logger.log('FINAL BOARDING CALL — DEPARTURE IMMINENT');
+    }
+  },
+
+  board(){
+    clearInterval(this._timer);this._timer=null;
+    document.getElementById('boarding-overlay').classList.remove('visible');
+    Logger.log('PASSENGER BOARDED — INITIATING LAUNCH SEQUENCE');
+    LaunchSequence.startCountdown();
+  },
+
+  close(){
+    document.getElementById('boarding-overlay').classList.remove('visible');
+    if(this._timer){clearInterval(this._timer);this._timer=null;}
+  }
+};
+
 // OrbitCam removed in v68 — replaced by always-on FPS free camera
 
 // ══════════════════════════════════════════════
@@ -1258,7 +1343,10 @@ const LaunchSequence = {
     {name:'HANDOFF',         dur:2.5,cam:'FPS_HANDOFF'},
   ],
 
-  init(){document.getElementById('launch-btn').addEventListener('click',()=>this.startCountdown());
+  init(){
+    document.getElementById('launch-btn').addEventListener('click',()=>this.startCountdown());
+    // Boarding pass system
+    BoardingPass.init();
   },
 
   startCountdown(){
@@ -1589,27 +1677,27 @@ const LaunchSequence = {
     if(Rocket3D._exhaustCone)Rocket3D._exhaustCone.material.opacity=bThrust*0.55;
     if(Rocket3D._exhaustHaze)Rocket3D._exhaustHaze.material.opacity=bThrust*0.25;
 
-    // v74: Realistic smoke update — massive billowing column + ground spread
+    // v75: Massive smoke update — towering pillar + ground tsunami
     if(Rocket3D._smokeParticles){
       const st=performance.now()*0.001;
       Rocket3D._smokeParticles.forEach((s,si)=>{
         const d=s.userData;
-        const lifeSpeed=d.type==='exhaust'?0.4:d.type==='ground'?0.12:0.08;
+        const lifeSpeed=d.type==='exhaust'?0.5:d.type==='ground'?0.18:0.12;
         d.life+=dt*lifeSpeed;
         if(d.life>d.maxLife||(bThrust<0.01&&d.type==='exhaust')){
           d.life=0;
-          const spread=d.type==='column'?15:d.type==='ground'?30:8;
+          const spread=d.type==='column'?20:d.type==='ground'?40:10;
           s.position.set(
             (Math.random()-0.5)*spread,
-            d.type==='column'?(-3-Math.random()*8):d.type==='ground'?(-1-Math.random()*2):(-10-Math.random()*6),
+            d.type==='column'?(-2-Math.random()*6):d.type==='ground'?(-1-Math.random()*2):(-8-Math.random()*8),
             (Math.random()-0.5)*spread
           );
           d.vel.set(
-            (Math.random()-0.5)*(d.type==='ground'?1.2:d.type==='column'?0.5:0.3),
-            d.type==='column'?(0.3+Math.random()*0.8):d.type==='ground'?(-0.05+Math.random()*0.15):(-0.8-Math.random()*1.5),
-            (Math.random()-0.5)*(d.type==='ground'?1.2:d.type==='column'?0.5:0.3)
+            (Math.random()-0.5)*(d.type==='ground'?2.0:d.type==='column'?0.8:0.5),
+            d.type==='column'?(0.8+Math.random()*1.5):d.type==='ground'?(-0.02+Math.random()*0.2):(-1.2-Math.random()*2.0),
+            (Math.random()-0.5)*(d.type==='ground'?2.0:d.type==='column'?0.8:0.5)
           );
-          s.scale.setScalar(d.baseScale*0.3);
+          s.scale.setScalar(d.baseScale*0.5);
           s.material.opacity=0;
         }else if(bThrust>0.01||d.type!=='exhaust'){
           const progress=d.life/d.maxLife;
@@ -1618,35 +1706,35 @@ const LaunchSequence = {
           d.vel.x+=Math.sin(st*d.turbFreq+si*1.7)*d.turbAmp;
           d.vel.z+=Math.cos(st*d.turbFreq*0.8+si*2.3)*d.turbAmp;
           if(d.type==='column'){
-            // Column smoke: rises steadily, expands slowly, stays in the air
-            d.vel.y+=0.005; // steady upward drift
-            d.vel.x*=1.003;d.vel.z*=1.003;
-            s.scale.setScalar(d.baseScale*(1+progress*6));
-            const fade=progress<0.08?progress*12:progress<0.5?1.0:Math.max(0,(1-progress)*2.0);
-            s.material.opacity=fade*Math.min(1,bThrust+0.2)*0.45;
-            // Beige/cream color that fades to light gray
-            const r=0.83-progress*0.1, g=0.78-progress*0.12, b=0.68-progress*0.1;
+            // Column: towering pillar — fast rise, big expansion, HIGH opacity
+            d.vel.y+=0.015;
+            d.vel.x*=1.005;d.vel.z*=1.005;
+            d.vel.x+=(Math.random()-0.5)*0.08;
+            d.vel.z+=(Math.random()-0.5)*0.08;
+            s.scale.setScalar(d.baseScale*(1+progress*8));
+            const fade=progress<0.05?progress*20:progress<0.5?1.0:Math.max(0,(1-progress)*2.0);
+            s.material.opacity=fade*Math.min(1,bThrust+0.3)*0.75;
+            const r=0.87-progress*0.12, g=0.82-progress*0.14, b=0.72-progress*0.12;
             s.material.color.setRGB(r,g,b);
           }else if(d.type==='ground'){
-            // Ground clouds: spread outward horizontally, billow massively
-            d.vel.x*=1.012;d.vel.z*=1.012;
-            d.vel.y+=0.001;
-            d.vel.x+=(Math.random()-0.5)*0.15;
-            d.vel.z+=(Math.random()-0.5)*0.15;
-            s.scale.setScalar(d.baseScale*(1+progress*10));
-            const fade=progress<0.06?progress*16:progress<0.4?1.0:Math.max(0,(1-progress)*1.7);
-            s.material.opacity=fade*Math.min(1,bThrust+0.3)*0.40;
-            // Warm beige at start → light gray as it cools
-            const r=0.80-progress*0.15, g=0.74-progress*0.15, b=0.62-progress*0.1;
+            // Ground: tsunami spreading outward — MASSIVE expansion
+            d.vel.x*=1.018;d.vel.z*=1.018;
+            d.vel.y+=0.003;
+            d.vel.x+=(Math.random()-0.5)*0.25;
+            d.vel.z+=(Math.random()-0.5)*0.25;
+            s.scale.setScalar(d.baseScale*(1+progress*12));
+            const fade=progress<0.04?progress*25:progress<0.35?1.0:Math.max(0,(1-progress)*1.5);
+            s.material.opacity=fade*Math.min(1,bThrust+0.4)*0.65;
+            const r=0.84-progress*0.18, g=0.78-progress*0.18, b=0.66-progress*0.12;
             s.material.color.setRGB(r,g,b);
           }else{
-            // Nozzle exhaust: fast, thin, warm-tinted
-            d.vel.x*=1.002;d.vel.z*=1.002;
-            s.scale.setScalar(d.baseScale*(1+progress*5));
-            const fade=progress<0.08?progress*12.5:Math.max(0,1-progress*1.05);
-            s.material.opacity=fade*bThrust*0.40;
-            const r=0.70-progress*0.3, g=0.60-progress*0.35, b=0.50-progress*0.3;
-            s.material.color.setRGB(r+0.1,g,b);
+            // Exhaust: hot, fast, dense plume from nozzle
+            d.vel.x*=1.004;d.vel.z*=1.004;
+            s.scale.setScalar(d.baseScale*(1+progress*6));
+            const fade=progress<0.06?progress*16:Math.max(0,1-progress*1.0);
+            s.material.opacity=fade*bThrust*0.60;
+            const r=0.75-progress*0.3, g=0.65-progress*0.35, b=0.55-progress*0.3;
+            s.material.color.setRGB(r+0.12,g,b);
           }
         }
       });
@@ -3960,6 +4048,35 @@ const DroneNetwork={
     return {mesh:g,rotors:rotors,ledR:ledR,ledG:ledG};
   },
 
+  _createDispatchDrone(){
+    const g=new THREE.Group();
+    const frameMat=new THREE.MeshBasicMaterial({color:0xffcc00});
+    const bar1=new THREE.Mesh(new THREE.BoxGeometry(3,0.12,0.2),frameMat);
+    const bar2=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.12,3),frameMat);
+    g.add(bar1,bar2);
+    const body=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.3,0.7),new THREE.MeshBasicMaterial({color:0xcc9900}));
+    g.add(body);
+    // Camera lens (front)
+    const lens=new THREE.Mesh(new THREE.SphereGeometry(0.15,6,4),new THREE.MeshBasicMaterial({color:0x00d8ff}));
+    lens.position.set(0,-0.1,0.45);
+    g.add(lens);
+    // 4 gold rotors
+    const rotorGeo=new THREE.CircleGeometry(0.5,8);
+    const rotorMat=new THREE.MeshBasicMaterial({color:0xffdd44,transparent:true,opacity:0.6,side:THREE.DoubleSide});
+    const rotors=[];
+    [[-1.3,0.15,0],[1.3,0.15,0],[0,0.15,-1.3],[0,0.15,1.3]].forEach(p=>{
+      const r=new THREE.Mesh(rotorGeo,rotorMat);
+      r.rotation.x=-Math.PI/2;r.position.set(p[0],p[1],p[2]);
+      g.add(r);rotors.push(r);
+    });
+    // Flash light for "screenshot" effect
+    const flash=new THREE.PointLight(0xffffff,0,30);
+    flash.position.set(0,-0.2,0.5);
+    g.add(flash);
+    g.scale.setScalar(0.45);
+    return {mesh:g,rotors:rotors,flash:flash,lens:lens,_flashTimer:0};
+  },
+
   _pickRandomHub(exclude){
     let idx;
     do{idx=Math.floor(Math.random()*this._hubData.length);}while(idx===exclude);
@@ -4043,8 +4160,21 @@ const DroneNetwork={
       this._assignRoute(d);
     }
     this._totalDelivered=Math.floor(Math.random()*500)+1000;
+    // Dispatch Drone — special gold drone for Mac mini monitoring
+    this._dispatchDrone=this._createDispatchDrone();
+    this._dispatchDrone.currentHub=0; // Start at TOKYO
+    this._dispatchDrone.mesh.position.copy(this._hubs[0].pos);
+    this.group.add(this._dispatchDrone.mesh);
+    this._assignRoute(this._dispatchDrone);
+    this._dispatchDrone.speed=0.002; // slower patrol speed
+    // Dispatch label
+    const dLabel=document.createElement('div');
+    dLabel.style.cssText='color:#ffcc00;font:bold 8px monospace;background:rgba(40,30,0,0.8);padding:2px 6px;border:1px solid #ffcc00;border-radius:3px;pointer-events:none;white-space:nowrap;text-shadow:0 0 4px #ffcc00;';
+    dLabel.textContent='DISPATCH';
+    this._dispatchLabel=new THREE.CSS2DObject(dLabel);
+    this.group.add(this._dispatchLabel);
     scene.add(this.group);
-    Logger.log("DRONE NETWORK: 8 hubs, 20 delivery drones active");
+    Logger.log("DRONE NETWORK: 8 hubs, 20 delivery drones + DISPATCH patrol active");
   },
 
   update(now){
@@ -4105,6 +4235,51 @@ const DroneNetwork={
         }
       }
     });
+    // Dispatch drone update
+    const dd=this._dispatchDrone;
+    if(dd){
+      dd.rotors.forEach((r,i)=>{r.rotation.z+=0.6+(i%2?-0.15:0.15);});
+      if(dd.state==='flying'){
+        dd.progress+=dd.speed;
+        if(dd.routeLine)dd.routeLine.material.opacity=Math.min(0.3,dd.routeLine.material.opacity+0.01);
+        if(dd.progress>=1){
+          dd.progress=1;dd.state='paused';dd.pauseTimer=now;dd.currentHub=dd.toHub;
+          if(dd.routeLine)dd.routeLine.material.opacity=0;
+          // Flash "screenshot" effect on arrival
+          dd.flash.intensity=8;dd._flashTimer=now;
+          dd.lens.material.color.setHex(0xffffff);
+        }
+        if(dd.waypoints&&dd.waypoints.length>1){
+          const ts=dd.waypoints.length-1;
+          const ri=dd.progress*ts;
+          const idx=Math.min(Math.floor(ri),ts-1);
+          const frac=ri-idx;
+          const p=dd.waypoints[idx].clone().lerp(dd.waypoints[idx+1],frac);
+          dd.mesh.position.copy(p);
+          if(idx<ts-1){
+            const fwd=dd.waypoints[idx+1].clone().sub(dd.waypoints[idx]).normalize();
+            const up=p.clone().sub(this.earthCenter).normalize();
+            const right=new THREE.Vector3().crossVectors(fwd,up).normalize();
+            const cu=new THREE.Vector3().crossVectors(right,fwd).normalize();
+            const m=new THREE.Matrix4().makeBasis(right,cu,fwd.negate());
+            dd.mesh.quaternion.setFromRotationMatrix(m);
+          }
+        }
+      }else if(dd.state==='paused'){
+        // Flash fade out
+        if(dd.flash.intensity>0){
+          dd.flash.intensity*=0.9;
+          if(dd.flash.intensity<0.1){dd.flash.intensity=0;dd.lens.material.color.setHex(0x00d8ff);}
+        }
+        // Patrol: wait 5s at each hub then move on
+        if(now-dd.pauseTimer>5){this._assignRoute(dd);dd.speed=0.002;}
+      }
+      // Update dispatch label position
+      if(this._dispatchLabel){
+        const up=dd.mesh.position.clone().sub(this.earthCenter).normalize();
+        this._dispatchLabel.position.copy(dd.mesh.position).add(up.multiplyScalar(3));
+      }
+    }
   }
 };
 
