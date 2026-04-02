@@ -931,18 +931,18 @@ const Rocket3D = {
     this._flameGroup.add(glowPlane3);
     // Inner exhaust cone (bright blue-white core — Raptor signature)
     const coneMatInner=new THREE.MeshBasicMaterial({color:0xffeebb,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
-    this._exhaustConeInner=new THREE.Mesh(new THREE.ConeGeometry(3.5,28,12,1,true),coneMatInner);
-    this._exhaustConeInner.rotation.x=Math.PI;this._exhaustConeInner.position.y=-14;
+    this._exhaustConeInner=new THREE.Mesh(new THREE.ConeGeometry(5,36,12,1,true),coneMatInner); // v75: 大型化
+    this._exhaustConeInner.rotation.x=Math.PI;this._exhaustConeInner.position.y=-18;
     this._flameGroup.add(this._exhaustConeInner);
     // Mid exhaust cone (pale yellow — longer)
     const coneMat=new THREE.MeshBasicMaterial({color:0xffcc66,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
-    this._exhaustCone=new THREE.Mesh(new THREE.ConeGeometry(7,38,12,1,true),coneMat);
-    this._exhaustCone.rotation.x=Math.PI;this._exhaustCone.position.y=-18;
+    this._exhaustCone=new THREE.Mesh(new THREE.ConeGeometry(10,50,12,1,true),coneMat); // v75: 大型化
+    this._exhaustCone.rotation.x=Math.PI;this._exhaustCone.position.y=-24;
     this._flameGroup.add(this._exhaustCone);
     // Outer exhaust haze (wide orange-red — heat shimmer)
     const hazeMat=new THREE.MeshBasicMaterial({color:0xff6633,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
-    this._exhaustHaze=new THREE.Mesh(new THREE.ConeGeometry(13,24,12,1,true),hazeMat);
-    this._exhaustHaze.rotation.x=Math.PI;this._exhaustHaze.position.y=-10;
+    this._exhaustHaze=new THREE.Mesh(new THREE.ConeGeometry(18,32,12,1,true),hazeMat); // v75: 大型化
+    this._exhaustHaze.rotation.x=Math.PI;this._exhaustHaze.position.y=-14;
     this._flameGroup.add(this._exhaustHaze);
     this.boosterGroup.add(this._flameGroup);
 
@@ -1671,8 +1671,8 @@ const LaunchSequence = {
     Rocket3D.flameUniforms.time.value=t;
     Rocket3D.upperFlameUni.time.value=t;
     const bThrust=Rocket3D.flameUniforms.thrust.value;
-    if(Rocket3D._flameLight)Rocket3D._flameLight.intensity=bThrust*15.0;
-    if(Rocket3D._groundLight)Rocket3D._groundLight.intensity=bThrust*8.0;
+    if(Rocket3D._flameLight)Rocket3D._flameLight.intensity=bThrust*25.0; // v75: 大幅強化
+    if(Rocket3D._groundLight)Rocket3D._groundLight.intensity=bThrust*15.0;
     if(Rocket3D._exhaustConeInner)Rocket3D._exhaustConeInner.material.opacity=bThrust*0.7;
     if(Rocket3D._exhaustCone)Rocket3D._exhaustCone.material.opacity=bThrust*0.55;
     if(Rocket3D._exhaustHaze)Rocket3D._exhaustHaze.material.opacity=bThrust*0.25;
