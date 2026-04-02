@@ -52,7 +52,15 @@
   .bp-header{font-size:9px;letter-spacing:0.3em;color:rgba(0,216,255,0.5);margin-bottom:8px;}
   .bp-title{font-size:16px;letter-spacing:0.2em;text-shadow:0 0 10px var(--term-color);margin-bottom:4px;}
   .bp-route{font-size:11px;color:rgba(0,216,255,0.7);letter-spacing:0.15em;margin-bottom:16px;}
-  .bp-qr{width:120px;height:120px;margin:0 auto 16px;background:rgba(0,216,255,0.05);border:1px solid rgba(0,216,255,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:48px;}
+  /* Flight Monitor Board */
+  #flight-monitor{position:absolute;top:10px;left:10px;z-index:30;background:rgba(2,5,16,0.85);border:1px solid rgba(0,216,255,0.25);border-radius:8px;padding:8px 12px;font-family:"Courier New",monospace;font-size:9px;color:var(--term-color);pointer-events:none;max-width:220px;backdrop-filter:blur(4px);}
+  #flight-monitor .fm-header{font-size:8px;letter-spacing:0.2em;color:rgba(0,216,255,0.5);border-bottom:1px solid rgba(0,216,255,0.15);padding-bottom:4px;margin-bottom:4px;}
+  #flight-monitor .fm-row{display:flex;justify-content:space-between;padding:2px 0;font-size:9px;}
+  #flight-monitor .fm-row.active{color:#ffcc00;text-shadow:0 0 4px #ffcc00;}
+  #flight-monitor .fm-status{font-size:8px;padding:1px 4px;border-radius:2px;}
+  .fm-boarding{background:rgba(255,204,0,0.2);color:#ffcc00;}
+  .fm-waiting{background:rgba(0,216,255,0.15);color:var(--term-color);}
+  .fm-departed{background:rgba(0,255,136,0.15);color:#00ff88;}
   .bp-info{display:flex;justify-content:space-between;margin:8px 0;font-size:10px;letter-spacing:0.1em;}
   .bp-info-label{color:rgba(0,216,255,0.4);}
   .bp-info-val{color:var(--term-color);}
@@ -260,6 +268,12 @@
 <div id="scanline" style="display:none;"></div>
 <script>function toggleScanline(v){document.getElementById('scanline').style.display=v==='on'?'block':'none';localStorage.setItem('scanline_pref',v);}</script>
 
+<!-- Flight Monitor Board -->
+<div id="flight-monitor" style="display:none;">
+  <div class="fm-header">DEPARTURE BOARD — GATE A-1</div>
+  <div id="fm-rows"></div>
+</div>
+
 <!-- Boarding Pass Overlay -->
 <div id="boarding-overlay">
   <div id="boarding-pass">
@@ -267,24 +281,26 @@
     <div class="bp-header">GRACE OF TOUCH SPACEPORT</div>
     <div class="bp-title">&#127756; BOARDING PASS</div>
     <div class="bp-route">EARTH &rarr; MOON &rarr; EARTH</div>
-    <div class="bp-qr">🚀</div>
+    <canvas id="bp-qr-canvas" width="100" height="100" style="margin:0 auto 12px;display:block;border-radius:6px;border:1px solid rgba(0,216,255,0.2);width:100px;height:100px;"></canvas>
     <div class="bp-info"><span class="bp-info-label">FLIGHT</span><span class="bp-info-val" id="bp-flight">GRT-001</span></div>
     <div class="bp-info"><span class="bp-info-label">GATE</span><span class="bp-info-val">A-1 PACIFIC</span></div>
     <div class="bp-info"><span class="bp-info-label">SEAT</span><span class="bp-info-val" id="bp-seat">1A</span></div>
     <div class="bp-info"><span class="bp-info-label">PASSENGER</span><span class="bp-info-val">EXPLORER</span></div>
     <div class="bp-countdown" id="bp-timer">--:--</div>
     <div class="bp-countdown-sub">TIME TO DEPARTURE</div>
+    <div class="bp-info"><span class="bp-info-label">TICKET #</span><span class="bp-info-val" id="bp-ticket-no">---</span></div>
+    <button id="bp-save-btn" style="margin-top:8px;background:none;border:1px solid rgba(0,216,255,0.3);color:rgba(0,216,255,0.6);font-family:'Courier New',monospace;font-size:9px;letter-spacing:0.1em;padding:6px 16px;border-radius:4px;cursor:pointer;">📱 SAVE TO DEVICE</button>
     <button id="bp-board-btn" disabled>PROCEED TO LAUNCH PAD</button>
   </div>
 </div>
 
 <!-- Launch Start Panel (replaces SVG overlay) -->
 <div id="launch-start-panel">
-  <div id="mission-title">MEGA ROCKET EXPLORER</div>
-  <div id="mission-sub">GRACE OF TOUCH SPACEPORT — PACIFIC OCEAN</div>
-  <button id="ticket-btn" style="background:rgba(255,204,0,0.1);border:1px solid rgba(255,204,0,0.5);color:#ffcc00;font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.15em;padding:10px 24px;border-radius:20px;cursor:pointer;text-shadow:0 0 6px #ffcc00;box-shadow:0 0 15px rgba(255,204,0,0.15);transition:all 0.3s;pointer-events:auto;margin-bottom:8px;display:block;">&#127915; GET BOARDING PASS</button>
-  <button id="launch-btn">LAUNCH SEQUENCE START</button>
-  <div style="margin-top:8px;font-size:9px;color:rgba(0,216,255,0.4);font-family:'Courier New',monospace;letter-spacing:0.1em;">V/C: CAMERA MODE &nbsp; WASD: MOVE &nbsp; MOUSE: LOOK</div>
+  <div id="mission-title" style="display:block;font-family:'Courier New',monospace;font-size:14px;letter-spacing:0.2em;color:var(--term-color);text-shadow:0 0 10px var(--term-color);margin-bottom:4px;">MEGA ROCKET EXPLORER</div>
+  <div id="mission-sub" style="display:block;font-size:9px;color:rgba(0,216,255,0.5);letter-spacing:0.15em;margin-bottom:12px;font-family:'Courier New',monospace;">GRACE OF TOUCH SPACEPORT — PACIFIC OCEAN</div>
+  <button id="ticket-btn" style="background:rgba(255,204,0,0.1);border:1px solid rgba(255,204,0,0.5);color:#ffcc00;font-family:'Courier New',monospace;font-size:13px;letter-spacing:0.15em;padding:12px 28px;border-radius:20px;cursor:pointer;text-shadow:0 0 6px #ffcc00;box-shadow:0 0 15px rgba(255,204,0,0.15);transition:all 0.3s;pointer-events:auto;display:block;animation:btnPulse 3s ease-in-out infinite;">&#127915; GET BOARDING PASS</button>
+  <button id="launch-btn" style="display:none;">LAUNCH SEQUENCE START</button>
+  <div style="margin-top:10px;font-size:9px;color:rgba(0,216,255,0.4);font-family:'Courier New',monospace;letter-spacing:0.1em;">V/C: CAMERA &nbsp; WASD: MOVE &nbsp; MOUSE: LOOK</div>
 </div>
 
 <!-- Countdown HUD -->
@@ -1253,64 +1269,251 @@ const Mechazilla = {
 // ══════════════════════════════════════════════
 const BoardingPass={
   _timer:null,_countdown:30,_ready:false,_flightNum:1,
+  _state:'idle', // idle → issued → walking → boarded → launching
+  _padPos:new THREE.Vector3(0,-28,0), // near rocket base
+  _guideArrow:null,_guideLabel:null,
+  _boardRadius:15, // distance to auto-board
+  _ticketNo:0,
+  _passengers:[], // simulated other passengers for flight monitor
 
   init(){
     const ticketBtn=document.getElementById('ticket-btn');
     const boardBtn=document.getElementById('bp-board-btn');
     const closeBtn=document.getElementById('bp-close-btn');
+    const saveBtn=document.getElementById('bp-save-btn');
     if(ticketBtn)ticketBtn.addEventListener('click',()=>this.issuePass());
     if(boardBtn)boardBtn.addEventListener('click',()=>this.board());
     if(closeBtn)closeBtn.addEventListener('click',()=>this.close());
+    if(saveBtn)saveBtn.addEventListener('click',()=>this.saveToDevice());
+    // Check for saved ticket
+    this._checkSavedTicket();
+  },
+
+  _checkSavedTicket(){
+    const saved=localStorage.getItem('grace_boarding_pass');
+    if(saved){
+      try{
+        const t=JSON.parse(saved);
+        // If ticket hasn't expired (within 10 minutes)
+        if(Date.now()-t.issued<600000){
+          Logger.log('SAVED BOARDING PASS FOUND — TICKET #'+t.ticketNo);
+        }
+      }catch(_){}
+    }
+  },
+
+  // Simple QR-like pattern generator on canvas
+  _drawQR(ticketId){
+    const c=document.getElementById('bp-qr-canvas');
+    if(!c)return;
+    const ctx=c.getContext('2d');
+    const size=100;
+    ctx.fillStyle='#0a1020';
+    ctx.fillRect(0,0,size,size);
+    // Generate deterministic pattern from ticketId
+    const grid=21;
+    const cellSize=size/grid;
+    let seed=0;
+    for(let i=0;i<ticketId.length;i++)seed=((seed<<5)-seed)+ticketId.charCodeAt(i);
+    // Corner finder patterns (QR standard)
+    const drawFinder=(x,y)=>{
+      ctx.fillStyle='#00d8ff';
+      ctx.fillRect(x*cellSize,y*cellSize,7*cellSize,7*cellSize);
+      ctx.fillStyle='#0a1020';
+      ctx.fillRect((x+1)*cellSize,(y+1)*cellSize,5*cellSize,5*cellSize);
+      ctx.fillStyle='#00d8ff';
+      ctx.fillRect((x+2)*cellSize,(y+2)*cellSize,3*cellSize,3*cellSize);
+    };
+    drawFinder(0,0);drawFinder(14,0);drawFinder(0,14);
+    // Data pattern
+    ctx.fillStyle='#00d8ff';
+    for(let r=0;r<grid;r++){
+      for(let c2=0;c2<grid;c2++){
+        // Skip finder areas
+        if((r<8&&c2<8)||(r<8&&c2>12)||(r>12&&c2<8))continue;
+        seed=((seed*1103515245+12345)&0x7fffffff);
+        if(seed%3===0){
+          ctx.fillRect(c2*cellSize,r*cellSize,cellSize-0.5,cellSize-0.5);
+        }
+      }
+    }
+    // Center text
+    ctx.fillStyle='rgba(0,216,255,0.9)';
+    ctx.font='bold 8px monospace';
+    ctx.textAlign='center';
+    ctx.fillText(ticketId,size/2,size/2+3);
+  },
+
+  _generatePassengers(myTicket){
+    const names=['TANAKA','SMITH','CHEN','GARCIA','KIM','MUELLER','SATO','PATEL'];
+    const p=[];
+    const myPos=Math.floor(Math.random()*5)+1;
+    for(let i=1;i<=6;i++){
+      if(i===myPos){
+        p.push({no:myTicket,name:'YOU',status:'boarding'});
+      }else{
+        const no=Math.floor(Math.random()*900)+100;
+        const status=Math.random()>0.4?'boarded':'waiting';
+        p.push({no:no,name:names[Math.floor(Math.random()*names.length)],status});
+      }
+    }
+    return p;
+  },
+
+  _updateMonitor(){
+    const mon=document.getElementById('flight-monitor');
+    const rows=document.getElementById('fm-rows');
+    if(!mon||!rows)return;
+    mon.style.display='block';
+    let html='';
+    this._passengers.forEach(p=>{
+      const cls=p.name==='YOU'?'active':'';
+      const statusCls=p.status==='boarding'?'fm-boarding':p.status==='boarded'?'fm-departed':'fm-waiting';
+      const statusText=p.status==='boarding'?'BOARDING':p.status==='boarded'?'BOARDED':'WAITING';
+      html+=`<div class="fm-row ${cls}"><span>#${p.no}</span><span>${p.name}</span><span class="fm-status ${statusCls}">${statusText}</span></div>`;
+    });
+    rows.innerHTML=html;
   },
 
   issuePass(){
     const overlay=document.getElementById('boarding-overlay');
     overlay.classList.add('visible');
-    // Generate flight info
+    this._state='issued';
     this._flightNum=Math.floor(Math.random()*999)+1;
+    this._ticketNo=Math.floor(Math.random()*900)+100;
     document.getElementById('bp-flight').textContent='GRT-'+String(this._flightNum).padStart(3,'0');
+    document.getElementById('bp-ticket-no').textContent=String(this._ticketNo);
     const seats=['1A','1B','2A','2B','3A','3B','4A','4B'];
     document.getElementById('bp-seat').textContent=seats[Math.floor(Math.random()*seats.length)];
-    // Start countdown
-    this._countdown=30;
+    // Generate QR code
+    const ticketId='GRT'+String(this._flightNum).padStart(3,'0')+'-'+this._ticketNo;
+    this._drawQR(ticketId);
+    // Generate passenger list for monitor
+    this._passengers=this._generatePassengers(this._ticketNo);
+    this._updateMonitor();
+    this._countdown=60;
     this._ready=false;
-    document.getElementById('bp-board-btn').disabled=true;
-    document.getElementById('bp-board-btn').textContent='BOARDING IN PROGRESS...';
-    Logger.log('BOARDING PASS ISSUED — FLIGHT GRT-'+String(this._flightNum).padStart(3,'0'));
+    document.getElementById('bp-board-btn').disabled=false;
+    document.getElementById('bp-board-btn').textContent='PROCEED TO LAUNCH PAD →';
+    document.getElementById('bp-timer').textContent='01:00';
+    Logger.log('BOARDING PASS ISSUED — FLIGHT GRT-'+String(this._flightNum).padStart(3,'0')+' TICKET #'+this._ticketNo);
+    Logger.log('CHECK DEPARTURE BOARD — YOUR TICKET NUMBER IS DISPLAYED');
+    Logger.log('PLEASE PROCEED TO GATE A-1 LAUNCH PAD');
     if(this._timer)clearInterval(this._timer);
     this._timer=setInterval(()=>this._tick(),1000);
   },
 
+  saveToDevice(){
+    const ticket={
+      flight:'GRT-'+String(this._flightNum).padStart(3,'0'),
+      ticketNo:this._ticketNo,
+      seat:document.getElementById('bp-seat').textContent,
+      issued:Date.now()
+    };
+    localStorage.setItem('grace_boarding_pass',JSON.stringify(ticket));
+    Logger.log('BOARDING PASS SAVED TO DEVICE');
+    const btn=document.getElementById('bp-save-btn');
+    if(btn){btn.textContent='✅ SAVED';btn.style.color='#00ff88';btn.style.borderColor='rgba(0,255,136,0.3)';}
+  },
+
   _tick(){
+    if(this._state==='idle')return;
     this._countdown--;
-    const m=Math.floor(this._countdown/60);
-    const s=this._countdown%60;
+    const m=Math.floor(Math.max(0,this._countdown)/60);
+    const s=Math.max(0,this._countdown)%60;
     document.getElementById('bp-timer').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
-    if(this._countdown<=10&&!this._ready){
-      this._ready=true;
-      document.getElementById('bp-board-btn').disabled=false;
-      document.getElementById('bp-board-btn').textContent='PROCEED TO LAUNCH PAD';
-      Logger.log('BOARDING CALL — PLEASE PROCEED TO GATE A-1');
+    if(this._state==='boarded'&&this._countdown<=10){
+      document.getElementById('bp-timer').textContent='IGNITION';
+      if(this._countdown<=0){
+        clearInterval(this._timer);this._timer=null;
+        document.getElementById('boarding-overlay').classList.remove('visible');
+        this._state='launching';
+        this._hideGuide();
+        document.getElementById('flight-monitor').style.display='none';
+        Logger.log('ALL PASSENGERS ABOARD — LAUNCH SEQUENCE START');
+        LaunchSequence.startCountdown();
+      }
     }
-    if(this._countdown<=0){
-      clearInterval(this._timer);
-      this._timer=null;
-      document.getElementById('bp-timer').textContent='NOW';
-      document.getElementById('bp-board-btn').textContent='BOARD NOW — FINAL CALL';
-      Logger.log('FINAL BOARDING CALL — DEPARTURE IMMINENT');
+    if(this._countdown<=0&&this._state!=='boarded'&&this._state!=='launching'){
+      // Time expired without boarding — auto-board
+      this._autoBoard();
     }
   },
 
+  // Step 1: Close overlay, start walking to pad
   board(){
-    clearInterval(this._timer);this._timer=null;
     document.getElementById('boarding-overlay').classList.remove('visible');
-    Logger.log('PASSENGER BOARDED — INITIATING LAUNCH SEQUENCE');
-    LaunchSequence.startCountdown();
+    this._state='walking';
+    this._showGuide();
+    Logger.log('FOLLOW THE GUIDE TO GATE A-1 — WALK TO THE LAUNCH PAD');
+    Logger.log('LAUNCH PAD IS AHEAD — APPROACH THE ROCKET TO BOARD');
+  },
+
+  // Guide arrow pointing to pad
+  _showGuide(){
+    if(!this._guideLabel){
+      const div=document.createElement('div');
+      div.id='bp-guide-hud';
+      div.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:55;text-align:center;pointer-events:none;font-family:"Courier New",monospace;';
+      div.innerHTML='<div style="font-size:11px;color:#ffcc00;letter-spacing:0.15em;text-shadow:0 0 8px #ffcc00;">▼ PROCEED TO LAUNCH PAD ▼</div><div id="bp-distance" style="font-size:9px;color:rgba(255,204,0,0.6);margin-top:4px;">-- m</div>';
+      document.body.appendChild(div);
+      this._guideLabel=div;
+    }
+    this._guideLabel.style.display='block';
+  },
+
+  _hideGuide(){
+    if(this._guideLabel)this._guideLabel.style.display='none';
+  },
+
+  // Called every frame from App._animate
+  updateWalking(){
+    if(this._state!=='walking')return;
+    const dist=App.camera.position.distanceTo(this._padPos);
+    const distM=Math.round(dist*10);
+    if(this._guideLabel){
+      const distEl=document.getElementById('bp-distance');
+      if(distEl)distEl.textContent=distM+' m to pad';
+    }
+    // Auto-board when close enough to pad
+    if(dist<this._boardRadius){
+      this._autoBoard();
+    }
+  },
+
+  _autoBoard(){
+    this._state='boarded';
+    this._hideGuide();
+    // Switch to cockpit view inside rocket
+    if(App._camMode!=='cockpit'){
+      App._camMode='cockpit';
+      document.getElementById('cam-mode').textContent='CAM: COCKPIT [V/C]';
+      document.getElementById('cockpit-hud').classList.add('visible');
+    }
+    // Position camera at rocket nose
+    App.camera.position.set(0,-30+56*S,0);
+    App.camera.lookAt(0,-30+100*S,0);
+    App.velocity.set(0,0,0);
+    // Show boarding overlay with countdown to launch
+    document.getElementById('boarding-overlay').classList.add('visible');
+    document.getElementById('bp-board-btn').disabled=true;
+    document.getElementById('bp-board-btn').textContent='SEATED — AWAITING DEPARTURE';
+    // Reset countdown to 15 seconds for launch
+    this._countdown=15;
+    // Update flight monitor — mark self as boarded
+    this._passengers.forEach(p=>{if(p.name==='YOU')p.status='boarded';});
+    // Simulate other passengers boarding
+    this._passengers.forEach(p=>{if(p.status==='waiting'&&Math.random()>0.3)p.status='boarded';});
+    this._updateMonitor();
+    Logger.log('BOARDED SUCCESSFULLY — SECURED IN SEAT '+document.getElementById('bp-seat').textContent);
+    Logger.log('DEPARTURE IN 15 SECONDS — PLEASE FASTEN SEATBELT');
   },
 
   close(){
     document.getElementById('boarding-overlay').classList.remove('visible');
     if(this._timer){clearInterval(this._timer);this._timer=null;}
+    this._state='idle';
+    this._hideGuide();
   }
 };
 
@@ -6647,6 +6850,7 @@ const App={
     const inp=Input.update();
     LaunchSequence.update(dt);
     MoonMission.update(dt);
+    BoardingPass.updateWalking();
     MusicEngine.update();
     MultiUser.update();
 
@@ -6712,26 +6916,52 @@ const App={
     SpaceElevator.update(now);
     MusicZones.update(this.camera.position);
     AppTower.update(now);
-    if(this._camMode==='third'&&PlayerShip.group){
-      const tpc=PlayerShip.getThirdPersonCam(this.camera.position,this.camera.quaternion);
-      // Store real position, move camera to 3rd person view
-      this._fpsCamPos.copy(this.camera.position);
-      this.camera.position.copy(tpc.pos);
-      this.camera.lookAt(tpc.target);
+
+    // Check if we're in an active launch phase
+    const inLaunch=LaunchSequence.phase!=='standby'&&LaunchSequence.phase!=='explore'&&LaunchSequence.phase!=='cycle_wait';
+
+    if(this._camMode==='third'){
+      if(inLaunch){
+        // During launch: 3rd person follows the rocket
+        let rocketWorldPos;
+        if(LaunchSequence.separated){
+          rocketWorldPos=Rocket3D.upperGroup?Rocket3D.upperGroup.position.clone():new THREE.Vector3(0,0,0);
+        }else{
+          rocketWorldPos=Rocket3D.fullStack?Rocket3D.fullStack.position.clone():new THREE.Vector3(0,-30,0);
+        }
+        // Camera behind+above rocket, looking at rocket
+        const camBehind=rocketWorldPos.clone().add(new THREE.Vector3(8,4,12));
+        this._smoothCamPos.lerp(camBehind,0.05);
+        this.camera.position.copy(this._smoothCamPos);
+        this.camera.lookAt(rocketWorldPos);
+        this._fpsCamPos.copy(rocketWorldPos);
+        // Show PlayerShip at rocket position for visual
+        if(PlayerShip.group){
+          PlayerShip.group.position.copy(rocketWorldPos);
+          PlayerShip.group.visible=true;
+        }
+      }else if(PlayerShip.group){
+        // Explore mode: 3rd person follows player ship
+        const tpc=PlayerShip.getThirdPersonCam(this.camera.position,this.camera.quaternion);
+        this._fpsCamPos.copy(this.camera.position);
+        this.camera.position.copy(tpc.pos);
+        this.camera.lookAt(tpc.target);
+      }
     }
     // Cockpit mode: camera inside rocket nose during launch, or at player pos in explore
     if(this._camMode==='cockpit'){
-      // During launch sequence, lock to rocket nose
-      if(LaunchSequence.phase!=='standby'&&LaunchSequence.phase!=='explore'&&LaunchSequence.phase!=='cycle_wait'){
-        const rocketPos=Rocket3D.fullStack?Rocket3D.fullStack.position.clone():new THREE.Vector3(0,0,0);
-        const noseOffset=new THREE.Vector3(0,56*S+LaunchSequence.rocketY,0);
+      if(inLaunch){
         if(LaunchSequence.separated){
           const upperPos=Rocket3D.upperGroup?Rocket3D.upperGroup.position.clone():new THREE.Vector3(0,0,0);
           this._fpsCamPos.copy(this.camera.position);
           this.camera.position.copy(upperPos).add(new THREE.Vector3(0,48*S,0));
+          // Look forward (up along rocket axis)
+          this.camera.lookAt(upperPos.clone().add(new THREE.Vector3(0,100*S,0)));
         }else{
+          const rocketPos=Rocket3D.fullStack?Rocket3D.fullStack.position.clone():new THREE.Vector3(0,0,0);
           this._fpsCamPos.copy(this.camera.position);
           this.camera.position.set(rocketPos.x,rocketPos.y+56*S,rocketPos.z);
+          this.camera.lookAt(new THREE.Vector3(rocketPos.x,rocketPos.y+100*S,rocketPos.z));
         }
       }
     }
