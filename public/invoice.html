@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>Grace of Touch — 見積書・請求書</title>
+<!-- © 2024-2026 Grace of Touch Co. / Yuuichi Onozaki. All rights reserved. -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans JP',sans-serif;background:#f5f5f5;color:#1a1a1a;padding:20px;}
+
+/* コントロールパネル（印刷時は非表示） */
+.controls{max-width:800px;margin:0 auto 20px;background:#1a1a2e;color:#fff;padding:20px;border-radius:12px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;}
+.controls label{font-size:13px;font-weight:300;}
+.controls select,.controls input[type="date"]{padding:6px 10px;border:1px solid #444;border-radius:6px;background:#2a2a4e;color:#fff;font-size:14px;}
+.controls button{padding:8px 20px;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700;transition:all .2s;}
+.btn-pdf{background:#c8a84e;color:#1a1a2e;}
+.btn-pdf:hover{background:#dabb5e;}
+.btn-add{background:#3a5a8c;color:#fff;}
+.btn-add:hover{background:#4a6a9c;}
+.btn-del{background:#8c3a3a;color:#fff;padding:4px 10px;font-size:12px;}
+.btn-del:hover{background:#a44;}
+
+/* 書類本体 */
+.document{max-width:800px;margin:0 auto;background:#fff;padding:60px;box-shadow:0 2px 20px rgba(0,0,0,.1);border-radius:4px;position:relative;}
+
+/* ヘッダー */
+.doc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:40px;padding-bottom:20px;border-bottom:3px solid #c8a84e;}
+.doc-title{font-size:28px;font-weight:700;letter-spacing:4px;}
+.doc-title.estimate{color:#1a5a1a;}
+.doc-title.invoice{color:#1a1a5a;}
+.doc-number{font-size:13px;color:#666;margin-top:8px;}
+.company-info{text-align:right;font-size:12px;line-height:1.8;color:#444;}
+.company-name{font-size:16px;font-weight:700;color:#1a1a1a;}
+
+/* 宛先 */
+.client-section{margin-bottom:30px;padding:16px 20px;background:#fafafa;border-radius:8px;border-left:4px solid #c8a84e;}
+.client-name{font-size:18px;font-weight:700;margin-bottom:4px;}
+.client-name::after{content:' 御中';font-weight:400;font-size:14px;color:#666;}
+.client-detail{font-size:12px;color:#666;line-height:1.6;}
+
+/* 件名・概要 */
+.subject-section{margin-bottom:24px;}
+.subject-label{font-size:11px;color:#999;margin-bottom:4px;}
+.subject-text{font-size:16px;font-weight:700;padding:8px 0;border-bottom:1px solid #ddd;}
+
+/* 明細テーブル */
+.items-table{width:100%;border-collapse:collapse;margin-bottom:20px;}
+.items-table th{background:#1a1a2e;color:#fff;padding:10px 12px;font-size:12px;font-weight:400;text-align:left;}
+.items-table th:nth-child(3),.items-table th:nth-child(4),.items-table th:nth-child(5){text-align:right;}
+.items-table td{padding:10px 12px;border-bottom:1px solid #eee;font-size:13px;vertical-align:top;}
+.items-table td:nth-child(3),.items-table td:nth-child(4),.items-table td:nth-child(5){text-align:right;font-family:monospace;}
+.items-table td input,.items-table td textarea{width:100%;border:1px solid #ddd;border-radius:4px;padding:4px 8px;font-size:13px;font-family:inherit;}
+.items-table td input[type="number"]{text-align:right;width:100px;}
+.items-table td textarea{resize:vertical;min-height:20px;height:24px;}
+
+/* 合計 */
+.totals{display:flex;justify-content:flex-end;margin-bottom:30px;}
+.totals-table{width:280px;}
+.totals-table tr td{padding:8px 12px;font-size:14px;}
+.totals-table tr td:last-child{text-align:right;font-family:monospace;font-weight:700;}
+.totals-table .grand-total{border-top:2px solid #1a1a2e;font-size:18px;}
+.totals-table .grand-total td{color:#c8a84e;font-weight:700;}
+
+/* 備考 */
+.notes-section{margin-top:20px;padding:16px 20px;background:#fafafa;border-radius:8px;font-size:12px;line-height:1.8;}
+.notes-section h4{font-size:13px;margin-bottom:8px;color:#666;}
+.notes-section textarea{width:100%;border:1px solid #ddd;border-radius:4px;padding:8px;font-size:12px;font-family:inherit;min-height:60px;resize:vertical;}
+
+/* 振込先 */
+.bank-section{margin-top:20px;padding:16px 20px;background:#f0f4f8;border-radius:8px;font-size:12px;line-height:2;}
+.bank-section h4{font-size:13px;margin-bottom:8px;color:#1a1a5a;}
+
+/* フッター */
+.doc-footer{margin-top:40px;padding-top:20px;border-top:1px solid #ddd;display:flex;justify-content:space-between;font-size:11px;color:#999;}
+
+/* 印刷スタイル */
+@media print{
+  body{background:#fff;padding:0;}
+  .controls{display:none!important;}
+  .document{box-shadow:none;padding:40px;border-radius:0;}
+  .items-table td input,.items-table td textarea,.notes-section textarea{border:none;background:transparent;padding:0;}
+  .btn-del{display:none!important;}
+  @page{margin:15mm;size:A4;}
+}
+
+/* レスポンシブ */
+@media(max-width:640px){
+  .document{padding:24px 16px;}
+  .doc-header{flex-direction:column;gap:16px;}
+  .company-info{text-align:left;}
+  .totals{justify-content:stretch;}
+  .totals-table{width:100%;}
+}
+</style>
+</head>
+<body>
+
+<!-- コントロールパネル -->
+<div class="controls" id="controls">
+  <label>書類種別
+    <select id="docType" onchange="toggleDocType()">
+      <option value="estimate">見積書</option>
+      <option value="invoice">請求書</option>
+    </select>
+  </label>
+  <label>発行日
+    <input type="date" id="issueDate">
+  </label>
+  <label>支払期限
+    <input type="date" id="dueDate">
+  </label>
+  <button class="btn-add" onclick="addRow()">+ 明細追加</button>
+  <button class="btn-pdf" onclick="window.print()">PDF出力 / 印刷</button>
+</div>
+
+<!-- 書類本体 -->
+<div class="document" id="document">
+
+  <!-- ヘッダー -->
+  <div class="doc-header">
+    <div>
+      <div class="doc-title estimate" id="docTitle">見 積 書</div>
+      <div class="doc-number">No. <span id="docNumber">GOT-E-20260402-001</span></div>
+      <div class="doc-number">発行日: <span id="displayDate">2026年4月2日</span></div>
+    </div>
+    <div class="company-info">
+      <div class="company-name">Grace of Touch</div>
+      小野崎 佑一<br>
+      個人事業主<br>
+      graceoftouchco@gmail.com<br>
+      適格請求書発行事業者登録番号: T______________
+    </div>
+  </div>
+
+  <!-- 宛先 -->
+  <div class="client-section">
+    <div class="client-name" contenteditable="true" id="clientName">クライアント名</div>
+    <div class="client-detail" contenteditable="true" id="clientDetail">住所・部署名等</div>
+  </div>
+
+  <!-- 件名 -->
+  <div class="subject-section">
+    <div class="subject-label">件名</div>
+    <div class="subject-text" contenteditable="true" id="subjectText">ソフトウェア開発業務</div>
+  </div>
+
+  <!-- 合計金額（上部表示） -->
+  <div style="margin-bottom:24px;padding:12px 20px;background:#1a1a2e;border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+    <span style="color:#fff;font-size:14px;">合計金額（税込）</span>
+    <span style="color:#c8a84e;font-size:24px;font-weight:700;font-family:monospace;" id="grandTotalTop">¥0</span>
+  </div>
+
+  <!-- 明細 -->
+  <table class="items-table" id="itemsTable">
+    <thead>
+      <tr>
+        <th style="width:30px;">No</th>
+        <th>項目</th>
+        <th style="width:80px;">数量</th>
+        <th style="width:120px;">単価</th>
+        <th style="width:120px;">金額</th>
+        <th style="width:40px;" class="no-print"></th>
+      </tr>
+    </thead>
+    <tbody id="itemsBody">
+    </tbody>
+  </table>
+
+  <!-- 合計 -->
+  <div class="totals">
+    <table class="totals-table">
+      <tr><td>小計</td><td id="subtotal">¥0</td></tr>
+      <tr><td>消費税 (10%)</td><td id="tax">¥0</td></tr>
+      <tr class="grand-total"><td>合計</td><td id="grandTotal">¥0</td></tr>
+    </table>
+  </div>
+
+  <!-- 備考 -->
+  <div class="notes-section">
+    <h4>備考</h4>
+    <textarea id="notes">・納期: ご発注後○営業日以内
+・本見積書の有効期限: 発行日より30日間</textarea>
+  </div>
+
+  <!-- 振込先（請求書のみ） -->
+  <div class="bank-section" id="bankSection" style="display:none;">
+    <h4>お振込先</h4>
+    <span contenteditable="true">○○銀行 ○○支店 普通 1234567<br>口座名義: オノザキ ユウイチ</span>
+  </div>
+
+  <!-- フッター -->
+  <div class="doc-footer">
+    <span>Grace of Touch Co. — graceoftouchco@gmail.com</span>
+    <span>© 2024-2026 Grace of Touch Co.</span>
+  </div>
+</div>
+
+<script>
+// 初期化
+const today = new Date();
+document.getElementById('issueDate').value = fmt(today);
+document.getElementById('dueDate').value = fmt(new Date(today.getTime() + 30*86400000));
+updateDisplayDate();
+generateDocNumber();
+
+// 初期明細3行
+for(let i=0;i<3;i++) addRow();
+
+// サンプルデータ
+const sample = [
+  ['要件定義・基本設計', 1, 50000],
+  ['フロントエンド開発', 1, 100000],
+  ['テスト・デプロイ', 1, 30000],
+];
+document.querySelectorAll('#itemsBody tr').forEach((tr,i) => {
+  if(!sample[i]) return;
+  tr.querySelector('.item-name').value = sample[i][0];
+  tr.querySelector('.item-qty').value = sample[i][1];
+  tr.querySelector('.item-price').value = sample[i][2];
+});
+calcTotal();
+
+function fmt(d){ return d.toISOString().split('T')[0]; }
+
+function generateDocNumber(){
+  const d = today;
+  const type = document.getElementById('docType').value === 'estimate' ? 'E' : 'I';
+  const num = `GOT-${type}-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}-001`;
+  document.getElementById('docNumber').textContent = num;
+}
+
+function updateDisplayDate(){
+  const d = new Date(document.getElementById('issueDate').value);
+  document.getElementById('displayDate').textContent = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+}
+
+document.getElementById('issueDate').addEventListener('change', () => { updateDisplayDate(); generateDocNumber(); });
+
+function toggleDocType(){
+  const type = document.getElementById('docType').value;
+  const title = document.getElementById('docTitle');
+  if(type === 'estimate'){
+    title.textContent = '見 積 書';
+    title.className = 'doc-title estimate';
+    document.getElementById('bankSection').style.display = 'none';
+    document.getElementById('notes').value = '・納期: ご発注後○営業日以内\n・本見積書の有効期限: 発行日より30日間';
+  } else {
+    title.textContent = '請 求 書';
+    title.className = 'doc-title invoice';
+    document.getElementById('bankSection').style.display = 'block';
+    document.getElementById('notes').value = '・お支払期限: ' + document.getElementById('dueDate').value + '\n・振込手数料はお客様にてご負担ください';
+  }
+  generateDocNumber();
+}
+
+function addRow(){
+  const tbody = document.getElementById('itemsBody');
+  const rowNum = tbody.rows.length + 1;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${rowNum}</td>
+    <td><input type="text" class="item-name" placeholder="項目名"></td>
+    <td><input type="number" class="item-qty" value="1" min="0" step="0.5" onchange="calcTotal()" oninput="calcTotal()"></td>
+    <td><input type="number" class="item-price" value="0" min="0" step="1000" onchange="calcTotal()" oninput="calcTotal()"></td>
+    <td class="item-amount">¥0</td>
+    <td class="no-print"><button class="btn-del" onclick="delRow(this)">×</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function delRow(btn){
+  btn.closest('tr').remove();
+  renumber();
+  calcTotal();
+}
+
+function renumber(){
+  document.querySelectorAll('#itemsBody tr').forEach((tr,i) => {
+    tr.cells[0].textContent = i + 1;
+  });
+}
+
+function calcTotal(){
+  let subtotal = 0;
+  document.querySelectorAll('#itemsBody tr').forEach(tr => {
+    const qty = parseFloat(tr.querySelector('.item-qty')?.value) || 0;
+    const price = parseFloat(tr.querySelector('.item-price')?.value) || 0;
+    const amount = qty * price;
+    subtotal += amount;
+    const amountCell = tr.querySelector('.item-amount');
+    if(amountCell) amountCell.textContent = '¥' + amount.toLocaleString();
+  });
+  const tax = Math.floor(subtotal * 0.1);
+  const total = subtotal + tax;
+  document.getElementById('subtotal').textContent = '¥' + subtotal.toLocaleString();
+  document.getElementById('tax').textContent = '¥' + tax.toLocaleString();
+  document.getElementById('grandTotal').textContent = '¥' + total.toLocaleString();
+  document.getElementById('grandTotalTop').textContent = '¥' + total.toLocaleString();
+}
+</script>
+</body>
+</html>

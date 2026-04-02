@@ -4,9 +4,11 @@ admin.initializeApp();
 
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
-const PRICE_ID = process.env.STRIPE_PRICE_ID;
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const APP_URL = "https://grace-of-touch.web.app";
+
+// Legacy single price (GraceVox backward compat)
+const PRICE_ID = process.env.STRIPE_PRICE_ID;
 
 // ============================================================
 // AI Proofreading Engine (Patent Pending — Server-side only)
@@ -185,7 +187,7 @@ exports.proofread = functions.https.onCall(async (data, context) => {
   return serverProofread(text);
 });
 
-// Create Stripe Checkout Session
+// Create Stripe Checkout Session (multi-app対応)
 exports.createCheckoutSession = functions.https.onCall(async (data, context) => {
   if (!context.auth) {
     throw new functions.https.HttpsError("unauthenticated", "ログインが必要です");
@@ -193,19 +195,75 @@ exports.createCheckoutSession = functions.https.onCall(async (data, context) => 
 
   const uid = context.auth.uid;
   const email = context.auth.token.email || "";
+  const { appId, planId, mode: payMode } = data;
+
+  let priceId = PRICE_ID;
+  let checkoutMode = "subscription";
+  let successUrl = `${APP_URL}/gracevox.html?payment=success`;
+  let cancelUrl = `${APP_URL}/gracevox.html?payment=cancel`;
+
+  // appIdが指定されている場合、Firestoreのpricingから取得
+  if (appId && planId) {
+    const db = admin.firestore();
+    const pricingDoc = await db.collection("pricing").doc(appId).get();
+    if (!pricingDoc.exists) {
+      throw new functions.https.HttpsError("not-found", `アプリ ${appId} の料金設定が見つかりません`);
+    }
+    const pricing = pricingDoc.data();
+    const plan = pricing.plans?.[planId];
+    if (!plan || !plan.stripePriceId) {
+      throw new functions.https.HttpsError("not-found", `プラン ${planId} が見つかりません`);
+    }
+    priceId = plan.stripePriceId;
+    checkoutMode = plan.mode || "subscription"; // "subscription" or "payment"
+    successUrl = `${APP_URL}/${pricing.successPath || appId + '.html'}?payment=success`;
+    cancelUrl = `${APP_URL}/${pricing.cancelPath || appId + '.html'}?payment=cancel`;
+  }
+
+  // 従量課金の場合
+  if (payMode === "payment") checkoutMode = "payment";
 
   const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
+    mode: checkoutMode,
     payment_method_types: ["card"],
     customer_email: email,
-    metadata: { firebaseUID: uid },
-    line_items: [{ price: PRICE_ID, quantity: 1 }],
-    success_url: `${APP_URL}/gracevox.html?payment=success`,
-    cancel_url: `${APP_URL}/gracevox.html?payment=cancel`,
+    metadata: { firebaseUID: uid, appId: appId || "gracevox", planId: planId || "pro" },
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: successUrl,
+    cancel_url: cancelUrl,
     locale: "ja",
   });
 
   return { url: session.url };
+});
+
+// Firestore pricing一覧取得（フロントエンド用）
+exports.getPricing = functions.https.onCall(async (data, context) => {
+  const db = admin.firestore();
+  const { appId } = data;
+
+  if (appId) {
+    const doc = await db.collection("pricing").doc(appId).get();
+    if (!doc.exists) return null;
+    const d = doc.data();
+    // stripePriceIdは公開しない
+    const plans = {};
+    for (const [k, v] of Object.entries(d.plans || {})) {
+      plans[k] = { name: v.name, price: v.price, interval: v.interval, features: v.features, mode: v.mode };
+    }
+    return { id: doc.id, title: d.title, plans };
+  }
+
+  // 全アプリの料金一覧
+  const snap = await db.collection("pricing").where("active", "==", true).get();
+  return snap.docs.map(doc => {
+    const d = doc.data();
+    const plans = {};
+    for (const [k, v] of Object.entries(d.plans || {})) {
+      plans[k] = { name: v.name, price: v.price, interval: v.interval, features: v.features, mode: v.mode };
+    }
+    return { id: doc.id, title: d.title, category: d.category, plans };
+  });
 });
 
 // Stripe Webhook — subscription lifecycle
@@ -233,31 +291,59 @@ exports.stripeWebhook = functions.https.onRequest(async (req, res) => {
       const uid = session.metadata?.firebaseUID;
       if (!uid) break;
 
-      const subscription = await stripe.subscriptions.retrieve(session.subscription);
-      const periodEnd = new Date(subscription.current_period_end * 1000);
+      const appId = session.metadata?.appId || "gracevox";
+      const planId = session.metadata?.planId || "pro";
 
-      await db.collection("subscriptions").doc(uid).set({
-        plan: "pro",
-        stripeCustomerId: session.customer,
-        stripeSubscriptionId: session.subscription,
-        expiresAt: admin.firestore.Timestamp.fromDate(periodEnd),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true });
+      if (session.mode === "subscription" && session.subscription) {
+        const subscription = await stripe.subscriptions.retrieve(session.subscription);
+        const periodEnd = new Date(subscription.current_period_end * 1000);
 
-      console.log(`Pro activated for ${uid} until ${periodEnd.toISOString()}`);
+        await db.collection("subscriptions").doc(uid).set({
+          [appId]: {
+            plan: planId,
+            stripeCustomerId: session.customer,
+            stripeSubscriptionId: session.subscription,
+            expiresAt: admin.firestore.Timestamp.fromDate(periodEnd),
+          },
+          // Legacy flat field for backward compat
+          ...(appId === "gracevox" ? { plan: planId } : {}),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+
+        console.log(`${appId}/${planId} activated for ${uid} until ${periodEnd.toISOString()}`);
+      } else {
+        // 買い切り（payment mode）
+        await db.collection("subscriptions").doc(uid).set({
+          [appId]: {
+            plan: planId,
+            type: "one_time",
+            purchasedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+
+        console.log(`${appId}/${planId} one-time purchase for ${uid}`);
+      }
       break;
     }
 
     case "invoice.paid": {
       const invoice = event.data.object;
+      if (!invoice.subscription) break;
       const sub = await stripe.subscriptions.retrieve(invoice.subscription);
       const uid = sub.metadata?.firebaseUID;
       if (!uid) break;
 
+      const appId = sub.metadata?.appId || "gracevox";
+      const planId = sub.metadata?.planId || "pro";
       const periodEnd = new Date(sub.current_period_end * 1000);
+
       await db.collection("subscriptions").doc(uid).set({
-        plan: "pro",
-        expiresAt: admin.firestore.Timestamp.fromDate(periodEnd),
+        [appId]: {
+          plan: planId,
+          expiresAt: admin.firestore.Timestamp.fromDate(periodEnd),
+        },
+        ...(appId === "gracevox" ? { plan: planId, expiresAt: admin.firestore.Timestamp.fromDate(periodEnd) } : {}),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
       break;
@@ -268,11 +354,14 @@ exports.stripeWebhook = functions.https.onRequest(async (req, res) => {
       const uid = sub.metadata?.firebaseUID;
       if (!uid) break;
 
+      const appId = sub.metadata?.appId || "gracevox";
+
       await db.collection("subscriptions").doc(uid).set({
-        plan: "free",
+        [appId]: { plan: "free" },
+        ...(appId === "gracevox" ? { plan: "free" } : {}),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       }, { merge: true });
-      console.log(`Pro deactivated for ${uid}`);
+      console.log(`${appId} deactivated for ${uid}`);
       break;
     }
   }

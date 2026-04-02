@@ -318,7 +318,7 @@ let bookmarks = loadJSON('grace-bookmarks', [
   { title: 'Records', url: '/records.html', icon: '🎵' },
 ]);
 
-let history = loadJSON('grace-history', []);
+let browsingHistory = loadJSON('grace-history', []);
 const MAX_HISTORY = 200;
 
 // DOM refs
@@ -650,6 +650,7 @@ function navigateTab(id, url) {
       updateNavButtons(tab);
     }
     setStatus(`外部サイトを新しいタブで開きました`);
+    showPichanBubble('Chromeで開いたよ！');
     renderTabs();
     return;
   }
@@ -879,9 +880,9 @@ function toggleBookmark() {
 
 function addHistory(title, url) {
   if (url === HOME_URL) return;
-  history.unshift({ title, url, time: Date.now() });
-  if (history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
-  saveJSON('grace-history', history);
+  browsingHistory.unshift({ title, url, time: Date.now() });
+  if (browsingHistory.length > MAX_HISTORY) browsingHistory = browsingHistory.slice(0, MAX_HISTORY);
+  saveJSON('grace-history', browsingHistory);
 }
 
 // ===== Side Panel =====
@@ -891,7 +892,7 @@ function togglePanel() {
 }
 
 function renderPanel() {
-  const items = panelMode === 'bookmarks' ? bookmarks : history;
+  const items = panelMode === 'bookmarks' ? bookmarks : browsingHistory;
   if (items.length === 0) {
     panelContent.innerHTML = `<div class="panel-empty">${panelMode === 'bookmarks' ? 'ブックマークはありません' : '履歴はありません'}</div>`;
     return;
@@ -918,8 +919,8 @@ function renderPanel() {
           bookmarks.splice(idx, 1);
           saveJSON('grace-bookmarks', bookmarks);
         } else {
-          history.splice(idx, 1);
-          saveJSON('grace-history', history);
+          browsingHistory.splice(idx, 1);
+          saveJSON('grace-history', browsingHistory);
         }
         renderPanel();
         return;
@@ -938,6 +939,20 @@ document.getElementById('btn-reload').addEventListener('click', reload);
 document.getElementById('btn-home').addEventListener('click', goHome);
 document.getElementById('panel-btn').addEventListener('click', togglePanel);
 document.getElementById('btn-terminal').addEventListener('click', () => { window.location.href = 'index.html'; });
+document.getElementById('btn-download').addEventListener('click', () => {
+  const tab = tabs.find(t => t.id === activeTabId);
+  if (!tab || tab.url === HOME_URL) {
+    showPichanBubble('ダウンロードできるページがないよ');
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = tab.url;
+  a.target = '_blank';
+  a.download = '';
+  a.click();
+  statusText.textContent = 'ダウンロード開始: ' + tab.url;
+  showPichanBubble('ダウンロード開始！');
+});
 bookmarkBtn.addEventListener('click', toggleBookmark);
 
 document.querySelector('.panel-close').addEventListener('click', () => {
@@ -952,6 +967,48 @@ document.querySelectorAll('.panel-tab').forEach(tab => {
     renderPanel();
   });
 });
+
+// Context Menu
+document.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  const tab = tabs.find(t => t.id === activeTabId);
+  const currentUrl = tab ? tab.url : '';
+  const isPage = currentUrl && currentUrl !== HOME_URL;
+
+  contextMenu.innerHTML = [
+    { icon: '←', label: '戻る', action: 'goBack' },
+    { icon: '→', label: '進む', action: 'goForward' },
+    { icon: '⟳', label: '再読み込み', action: 'reload' },
+    { sep: true },
+    { icon: '★', label: 'ブックマークに追加', action: 'bookmark', show: isPage },
+    { icon: '↓', label: 'ページをダウンロード', action: 'download', show: isPage },
+    { icon: '+', label: '新しいタブ', action: 'newTab' },
+    { sep: true },
+    { icon: '⌂', label: 'ホームに戻る', action: 'home' },
+  ].filter(item => item.show !== false).map(item => {
+    if (item.sep) return '<div class="ctx-sep"></div>';
+    return `<div class="ctx-item" data-action="${item.action}"><span>${item.icon}</span> ${item.label}</div>`;
+  }).join('');
+
+  contextMenu.style.display = 'block';
+  contextMenu.style.left = Math.min(e.clientX, window.innerWidth - 200) + 'px';
+  contextMenu.style.top = Math.min(e.clientY, window.innerHeight - 250) + 'px';
+});
+contextMenu.addEventListener('click', (e) => {
+  const action = e.target.closest('.ctx-item')?.dataset.action;
+  contextMenu.style.display = 'none';
+  if (!action) return;
+  switch(action) {
+    case 'goBack': goBack(); break;
+    case 'goForward': goForward(); break;
+    case 'reload': reload(); break;
+    case 'bookmark': toggleBookmark(); break;
+    case 'download': document.getElementById('btn-download').click(); break;
+    case 'newTab': createTab(); break;
+    case 'home': goHome(); break;
+  }
+});
+document.addEventListener('click', () => { contextMenu.style.display = 'none'; });
 
 // URL bar
 urlBar.addEventListener('keydown', (e) => {

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
+<meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
+<title>Grace of Touch — 業務委託契約書</title>
+<!-- © 2024-2026 Grace of Touch Co. / Yuuichi Onozaki. All rights reserved. -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans JP',sans-serif;background:#f5f5f5;color:#1a1a1a;padding:20px;}
+
+.controls{max-width:800px;margin:0 auto 20px;background:#1a1a2e;color:#fff;padding:20px;border-radius:12px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;}
+.controls label{font-size:13px;font-weight:300;}
+.controls select{padding:6px 10px;border:1px solid #444;border-radius:6px;background:#2a2a4e;color:#fff;font-size:14px;}
+.controls button{padding:8px 20px;border:none;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700;background:#c8a84e;color:#1a1a2e;}
+.controls button:hover{background:#dabb5e;}
+
+.document{max-width:800px;margin:0 auto;background:#fff;padding:60px;box-shadow:0 2px 20px rgba(0,0,0,.1);border-radius:4px;}
+
+h1{font-size:24px;text-align:center;letter-spacing:6px;margin-bottom:40px;padding-bottom:16px;border-bottom:3px solid #c8a84e;}
+h2{font-size:15px;font-weight:700;margin:28px 0 12px;padding:6px 12px;background:#f0f4f8;border-left:4px solid #1a1a2e;border-radius:4px;}
+p{font-size:13px;line-height:2;margin-bottom:8px;text-indent:1em;}
+.article-body{padding-left:8px;}
+
+.blank{border-bottom:1px dashed #999;padding:0 4px;min-width:120px;display:inline-block;color:#666;}
+[contenteditable]:focus{outline:2px solid #c8a84e;border-radius:2px;}
+
+.signatures{margin-top:60px;display:flex;justify-content:space-between;gap:40px;}
+.sig-block{flex:1;padding:20px;border:1px solid #ddd;border-radius:8px;}
+.sig-block h3{font-size:13px;color:#666;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #eee;}
+.sig-field{font-size:13px;line-height:2.5;color:#444;}
+.sig-field .blank{min-width:200px;}
+
+.doc-footer{margin-top:40px;padding-top:16px;border-top:1px solid #ddd;text-align:center;font-size:11px;color:#999;}
+
+@media print{
+  body{background:#fff;padding:0;}
+  .controls{display:none!important;}
+  .document{box-shadow:none;padding:40px;border-radius:0;}
+  @page{margin:15mm;size:A4;}
+}
+@media(max-width:640px){
+  .document{padding:24px 16px;}
+  .signatures{flex-direction:column;gap:20px;}
+}
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <label>契約書種別
+    <select id="contractType" onchange="switchTemplate()">
+      <option value="development">ソフトウェア開発業務委託</option>
+      <option value="consulting">コンサルティング業務委託</option>
+      <option value="nda">秘密保持契約（NDA）</option>
+    </select>
+  </label>
+  <button onclick="window.print()">PDF出力 / 印刷</button>
+</div>
+
+<div class="document" id="document">
+
+<!-- ===== ソフトウェア開発業務委託契約書 ===== -->
+<div id="tpl-development">
+<h1>業務委託契約書</h1>
+
+<p style="text-indent:0;margin-bottom:20px;">
+<span contenteditable="true" class="blank">クライアント名</span>（以下「甲」という）と、小野崎 佑一（屋号: Grace of Touch、以下「乙」という）は、以下のとおり業務委託契約（以下「本契約」という）を締結する。
+</p>
+
+<h2>第1条（委託業務の内容）</h2>
+<div class="article-body">
+<p>甲は乙に対し、以下の業務を委託し、乙はこれを受託する。</p>
+<p>業務内容: <span contenteditable="true" class="blank">Webアプリケーション開発業務</span></p>
+<p>詳細な仕様は別途協議の上、仕様書にて定めるものとする。</p>
+</div>
+
+<h2>第2条（契約期間）</h2>
+<div class="article-body">
+<p>本契約の有効期間は、<span contenteditable="true" class="blank">2026年○月○日</span>から<span contenteditable="true" class="blank">2026年○月○日</span>までとする。</p>
+<p>ただし、期間満了の30日前までに甲乙いずれからも書面による解約の申出がない場合、同一条件にて1か月間自動更新されるものとし、以後も同様とする。</p>
+</div>
+
+<h2>第3条（報酬及び支払条件）</h2>
+<div class="article-body">
+<p>1. 報酬額: 金<span contenteditable="true" class="blank">○○○,○○○</span>円（税別）</p>
+<p>2. 支払方法: 乙の指定する銀行口座への振込とする。振込手数料は甲の負担とする。</p>
+<p>3. 支払時期: <span contenteditable="true" class="blank">納品検収完了月の翌月末日</span></p>
+<p>4. 追加作業が発生した場合は、甲乙協議の上、別途見積書により報酬を定めるものとする。</p>
+</div>
+
+<h2>第4条（納品及び検収）</h2>
+<div class="article-body">
+<p>1. 乙は、業務の成果物を本契約に定める期日までに甲に納品するものとする。</p>
+<p>2. 甲は、納品後<span contenteditable="true" class="blank">14</span>営業日以内に検収を行い、合否を乙に通知する。</p>
+<p>3. 検収期間内に甲から通知がない場合、検収に合格したものとみなす。</p>
+</div>
+
+<h2>第5条（知的財産権）</h2>
+<div class="article-body">
+<p>1. 本業務により新たに作成された成果物の著作権（著作権法第27条及び第28条を含む）は、報酬の完済をもって乙から甲に移転する。</p>
+<p>2. ただし、乙が本業務以前から保有していた汎用ライブラリ、フレームワーク、ツール（以下「既存成果物」という）の権利は乙に帰属するものとし、甲は本業務の成果物に含まれる既存成果物について、非独占的な利用権を有する。</p>
+<p>3. 乙は、甲に対して著作者人格権を行使しないものとする。</p>
+</div>
+
+<h2>第6条（秘密保持）</h2>
+<div class="article-body">
+<p>1. 甲及び乙は、本契約に関連して知り得た相手方の技術上、営業上の秘密情報を、相手方の書面による事前の承諾なく第三者に開示・漏洩してはならない。</p>
+<p>2. 本条の義務は、本契約終了後も<span contenteditable="true" class="blank">3</span>年間存続する。</p>
+</div>
+
+<h2>第7条（再委託の禁止）</h2>
+<div class="article-body">
+<p>乙は、甲の書面による事前の承諾なく、本業務の全部又は一部を第三者に再委託してはならない。</p>
+</div>
+
+<h2>第8条（損害賠償）</h2>
+<div class="article-body">
+<p>甲又は乙が本契約に違反し相手方に損害を与えた場合、損害を与えた当事者は相手方に対し損害を賠償する責任を負う。ただし、賠償額の上限は本契約に定める報酬総額とする。</p>
+</div>
+
+<h2>第9条（契約解除）</h2>
+<div class="article-body">
+<p>甲又は乙は、相手方が以下の各号に該当した場合、催告なく本契約を解除できる。</p>
+<p>(1) 本契約に違反し、相当期間を定めて催告しても是正されないとき</p>
+<p>(2) 支払停止又は支払不能となったとき</p>
+<p>(3) 破産、民事再生、会社更生等の手続申立てがあったとき</p>
+</div>
+
+<h2>第10条（反社会的勢力の排除）</h2>
+<div class="article-body">
+<p>甲及び乙は、自らが反社会的勢力に該当しないことを表明し、将来にわたって該当しないことを保証する。</p>
+</div>
+
+<h2>第11条（協議事項）</h2>
+<div class="article-body">
+<p>本契約に定めのない事項又は本契約の解釈について疑義が生じた場合、甲乙誠意をもって協議し解決するものとする。</p>
+</div>
+
+<h2>第12条（管轄裁判所）</h2>
+<div class="article-body">
+<p>本契約に関する一切の紛争については、<span contenteditable="true" class="blank">東京地方裁判所</span>を第一審の専属的合意管轄裁判所とする。</p>
+</div>
+
+<p style="text-indent:0;margin-top:30px;">本契約の成立を証するため、本書2通を作成し、甲乙記名押印の上、各1通を保有する。</p>
+
+<p style="text-indent:0;margin-top:16px;text-align:right;color:#666;">
+契約締結日: <span contenteditable="true" class="blank">2026年　月　日</span>
+</p>
+
+<div class="signatures">
+  <div class="sig-block">
+    <h3>甲（委託者）</h3>
+    <div class="sig-field">
+      住所: <span contenteditable="true" class="blank"></span><br>
+      名称: <span contenteditable="true" class="blank"></span><br>
+      代表者: <span contenteditable="true" class="blank"></span><br>
+      <br>印
+    </div>
+  </div>
+  <div class="sig-block">
+    <h3>乙（受託者）</h3>
+    <div class="sig-field">
+      住所: <span contenteditable="true" class="blank"></span><br>
+      屋号: Grace of Touch<br>
+      氏名: 小野崎 佑一<br>
+      <br>印
+    </div>
+  </div>
+</div>
+</div><!-- /tpl-development -->
+
+<!-- ===== NDA ===== -->
+<div id="tpl-nda" style="display:none;">
+<h1>秘密保持契約書</h1>
+
+<p style="text-indent:0;margin-bottom:20px;">
+<span contenteditable="true" class="blank">クライアント名</span>（以下「甲」という）と、小野崎 佑一（屋号: Grace of Touch、以下「乙」という）は、相互の秘密情報の取扱いに関し、以下のとおり秘密保持契約（以下「本契約」という）を締結する。
+</p>
+
+<h2>第1条（秘密情報の定義）</h2>
+<div class="article-body">
+<p>本契約における「秘密情報」とは、開示当事者が受領当事者に対し、書面、口頭、電磁的記録その他の方法により開示する技術上、営業上その他事業に関する一切の情報をいう。ただし、以下に該当するものを除く。</p>
+<p>(1) 開示の時点で既に公知であったもの</p>
+<p>(2) 開示後、受領当事者の責によらず公知となったもの</p>
+<p>(3) 開示の時点で既に受領当事者が適法に保有していたもの</p>
+<p>(4) 正当な権限を有する第三者から秘密保持義務を負うことなく適法に取得したもの</p>
+<p>(5) 秘密情報によらず独自に開発したもの</p>
+</div>
+
+<h2>第2条（秘密保持義務）</h2>
+<div class="article-body">
+<p>1. 受領当事者は、秘密情報を善良なる管理者の注意をもって管理し、開示当事者の書面による事前の承諾なく第三者に開示・漏洩してはならない。</p>
+<p>2. 受領当事者は、秘密情報を本契約の目的以外に使用してはならない。</p>
+</div>
+
+<h2>第3条（有効期間）</h2>
+<div class="article-body">
+<p>本契約の有効期間は、締結日から<span contenteditable="true" class="blank">3</span>年間とする。ただし、秘密保持義務は本契約終了後もなお存続する。</p>
+</div>
+
+<h2>第4条（秘密情報の返還・廃棄）</h2>
+<div class="article-body">
+<p>受領当事者は、開示当事者の求めに応じ、秘密情報及びその複製物を速やかに返還又は廃棄し、その旨を書面にて通知するものとする。</p>
+</div>
+
+<h2>第5条（損害賠償）</h2>
+<div class="article-body">
+<p>本契約に違反して秘密情報を漏洩した当事者は、相手方に生じた損害を賠償する責任を負う。</p>
+</div>
+
+<h2>第6条（管轄裁判所）</h2>
+<div class="article-body">
+<p>本契約に関する一切の紛争については、<span contenteditable="true" class="blank">東京地方裁判所</span>を第一審の専属的合意管轄裁判所とする。</p>
+</div>
+
+<p style="text-indent:0;margin-top:30px;">本契約の成立を証するため、本書2通を作成し、甲乙記名押印の上、各1通を保有する。</p>
+
+<p style="text-indent:0;margin-top:16px;text-align:right;color:#666;">
+契約締結日: <span contenteditable="true" class="blank">2026年　月　日</span>
+</p>
+
+<div class="signatures">
+  <div class="sig-block">
+    <h3>甲</h3>
+    <div class="sig-field">
+      住所: <span contenteditable="true" class="blank"></span><br>
+      名称: <span contenteditable="true" class="blank"></span><br>
+      代表者: <span contenteditable="true" class="blank"></span><br>
+      <br>印
+    </div>
+  </div>
+  <div class="sig-block">
+    <h3>乙</h3>
+    <div class="sig-field">
+      住所: <span contenteditable="true" class="blank"></span><br>
+      屋号: Grace of Touch<br>
+      氏名: 小野崎 佑一<br>
+      <br>印
+    </div>
+  </div>
+</div>
+</div><!-- /tpl-nda -->
+
+<!-- ===== コンサルティング ===== -->
+<div id="tpl-consulting" style="display:none;">
+<h1>コンサルティング業務委託契約書</h1>
+
+<p style="text-indent:0;margin-bottom:20px;">
+<span contenteditable="true" class="blank">クライアント名</span>（以下「甲」という）と、小野崎 佑一（屋号: Grace of Touch、以下「乙」という）は、以下のとおりコンサルティング業務委託契約を締結する。
+</p>
+
+<h2>第1条（委託業務の内容）</h2>
+<div class="article-body">
+<p>甲は乙に対し、以下のコンサルティング業務を委託する。</p>
+<p>業務内容: <span contenteditable="true" class="blank">技術コンサルティング（インフラ点検システム導入支援）</span></p>
+</div>
+
+<h2>第2条（報酬）</h2>
+<div class="article-body">
+<p>1. 時間単価: 金<span contenteditable="true" class="blank">○○,○○○</span>円（税別）/ 時間</p>
+<p>2. 月間上限: <span contenteditable="true" class="blank">○○</span>時間</p>
+<p>3. 稼働報告を月末に提出し、翌月末日までに支払うものとする。</p>
+</div>
+
+<h2>第3条（契約期間）</h2>
+<div class="article-body">
+<p>本契約の有効期間は、<span contenteditable="true" class="blank">2026年○月○日</span>から<span contenteditable="true" class="blank">2026年○月○日</span>までとする。</p>
+</div>
+
+<h2>第4条（秘密保持）</h2>
+<div class="article-body">
+<p>甲及び乙は、本契約に関連して知り得た相手方の秘密情報を第三者に開示・漏洩してはならない。本条の義務は契約終了後3年間存続する。</p>
+</div>
+
+<h2>第5条（知的財産権）</h2>
+<div class="article-body">
+<p>コンサルティングの過程で乙が作成した資料・レポートの著作権は、報酬の完済をもって甲に移転する。ただし、乙の既存ノウハウ・汎用的知見は乙に帰属する。</p>
+</div>
+
+<h2>第6条（管轄裁判所）</h2>
+<div class="article-body">
+<p>本契約に関する紛争は、<span contenteditable="true" class="blank">東京地方裁判所</span>を専属的合意管轄裁判所とする。</p>
+</div>
+
+<p style="text-indent:0;margin-top:30px;">本契約の成立を証するため、本書2通を作成し、甲乙記名押印の上、各1通を保有する。</p>
+
+<p style="text-indent:0;margin-top:16px;text-align:right;color:#666;">
+契約締結日: <span contenteditable="true" class="blank">2026年　月　日</span>
+</p>
+
+<div class="signatures">
+  <div class="sig-block">
+    <h3>甲（委託者）</h3>
+    <div class="sig-field">
+      住所: <span contenteditable="true" class="blank"></span><br>
+      名称: <span contenteditable="true" class="blank"></span><br>
+      代表者: <span contenteditable="true" class="blank"></span><br>
+      <br>印
+    </div>
+  </div>
+  <div class="sig-block">
+    <h3>乙（受託者）</h3>
+    <div class="sig-field">
+      住所: <span contenteditable="true" class="blank"></span><br>
+      屋号: Grace of Touch<br>
+      氏名: 小野崎 佑一<br>
+      <br>印
+    </div>
+  </div>
+</div>
+</div><!-- /tpl-consulting -->
+
+<div class="doc-footer">
+  <p>© 2024-2026 Grace of Touch Co. All rights reserved.</p>
+</div>
+
+</div><!-- /document -->
+
+<script>
+function switchTemplate(){
+  const type = document.getElementById('contractType').value;
+  document.getElementById('tpl-development').style.display = type === 'development' ? 'block' : 'none';
+  document.getElementById('tpl-nda').style.display = type === 'nda' ? 'block' : 'none';
+  document.getElementById('tpl-consulting').style.display = type === 'consulting' ? 'block' : 'none';
+}
+</script>
+</body>
+</html>
