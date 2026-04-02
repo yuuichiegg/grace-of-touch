@@ -1103,6 +1103,7 @@ const Rocket3D = {
 // ══════════════════════════════════════════════
 const Mechazilla = {
   group: null, armL: null, armR: null, catchProgress: 0,
+  elevator: null, elevatorY: 24, // internal Y, matches arm height
   _bloomMats: null, _realMats: null,
   create(scene) {
     this.group=new THREE.Group();
@@ -1164,6 +1165,25 @@ const Mechazilla = {
     tipR.position.set(6,0,0);armMeshR.add(tipR);
     armR.add(armMeshR);
     this.group.add(armR);this.armR=armR;
+
+    // Elevator platform (yellow bar) — slides vertically on tower rails
+    const elevMat=new THREE.MeshBasicMaterial({color:0xffcc00});
+    this._bloomMats.elev=elevMat;
+    this._realMats.elev=new THREE.MeshStandardMaterial({color:0xffcc00,metalness:0.5,roughness:0.3});
+    const elevBar=new THREE.Group();
+    // Main crossbar
+    const crossbar=new THREE.Mesh(new THREE.BoxGeometry(5,0.5,4),elevMat);
+    elevBar.add(crossbar);
+    // Rail guides on each side
+    const guideL=new THREE.Mesh(new THREE.BoxGeometry(0.4,1.2,0.4),elevMat);
+    guideL.position.set(-2,0,1.5);elevBar.add(guideL);
+    const guideR=new THREE.Mesh(new THREE.BoxGeometry(0.4,1.2,0.4),elevMat);
+    guideR.position.set(-2,0,-1.5);elevBar.add(guideR);
+    elevBar.position.y=24; // same height as arms
+    elevBar.visible=false; // hidden until catch phase
+    this.group.add(elevBar);
+    this.elevator=elevBar;
+    this.elevatorY=24;
 
     // Lightning rod
     const rod=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.1,6,6),tMat);
@@ -2131,13 +2151,15 @@ const JoyRenderer={canvas:document.getElementById('joystick-layer'),ctx:null,
 init(){
   this.ctx=this.canvas.getContext('2d');this.resize();
   window.addEventListener('resize',()=>this.resize());
-  // Add mode toggle button + labels (mobile only)
-  if('ontouchstart' in window||navigator.maxTouchPoints>0){
+  // Add mode toggle button + labels (touch devices)
+  const isTouchDevice='ontouchstart' in window||navigator.maxTouchPoints>0;
+  const isMobileOnly=isTouchDevice&&window.innerWidth<=768&&!window.matchMedia('(pointer:fine)').matches;
+  if(isTouchDevice){
     const modeBtn=document.createElement('div');
     modeBtn.id='stick-mode-btn';
-    modeBtn.innerHTML='<span id="stick-mode-label">EXPLORE</span>';
-    // モバイルはEXPLOREをデフォルトに（PCはPILOT USのまま）
-    Input._stickMode=3;
+    // スマホ（小画面+タッチのみ）はEXPLORE、PCタッチスクリーンはPILOT維持
+    if(isMobileOnly)Input._stickMode=3;
+    modeBtn.innerHTML='<span id="stick-mode-label">'+Input._stickModes[Input._stickMode-1]+'</span>';
     modeBtn.style.cssText='position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:30;background:rgba(0,30,50,0.7);border:1px solid rgba(0,216,255,0.4);color:rgba(0,216,255,0.9);font-family:Courier New,monospace;font-size:11px;padding:6px 16px;border-radius:20px;cursor:pointer;backdrop-filter:blur(4px);user-select:none;letter-spacing:1px;';
     modeBtn.addEventListener('touchstart',e=>{e.stopPropagation();Input.toggleStickMode();});
     document.body.appendChild(modeBtn);
