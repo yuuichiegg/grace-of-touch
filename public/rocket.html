@@ -60,8 +60,9 @@
   #altitude-bar-fill{position:absolute;bottom:0;left:0;width:100%;background:linear-gradient(to top,#00d8ff,#ffffff);border-radius:3px;transition:height 0.5s ease;box-shadow:0 0 8px #00d8ff;height:0%;}
   #altitude-val{font-size:10px;color:var(--term-color);letter-spacing:0.05em;}
 
-  /* Chat */
+  /* Chat — hidden on mobile by default */
   #chat-container{position:absolute;bottom:58px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:40;pointer-events:auto;background:rgba(2,5,16,0.85);padding:8px;border-radius:8px;border:1px solid var(--term-dim);backdrop-filter:blur(5px);}
+  @media(max-width:768px){#chat-container{display:none!important;}#chat-container.mobile-open{display:flex!important;}}
   #chat-input{background:rgba(0,0,0,0.5);border:1px solid var(--term-dim);color:var(--term-color);font-family:"Courier New",monospace;padding:6px 10px;border-radius:4px;width:250px;outline:none;}
   #chat-input:focus{border-color:var(--term-color);box-shadow:0 0 8px rgba(0,216,255,0.3);}
   #chat-send{background:transparent;border:1px solid var(--term-color);color:var(--term-color);font-family:"Courier New",monospace;padding:6px 12px;border-radius:4px;cursor:pointer;}
@@ -1955,7 +1956,7 @@ _codeMap:{KeyW:'w',KeyA:'a',KeyS:'s',KeyD:'d',KeyE:'e',KeyQ:'q',KeyV:'v',KeyC:'c
 keys:{w:false,a:false,s:false,d:false,e:false,q:false,c:false,Shift:false,ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false},isPointerDown:false,pointerPos:{x:0,y:0},touchJoyActive:false,touchJoyId:null,touchJoyOrigin:{x:0,y:0},touchJoyCurrent:{x:0,y:0},touchLookActive:false,touchLookId:null,touchLookLastPos:{x:0,y:0},_enabled:false,wheelBoost:0,
 // Pinch zoom
 _pinchActive:false,_pinchDist0:0,pinchDelta:0,
-init(){window.addEventListener('keydown',e=>{const k=this._codeMap[e.code];if(k)this.keys[k]=true;if((e.code==='KeyV'||e.code==='KeyC')&&!e.repeat)App.toggleCamMode();if(e.code==='Digit1'&&!e.repeat){this._stickMode=1;this._lastNormalMode=1;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='MODE 1 (JP)');Logger.log('CONTROLLER: MODE 1 (JP)');}if(e.code==='Digit2'&&!e.repeat){this._stickMode=2;this._lastNormalMode=2;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='MODE 2 (US)');Logger.log('CONTROLLER: MODE 2 (US)');}if(e.code==='Digit3'&&!e.repeat){this._stickMode=3;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='ORBIT 360');Logger.log('CONTROLLER: ORBIT 360');if(!this._orbitTarget){const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(App.camera.quaternion);this._orbitTarget=App.camera.position.clone().addScaledVector(fwd,this._orbitDist);}}if(e.code==='Digit4'&&!e.repeat){this._stickMode=4;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='FPV');Logger.log('CONTROLLER: FPV');}});window.addEventListener('keyup',e=>{const k=this._codeMap[e.code];if(k)this.keys[k]=false;});const cv=document.getElementById('webgl-canvas');
+init(){window.addEventListener('keydown',e=>{const k=this._codeMap[e.code];if(k)this.keys[k]=true;if((e.code==='KeyV'||e.code==='KeyC')&&!e.repeat)App.toggleCamMode();if(e.code==='Digit1'&&!e.repeat){this._stickMode=1;this._lastNormalMode=1;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='PILOT (JP)');Logger.log('CONTROLLER: PILOT (JP)');}if(e.code==='Digit2'&&!e.repeat){this._stickMode=2;this._lastNormalMode=2;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='PILOT (US)');Logger.log('CONTROLLER: PILOT (US)');}if(e.code==='Digit3'&&!e.repeat){this._stickMode=3;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='EXPLORE');Logger.log('CONTROLLER: EXPLORE');if(!this._orbitTarget){const fwd=new THREE.Vector3(0,0,-1).applyQuaternion(App.camera.quaternion);this._orbitTarget=App.camera.position.clone().addScaledVector(fwd,this._orbitDist);}}if(e.code==='Digit4'&&!e.repeat){this._stickMode=4;document.getElementById('stick-mode-label')&&(document.getElementById('stick-mode-label').textContent='FPV');Logger.log('CONTROLLER: FPV');}});window.addEventListener('keyup',e=>{const k=this._codeMap[e.code];if(k)this.keys[k]=false;});const cv=document.getElementById('webgl-canvas');
 // Mouse — Left-click drag to look around (cursor always visible)
 this._pointerLocked=false;
 window.addEventListener('mousemove',e=>{
@@ -1976,14 +1977,14 @@ sp.querySelectorAll('input[type=range]').forEach(el=>{['touchstart','touchmove']
 // Drone-style dual joystick: Mode1 (JP) / Mode2 (US)
 // Mode1: Left=Throttle(↑↓)+Yaw(←→), Right=Pitch(↑↓fwd/back)+Roll(←→strafe)
 // Mode2: Left=Throttle(↑↓)+Yaw(←→), Right=Pitch(↑↓look)+Roll(←→look)
-_stickMode:2, // 1=Mode1(JP), 2=Mode2(US), 3=Orbit, 4=FPV
-_stickModes:['MODE 1 (JP)','MODE 2 (US)','ORBIT 360','FPV'],
+_stickMode:3, // v75: デフォルトをEXPLORE(旧Orbit)に変更。1=PILOT JP, 2=PILOT US, 3=EXPLORE, 4=FPV
+_stickModes:['PILOT (JP)','PILOT (US)','EXPLORE','FPV'],
 // Left stick state
 _stickL:{active:false,id:null,ox:0,oy:0,cx:0,cy:0,dx:0,dy:0},
 // Right stick state
 _stickR:{active:false,id:null,ox:0,oy:0,cx:0,cy:0,dx:0,dy:0},
-_stickRadius:55,
-_stickDeadzone:0.08,
+_stickRadius:75, // v75: 55→75 モバイル操作性改善
+_stickDeadzone:0.06,
 // Orbit mode state
 _orbitYaw:0,_orbitPitch:0.3,_orbitDist:50,_orbitTarget:null,
 
@@ -2129,7 +2130,7 @@ init(){
   if('ontouchstart' in window||navigator.maxTouchPoints>0){
     const modeBtn=document.createElement('div');
     modeBtn.id='stick-mode-btn';
-    modeBtn.innerHTML='<span id="stick-mode-label">MODE 2 (US)</span>';
+    modeBtn.innerHTML='<span id="stick-mode-label">EXPLORE</span>';
     modeBtn.style.cssText='position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:30;background:rgba(0,30,50,0.7);border:1px solid rgba(0,216,255,0.4);color:rgba(0,216,255,0.9);font-family:Courier New,monospace;font-size:11px;padding:6px 16px;border-radius:20px;cursor:pointer;backdrop-filter:blur(4px);user-select:none;letter-spacing:1px;';
     modeBtn.addEventListener('touchstart',e=>{e.stopPropagation();Input.toggleStickMode();});
     document.body.appendChild(modeBtn);
@@ -2172,8 +2173,29 @@ _drawStick(stick,color,label){
   ctx.strokeStyle=color.replace('0.75','0.3');ctx.lineWidth=1;
   ctx.beginPath();ctx.arc(ox,oy,8,0,Math.PI*2);ctx.stroke();
 },
+_drawGhostStick(x,y,color,label){
+  // v75: 半透明のガイド円を常時表示（初見ユーザー向け）
+  const ctx=this.ctx,r=Input._stickRadius;
+  // Outer ring (faint)
+  ctx.strokeStyle=color.replace(/[\d.]+\)$/,'0.12)');ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke();
+  // Center dot
+  ctx.fillStyle=color.replace(/[\d.]+\)$/,'0.15)');
+  ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.fill();
+  // Label
+  ctx.fillStyle=color.replace(/[\d.]+\)$/,'0.2)');
+  ctx.font='10px Courier New';ctx.textAlign='center';
+  ctx.fillText(label,x,y+r+14);
+},
 render(){
   this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+  // Ghost sticks (always visible on touch devices)
+  if('ontouchstart' in window||navigator.maxTouchPoints>0){
+    const w=this.canvas.width,h=this.canvas.height;
+    const ghostY=h-140; // above music player
+    this._drawGhostStick(w*0.22,ghostY,'rgba(0,216,255,0.75)','L');
+    this._drawGhostStick(w*0.78,ghostY,'rgba(0,255,136,0.75)','R');
+  }
   this._drawStick(Input._stickL,'rgba(0,216,255,0.75)','L');
   this._drawStick(Input._stickR,'rgba(0,255,136,0.75)','R');
 }};
