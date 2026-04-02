@@ -69,7 +69,7 @@
             if(e.error==='not-allowed'||e.error==='service-not-allowed'){
               if(!document.getElementById('envBanner')){
                 const openMsg=isiOS?'Safariで開く':'ブラウザで開く';
-                _showEnvBanner('音声認識が利用できません','「'+openMsg+'」で開き直してください');
+                _showEnvBanner('マイクの許可が必要です','「'+openMsg+'」でアクセスし、マイクを許可してください');
               }
             }
             try{test.abort();}catch(ex){}

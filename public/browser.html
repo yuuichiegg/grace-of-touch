@@ -124,11 +124,14 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
 .ntp-shortcut{display:flex;flex-direction:column;align-items:center;gap:8px;
   cursor:pointer;padding:12px 8px;border-radius:12px;transition:all .15s;}
 .ntp-shortcut:hover{background:var(--surface);}
-.ntp-shortcut-icon{width:48px;height:48px;border-radius:12px;background:var(--surface2);
-  display:flex;align-items:center;justify-content:center;font-size:22px;
-  border:1px solid var(--border);transition:all .15s;}
+.ntp-shortcut-icon{width:56px;height:56px;border-radius:14px;
+  display:flex;align-items:center;justify-content:center;font-size:26px;
+  border:1px solid var(--border);transition:all .2s;position:relative;overflow:hidden;}
+.ntp-shortcut-icon::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 30% 30%,rgba(255,255,255,.08),transparent 60%);
+  pointer-events:none;}
 .ntp-shortcut:hover .ntp-shortcut-icon{border-color:var(--accent);
-  box-shadow:0 0 12px rgba(0,229,255,.15);}
+  box-shadow:0 4px 20px rgba(0,229,255,.2);transform:translateY(-2px);}
 /* Feed cards */
 .feed-card{display:flex;gap:10px;padding:10px;background:var(--surface);
   border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all .15s;}
@@ -415,7 +418,7 @@ function buildNewTabPage() {
   ];
   const studioHTML = studioApps.map(a =>
     `<div class="ntp-shortcut" data-url="${escapeAttr(a.url)}" style="gap:4px;">
-      <div class="ntp-shortcut-icon" style="border-color:rgba(108,92,231,.4);background:rgba(108,92,231,.1);font-size:24px;">${a.icon}</div>
+      <div class="ntp-shortcut-icon" style="border-color:rgba(108,92,231,.4);background:linear-gradient(135deg,rgba(108,92,231,.2),rgba(108,92,231,.05));font-size:26px;">${a.icon}</div>
       <div class="ntp-shortcut-label" style="color:#8b7cf7;font-size:10px;">${escapeHTML(a.title)}</div>
       <div style="font-size:8px;color:var(--text2);opacity:.6;">${a.desc}</div>
     </div>`
@@ -430,7 +433,7 @@ function buildNewTabPage() {
   ];
   const creativeHTML = creativeApps.map(a =>
     `<div class="ntp-shortcut" data-url="${escapeAttr(a.url)}" style="gap:4px;">
-      <div class="ntp-shortcut-icon" style="border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.06);font-size:22px;">${a.icon}</div>
+      <div class="ntp-shortcut-icon" style="border-color:rgba(0,255,136,.3);background:linear-gradient(135deg,rgba(0,255,136,.15),rgba(0,255,136,.03));font-size:26px;">${a.icon}</div>
       <div class="ntp-shortcut-label" style="color:#00ff88;font-size:10px;">${escapeHTML(a.title)}</div>
       <div style="font-size:8px;color:var(--text2);opacity:.6;">${a.desc}</div>
     </div>`
@@ -445,7 +448,7 @@ function buildNewTabPage() {
   ];
   const infraHTML = infraApps.map(a =>
     `<div class="ntp-shortcut" data-url="${escapeAttr(a.url)}" style="gap:4px;">
-      <div class="ntp-shortcut-icon" style="border-color:rgba(255,165,2,.3);background:rgba(255,165,2,.06);font-size:22px;">${a.icon}</div>
+      <div class="ntp-shortcut-icon" style="border-color:rgba(255,165,2,.3);background:linear-gradient(135deg,rgba(255,165,2,.15),rgba(255,165,2,.03));font-size:26px;">${a.icon}</div>
       <div class="ntp-shortcut-label" style="color:#ffa502;font-size:10px;">${escapeHTML(a.title)}</div>
       <div style="font-size:8px;color:var(--text2);opacity:.6;">${a.desc}</div>
     </div>`
@@ -459,7 +462,7 @@ function buildNewTabPage() {
   ];
   const gameHTML = gameApps.map(a =>
     `<div class="ntp-shortcut" data-url="${escapeAttr(a.url)}" style="gap:4px;">
-      <div class="ntp-shortcut-icon" style="border-color:rgba(255,107,157,.3);background:rgba(255,107,157,.06);font-size:22px;">${a.icon}</div>
+      <div class="ntp-shortcut-icon" style="border-color:rgba(255,107,157,.3);background:linear-gradient(135deg,rgba(255,107,157,.15),rgba(255,107,157,.03));font-size:26px;">${a.icon}</div>
       <div class="ntp-shortcut-label" style="color:#ff6b9d;font-size:10px;">${escapeHTML(a.title)}</div>
       <div style="font-size:8px;color:var(--text2);opacity:.6;">${a.desc}</div>
     </div>`
