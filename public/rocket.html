@@ -149,6 +149,10 @@
   #moon-mission-btn{position:absolute;top:80px;right:20px;z-index:31;pointer-events:auto;display:none;background:rgba(0,216,255,0.08);border:2px solid var(--term-color);color:var(--term-color);font-family:"Courier New",monospace;font-size:12px;letter-spacing:0.15em;padding:10px 20px;border-radius:6px;cursor:pointer;text-shadow:0 0 8px var(--term-color);box-shadow:0 0 15px rgba(0,216,255,0.2);transition:all 0.3s;animation:btnPulse 2.5s ease-in-out infinite;}
   #moon-mission-btn:hover{background:rgba(0,216,255,0.15);box-shadow:0 0 30px rgba(0,216,255,0.4);}
   #moon-mission-btn.hidden{display:none;}
+  /* Moon Mission Guide Tooltip */
+  #moon-guide-tooltip{position:absolute;top:125px;right:20px;z-index:32;pointer-events:auto;display:none;background:rgba(0,216,255,0.12);border:1px solid rgba(0,216,255,0.4);color:var(--term-color);font-family:"Courier New",monospace;font-size:11px;letter-spacing:0.08em;padding:10px 16px;border-radius:6px;backdrop-filter:blur(8px);max-width:220px;text-align:center;animation:guideFloat 2s ease-in-out infinite;cursor:pointer;}
+  #moon-guide-tooltip::before{content:'';position:absolute;top:-6px;right:30px;width:12px;height:12px;background:rgba(0,216,255,0.12);border-left:1px solid rgba(0,216,255,0.4);border-top:1px solid rgba(0,216,255,0.4);transform:rotate(45deg);}
+  @keyframes guideFloat{0%,100%{transform:translateY(0);opacity:1;}50%{transform:translateY(-5px);opacity:0.85;}}
 
   /* Moon HUD */
   #moon-hud{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:25;opacity:0;transition:opacity 0.8s;font-family:"Courier New",monospace;}
@@ -419,6 +423,7 @@
 </div>
 <!-- Moon Mission Button -->
 <button id="moon-mission-btn">&#127761; MOON MISSION</button>
+<div id="moon-guide-tooltip" onclick="this.style.display='none'">&#127761; READY FOR MOON?<br><span style="font-size:9px;color:rgba(0,216,255,0.6)">Tap the button above to launch a lunar mission</span></div>
 <button id="moon-abort-btn" style="position:absolute;top:80px;right:20px;z-index:35;pointer-events:auto;display:none;background:rgba(255,40,40,0.15);border:2px solid #ff4444;color:#ff4444;font-family:'Courier New',monospace;font-size:14px;font-weight:bold;letter-spacing:0.15em;padding:12px 24px;border-radius:6px;cursor:pointer;text-shadow:0 0 8px #ff4444;box-shadow:0 0 15px rgba(255,68,68,0.3);animation:btnPulse 2s ease-in-out infinite;">&#9888; ABORT MISSION</button>
 
 <!-- Moon Mission HUD -->
@@ -1977,7 +1982,7 @@ sp.querySelectorAll('input[type=range]').forEach(el=>{['touchstart','touchmove']
 // Drone-style dual joystick: Mode1 (JP) / Mode2 (US)
 // Mode1: Left=Throttle(↑↓)+Yaw(←→), Right=Pitch(↑↓fwd/back)+Roll(←→strafe)
 // Mode2: Left=Throttle(↑↓)+Yaw(←→), Right=Pitch(↑↓look)+Roll(←→look)
-_stickMode:3, // v75: デフォルトをEXPLORE(旧Orbit)に変更。1=PILOT JP, 2=PILOT US, 3=EXPLORE, 4=FPV
+_stickMode:2, // PC default: PILOT(US)。モバイルはJoyRenderer.initでEXPLOREに切替
 _stickModes:['PILOT (JP)','PILOT (US)','EXPLORE','FPV'],
 // Left stick state
 _stickL:{active:false,id:null,ox:0,oy:0,cx:0,cy:0,dx:0,dy:0},
@@ -2131,6 +2136,8 @@ init(){
     const modeBtn=document.createElement('div');
     modeBtn.id='stick-mode-btn';
     modeBtn.innerHTML='<span id="stick-mode-label">EXPLORE</span>';
+    // モバイルはEXPLOREをデフォルトに（PCはPILOT USのまま）
+    Input._stickMode=3;
     modeBtn.style.cssText='position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:30;background:rgba(0,30,50,0.7);border:1px solid rgba(0,216,255,0.4);color:rgba(0,216,255,0.9);font-family:Courier New,monospace;font-size:11px;padding:6px 16px;border-radius:20px;cursor:pointer;backdrop-filter:blur(4px);user-select:none;letter-spacing:1px;';
     modeBtn.addEventListener('touchstart',e=>{e.stopPropagation();Input.toggleStickMode();});
     document.body.appendChild(modeBtn);
@@ -5482,6 +5489,10 @@ const MoonMission={
 
   show(){
     document.getElementById('moon-mission-btn').style.display='block';
+    // Show guide tooltip for first-time discovery
+    const tip=document.getElementById('moon-guide-tooltip');
+    tip.style.display='block';
+    setTimeout(()=>{tip.style.display='none';},8000);
   },
 
   getMoonWorldPos(){
@@ -5512,6 +5523,7 @@ const MoonMission={
     this.deltaV=100;
     this.flagPlanted=false;
     this._footprints=[];
+    document.getElementById('moon-guide-tooltip').style.display='none';
 
     // Hide start button, show abort button + HUD
     document.getElementById('moon-mission-btn').style.display='none';
