@@ -1314,7 +1314,7 @@ const LaunchSequence = {
         const cd=Math.ceil(p.dur-this.phaseTimer);
         document.getElementById('cd-number').textContent=cd>0?cd:'GO!';
         document.getElementById('cd-status').textContent=cd>0?this._cdMsg(cd):'MAIN ENGINE START';
-        if(cd>=0&&cd<=10&&Math.abs(this.phaseTimer-Math.floor(this.phaseTimer))<dt){SFXSystem.playCountdownBeep(cd);}
+        try{if(cd>=0&&cd<=10&&Math.abs(this.phaseTimer-Math.floor(this.phaseTimer))<dt){SFXSystem.playCountdownBeep(cd);}}catch(e){console.warn('Beep error:',e);}
         break;
       }
       case 'IGNITION':
@@ -1913,8 +1913,8 @@ _setupEngineRoar(){
   this._roarSource.start();
 },
 playCountdownBeep(n){try{if(!this.ctx)return;this._click(this.ctx.currentTime,n===0?880:440,n===0?0.3:0.15,n===0?0.4:0.12);}catch(e){}},
-playLiftoff(){if(!this.ctx||this._liftoffPlayed)return;this._liftoffPlayed=true;const sz=this.ctx.sampleRate*3,buf=this.ctx.createBuffer(1,sz,this.ctx.sampleRate),d=buf.getChannelData(0);for(let i=0;i<sz;i++)d[i]=Math.random()*2-1;const ns=this.ctx.createBufferSource();ns.buffer=buf;ns.loop=true;const flt=this.ctx.createBiquadFilter();flt.type='lowpass';flt.frequency.setValueAtTime(80,this.ctx.currentTime);flt.frequency.linearRampToValueAtTime(800,this.ctx.currentTime+8);const eg=this.ctx.createGain();eg.gain.value=0;eg.gain.linearRampToValueAtTime(0.5,this.ctx.currentTime+0.5);eg.gain.setTargetAtTime(0.1,this.ctx.currentTime+12,3);ns.connect(flt);flt.connect(eg);eg.connect(this.masterGain);ns.start();},
-_click(ct,f,g,dur){const o=this.ctx.createOscillator(),gn=this.ctx.createGain();o.type='sine';o.frequency.value=f;gn.gain.setValueAtTime(g,ct);gn.gain.exponentialRampToValueAtTime(0.0001,ct+dur);o.connect(gn);gn.connect(this.masterGain);o.start(ct);o.stop(ct+dur);},
+playLiftoff(){try{if(!this.ctx||this._liftoffPlayed)return;this._liftoffPlayed=true;const sz=this.ctx.sampleRate*3,buf=this.ctx.createBuffer(1,sz,this.ctx.sampleRate),d=buf.getChannelData(0);for(let i=0;i<sz;i++)d[i]=Math.random()*2-1;const ns=this.ctx.createBufferSource();ns.buffer=buf;ns.loop=true;const flt=this.ctx.createBiquadFilter();flt.type='lowpass';flt.frequency.setValueAtTime(80,this.ctx.currentTime);flt.frequency.linearRampToValueAtTime(800,this.ctx.currentTime+8);const eg=this.ctx.createGain();eg.gain.value=0;eg.gain.linearRampToValueAtTime(0.5,this.ctx.currentTime+0.5);eg.gain.setTargetAtTime(0.1,this.ctx.currentTime+12,3);ns.connect(flt);flt.connect(eg);eg.connect(this.masterGain);ns.start();}catch(e){console.warn('Liftoff SFX error:',e);}},
+_click(ct,f,g,dur){try{const o=this.ctx.createOscillator(),gn=this.ctx.createGain();o.type='sine';o.frequency.value=f;gn.gain.setValueAtTime(g,ct);gn.gain.exponentialRampToValueAtTime(0.0001,ct+dur);o.connect(gn);gn.connect(this.masterGain);o.start(ct);o.stop(ct+dur);}catch(e){}},
 // v70: Enhanced setSpeed with Doppler-like shift and engine thrust coupling
 setSpeed(s){
   if(!this.ctx)return;
@@ -3558,15 +3558,15 @@ const TrafficNetwork={
       const stripe=new THREE.Mesh(new THREE.BoxGeometry(0.47,0.03,5.5),stripeMat);
       stripe.position.y=0.05;g.add(stripe);
     }
-    g.scale.setScalar(0.6);
+    g.scale.setScalar(3.0); // v75fix: 地球スケール(R=3000)に対して視認可能なサイズ
     return g;
   },
 
   _createTrail(){
-    // 光の尾（残像効果）
-    const pts=[];for(let i=0;i<20;i++)pts.push(new THREE.Vector3(0,0,0));
+    // 光の尾（残像効果）— 太いラインで視認性向上
+    const pts=[];for(let i=0;i<30;i++)pts.push(new THREE.Vector3(0,0,0));
     const geo=new THREE.BufferGeometry().setFromPoints(pts);
-    const mat=new THREE.LineBasicMaterial({color:0x00ddff,transparent:true,opacity:0.4,blending:THREE.AdditiveBlending});
+    const mat=new THREE.LineBasicMaterial({color:0x00ddff,transparent:true,opacity:0.6,blending:THREE.AdditiveBlending,linewidth:2});
     const line=new THREE.Line(geo,mat);
     line.frustumCulled=false;
     return line;
@@ -3618,7 +3618,7 @@ const TrafficNetwork={
       const geo=new THREE.BufferGeometry();
       const positions=new Float32Array(N*3);
       geo.setAttribute('position',new THREE.BufferAttribute(positions,3));
-      const mat=new THREE.PointsMaterial({color:loop.color,size:0.8,transparent:true,opacity:0.8,blending:THREE.AdditiveBlending,depthWrite:false});
+      const mat=new THREE.PointsMaterial({color:loop.color,size:3.0,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false});
       const pts=new THREE.Points(geo,mat);
       pts.userData={_points:loop.points,_speed:loop.speed,_alt:loop.alt,_offsets:[]};
       for(let i=0;i<N;i++)pts.userData._offsets.push(i/N);
@@ -3637,7 +3637,7 @@ const TrafficNetwork={
       const geo=new THREE.BufferGeometry();
       const positions=new Float32Array(N*3);
       geo.setAttribute('position',new THREE.BufferAttribute(positions,3));
-      const mat=new THREE.PointsMaterial({color:hw.color,size:0.4,transparent:true,opacity:0.6,blending:THREE.AdditiveBlending,depthWrite:false});
+      const mat=new THREE.PointsMaterial({color:hw.color,size:2.0,transparent:true,opacity:0.7,blending:THREE.AdditiveBlending,depthWrite:false});
       const pts=new THREE.Points(geo,mat);
       pts.userData={_waypoints:hw.waypoints,_speed:hw.speed,_alt:hw.alt,_offsets:[]};
       for(let i=0;i<N;i++)pts.userData._offsets.push(i/N+Math.random()*0.02);
@@ -3681,10 +3681,10 @@ const TrafficNetwork={
       // 光の尾を更新
       if(d._trail){
         d._trailPositions.unshift(pos.clone());
-        if(d._trailPositions.length>20)d._trailPositions.pop();
+        if(d._trailPositions.length>30)d._trailPositions.pop();
         const tGeo=d._trail.geometry;
         const tPos=tGeo.attributes.position.array;
-        for(let i=0;i<20;i++){
+        for(let i=0;i<30;i++){
           const p=d._trailPositions[i]||pos;
           tPos[i*3]=p.x;tPos[i*3+1]=p.y;tPos[i*3+2]=p.z;
         }
