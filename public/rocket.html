@@ -44,6 +44,25 @@
   #launch-btn:hover{background:rgba(0,216,255,0.12);box-shadow:0 0 30px rgba(0,216,255,0.4);opacity:1;animation:none;}
   #launch-btn:disabled{opacity:0.3;cursor:not-allowed;}
 
+  /* Boarding Pass / Ticket UI */
+  #boarding-overlay{position:absolute;top:0;left:0;width:100%;height:100%;z-index:60;background:rgba(2,5,16,0.85);display:none;justify-content:center;align-items:center;backdrop-filter:blur(4px);pointer-events:auto;}
+  #boarding-overlay.visible{display:flex;}
+  #boarding-pass{background:linear-gradient(135deg,#0d1526,#1a2744);border:1px solid rgba(0,216,255,0.3);border-radius:16px;padding:28px 24px;max-width:340px;width:90%;text-align:center;font-family:"Courier New",monospace;color:var(--term-color);position:relative;box-shadow:0 0 40px rgba(0,216,255,0.1);}
+  #boarding-pass::before{content:'';position:absolute;left:-1px;right:-1px;top:50%;height:1px;background:repeating-linear-gradient(90deg,transparent,transparent 4px,rgba(0,216,255,0.2) 4px,rgba(0,216,255,0.2) 8px);}
+  .bp-header{font-size:9px;letter-spacing:0.3em;color:rgba(0,216,255,0.5);margin-bottom:8px;}
+  .bp-title{font-size:16px;letter-spacing:0.2em;text-shadow:0 0 10px var(--term-color);margin-bottom:4px;}
+  .bp-route{font-size:11px;color:rgba(0,216,255,0.7);letter-spacing:0.15em;margin-bottom:16px;}
+  .bp-qr{width:120px;height:120px;margin:0 auto 16px;background:rgba(0,216,255,0.05);border:1px solid rgba(0,216,255,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:48px;}
+  .bp-info{display:flex;justify-content:space-between;margin:8px 0;font-size:10px;letter-spacing:0.1em;}
+  .bp-info-label{color:rgba(0,216,255,0.4);}
+  .bp-info-val{color:var(--term-color);}
+  .bp-countdown{font-size:20px;letter-spacing:0.2em;margin:16px 0 8px;text-shadow:0 0 12px var(--term-color);}
+  .bp-countdown-sub{font-size:9px;color:rgba(0,216,255,0.5);letter-spacing:0.15em;}
+  #bp-board-btn{margin-top:16px;background:rgba(0,216,255,0.1);border:1px solid var(--term-color);color:var(--term-color);font-family:"Courier New",monospace;font-size:12px;letter-spacing:0.15em;padding:12px 32px;border-radius:8px;cursor:pointer;text-shadow:0 0 8px var(--term-color);transition:all 0.3s;}
+  #bp-board-btn:hover{background:rgba(0,216,255,0.2);box-shadow:0 0 20px rgba(0,216,255,0.3);}
+  #bp-board-btn:disabled{opacity:0.3;cursor:not-allowed;}
+  #bp-close-btn{position:absolute;top:12px;right:16px;background:none;border:none;color:rgba(0,216,255,0.4);font-size:18px;cursor:pointer;font-family:"Courier New",monospace;}
+
   /* Countdown HUD */
   #countdown-hud{position:absolute;top:15%;left:50%;transform:translate(-50%,-50%);z-index:55;text-align:center;pointer-events:none;opacity:0;transition:opacity 0.5s;}
   #countdown-hud.visible{opacity:1;}
@@ -2035,8 +2054,8 @@ init(){window.addEventListener('keydown',e=>{const k=this._codeMap[e.code];if(k)
 this._pointerLocked=false;
 window.addEventListener('mousemove',e=>{
   if(this.isPointerDown){
-    this.look.x+=(e.clientX-this.pointerPos.x)*0.45;
-    this.look.y+=(e.clientY-this.pointerPos.y)*0.45;
+    this.look.x+=(e.clientX-this.pointerPos.x)*0.65;
+    this.look.y+=(e.clientY-this.pointerPos.y)*0.65;
     this.pointerPos={x:e.clientX,y:e.clientY};
   }
 });
@@ -6162,7 +6181,7 @@ const App={
   scene:null,camera:null,renderer:null,composer:null,bloomPass:null,
   particles:null,_starField:null,earth:null,labelRenderer:null,
   velocity:new THREE.Vector3(),cameraEuler:new THREE.Euler(0,0,0,'YXZ'),
-  accel:0.22,friction:0.965,lookSens:0.006,turboMult:3.5,
+  accel:0.35,friction:0.955,lookSens:0.008,turboMult:3.5, // v75: 加速UP+マウス感度UP+慣性感
   _fwd:new THREE.Vector3(),_rgt:new THREE.Vector3(),_up:new THREE.Vector3(0,1,0),
   _exploreMode:false,userBrightness:0.5,_realisticMode:true,
   _camMode:'fps', // 'fps', 'third', or 'cockpit'
