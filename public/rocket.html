@@ -274,6 +274,19 @@
   <div id="fm-rows"></div>
 </div>
 
+<!-- SPEC-01: VoiceNav Listening Overlay -->
+<div id="voicenav-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:58;background:rgba(2,5,16,0.7);display:none;justify-content:center;align-items:center;backdrop-filter:blur(3px);pointer-events:auto;">
+  <div style="text-align:center;font-family:'Courier New',monospace;color:var(--term-color);">
+    <div style="font-size:36px;margin-bottom:12px;animation:btnPulse 1.5s ease-in-out infinite;">🎤</div>
+    <div style="font-size:12px;letter-spacing:0.2em;margin-bottom:8px;">LISTENING...</div>
+    <div class="vn-text" style="font-size:14px;color:rgba(0,216,255,0.8);min-height:20px;"></div>
+    <button onclick="document.getElementById('voicenav-overlay').style.display='none'" style="margin-top:16px;background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.4);font-family:'Courier New',monospace;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:10px;">CANCEL</button>
+  </div>
+</div>
+
+<!-- SPEC-01: VoiceNav Button -->
+<div id="voicenav-btn" onclick="VoiceNav.startListening()" style="position:absolute;bottom:60px;left:20px;z-index:31;pointer-events:auto;cursor:pointer;font-size:14px;color:var(--term-color);width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:rgba(2,5,16,0.6);border:1px solid rgba(0,216,255,0.3);border-radius:50%;transition:all 0.3s;" title="Voice Navigation">🎤</div>
+
 <!-- v76: Permission Badge -->
 <div id="permission-badge" style="position:absolute;top:12px;right:12px;z-index:25;font-family:'Courier New',monospace;font-size:9px;letter-spacing:0.15em;padding:4px 10px;border-radius:4px;pointer-events:none;text-shadow:0 0 4px currentColor;"></div>
 <!-- Badge updated after PERMISSION constants load -->
@@ -7859,6 +7872,263 @@ function vtStopSpectrogram(){
   const pitchEl=document.getElementById('vt-pitch-display');
   if(pitchEl)pitchEl.textContent='';
 }
+
+// ══════════════════════════════════════════════
+// SPEC-01: VoiceNav — 音声コマンドナビゲーション
+// Grace of Touch Engine v76
+// ══════════════════════════════════════════════
+const VoiceNav={
+  _active:false,
+  _prevPos:null,
+  _flyAnim:null,
+
+  // ロケーション辞書
+  LOCATIONS:{
+    '打ち上げ台':     {x:0, y:-30, z:0},
+    'ロケット':       {x:0, y:-30, z:0},
+    'ラウンチパッド':  {x:0, y:-30, z:0},
+    '地球':           {x:0, y:0, z:0},
+    '月':             {x:0, y:0, z:-384400*0.0001}, // Three.js scale
+    '太陽':           {x:0, y:0, z:0}, // SolarSystem center
+    '宇宙ステーション':{x:200, y:408, z:-200},
+    'iss':            {x:200, y:408, z:-200},
+    'タワー':         'tower',
+    '東京タワー':     'tower',
+    '東京hub':        'hub_tokyo',
+    'シドニーhub':    'hub_sydney',
+    '東京':           'hub_tokyo',
+    'シドニー':       'hub_sydney',
+    'パンダ':         'panda',
+  },
+
+  // インテント解析パターン
+  INTENTS:[
+    {pattern:/(.+?)に行って|(.+?)に行きたい|(.+?)を見せて|(.+?)に連れてって|(.+?)へ行って|(.+?)に飛んで/, action:'navigate'},
+    {pattern:/ロケットに乗り|乗り物に乗り|搭乗|チケット|ボーディング/, action:'boarding'},
+    {pattern:/戻って|もどって|もどる|元の場所|帰って/, action:'goBack'},
+    {pattern:/カメラ.*(?:一人称|fps)|一人称/, action:'camFPS'},
+    {pattern:/カメラ.*(?:三人称|third)|三人称/, action:'camThird'},
+  ],
+
+  // 特殊ロケーション解決
+  _resolveSpecial(key){
+    if(key==='tower'&&typeof AppTower!=='undefined'){
+      const tp=AppTower.group?AppTower.group.position:null;
+      return tp?{x:tp.x+20,y:tp.y+50,z:tp.z+20}:{x:50,y:80,z:50};
+    }
+    if(key==='hub_tokyo') return {x:-100, y:10, z:80};
+    if(key==='hub_sydney') return {x:120, y:10, z:150};
+    if(key==='panda'){
+      // 最近のパンダゾーンを検索
+      if(typeof PandaZones!=='undefined'&&PandaZones.zones&&PandaZones.zones.length>0){
+        const pz=PandaZones.zones[0];
+        return {x:pz.position.x,y:pz.position.y+10,z:pz.position.z};
+      }
+      return {x:30, y:5, z:-30};
+    }
+    return null;
+  },
+
+  // テキストからインテント解析
+  parseIntent(text){
+    const t=text.toLowerCase().trim();
+    for(const intent of this.INTENTS){
+      const m=t.match(intent.pattern);
+      if(m){
+        // 移動の場合、場所名を抽出
+        if(intent.action==='navigate'){
+          const place=m[1]||m[2]||m[3]||m[4]||m[5]||m[6]||'';
+          return {action:'navigate', place:place.trim()};
+        }
+        return {action:intent.action};
+      }
+    }
+    // パターンに一致しない場合、辞書直接検索
+    for(const[name]of Object.entries(this.LOCATIONS)){
+      if(t.includes(name.toLowerCase())){
+        return {action:'navigate', place:name};
+      }
+    }
+    return null;
+  },
+
+  // 場所を解決して座標を返す
+  resolveLocation(placeName){
+    const key=placeName.toLowerCase();
+    for(const[name,val]of Object.entries(this.LOCATIONS)){
+      if(key.includes(name.toLowerCase())||name.toLowerCase().includes(key)){
+        if(typeof val==='string') return this._resolveSpecial(val);
+        return val;
+      }
+    }
+    return null;
+  },
+
+  // カメラ fly-to アニメーション
+  flyTo(target, duration=3000){
+    if(this._flyAnim) cancelAnimationFrame(this._flyAnim);
+    this._prevPos=App.camera.position.clone();
+
+    const start=App.camera.position.clone();
+    const end=new THREE.Vector3(target.x, target.y, target.z);
+    const startTime=performance.now();
+
+    // 上空を経由する中間点（弧を描く飛行）
+    const mid=start.clone().lerp(end,0.5);
+    mid.y=Math.max(start.y,end.y)+Math.min(200,start.distanceTo(end)*0.3);
+
+    const self=this;
+    function animate(){
+      const now=performance.now();
+      const elapsed=now-startTime;
+      let t=Math.min(elapsed/duration,1);
+      // ease-in-out (smoothstep)
+      t=t*t*(3-2*t);
+
+      // Quadratic Bezier: start → mid → end
+      const a=start.clone().lerp(mid,t);
+      const b=mid.clone().lerp(end,t);
+      const pos=a.lerp(b,t);
+
+      App.camera.position.copy(pos);
+      App.velocity.set(0,0,0);
+      // Look toward target
+      App.camera.lookAt(end);
+      App.cameraEuler.setFromQuaternion(App.camera.quaternion,'YXZ');
+
+      if(t<1){
+        self._flyAnim=requestAnimationFrame(animate);
+      }else{
+        self._flyAnim=null;
+        Logger.log('ARRIVED — VOICENAV COMPLETE');
+        self._speak('到着しました');
+      }
+    }
+    animate();
+  },
+
+  // TTS フィードバック
+  _speak(text){
+    if(!('speechSynthesis' in window))return;
+    const u=new SpeechSynthesisUtterance(text);
+    u.lang='ja-JP';
+    u.rate=1.1;
+    u.volume=0.7;
+    speechSynthesis.speak(u);
+  },
+
+  // メインハンドラ
+  handleCommand(text){
+    const intent=this.parseIntent(text);
+    if(!intent){
+      Logger.log('VOICENAV: コマンドを認識できませんでした');
+      this._speak('すみません、分かりませんでした');
+      return false;
+    }
+
+    switch(intent.action){
+      case 'navigate':{
+        const loc=this.resolveLocation(intent.place);
+        if(loc){
+          Logger.log('VOICENAV: '+intent.place+'に向かいます');
+          this._speak(intent.place+'に向かいます');
+          this.flyTo(loc);
+          return true;
+        }else{
+          Logger.log('VOICENAV: 「'+intent.place+'」が見つかりません');
+          this._speak(intent.place+'が見つかりません');
+          return false;
+        }
+      }
+      case 'boarding':
+        Logger.log('VOICENAV: 搭乗フローを開始します');
+        this._speak('搭乗フローを開始します');
+        if(typeof BoardingSystem!=='undefined') BoardingSystem._showConsent();
+        return true;
+      case 'goBack':
+        if(this._prevPos){
+          Logger.log('VOICENAV: 元の位置に戻ります');
+          this._speak('元の位置に戻ります');
+          this.flyTo({x:this._prevPos.x,y:this._prevPos.y,z:this._prevPos.z},2000);
+          return true;
+        }
+        this._speak('戻る先がありません');
+        return false;
+      case 'camFPS':
+        App._camMode='fps';
+        Logger.log('VOICENAV: 一人称視点に切り替えました');
+        this._speak('一人称視点です');
+        return true;
+      case 'camThird':
+        App._camMode='third';
+        Logger.log('VOICENAV: 三人称視点に切り替えました');
+        this._speak('三人称視点です');
+        return true;
+      default:
+        return false;
+    }
+  },
+
+  // 音声入力開始（GraceVoxのSpeechRecognitionを流用）
+  startListening(){
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR){
+      Logger.log('VOICENAV: 音声認識非対応');
+      return;
+    }
+    if(this._active)return;
+    this._active=true;
+
+    const rec=new SR();
+    rec.continuous=false;
+    rec.interimResults=false;
+    rec.lang='ja-JP';
+
+    Logger.log('VOICENAV: 🎤 聞いています...');
+
+    // Show listening overlay
+    const overlay=document.getElementById('voicenav-overlay');
+    if(overlay)overlay.style.display='flex';
+
+    rec.onresult=(e)=>{
+      const text=e.results[0][0].transcript;
+      Logger.log('VOICENAV: 認識「'+text+'」');
+      if(overlay){
+        overlay.querySelector('.vn-text').textContent='「'+text+'」';
+      }
+      setTimeout(()=>{
+        this.handleCommand(text);
+        if(overlay)overlay.style.display='none';
+        this._active=false;
+      },500);
+    };
+    rec.onerror=(e)=>{
+      Logger.log('VOICENAV: エラー — '+e.error);
+      if(overlay)overlay.style.display='none';
+      this._active=false;
+    };
+    rec.onend=()=>{
+      if(overlay&&this._active)overlay.style.display='none';
+      this._active=false;
+    };
+    rec.start();
+  }
+};
+
+// GraceVoxチャット送信時にVoiceNavも試行するフック
+(function(){
+  const origSend=window.vtSendToChat;
+  if(origSend){
+    window.vtSendToChat=function(){
+      const input=document.getElementById('chat-input');
+      if(input&&input.value){
+        const handled=VoiceNav.handleCommand(input.value);
+        if(handled){input.value='';return;}
+      }
+      origSend();
+    };
+  }
+})();
 </script>
 </body>
 </html>
