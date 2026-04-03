@@ -318,7 +318,7 @@
     <button id="bp-close-btn">&times;</button>
     <div class="bp-title">&#127756; BOARDING PASS</div>
     <div class="bp-route">EARTH &rarr; MOON &rarr; EARTH</div>
-    <canvas id="bp-qr-canvas" width="100" height="100" style="margin:0 auto 12px;display:block;border-radius:6px;border:1px solid rgba(0,216,255,0.2);width:100px;height:100px;"></canvas>
+    <canvas id="bp-qr-canvas" width="100" height="100" style="position:relative;margin:0 auto 12px;display:block;border-radius:6px;border:1px solid rgba(0,216,255,0.2);width:100px;height:100px;z-index:10;"></canvas>
     <div class="bp-info"><span class="bp-info-label">FLIGHT</span><span class="bp-info-val" id="bp-flight">GRT-001</span></div>
     <div class="bp-info"><span class="bp-info-label">GATE</span><span class="bp-info-val">A-1 PACIFIC</span></div>
     <div class="bp-info"><span class="bp-info-label">SEAT</span><span class="bp-info-val" id="bp-seat">1A</span></div>
@@ -1335,12 +1335,15 @@ const BoardingPass={
     // v76: Consent modal handlers
     const agreeBtn=document.getElementById('consent-agree');
     const declineBtn=document.getElementById('consent-decline');
-    if(agreeBtn)agreeBtn.addEventListener('click',()=>{
+    if(agreeBtn)agreeBtn.addEventListener('click',(e)=>{
+      e.stopPropagation(); // BUG-W17: prevent launcher hijack
       document.getElementById('consent-overlay').style.display='none';
+      const ph=document.getElementById('phase-hud');if(ph)ph.style.display=''; // BUG-W19: restore
       this._consentGiven=true;
       this.issuePass();
     });
-    if(declineBtn)declineBtn.addEventListener('click',()=>{
+    if(declineBtn)declineBtn.addEventListener('click',(e)=>{
+      e.stopPropagation(); // BUG-W17
       document.getElementById('consent-overlay').style.display='none';
       Logger.log('FLIGHT AGREEMENT DECLINED — BOARDING CANCELLED');
     });
@@ -1354,6 +1357,8 @@ const BoardingPass={
       return;
     }
     document.getElementById('consent-overlay').style.display='flex';
+    // BUG-W19: hide phaseHud during modal
+    const ph=document.getElementById('phase-hud');if(ph)ph.style.display='none';
   },
 
   _checkSavedTicket(){
