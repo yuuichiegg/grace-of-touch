@@ -834,8 +834,87 @@
       // pitchが-10度より上の場合はそのまま
     }
 
+    // モバイルタッチスティック入力処理
+    if(mobileStickL.active){
+      const camPos=camera.position;
+      const carto=Cesium.Cartographic.fromCartesian(camPos,Cesium.Ellipsoid.WGS84,scratchCartographic);
+      const moveDist=speed*dt;
+      const heading=camera.heading;
+      const sinH=Math.sin(heading),cosH=Math.cos(heading);
+      const metersPerDegLat=111320;
+      const metersPerDegLng=111320*Math.cos(carto.latitude);
+      // 左スティック: 前後左右移動
+      const fwdAmt=-mobileStickL.dy*moveDist;
+      const sideAmt=mobileStickL.dx*moveDist;
+      let dLat=(cosH*fwdAmt+sinH*sideAmt)/metersPerDegLat;
+      let dLng=(sinH*fwdAmt-cosH*sideAmt)/metersPerDegLng;
+      const newLng=Cesium.Math.toDegrees(carto.longitude)+dLng;
+      const newLat=Cesium.Math.toDegrees(carto.latitude)+dLat;
+      const newH=currentMode===MODE.FREE_FLY?carto.height:TOKYO_TOWER.height;
+      camera.setView({
+        destination:Cesium.Cartesian3.fromDegrees(newLng,newLat,newH),
+        orientation:{heading:camera.heading,pitch:camera.pitch,roll:camera.roll}
+      });
+    }
+    if(mobileStickR.active){
+      // 右スティック: X=左右回転(heading), Y=上下ピッチ
+      camera.rotateRight(mobileStickR.dx*1.5*dt);
+      camera.lookUp(-mobileStickR.dy*1.0*dt);
+    }
+
     // 座標表示更新
     updateCoordsDisplay();
+  }
+
+  // ========================================
+  // モバイルデュアルスティック（タッチ専用）
+  // ========================================
+  const mobileStickL={active:false,id:null,ox:0,oy:0,dx:0,dy:0};
+  const mobileStickR={active:false,id:null,ox:0,oy:0,dx:0,dy:0};
+  const STICK_RADIUS=60;
+
+  if('ontouchstart' in window||navigator.maxTouchPoints>0){
+    // CesiumJSのデフォルトタッチを無効化（競合防止）
+    viewer.scene.screenSpaceCameraController.enableTilt=false;
+    viewer.scene.screenSpaceCameraController.enableRotate=false;
+    viewer.scene.screenSpaceCameraController.enableTranslate=false;
+    viewer.scene.screenSpaceCameraController.enableZoom=false;
+
+    const cesiumCanvas=viewer.canvas;
+    cesiumCanvas.addEventListener('touchstart',(e)=>{
+      e.preventDefault();
+      for(const t of e.changedTouches){
+        const x=t.clientX,y=t.clientY;
+        const half=window.innerWidth/2;
+        if(x<half&&!mobileStickL.active){
+          mobileStickL.active=true;mobileStickL.id=t.identifier;
+          mobileStickL.ox=x;mobileStickL.oy=y;mobileStickL.dx=0;mobileStickL.dy=0;
+        }else if(x>=half&&!mobileStickR.active){
+          mobileStickR.active=true;mobileStickR.id=t.identifier;
+          mobileStickR.ox=x;mobileStickR.oy=y;mobileStickR.dx=0;mobileStickR.dy=0;
+        }
+      }
+    },{passive:false});
+
+    cesiumCanvas.addEventListener('touchmove',(e)=>{
+      e.preventDefault();
+      for(const t of e.changedTouches){
+        let stick=null;
+        if(t.identifier===mobileStickL.id)stick=mobileStickL;
+        else if(t.identifier===mobileStickR.id)stick=mobileStickR;
+        if(stick){
+          stick.dx=Math.max(-1,Math.min(1,(t.clientX-stick.ox)/STICK_RADIUS));
+          stick.dy=Math.max(-1,Math.min(1,(t.clientY-stick.oy)/STICK_RADIUS));
+        }
+      }
+    },{passive:false});
+
+    cesiumCanvas.addEventListener('touchend',(e)=>{
+      for(const t of e.changedTouches){
+        if(t.identifier===mobileStickL.id){mobileStickL.active=false;mobileStickL.dx=0;mobileStickL.dy=0;}
+        if(t.identifier===mobileStickR.id){mobileStickR.active=false;mobileStickR.dx=0;mobileStickR.dy=0;}
+      }
+    });
   }
 
   // ========================================
