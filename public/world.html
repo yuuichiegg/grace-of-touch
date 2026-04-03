@@ -863,7 +863,8 @@
     }
     if(mobileStickR.active){
       // 右スティック: X=左右回転(heading), Y=上下ピッチ
-      camera.rotateRight(mobileStickR.dx*1.5*dt);
+      // BUG-W10 fix: lookRight for heading, lookUp for pitch
+      camera.lookRight(mobileStickR.dx*1.5*dt);
       camera.lookUp(-mobileStickR.dy*1.0*dt);
     }
 
@@ -1027,55 +1028,115 @@
     },
 
     _createLaunchUI() {
+      // BUG-W9 fix + SPEC-14: 常時表示の搭乗ボタン
       const btn = document.createElement('button');
       btn.id = 'rocket-launch-btn';
-      btn.innerHTML = '🚀 GET BOARDING PASS';
-      btn.style.cssText = 'position:absolute;bottom:100px;left:50%;transform:translateX(-50%);z-index:50;background:rgba(255,140,0,0.15);border:1px solid rgba(255,140,0,0.5);color:#ff8c00;font-family:Courier New,monospace;font-size:12px;letter-spacing:0.15em;padding:10px 24px;border-radius:20px;cursor:pointer;display:none;pointer-events:auto;';
-      btn.addEventListener('click', () => this.startLaunchSequence());
+      btn.innerHTML = '🚀 SPACE FLIGHT';
+      btn.style.cssText = 'position:absolute;bottom:100px;right:16px;z-index:50;background:rgba(255,140,0,0.12);border:1px solid rgba(255,140,0,0.5);color:#ff8c00;font-family:Courier New,monospace;font-size:11px;letter-spacing:0.12em;padding:8px 18px;border-radius:20px;cursor:pointer;pointer-events:auto;transition:all 0.3s;';
+      btn.addEventListener('click', () => this._showFlightAgreement());
       document.body.appendChild(btn);
+
+      // SPEC-14: Flight Agreement + Boarding Experience Overlay
+      const overlay = document.createElement('div');
+      overlay.id = 'flight-experience';
+      overlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:60;background:rgba(2,5,16,0.92);display:none;justify-content:center;align-items:center;pointer-events:auto;backdrop-filter:blur(6px);';
+      overlay.innerHTML = `
+        <div style="max-width:400px;width:90%;font-family:Courier New,monospace;color:#00d8ff;text-align:center;">
+          <div id="fe-stage" data-stage="agreement">
+            <div id="fe-agreement" style="text-align:left;">
+              <div style="text-align:center;font-size:16px;letter-spacing:0.2em;margin-bottom:16px;text-shadow:0 0 10px #00d8ff;">FLIGHT AGREEMENT</div>
+              <div style="font-size:10px;line-height:1.8;color:rgba(0,216,255,0.7);max-height:200px;overflow-y:auto;padding:12px;background:rgba(0,0,0,0.4);border-radius:8px;border:1px solid rgba(0,216,255,0.15);margin-bottom:12px;">
+                1. This is a simulated space flight on Grace of Touch Engine.<br>
+                2. Flight data and boarding passes are for simulation only.<br>
+                3. The operator is not liable for virtual incidents.<br>
+                4. By proceeding, you agree to the Grace of Touch Terms of Service.<br>
+                5. Estimated flight time: Earth orbit (3 min) → return.<br>
+                6. Future flights: Moon (3 days), Mars (7 months).
+              </div>
+              <label style="display:flex;align-items:center;gap:8px;font-size:11px;color:rgba(0,216,255,0.8);cursor:pointer;margin-bottom:16px;">
+                <input type="checkbox" id="fe-agree-check" style="accent-color:#00d8ff;"> 上記に同意して搭乗します
+              </label>
+              <button id="fe-proceed-btn" disabled style="width:100%;background:rgba(0,216,255,0.1);border:1px solid rgba(0,216,255,0.3);color:rgba(0,216,255,0.4);font-family:Courier New,monospace;font-size:12px;letter-spacing:0.15em;padding:12px;border-radius:8px;cursor:not-allowed;transition:all 0.3s;">搭乗ゲートへ進む</button>
+              <button onclick="document.getElementById('flight-experience').style.display='none'" style="margin-top:8px;width:100%;background:transparent;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.3);font-family:Courier New,monospace;font-size:10px;padding:8px;border-radius:8px;cursor:pointer;">キャンセル</button>
+            </div>
+            <div id="fe-boarding" style="display:none;">
+              <div style="font-size:10px;color:rgba(0,216,255,0.4);letter-spacing:0.2em;margin-bottom:8px;">GRACE LAUNCH COMPLEX</div>
+              <div style="font-size:18px;letter-spacing:0.2em;margin-bottom:4px;">BOARDING GATE GRT-001</div>
+              <div style="font-size:12px;color:rgba(0,216,255,0.6);margin-bottom:20px;">宇宙への旅へようこそ</div>
+              <div style="font-size:11px;color:rgba(0,216,255,0.5);margin-bottom:12px;">ロケット内部に乗り込みました。<br>窓から発射台が見えます...</div>
+              <div id="fe-countdown" style="font-size:48px;font-weight:bold;text-shadow:0 0 30px #00d8ff;margin:20px 0;letter-spacing:0.1em;">T-10</div>
+              <div id="fe-status" style="font-size:11px;color:rgba(0,216,255,0.5);letter-spacing:0.15em;">SYSTEMS CHECK IN PROGRESS</div>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+
+      // Checkbox enables button
+      document.getElementById('fe-agree-check').addEventListener('change',(e)=>{
+        const btn=document.getElementById('fe-proceed-btn');
+        btn.disabled=!e.target.checked;
+        btn.style.color=e.target.checked?'#00d8ff':'rgba(0,216,255,0.4)';
+        btn.style.borderColor=e.target.checked?'rgba(0,216,255,0.6)':'rgba(0,216,255,0.3)';
+        btn.style.cursor=e.target.checked?'pointer':'not-allowed';
+      });
+      document.getElementById('fe-proceed-btn').addEventListener('click',()=>{
+        if(document.getElementById('fe-agree-check').checked) this._startBoarding();
+      });
     },
 
-    // 発射台との距離で搭乗ボタンを表示/非表示
-    updateProximity() {
-      const camPos = viewer.camera.positionCartographic;
-      const padPos = Cesium.Cartographic.fromDegrees(LAUNCH_PAD.lng, LAUNCH_PAD.lat);
-      const dist = Cesium.Cartesian3.distance(
-        Cesium.Cartesian3.fromRadians(camPos.longitude, camPos.latitude, camPos.height),
-        Cesium.Cartesian3.fromRadians(padPos.longitude, padPos.latitude, 0)
-      );
-      const btn = document.getElementById('rocket-launch-btn');
-      if (btn) btn.style.display = (dist < 5000 && this._phase === 'idle') ? 'block' : 'none';
-    },
-
-    startLaunchSequence() {
+    _showFlightAgreement() {
       if (this._phase !== 'idle') return;
+      const overlay = document.getElementById('flight-experience');
+      overlay.style.display = 'flex';
+      document.getElementById('fe-agreement').style.display = 'block';
+      document.getElementById('fe-boarding').style.display = 'none';
+      document.getElementById('fe-agree-check').checked = false;
+      document.getElementById('fe-proceed-btn').disabled = true;
+    },
+
+    _startBoarding() {
+      document.getElementById('fe-agreement').style.display = 'none';
+      document.getElementById('fe-boarding').style.display = 'block';
       this._phase = 'countdown';
-      this._altitude = 0;
-      this._startTime = Date.now();
-      const btn = document.getElementById('rocket-launch-btn');
-      if (btn) btn.style.display = 'none';
+
+      // カメラを発射台に移動
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(LAUNCH_PAD.lng + 0.005, LAUNCH_PAD.lat - 0.003, 300),
+        orientation: { heading: Cesium.Math.toRadians(300), pitch: Cesium.Math.toRadians(10), roll: 0 },
+        duration: 2,
+      });
 
       GraceBroadcasting.pushBreaking(
-        'GRACE ROCKET GRT-001 — LAUNCH SEQUENCE INITIATED',
+        'GRACE ROCKET GRT-001 — BOARDING COMPLETE, LAUNCH SEQUENCE INITIATED',
         { lat: LAUNCH_PAD.lat, lon: LAUNCH_PAD.lng, severity: 'warning' }
       );
 
-      showToast('T-10... LAUNCH SEQUENCE START');
-
-      // カメラを発射台に向ける
-      viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(LAUNCH_PAD.lng + 0.01, LAUNCH_PAD.lat - 0.005, 500),
-        orientation: {
-          heading: Cesium.Math.toRadians(300),
-          pitch: Cesium.Math.toRadians(15),
-          roll: 0,
-        },
-        duration: 3,
-      });
-
-      // 10秒後に発射
-      setTimeout(() => this._launch(), 10000);
+      // カウントダウン
+      let count = 10;
+      const cdEl = document.getElementById('fe-countdown');
+      const stEl = document.getElementById('fe-status');
+      const cdInterval = setInterval(() => {
+        count--;
+        if (count > 0) {
+          cdEl.textContent = 'T-' + count;
+          if (count === 5) stEl.textContent = 'ENGINE IGNITION';
+          if (count === 3) stEl.textContent = 'MAIN ENGINE START';
+          if (count === 1) { stEl.textContent = 'ALL ENGINES RUNNING'; cdEl.style.color = '#ff4400'; }
+        } else {
+          clearInterval(cdInterval);
+          cdEl.textContent = 'LIFTOFF!';
+          cdEl.style.color = '#ff8800';
+          stEl.textContent = '🔥 WE HAVE LIFTOFF';
+          setTimeout(() => {
+            document.getElementById('flight-experience').style.display = 'none';
+            cdEl.style.color = '#00d8ff';
+            this._launch();
+          }, 2000);
+        }
+      }, 1000);
     },
+
+    startLaunchSequence() { this._showFlightAgreement(); },
 
     _launch() {
       this._phase = 'ascending';
@@ -1089,10 +1150,7 @@
 
     // 毎フレーム更新
     update() {
-      if (this._phase === 'idle' || this._phase === 'countdown') {
-        this.updateProximity();
-        return;
-      }
+      if (this._phase === 'idle' || this._phase === 'countdown') return;
 
       const elapsed = (Date.now() - this._startTime) / 1000; // 秒
 
