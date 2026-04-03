@@ -2643,17 +2643,163 @@ _drawGhostStick(x,y,color,label){
   ctx.font='10px Courier New';ctx.textAlign='center';
   ctx.fillText(label,x,y+r+14);
 },
+// v76/SPEC-17: 乗り物モード
+_vehicleMode:'WALKING', // WALKING, AIRCRAFT_SS, AIRCRAFT_YK, HELICOPTER, ROCKET
+_throttle:0, // 0-100%
+setVehicleMode(mode){
+  this._vehicleMode=mode;
+  this._throttle=0;
+  Logger.log('CONTROL: '+mode+' MODE');
+  // Update stick labels
+  const lblL=document.getElementById('stick-lbl-L');
+  const lblR=document.getElementById('stick-lbl-R');
+  const labels={
+    WALKING:{l:'MOVE',r:'LOOK'},
+    AIRCRAFT_SS:{l:'THROTTLE',r:'SIDE STICK'},
+    AIRCRAFT_YK:{l:'THROTTLE×2',r:'YOKE'},
+    HELICOPTER:{l:'COLLECTIVE',r:'CYCLIC'},
+    ROCKET:{l:'THROTTLE',r:'ATTITUDE'},
+  };
+  const lb=labels[mode]||labels.WALKING;
+  if(lblL)lblL.textContent=lb.l;
+  if(lblR)lblR.textContent=lb.r;
+},
+// スロットルレバー描画
+_drawThrottle(x,y,h,pct,color,dual){
+  const ctx=this.ctx;
+  const w=dual?18:24;
+  const barH=h;
+  const fillH=barH*(pct/100);
+  // Track background
+  ctx.fillStyle='rgba(0,0,0,0.5)';
+  ctx.strokeStyle=color.replace(/[\d.]+\)$/,'0.4)');
+  ctx.lineWidth=1;
+  if(dual){
+    // Dual throttle (Boeing-style)
+    [-14,14].forEach(dx=>{
+      ctx.fillRect(x+dx-w/4,y-barH/2,w/2,barH);
+      ctx.strokeRect(x+dx-w/4,y-barH/2,w/2,barH);
+      ctx.fillStyle=color.replace(/[\d.]+\)$/,'0.6)');
+      ctx.fillRect(x+dx-w/4,y+barH/2-fillH,w/2,fillH);
+      ctx.fillStyle='rgba(0,0,0,0.5)';
+    });
+  }else{
+    ctx.fillRect(x-w/2,y-barH/2,w,barH);
+    ctx.strokeRect(x-w/2,y-barH/2,w,barH);
+    // Fill
+    ctx.fillStyle=color.replace(/[\d.]+\)$/,'0.6)');
+    ctx.fillRect(x-w/2,y+barH/2-fillH,w,fillH);
+  }
+  // Percentage text
+  ctx.fillStyle=color;
+  ctx.font='bold 11px Courier New';ctx.textAlign='center';
+  ctx.fillText(Math.round(pct)+'%',x,y+barH/2+16);
+  // Handle
+  const handleY=y+barH/2-fillH;
+  ctx.fillStyle='rgba(255,255,255,0.9)';
+  ctx.fillRect(x-(dual?20:w/2+4),handleY-3,(dual?40:w+8),6);
+},
+// ヨーク描画
+_drawYoke(x,y,dx,dy,color){
+  const ctx=this.ctx;
+  const r=40;
+  // Yoke ring
+  ctx.strokeStyle=color;ctx.lineWidth=2.5;
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke();
+  // Horizontal bar
+  ctx.strokeStyle=color.replace(/[\d.]+\)$/,'0.6)');ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(x-r-10,y);ctx.lineTo(x+r+10,y);ctx.stroke();
+  // Rotation indicator
+  const angle=dx*0.5;
+  ctx.save();ctx.translate(x,y);ctx.rotate(angle);
+  ctx.fillStyle=color;
+  ctx.fillRect(-r-6,-2,12,4);ctx.fillRect(r-6,-2,12,4);
+  // Pitch indicator (push/pull)
+  ctx.fillRect(-3,-r+dy*r*0.3-4,6,8);
+  ctx.restore();
+},
+// ペダル描画（ヘリ用テールローター）
+_drawPedal(x,y,val,color){
+  const ctx=this.ctx;
+  const w=120,h=16;
+  ctx.fillStyle='rgba(0,0,0,0.5)';
+  ctx.fillRect(x-w/2,y-h/2,w,h);
+  ctx.strokeStyle=color.replace(/[\d.]+\)$/,'0.3)');ctx.lineWidth=1;
+  ctx.strokeRect(x-w/2,y-h/2,w,h);
+  // Center line
+  ctx.strokeStyle=color.replace(/[\d.]+\)$/,'0.2)');
+  ctx.beginPath();ctx.moveTo(x,y-h/2);ctx.lineTo(x,y+h/2);ctx.stroke();
+  // Slider
+  const sx=x+val*w/2;
+  ctx.fillStyle=color;
+  ctx.fillRect(sx-6,y-h/2-2,12,h+4);
+  // Label
+  ctx.fillStyle=color.replace(/[\d.]+\)$/,'0.5)');
+  ctx.font='8px Courier New';ctx.textAlign='center';
+  ctx.fillText('PEDAL',x,y+h/2+12);
+},
 render(){
   this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
-  // Ghost sticks (always visible on touch devices)
-  if('ontouchstart' in window||navigator.maxTouchPoints>0){
-    const w=this.canvas.width,h=this.canvas.height;
-    const ghostY=h-140; // above music player
-    this._drawGhostStick(w*0.22,ghostY,'rgba(0,216,255,0.75)','L');
-    this._drawGhostStick(w*0.78,ghostY,'rgba(0,255,136,0.75)','R');
+  const isTouchDev='ontouchstart' in window||navigator.maxTouchPoints>0;
+  const w=this.canvas.width,h=this.canvas.height;
+  const ghostY=h-140;
+  const mode=this._vehicleMode;
+  const stL=Input._stickL,stR=Input._stickR;
+
+  // Update throttle from left stick Y
+  if(stL.active&&(mode==='AIRCRAFT_SS'||mode==='AIRCRAFT_YK'||mode==='HELICOPTER'||mode==='ROCKET')){
+    this._throttle=Math.max(0,Math.min(100,this._throttle-stL.dy*2));
   }
-  this._drawStick(Input._stickL,'rgba(0,216,255,0.75)','L');
-  this._drawStick(Input._stickR,'rgba(0,255,136,0.75)','R');
+
+  if(mode==='WALKING'||!isTouchDev){
+    // 歩行モード or PC: 従来のデュアルスティック
+    if(isTouchDev){
+      this._drawGhostStick(w*0.22,ghostY,'rgba(0,216,255,0.75)','MOVE');
+      this._drawGhostStick(w*0.78,ghostY,'rgba(0,255,136,0.75)','LOOK');
+    }
+    this._drawStick(stL,'rgba(0,216,255,0.75)','L');
+    this._drawStick(stR,'rgba(0,255,136,0.75)','R');
+  }else if(mode==='AIRCRAFT_SS'){
+    // サイドスティック型（エアバス系）
+    this._drawThrottle(w*0.12,ghostY,120,this._throttle,'rgba(0,255,136,0.75)',false);
+    if(isTouchDev)this._drawGhostStick(w*0.82,ghostY,'rgba(0,216,255,0.75)','STICK');
+    this._drawStick(stR,'rgba(0,216,255,0.75)','R');
+    // HUD: 出力
+    this.ctx.fillStyle='rgba(0,255,136,0.8)';this.ctx.font='10px Courier New';
+    this.ctx.textAlign='left';this.ctx.fillText('ENG: '+Math.round(this._throttle)+'%',w*0.04,ghostY-70);
+  }else if(mode==='AIRCRAFT_YK'){
+    // ヨーク型（ボーイング系）
+    this._drawThrottle(w*0.10,ghostY,120,this._throttle,'rgba(0,255,136,0.75)',true);
+    const yokeDx=stR.active?stR.dx:0;
+    const yokeDy=stR.active?stR.dy:0;
+    this._drawYoke(w*0.80,ghostY,yokeDx,yokeDy,'rgba(0,216,255,0.75)');
+    this._drawStick(stR,'rgba(0,216,255,0.75)','R');
+  }else if(mode==='HELICOPTER'){
+    // ヘリコプター: コレクティブ+サイクリック+ペダル
+    this._drawThrottle(w*0.12,ghostY,120,this._throttle,'rgba(255,200,0,0.75)',false);
+    if(isTouchDev)this._drawGhostStick(w*0.78,ghostY,'rgba(0,216,255,0.75)','CYCLIC');
+    this._drawStick(stR,'rgba(0,216,255,0.75)','R');
+    // Pedal
+    const pedalVal=stL.active?stL.dx:0;
+    this._drawPedal(w*0.5,h-40,pedalVal,'rgba(255,200,0,0.75)');
+    // HUD
+    this.ctx.fillStyle='rgba(255,200,0,0.8)';this.ctx.font='10px Courier New';
+    this.ctx.textAlign='left';this.ctx.fillText('COLL: '+Math.round(this._throttle)+'%',w*0.04,ghostY-70);
+  }else if(mode==='ROCKET'){
+    // ロケット: スロットル+姿勢制御
+    this._drawThrottle(w*0.12,ghostY,120,this._throttle,'rgba(255,100,50,0.75)',false);
+    if(isTouchDev)this._drawGhostStick(w*0.78,ghostY,'rgba(0,216,255,0.75)','ATT');
+    this._drawStick(stR,'rgba(0,216,255,0.75)','R');
+    this.ctx.fillStyle='rgba(255,100,50,0.8)';this.ctx.font='10px Courier New';
+    this.ctx.textAlign='left';this.ctx.fillText('THR: '+Math.round(this._throttle)+'%',w*0.04,ghostY-70);
+  }
+
+  // Vehicle mode indicator (top-left, small)
+  if(isTouchDev&&mode!=='WALKING'){
+    this.ctx.fillStyle='rgba(0,216,255,0.6)';
+    this.ctx.font='9px Courier New';this.ctx.textAlign='left';
+    this.ctx.fillText('MODE: '+mode,10,h-10);
+  }
 }};
 
 // ══════════════════════════════════════════════
@@ -7908,6 +8054,11 @@ const VoiceNav={
     {pattern:/戻って|もどって|もどる|元の場所|帰って/, action:'goBack'},
     {pattern:/カメラ.*(?:一人称|fps)|一人称/, action:'camFPS'},
     {pattern:/カメラ.*(?:三人称|third)|三人称/, action:'camThird'},
+    {pattern:/歩行|ウォーキング|歩く/, action:'modeWalk'},
+    {pattern:/飛行機|エアバス|サイドスティック/, action:'modeAircraftSS'},
+    {pattern:/ボーイング|ヨーク/, action:'modeAircraftYK'},
+    {pattern:/ヘリコプター|ヘリ/, action:'modeHeli'},
+    {pattern:/ロケットモード/, action:'modeRocket'},
   ],
 
   // 特殊ロケーション解決
@@ -8064,6 +8215,21 @@ const VoiceNav={
         Logger.log('VOICENAV: 三人称視点に切り替えました');
         this._speak('三人称視点です');
         return true;
+      case 'modeWalk':
+        JoyRenderer.setVehicleMode('WALKING');
+        this._speak('歩行モードです');return true;
+      case 'modeAircraftSS':
+        JoyRenderer.setVehicleMode('AIRCRAFT_SS');
+        this._speak('サイドスティックモードです');return true;
+      case 'modeAircraftYK':
+        JoyRenderer.setVehicleMode('AIRCRAFT_YK');
+        this._speak('ヨークモードです');return true;
+      case 'modeHeli':
+        JoyRenderer.setVehicleMode('HELICOPTER');
+        this._speak('ヘリコプターモードです');return true;
+      case 'modeRocket':
+        JoyRenderer.setVehicleMode('ROCKET');
+        this._speak('ロケットモードです');return true;
       default:
         return false;
     }
