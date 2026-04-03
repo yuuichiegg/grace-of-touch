@@ -2649,7 +2649,13 @@ _throttle:0, // 0-100%
 setVehicleMode(mode){
   this._vehicleMode=mode;
   this._throttle=0;
-  Logger.log('CONTROL: '+mode+' MODE');
+  this._distanceTraveled=0;
+  this._flightStartTime=performance.now();
+  const spec=VEHICLE_SPECS[mode]||VEHICLE_SPECS.WALKING;
+  // Apply physics from spec
+  App.accel=spec.accelFactor;
+  App.friction=spec.frictionFactor;
+  Logger.log('CONTROL: '+spec.icon+' '+spec.name+' MODE — MAX '+spec.maxSpeed+'km/h, ALT '+spec.maxAlt+'m, RANGE '+spec.range+'km');
   // Update stick labels
   const lblL=document.getElementById('stick-lbl-L');
   const lblR=document.getElementById('stick-lbl-R');
@@ -2794,11 +2800,51 @@ render(){
     this.ctx.textAlign='left';this.ctx.fillText('THR: '+Math.round(this._throttle)+'%',w*0.04,ghostY-70);
   }
 
-  // Vehicle mode indicator (top-left, small)
-  if(isTouchDev&&mode!=='WALKING'){
-    this.ctx.fillStyle='rgba(0,216,255,0.6)';
-    this.ctx.font='9px Courier New';this.ctx.textAlign='left';
-    this.ctx.fillText('MODE: '+mode,10,h-10);
+  // SPEC-17: Vehicle specs HUD (bottom-center or top-right for non-walking)
+  if(mode!=='WALKING'){
+    const spec=VEHICLE_SPECS[mode]||VEHICLE_SPECS.WALKING;
+    const speed=App.velocity.length()*100; // approximate km/h from scene units
+    const alt=Math.max(0,App.camera.position.y*10); // approximate meters
+    const hudX=isTouchDev?w/2:w-180;
+    const hudY=isTouchDev?50:100;
+    const ctx=this.ctx;
+
+    // Background panel
+    ctx.fillStyle='rgba(0,0,0,0.6)';
+    ctx.fillRect(hudX-85,hudY-12,170,isTouchDev?58:70);
+    ctx.strokeStyle='rgba(0,216,255,0.3)';ctx.lineWidth=1;
+    ctx.strokeRect(hudX-85,hudY-12,170,isTouchDev?58:70);
+
+    ctx.font='9px Courier New';ctx.textAlign='left';
+    const lx=hudX-78;
+    // Vehicle name
+    ctx.fillStyle='rgba(0,216,255,0.9)';
+    ctx.fillText(spec.icon+' '+spec.name,lx,hudY+2);
+    // Speed
+    const speedPct=Math.min(100,(speed/spec.maxSpeed)*100);
+    ctx.fillStyle=speedPct>90?'rgba(255,100,50,0.9)':'rgba(0,255,136,0.8)';
+    ctx.fillText('SPD: '+Math.round(speed)+'/'+spec.maxSpeed+' km/h',lx,hudY+14);
+    // Altitude
+    const altPct=spec.maxAlt===Infinity?0:Math.min(100,(alt/spec.maxAlt)*100);
+    ctx.fillStyle=altPct>95?'rgba(255,100,50,0.9)':'rgba(0,216,255,0.8)';
+    ctx.fillText('ALT: '+Math.round(alt)+'/'+spec.maxAlt+' m',lx,hudY+26);
+    // Range
+    if(spec.range!==Infinity){
+      ctx.fillStyle='rgba(255,200,0,0.8)';
+      ctx.fillText('RNG: '+spec.range+' km',lx,hudY+38);
+    }
+
+    // Speed limit enforcement
+    if(speed>spec.maxSpeed*1.05){
+      App.velocity.multiplyScalar(0.95); // soft speed cap
+    }
+    // Altitude limit enforcement (non-admin)
+    if(spec.maxAlt!==Infinity&&alt>spec.maxAlt&&USER_PERMISSION>PERMISSION.ADMIN){
+      App.velocity.y*=0.8; // push back down
+      ctx.fillStyle='rgba(255,50,50,0.9)';
+      ctx.font='bold 11px Courier New';ctx.textAlign='center';
+      ctx.fillText('⚠ ALTITUDE LIMIT',w/2,hudY+55);
+    }
   }
 }};
 
@@ -6785,6 +6831,79 @@ const ROCKET_CONFIG={
 if(ROCKET_CONFIG.rocketTier==='medium') ROCKET_CONFIG.maxPassengers=12;
 if(ROCKET_CONFIG.rocketTier==='large') ROCKET_CONFIG.maxPassengers=24;
 
+// v76/SPEC-17: VEHICLE SPECS — リアル航空データ
+const VEHICLE_SPECS={
+  WALKING:{
+    name:'徒歩',
+    maxSpeed:5,        // km/h
+    maxAlt:0,          // m（地上のみ）
+    range:Infinity,    // km
+    accelFactor:0.15,
+    frictionFactor:0.92,
+    icon:'🚶',
+  },
+  AIRCRAFT_SS:{
+    name:'Airbus A320',
+    maxSpeed:840,      // km/h（巡航）
+    maxAlt:12500,      // m（41,000ft）
+    range:5700,        // km
+    accelFactor:0.5,
+    frictionFactor:0.97,
+    icon:'✈️',
+    cruiseAlt:11300,   // m（37,000ft）
+    stallSpeed:213,    // km/h
+  },
+  AIRCRAFT_YK:{
+    name:'Boeing 737-800',
+    maxSpeed:828,      // km/h（巡航）
+    maxAlt:12500,      // m（41,000ft）
+    range:5400,        // km
+    accelFactor:0.5,
+    frictionFactor:0.97,
+    icon:'✈️',
+    cruiseAlt:10700,   // m（35,000ft）
+    stallSpeed:220,    // km/h
+  },
+  HELICOPTER:{
+    name:'Bell 206',
+    maxSpeed:225,      // km/h
+    maxAlt:4100,       // m（13,500ft）
+    range:693,         // km
+    accelFactor:0.35,
+    frictionFactor:0.94,
+    icon:'🚁',
+  },
+  EVTOL:{
+    name:'Joby S4',
+    maxSpeed:322,      // km/h
+    maxAlt:4572,       // m（15,000ft）
+    range:161,         // km
+    accelFactor:0.4,
+    frictionFactor:0.95,
+    icon:'🛸',
+    passengers:4,
+  },
+  ROCKET:{
+    name:'Grace Rocket',
+    maxSpeed:28000,    // km/h（第一宇宙速度）
+    maxAlt:Infinity,
+    range:Infinity,
+    accelFactor:0.6,
+    frictionFactor:0.955,
+    icon:'🚀',
+  },
+  DRONE:{
+    name:'DJI Matrice 350',
+    maxSpeed:82,       // km/h
+    maxAlt:7000,       // m
+    range:28,          // km（往復）
+    accelFactor:0.4,
+    frictionFactor:0.93,
+    icon:'📡',
+    flightTime:55,     // 分
+  },
+};
+
 // ══════════════════════════════════════════════
 // App — v76 Main (Grace of Touch Engine)
 // ══════════════════════════════════════════════
@@ -8059,6 +8178,8 @@ const VoiceNav={
     {pattern:/ボーイング|ヨーク/, action:'modeAircraftYK'},
     {pattern:/ヘリコプター|ヘリ/, action:'modeHeli'},
     {pattern:/ロケットモード/, action:'modeRocket'},
+    {pattern:/空飛ぶ車|イーブイトール|eVTOL|ジョビー|joby/, action:'modeEVTOL'},
+    {pattern:/ドローンモード|ドローン操縦/, action:'modeDrone'},
   ],
 
   // 特殊ロケーション解決
@@ -8230,6 +8351,12 @@ const VoiceNav={
       case 'modeRocket':
         JoyRenderer.setVehicleMode('ROCKET');
         this._speak('ロケットモードです');return true;
+      case 'modeEVTOL':
+        JoyRenderer.setVehicleMode('EVTOL');
+        this._speak('空飛ぶクルマモードです');return true;
+      case 'modeDrone':
+        JoyRenderer.setVehicleMode('DRONE');
+        this._speak('ドローンモードです');return true;
       default:
         return false;
     }
