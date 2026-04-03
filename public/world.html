@@ -493,10 +493,10 @@
   setLoadingStatus('LOADING PLATEAU 3D TILES...');
 
   const plateauUrls = [
-    // PLATEAU 2022 東京23区 千代田区LOD1（reearth CMS — 2026年現在の公式URL）
+    // PLATEAU 2023 千代田区LOD1（Mac mini検証済み ✅）
+    'https://assets.cms.plateau.reearth.io/assets/0e/e5948a-e95c-4e31-be85-1f8c066ed996/13101_chiyoda-ku_pref_2023_citygml_1_op_bldg_3dtiles_13101_chiyoda-ku_lod1/tileset.json',
+    // フォールバック: 2022年版
     'https://assets.cms.plateau.reearth.io/assets/aa/ecf312-95c2-4e24-8351-642f27e447b6/13100_tokyo23-ku_2022_3dtiles_1_1_op_bldg_13101_chiyoda-ku_lod1/tileset.json',
-    // フォールバック: 旧geospatial.jp URL
-    'https://plateau.geospatial.jp/main/data/3d-tiles/bldg/13100_tokyo23ku/lod1/tileset.json',
   ];
 
   async function loadPlateau() {
