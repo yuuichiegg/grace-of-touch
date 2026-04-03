@@ -19,7 +19,7 @@
 </script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>">
 <link rel="manifest" href="/manifest.json">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Grace Browser">
 <meta name="theme-color" content="#00e5ff">
@@ -1409,15 +1409,18 @@ function showPichanBubble(text) {
   });
 })();
 
-// ===== Pi-Agent SSE Connection =====
+// ===== Pi-Agent SSE Connection (v76: graceful fail for public users) =====
 (function(){
-  let sse=null, retryTimer=null;
+  let sse=null, retryTimer=null, retryCount=0;
   const AGENT_URL='http://localhost:3334';
+  const MAX_RETRY=3; // Stop retrying after 3 failures (public users won't have agent)
   function connectSSE(){
+    if(retryCount>=MAX_RETRY)return; // Silently stop for public users
     if(sse){sse.close();sse=null;}
     try{
       sse=new EventSource(AGENT_URL+'/events/stream');
       sse.onopen=()=>{
+        retryCount=0; // Reset on success
         const mood=document.getElementById('pichanMood');
         if(mood)mood.textContent='🟢';
         showPichanBubble('pi-agentに接続したよ！');
@@ -1428,7 +1431,6 @@ function showPichanBubble(text) {
           if(d.type==='connected')return;
           if(d.type==='health:ok')return;
           if(d.type==='keepalive')return;
-          // Show event to user via pichan bubble
           const msgs={
             'task:done':'タスク完了！',
             'ssd:file:new':'新しいファイルを検出したよ📁',
@@ -1444,11 +1446,18 @@ function showPichanBubble(text) {
       };
       sse.onerror=()=>{
         sse.close();sse=null;
+        retryCount++;
         const mood=document.getElementById('pichanMood');
         if(mood)mood.textContent='💤';
-        retryTimer=setTimeout(connectSSE,15000);
+        if(retryCount<MAX_RETRY){
+          retryTimer=setTimeout(connectSSE,60000); // 60秒間隔（延長）
+        }
+        // MAX_RETRY超過: サイレントに停止（公開ユーザー向け）
       };
-    }catch(_){retryTimer=setTimeout(connectSSE,15000);}
+    }catch(_){
+      retryCount++;
+      if(retryCount<MAX_RETRY)retryTimer=setTimeout(connectSSE,60000);
+    }
   }
   // Auto-connect after page load
   setTimeout(connectSSE,2000);

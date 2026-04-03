@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="author" content="Grace of Touch Co. / Yuuichi Onozaki">
 <meta name="copyright" content="© 2024-2026 Grace of Touch Co. All rights reserved.">
-<title>Grace of TOUCH - MEGA ROCKET EXPLORER v75</title>
+<title>Grace of TOUCH - MEGA ROCKET EXPLORER v76</title>
 <!-- © 2024-2026 Grace of Touch Co. All rights reserved. Unauthorized copying prohibited. -->
 <script>
 (function(){
@@ -274,6 +274,31 @@
   <div id="fm-rows"></div>
 </div>
 
+<!-- v76: Permission Badge -->
+<div id="permission-badge" style="position:absolute;top:12px;right:12px;z-index:25;font-family:'Courier New',monospace;font-size:9px;letter-spacing:0.15em;padding:4px 10px;border-radius:4px;pointer-events:none;text-shadow:0 0 4px currentColor;"></div>
+<!-- Badge updated after PERMISSION constants load -->
+
+<!-- v76: Consent Modal (表示はissuePass前) -->
+<div id="consent-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:65;background:rgba(2,5,16,0.9);display:none;justify-content:center;align-items:center;backdrop-filter:blur(6px);pointer-events:auto;">
+  <div style="background:linear-gradient(135deg,#0d1526,#1a2744);border:1px solid rgba(0,216,255,0.3);border-radius:16px;padding:28px 24px;max-width:380px;width:90%;text-align:left;font-family:'Courier New',monospace;color:var(--term-color);">
+    <div style="text-align:center;font-size:14px;letter-spacing:0.2em;margin-bottom:16px;text-shadow:0 0 10px var(--term-color);">FLIGHT AGREEMENT</div>
+    <div style="font-size:10px;line-height:1.8;color:rgba(0,216,255,0.8);margin-bottom:16px;max-height:200px;overflow-y:auto;padding:8px;background:rgba(0,0,0,0.3);border-radius:6px;">
+      1. This is a simulated space flight experience provided by Grace of Touch Engine.<br>
+      2. All flight data, boarding passes, and QR codes are for simulation purposes only.<br>
+      3. By proceeding, you agree to the terms of the Grace of Touch Platform.<br>
+      4. Flight conditions are subject to real-time mission parameters.<br>
+      5. The operator (Grace of Touch Co.) is not liable for any virtual incidents during the flight.<br>
+      6. Your flight data may be used to improve the simulation experience.<br>
+      <br>
+      <span style="color:var(--term-color);">Grace of Touch Co. &copy; 2024-2026. Powered by Grace of Touch Engine.</span>
+    </div>
+    <div style="display:flex;gap:12px;justify-content:center;">
+      <button id="consent-agree" style="background:rgba(0,216,255,0.1);border:1px solid var(--term-color);color:var(--term-color);font-family:'Courier New',monospace;font-size:12px;letter-spacing:0.15em;padding:10px 24px;border-radius:8px;cursor:pointer;">I AGREE</button>
+      <button id="consent-decline" style="background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.4);font-family:'Courier New',monospace;font-size:12px;padding:10px 24px;border-radius:8px;cursor:pointer;">DECLINE</button>
+    </div>
+  </div>
+</div>
+
 <!-- Boarding Pass Overlay -->
 <div id="boarding-overlay">
   <div id="boarding-pass">
@@ -324,7 +349,7 @@
 <!-- UI Layer -->
 <div id="ui-layer">
   <div class="header">
-    <div style="font-size:10px;opacity:0.5;">MEGA ROCKET v73<br>STATUS: <span id="net-status" style="color:#ffcc00;">SOLO</span></div>
+    <div style="font-size:10px;opacity:0.5;">MEGA ROCKET v76<br>STATUS: <span id="net-status" style="color:#ffcc00;">SOLO</span></div>
     <div id="vitals">
       <div class="vital-row"><span>ID:</span><span id="my-name-val">AWAITING</span></div>
       <div class="vital-row"><span>PEERS:</span><span id="peer-val">0</span></div>
@@ -1283,18 +1308,39 @@ const BoardingPass={
   _boardRadius:15, // distance to auto-board
   _ticketNo:0,
   _passengers:[], // simulated other passengers for flight monitor
+  _consentGiven:false, // v76: consent tracking
 
   init(){
     const ticketBtn=document.getElementById('ticket-btn');
     const boardBtn=document.getElementById('bp-board-btn');
     const closeBtn=document.getElementById('bp-close-btn');
     const saveBtn=document.getElementById('bp-save-btn');
-    if(ticketBtn)ticketBtn.addEventListener('click',()=>this.issuePass());
+    if(ticketBtn)ticketBtn.addEventListener('click',()=>this._showConsent());
     if(boardBtn)boardBtn.addEventListener('click',()=>this.board());
     if(closeBtn)closeBtn.addEventListener('click',()=>this.close());
     if(saveBtn)saveBtn.addEventListener('click',()=>this.saveToDevice());
+    // v76: Consent modal handlers
+    const agreeBtn=document.getElementById('consent-agree');
+    const declineBtn=document.getElementById('consent-decline');
+    if(agreeBtn)agreeBtn.addEventListener('click',()=>{
+      document.getElementById('consent-overlay').style.display='none';
+      this._consentGiven=true;
+      this.issuePass();
+    });
+    if(declineBtn)declineBtn.addEventListener('click',()=>{
+      document.getElementById('consent-overlay').style.display='none';
+      Logger.log('FLIGHT AGREEMENT DECLINED — BOARDING CANCELLED');
+    });
     // Check for saved ticket
     this._checkSavedTicket();
+  },
+
+  _showConsent(){
+    if(this._consentGiven){
+      this.issuePass();
+      return;
+    }
+    document.getElementById('consent-overlay').style.display='flex';
   },
 
   _checkSavedTicket(){
@@ -1353,10 +1399,11 @@ const BoardingPass={
   },
 
   _generatePassengers(myTicket){
-    const names=['TANAKA','SMITH','CHEN','GARCIA','KIM','MUELLER','SATO','PATEL'];
+    const names=['TANAKA','SMITH','CHEN','GARCIA','KIM','MUELLER','SATO','PATEL','SUZUKI','JOHNSON','WANG','SILVA','NAKAMURA','LEE'];
     const p=[];
-    const myPos=Math.floor(Math.random()*5)+1;
-    for(let i=1;i<=6;i++){
+    const max=ROCKET_CONFIG.maxPassengers;
+    const myPos=Math.floor(Math.random()*(max-1))+1;
+    for(let i=1;i<=max;i++){
       if(i===myPos){
         p.push({no:myTicket,name:'YOU',status:'boarding'});
       }else{
@@ -6541,7 +6588,46 @@ const MoonMission={
 };
 
 // ══════════════════════════════════════════════
-// App — v68 Main
+// v76: PERMISSION SYSTEM
+// ══════════════════════════════════════════════
+const PERMISSION={
+  ADMIN:0,    // Tier 0: Owner — フリーフライ全解放
+  PREMIUM:1,  // Tier 1: 全乗り物+ロケット搭乗
+  BASIC:2,    // Tier 2: 地上乗り物+電車/新幹線
+  VISITOR:3,  // Tier 3: 徒歩のみ（デフォルト）
+};
+const PERMISSION_LABELS={0:'ADMIN',1:'PREMIUM',2:'BASIC',3:'VISITOR'};
+const PERMISSION_COLORS={0:'#ff8c00',1:'#ffd700',2:'#00d8ff',3:'#888888'};
+
+function getCurrentPermission(){
+  const params=new URLSearchParams(window.location.search);
+  if(params.get('dev')==='grace2024') return PERMISSION.ADMIN;
+  // Future: Firebase Auth check for PREMIUM/BASIC
+  return PERMISSION.VISITOR;
+}
+const USER_PERMISSION=getCurrentPermission();
+
+// v76: GROUND GRAVITY CONSTANTS
+const GROUND={
+  SURFACE_Y:0,         // 地表面のY座標
+  GRAVITY:-9.8,        // 重力加速度 (m/s²相当)
+  PLAYER_HEIGHT:1.7,   // プレイヤーの目線高さ
+  JUMP_VELOCITY:5.0,   // ジャンプ初速
+  GROUND_FRICTION:0.92, // 地上での摩擦
+  ENABLE:true,         // 地上重力モード有効/無効
+};
+
+// v76: ROCKET_CONFIG
+const ROCKET_CONFIG={
+  maxPassengers:6,     // デフォルト定員
+  rocketTier:'small',  // 'small'=6, 'medium'=12, 'large'=24
+  stripePrice:null,    // Phase 2: Stripe Price ID
+};
+if(ROCKET_CONFIG.rocketTier==='medium') ROCKET_CONFIG.maxPassengers=12;
+if(ROCKET_CONFIG.rocketTier==='large') ROCKET_CONFIG.maxPassengers=24;
+
+// ══════════════════════════════════════════════
+// App — v76 Main (Grace of Touch Engine)
 // ══════════════════════════════════════════════
 const App={
   scene:null,camera:null,renderer:null,composer:null,bloomPass:null,
@@ -6698,7 +6784,17 @@ const App={
     const scanPref=localStorage.getItem('scanline_pref')||'off';
     document.getElementById('scanline').style.display=scanPref==='on'?'block':'none';
     document.getElementById('scanline-select').value=scanPref;
-    Logger.log("v70 SOLAR SYSTEM + SPACE ELEVATOR + EARTH LIFE + SPACECRAFT READY.");
+    // v76: Permission badge
+    const badge=document.getElementById('permission-badge');
+    if(badge){
+      const label=PERMISSION_LABELS[USER_PERMISSION]||'VISITOR';
+      const color=PERMISSION_COLORS[USER_PERMISSION]||'#888';
+      badge.textContent=label;
+      badge.style.color=color;
+      badge.style.border='1px solid '+color;
+      badge.style.background='rgba(0,0,0,0.5)';
+    }
+    Logger.log("v76 GRACE OF TOUCH ENGINE — PERMISSION: "+PERMISSION_LABELS[USER_PERMISSION]);
     this._lastTime=performance.now()*0.001;
     this._animate();
   },
@@ -6876,12 +6972,40 @@ const App={
       const turboScale=inp.turbo?this.turboMult:1.0;
       const currentAccel=this.accel*turboScale;
       const acc=new THREE.Vector3();
-      const moveDir=(this._camMode==='third')?1:-1; // third person: invert fwd/back to match visual
-      acc.addScaledVector(this._fwd,moveDir*inp.move.y);acc.addScaledVector(this._rgt,inp.move.x);acc.addScaledVector(this._up,inp.upDown);
-      if(acc.length()>0)acc.normalize();
-      this.velocity.addScaledVector(acc,currentAccel);
+      const moveDir=-1; // v76: FPS/third共通。三人称はカメラオフセットで対応
+      const onGround=GROUND.ENABLE&&this.camera.position.y<=(GROUND.SURFACE_Y+GROUND.PLAYER_HEIGHT+0.5);
+      if(onGround&&USER_PERMISSION>=PERMISSION.VISITOR){
+        // v76: 地上重力モード — 徒歩移動（Y軸は重力で制御）
+        const groundFwd=new THREE.Vector3(this._fwd.x,0,this._fwd.z).normalize();
+        const groundRgt=new THREE.Vector3(this._rgt.x,0,this._rgt.z).normalize();
+        acc.addScaledVector(groundFwd,moveDir*inp.move.y);
+        acc.addScaledVector(groundRgt,inp.move.x);
+        if(acc.length()>0)acc.normalize();
+        this.velocity.x+=acc.x*currentAccel*0.4; // 地上は遅め
+        this.velocity.z+=acc.z*currentAccel*0.4;
+        // 重力適用
+        if(this.camera.position.y>(GROUND.SURFACE_Y+GROUND.PLAYER_HEIGHT)){
+          this.velocity.y+=GROUND.GRAVITY*dt*0.01;
+        }else{
+          this.camera.position.y=GROUND.SURFACE_Y+GROUND.PLAYER_HEIGHT;
+          if(this.velocity.y<0)this.velocity.y=0;
+          // ジャンプ（Spaceキー = upDown > 0）
+          if(inp.upDown>0)this.velocity.y=GROUND.JUMP_VELOCITY*0.02;
+        }
+        // Admin/Premiumは飛行可能
+        if(USER_PERMISSION<=PERMISSION.PREMIUM&&inp.upDown>0){
+          this.velocity.y+=currentAccel*0.5;
+        }
+        this.velocity.x*=GROUND.GROUND_FRICTION;
+        this.velocity.z*=GROUND.GROUND_FRICTION;
+      }else{
+        // フリーフライモード（宇宙/Admin）
+        acc.addScaledVector(this._fwd,moveDir*inp.move.y);acc.addScaledVector(this._rgt,inp.move.x);acc.addScaledVector(this._up,inp.upDown);
+        if(acc.length()>0)acc.normalize();
+        this.velocity.addScaledVector(acc,currentAccel);
+      }
       if(Math.abs(inp.wheelBoost)>0.001)this.velocity.addScaledVector(this._fwd,inp.wheelBoost*turboScale);
-      this.velocity.multiplyScalar(this.friction);
+      this.velocity.multiplyScalar(onGround?GROUND.GROUND_FRICTION:this.friction);
       this.camera.position.add(this.velocity);
     }
 
