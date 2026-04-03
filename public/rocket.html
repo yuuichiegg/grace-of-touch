@@ -631,15 +631,15 @@ float fbm3(vec2 p){float v=0.0;float a=0.5;for(int i=0;i<4;i++){v+=a*sn(p);p*=1.
 void main(){
   float y=vUv.y;float x=abs(vUv.x-0.5)*2.0;
 
-  // ── Multi-scale turbulence (SpaceX Raptor: violent, high-energy flow) ──
+  // ── Multi-scale turbulence (GT-1 Engine: violent, high-energy flow) ──
   float n1=fbm(vec2(x*3.5+0.3,y*8.0-time*22.0));
   float n2=fbm(vec2(x*7.0-0.7,y*12.0-time*30.0));
   float n3=sn(vec2(x*18.0,y*35.0-time*45.0))*0.4;
   float n4=fbm3(vec2(x*2.0+time*1.5,y*5.0-time*16.0))*0.3;
   float n=(n1*0.4+n2*0.3+n3*0.15+n4*0.15)*2.0-1.0;
 
-  // ── SpaceX Raptor plume shape: narrow nozzle → overexpanded bell → multiple shock diamonds ──
-  // Raptor nozzle is optimized for sea-level: slightly overexpanded at launch
+  // ── GT-1 Engine plume shape: narrow nozzle → overexpanded bell → multiple shock diamonds ──
+  // GT-1 nozzle is optimized for sea-level: slightly overexpanded at launch
   float nozzleW=0.12;   // very narrow at nozzle exit
   float bellW=0.38;      // first expansion
   float shock1W=0.22;    // first shock diamond contraction
@@ -665,7 +665,7 @@ void main(){
   edgeTurb+=sn(vec2(x*14.0-time*2.5,y*18.0-time*26.0))*0.05*y;
   float baseW=w+n*0.04+edgeTurb+kh;
 
-  // Overall taper — longer plume (Raptor: methane burns more efficiently, longer flame)
+  // Overall taper — longer plume (GT-1: methane burns more efficiently, longer flame)
   float taper=1.0-pow(y,2.2);
 
   // ── Flame tip breakup — chaotic, wispy dissolution (more violent than RP-1) ──
@@ -692,14 +692,14 @@ void main(){
   flick*=0.92+0.08*sin(time*37.0+y*15.0);  // high-freq shimmer
   float shape=edge*taper*flick*tipFade;
 
-  // ── Bright core — narrow, intensely hot (Raptor: blue-white at >3500K) ──
+  // ── Bright core — narrow, intensely hot (GT-1: blue-white at >3500K) ──
   float coreW=baseW*0.30;
   float core=smoothstep(coreW+0.02,0.0,x)*taper*tipFade;
   core*=0.83+0.17*sin(time*28.0+y*12.0);
   float innerCore=smoothstep(coreW*0.35,0.0,x)*taper*tipFade*0.7;
   float ultraCore=smoothstep(coreW*0.15,0.0,x)*taper*smoothstep(0.35,0.0,y)*0.5; // nozzle exit: nearly white
 
-  // ── Mach diamonds — SpaceX signature: prominent, stationary bright shock structures ──
+  // ── Mach diamonds — Grace signature: prominent, stationary bright shock structures ──
   // Multiple shock diamond intervals (real spacing ~ nozzle diameter apart)
   float mdSpacing=18.0;  // shock diamond frequency
   float md1=pow(max(0.0,sin(y*mdSpacing)),12.0)*smoothstep(baseW*0.45,0.0,x)*(1.0-y*0.3)*tipFade;
@@ -899,7 +899,7 @@ const Rocket3D = {
     for(let i=0;i<8;i++){const a=(i/8)*Math.PI*2;bellPos.push([Math.cos(a)*9*0.6,Math.sin(a)*9*0.6]);}
     bellPos.forEach(([bx,bz])=>{const bell=new THREE.Mesh(new THREE.ConeGeometry(bellR,bellH,8,1,true),darkMat);bell.rotation.x=Math.PI;bell.position.set(bx,-bellH/2,bz);this.boosterGroup.add(bell);});
 
-    // Grid fins (4) — SpaceX-style thin waffle panels, 45° offset from arms
+    // Grid fins (4) — Grace-style thin waffle panels, 45° offset from arms
     this.gridFins=[];
     for(let i=0;i<4;i++){
       const angle=(i/4)*Math.PI*2+Math.PI/4;
@@ -907,7 +907,7 @@ const Rocket3D = {
       outer.position.set(Math.cos(angle)*9.2,65,Math.sin(angle)*9.2);
       outer.rotation.y=angle;
       const inner=new THREE.Group();
-      // SpaceX grid fin: wide thin panel with lattice grid
+      // Grace grid fin: wide thin panel with lattice grid
       const fW=6,fD=6,fT=0.5; // wide flat panel, thin profile
       // Solid outer frame — 4 edges
       const frameT=0.4;
@@ -958,7 +958,7 @@ const Rocket3D = {
     const flameMat=new THREE.ShaderMaterial({uniforms:{time:{value:0},thrust:{value:0},color:{value:new THREE.Color(0xff6600)}},vertexShader:FLAME_VS,fragmentShader:FLAME_FS,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
     this.flameUniforms=flameMat.uniforms;
     this._flameGroup=new THREE.Group();
-    // 12 cross-planes with VARIED heights — SpaceX-scale violent plume (longer than v70)
+    // 12 cross-planes with VARIED heights — Grace-scale violent plume (longer than v70)
     const fw=9*2.5; // v75: 炎を太く
     const flameHeights=[95,80,90,72,98,76,85,68,92,74,82,66]; // v75: 炎を30%長く
     for(let i=0;i<12;i++){
@@ -968,7 +968,7 @@ const Rocket3D = {
       fm.position.y=-(fh/2+1);
       this._flameGroup.add(fm);
     }
-    // Large exhaust glow (nozzle exit bloom — brighter, bluer for Raptor methane)
+    // Large exhaust glow (nozzle exit bloom — brighter, bluer for GT-1 methane)
     const glowMat=new THREE.ShaderMaterial({uniforms:{thrust:flameMat.uniforms.thrust,glowColor:{value:new THREE.Color(1.0,0.9,0.6)}},vertexShader:GLOW_VS,fragmentShader:GLOW_FS,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
     const glowPlane=new THREE.Mesh(new THREE.PlaneGeometry(28,28),glowMat);
     glowPlane.position.y=-3;glowPlane.rotation.x=-Math.PI/2;
@@ -982,7 +982,7 @@ const Rocket3D = {
     const glowPlane3=new THREE.Mesh(new THREE.PlaneGeometry(18,18),glowMat2);
     glowPlane3.position.y=-20;glowPlane3.rotation.x=-Math.PI/2;
     this._flameGroup.add(glowPlane3);
-    // Inner exhaust cone (bright blue-white core — Raptor signature)
+    // Inner exhaust cone (bright blue-white core — GT-1 signature)
     const coneMatInner=new THREE.MeshBasicMaterial({color:0xffeebb,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
     this._exhaustConeInner=new THREE.Mesh(new THREE.ConeGeometry(5,36,12,1,true),coneMatInner); // v75: 大型化
     this._exhaustConeInner.rotation.x=Math.PI;this._exhaustConeInner.position.y=-18;
@@ -999,7 +999,7 @@ const Rocket3D = {
     this._flameGroup.add(this._exhaustHaze);
     this.boosterGroup.add(this._flameGroup);
 
-    // Smoke particle system — 80 billowing clouds (SpaceX-style launch pad steam)
+    // Smoke particle system — 80 billowing clouds (Grace-style launch pad steam)
     this._smokeParticles=[];
     this._smokeGroup=new THREE.Group();
     for(let i=0;i<80;i++){
@@ -1046,7 +1046,7 @@ const Rocket3D = {
     this._machInnerCone=new THREE.Mesh(new THREE.ConeGeometry(2.5,18,10,6,true),machInnerMat);
     this._machInnerCone.rotation.x=Math.PI;this._machInnerCone.position.y=-12;
     this._flameGroup.add(this._machInnerCone);
-    // Mach diamond ring markers (6 rings — SpaceX has very visible shock diamonds)
+    // Mach diamond ring markers (6 rings — Grace has very visible shock diamonds)
     this._machRings=[];
     for(let i=0;i<6;i++){
       const ringMat=new THREE.MeshBasicMaterial({color:i<2?0xddeeff:0xffeedd,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
@@ -1118,7 +1118,7 @@ const Rocket3D = {
     // Engine section (tapered 9→7)
     const uEngSec=new THREE.Mesh(new THREE.CylinderGeometry(9,7,8,24),darkMat);
     uEngSec.position.y=-4;this.upperGroup.add(uEngSec);
-    // 3 main Raptor engine bells (center cluster)
+    // 3 main GT-1 engine bells (center cluster)
     for(let i=-1;i<=1;i++){
       const uBell=new THREE.Mesh(new THREE.ConeGeometry(2.2,6,12,1,true),darkMat);
       uBell.rotation.x=Math.PI;uBell.position.set(i*2.8,-8-3,0);
@@ -1199,9 +1199,9 @@ const Rocket3D = {
 };
 
 // ══════════════════════════════════════════════
-// Mechazilla Tower
+// GraceCatcher Tower
 // ══════════════════════════════════════════════
-const Mechazilla = {
+const GraceCatcher = {
   group: null, armL: null, armR: null, catchProgress: 0,
   elevator: null, elevatorY: 24, // internal Y, matches arm height
   _bloomMats: null, _realMats: null,
@@ -1608,7 +1608,7 @@ const LaunchSequence = {
     {name:'STAGE SEPARATION',dur:4,  cam:'SEP_FOCUS'},
     {name:'BOOSTER FLIP',    dur:6,  cam:'BOOSTER_TRACK'},
     {name:'LANDING BURN',    dur:10, cam:'BOOSTER_TRACK'},
-    {name:'MECHAZILLA CATCH',dur:8,  cam:'TOWER_VIEW'},
+    {name:'GRACE CATCHER CATCH',dur:8,  cam:'TOWER_VIEW'},
     {name:'UPPER STAGE BURN',dur:4,  cam:'UPPER_FOLLOW'},
     {name:'ORBITAL INSERTION',dur:3, cam:'ORBIT_VIEW'},
     {name:'HANDOFF',         dur:2.5,cam:'FPS_HANDOFF'},
@@ -1654,9 +1654,9 @@ const LaunchSequence = {
         if(t>1&&!this._stackMsgShown){
           this._stackMsgShown=true;
           Logger.log("BOOSTER SECURED IN CHOPSTICK ARMS");
-          Mechazilla.elevator.visible=true;
-          Mechazilla.elevatorY=24;
-          Mechazilla.elevator.position.y=24;
+          GraceCatcher.elevator.visible=true;
+          GraceCatcher.elevatorY=24;
+          GraceCatcher.elevator.position.y=24;
           // Clear any rotation from flip phase
           if(Rocket3D.fullStack)Rocket3D.fullStack.rotation.set(0,0,0);
         }
@@ -1670,10 +1670,10 @@ const LaunchSequence = {
         const elevProg=(t-3)/10;
         const elevEase=elevProg<0.5?2*elevProg*elevProg:1-Math.pow(-2*elevProg+2,2)/2;
         const elevY=THREE.MathUtils.lerp(24,2,elevEase);
-        Mechazilla.elevator.position.y=elevY;
-        Mechazilla.elevatorY=elevY;
-        Mechazilla.armL.position.y=elevY;
-        Mechazilla.armR.position.y=elevY;
+        GraceCatcher.elevator.position.y=elevY;
+        GraceCatcher.elevatorY=elevY;
+        GraceCatcher.armL.position.y=elevY;
+        GraceCatcher.armR.position.y=elevY;
         const catchY=7.45,padY=0;
         const bY=THREE.MathUtils.lerp(catchY,padY,elevEase);
         // Direct position update (cycle_wait returns early, skips normal update)
@@ -1688,9 +1688,9 @@ const LaunchSequence = {
         }
         const openProg=(t-13)/2;
         const openZ=THREE.MathUtils.lerp(1.8,4.0,openProg);
-        Mechazilla.armL.position.z=openZ;
-        Mechazilla.armR.position.z=-openZ;
-        Mechazilla.catchProgress=Math.max(0,1-openProg);
+        GraceCatcher.armL.position.z=openZ;
+        GraceCatcher.armR.position.z=-openZ;
+        GraceCatcher.catchProgress=Math.max(0,1-openProg);
       }
       // Phase 4 (15-17s): Elevator + arms retract upward
       else if(t<17){
@@ -1708,20 +1708,20 @@ const LaunchSequence = {
         }
         const retProg=(t-15)/2;
         const retY=THREE.MathUtils.lerp(2,24,retProg);
-        Mechazilla.elevator.position.y=retY;
-        Mechazilla.armL.position.y=retY;
-        Mechazilla.armR.position.y=retY;
-        Mechazilla.armL.position.z=4.0;
-        Mechazilla.armR.position.z=-4.0;
+        GraceCatcher.elevator.position.y=retY;
+        GraceCatcher.armL.position.y=retY;
+        GraceCatcher.armR.position.y=retY;
+        GraceCatcher.armL.position.z=4.0;
+        GraceCatcher.armR.position.z=-4.0;
       }
       // Phase 5 (17-27s): Upper stage stacking
       else if(t<27){
         if(!this._stackingStarted){
           this._stackingStarted=true;
-          Mechazilla.elevator.visible=false;
-          Mechazilla.resetArms();
-          Mechazilla.armL.position.y=24;
-          Mechazilla.armR.position.y=24;
+          GraceCatcher.elevator.visible=false;
+          GraceCatcher.resetArms();
+          GraceCatcher.armL.position.y=24;
+          GraceCatcher.armR.position.y=24;
           Rocket3D.upperGroup.position.set(0,-30+150*S,0);
           Rocket3D.upperGroup.scale.setScalar(S);
           if(Rocket3D.upperGroup.parent!==App.scene)App.scene.add(Rocket3D.upperGroup);
@@ -1830,7 +1830,7 @@ const LaunchSequence = {
         const easeFlip=progress*progress;
         this.boosterY=THREE.MathUtils.lerp(this._boosterFlipStartY,flipEnd,easeFlip);
         // Drift toward arm catch position (tower X + arm offset, not tower center)
-        const flipCatchX=Mechazilla.group.position.x+1.75;
+        const flipCatchX=GraceCatcher.group.position.x+1.75;
         this.boosterReturnX=THREE.MathUtils.lerp(0,flipCatchX*0.3,progress);
         // Attitude wobble during flip — fins actively correcting
         const flipWobble=Math.sin(progress*Math.PI*2)*0.12*(1-progress)+Math.sin(progress*Math.PI*5)*0.04*(1-progress);
@@ -1855,19 +1855,19 @@ const LaunchSequence = {
         Rocket3D.steerFins(dt,lbSteer);
         // Stabilize flip wobble — fins + engine correcting attitude
         if(Rocket3D.fullStack)Rocket3D.fullStack.rotation.z*=0.93;
-        // No leg deploy — Mechazilla catches by grid fins (SpaceX style)
+        // No leg deploy — GraceCatcher catches by grid fins (Grace style)
         // Drift toward arm catch position (not tower center)
-        const lbCatchX=Mechazilla.group.position.x+1.75;
+        const lbCatchX=GraceCatcher.group.position.x+1.75;
         this.boosterReturnX+=(lbCatchX-this.boosterReturnX)*dt*0.5;
         break;
       }
-      case 'MECHAZILLA CATCH': {
+      case 'GRACE CATCHER CATCH': {
         this.upperVelY+=dt*4;this.upperY+=this.upperVelY*dt;
         // Engine off gradually
         Rocket3D.flameUniforms.thrust.value=Math.max(0,0.3*(1.0-progress*1.5));
         // Smoothstep approach: 8 → grid fin catch height
         // Grid fins at boosterGroup Y=65, fullStack scale S=0.07 → 65*0.07=4.55
-        // Mechazilla arms at internal Y=24, group scale 0.5 → world Y=-30+24*0.5=-18
+        // GraceCatcher arms at internal Y=24, group scale 0.5 → world Y=-30+24*0.5=-18
         // So boosterY needs to be: (-18 - (-30)) = 12 for grid fins to meet arms
         // Adjustment: gridFinLocalY(65)*S(0.07)=4.55, arm worldY=-18, padY=-30
         // boosterY so that -30+boosterY+65*0.07 = -18 → boosterY = 12-4.55 = 7.45
@@ -1879,14 +1879,14 @@ const LaunchSequence = {
         const catchSteer=0.15*(1-progress); // gentle, fading as arms catch
         Rocket3D.steerFins(dt,catchSteer);
         // Lock onto arm catch position (tower + offset)
-        const mcCatchX=Mechazilla.group.position.x+1.75;
+        const mcCatchX=GraceCatcher.group.position.x+1.75;
         this.boosterReturnX+=(mcCatchX-this.boosterReturnX)*dt*2;
         // Arms start closing at 30%
-        if(progress>0.3)Mechazilla.animateCatch(dt);
+        if(progress>0.3)GraceCatcher.animateCatch(dt);
         // Once arms grip, lock fins to full open (no more steering)
         if(progress>0.85){
           Rocket3D.gridFins.forEach(fin=>{fin.rotation.z=-0.1;}); // locked open
-          if(!this._mechaCatchLogged){this._mechaCatchLogged=true;Logger.log("MECHAZILLA: BOOSTER CAPTURED — GRID FINS LOCKED OPEN");}
+          if(!this._mechaCatchLogged){this._mechaCatchLogged=true;Logger.log("GRACE CATCHER: BOOSTER CAPTURED — GRID FINS LOCKED OPEN");}
         }
         break;
       }
@@ -2010,7 +2010,7 @@ const LaunchSequence = {
         }
       });
     }
-    // v71: SpaceX Mach diamond cone + ring animation (more prominent)
+    // v71: Grace Mach diamond cone + ring animation (more prominent)
     if(Rocket3D._machInnerCone){
       Rocket3D._machInnerCone.material.opacity=bThrust*0.45;
       const mFlicker=0.88+Math.sin(t*28)*0.12+Math.sin(t*45)*0.06;
@@ -2066,7 +2066,7 @@ const LaunchSequence = {
     document.getElementById('countdown-hud').classList.remove('visible');
     document.getElementById('launch-start-panel').classList.add('hidden');
     document.getElementById('chat-container').style.display='flex';
-    // Remove upper stage (deep space) but keep booster + pad + Mechazilla
+    // Remove upper stage (deep space) but keep booster + pad + GraceCatcher
     if(Rocket3D.upperGroup){
       Rocket3D.upperGroup.visible=true; // restore visibility for next cycle
       if(Rocket3D.upperGroup.parent===App.scene)App.scene.remove(Rocket3D.upperGroup);
@@ -2681,7 +2681,7 @@ _drawThrottle(x,y,h,pct,color,dual){
   ctx.strokeStyle=color.replace(/[\d.]+\)$/,'0.4)');
   ctx.lineWidth=1;
   if(dual){
-    // Dual throttle (Boeing-style)
+    // Dual throttle (dual-lever style)
     [-14,14].forEach(dx=>{
       ctx.fillRect(x+dx-w/4,y-barH/2,w/2,barH);
       ctx.strokeRect(x+dx-w/4,y-barH/2,w/2,barH);
@@ -4768,7 +4768,7 @@ const RocketCabin={
     this.group=new THREE.Group();
     this._orbitCenter=new THREE.Vector3(0,App.earth?App.earth.position.y:0,0);
 
-    // === EXTERIOR HULL (RocketCAD-inspired Starship shape) ===
+    // === EXTERIOR HULL (RocketCAD-inspired Grace Ship shape) ===
     const hullMat=new THREE.MeshStandardMaterial({color:0x8899aa,metalness:0.7,roughness:0.25});
     const hullDarkMat=new THREE.MeshStandardMaterial({color:0x445566,metalness:0.6,roughness:0.3});
     // Main fuselage cylinder
@@ -5259,7 +5259,7 @@ const PlayerShip={
     this.group.add(iRing);
 
     // === RAPTOR ENGINE BELLS (3 main + 6 outer ring = 9 total) ===
-    // 3 main Raptor engines (large, center cluster — scaled for r=9)
+    // 3 main GT-1 engines (large, center cluster — scaled for r=9)
     for(let i=-1;i<=1;i++){
       const bell=new THREE.Mesh(new THREE.CylinderGeometry(1.0,2.2,6,12),bellMat);
       bell.rotation.x=Math.PI/2;bell.position.set(i*2.8,0,31);
@@ -5328,7 +5328,7 @@ const PlayerShip={
     this._flameGroup.position.z=34;
     this.group.add(this._flameGroup);
 
-    // Engine point lights (Raptor: bluer, brighter)
+    // Engine point lights (GT-1: bluer, brighter)
     this._engineLight=new THREE.PointLight(0xccbbff,0,120);
     this._engineLight.position.set(0,0,40);
     this.group.add(this._engineLight);
@@ -5364,7 +5364,7 @@ const PlayerShip={
     this.group.rotateX(this._tiltX);
     this.group.rotateZ(this._tiltZ);
 
-    // Flame animation — FLAME_FS shader driven (SpaceX Raptor plume)
+    // Flame animation — FLAME_FS shader driven (GT-1 Engine plume)
     const now=performance.now()*0.001;
     if(this._shipFlameUniforms){
       this._shipFlameUniforms.time.value=now;
@@ -6482,7 +6482,7 @@ const MoonMission={
           this.boosterSepGroup.position.copy(bp);
           if(rp>=1){
             this.boosterSepGroup.visible=false;
-            Logger.log("MECHAZILLA: BOOSTER CAUGHT — REUSE CONFIRMED");
+            Logger.log("GRACE CATCHER: BOOSTER CAUGHT — REUSE CONFIRMED");
           }
         }
         this._followCamera(30,15);
@@ -6843,7 +6843,7 @@ const VEHICLE_SPECS={
     icon:'🚶',
   },
   AIRCRAFT_SS:{
-    name:'Airbus A320',
+    name:'Grace Liner 320',
     maxSpeed:840,      // km/h（巡航）
     maxAlt:12500,      // m（41,000ft）
     range:5700,        // km
@@ -6854,7 +6854,7 @@ const VEHICLE_SPECS={
     stallSpeed:213,    // km/h
   },
   AIRCRAFT_YK:{
-    name:'Boeing 737-800',
+    name:'Sky Eagle 800',
     maxSpeed:828,      // km/h（巡航）
     maxAlt:12500,      // m（41,000ft）
     range:5400,        // km
@@ -6865,7 +6865,7 @@ const VEHICLE_SPECS={
     stallSpeed:220,    // km/h
   },
   HELICOPTER:{
-    name:'Bell 206',
+    name:'Hawk 206',
     maxSpeed:225,      // km/h
     maxAlt:4100,       // m（13,500ft）
     range:693,         // km
@@ -6874,7 +6874,7 @@ const VEHICLE_SPECS={
     icon:'🚁',
   },
   EVTOL:{
-    name:'Joby S4',
+    name:'Grace Wing S4',
     maxSpeed:322,      // km/h
     maxAlt:4572,       // m（15,000ft）
     range:161,         // km
@@ -6893,7 +6893,7 @@ const VEHICLE_SPECS={
     icon:'🚀',
   },
   DRONE:{
-    name:'DJI Matrice 350',
+    name:'Scout M350',
     maxSpeed:82,       // km/h
     maxAlt:7000,       // m
     range:28,          // km（往復）
@@ -6975,7 +6975,7 @@ const App={
 
     // 3D Launch setup
     Rocket3D.create(this.scene);
-    Mechazilla.create(this.scene);
+    GraceCatcher.create(this.scene);
 
     // Offshore launch platform (千葉沖太平洋 海上発射施設)
     this._launchPad=new THREE.Group();
@@ -7036,7 +7036,7 @@ const App={
     const centralLeg=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.5,5,8),legMat);
     centralLeg.position.set(0,-2.5,0);
     this._launchPad.add(centralLeg);
-    // Service walkway extending toward Mechazilla tower (at x=-3)
+    // Service walkway extending toward GraceCatcher tower (at x=-3)
     const walkway=new THREE.Mesh(new THREE.BoxGeometry(6,0.3,2),deckMat);
     walkway.position.set(-4.5,0,0);
     this._launchPad.add(walkway);
@@ -7190,7 +7190,7 @@ const App={
   setRenderMode(realistic){
     this._realisticMode=realistic;
     Rocket3D.setRenderMode(realistic);
-    Mechazilla.setRenderMode(realistic);
+    GraceCatcher.setRenderMode(realistic);
     if(realistic){
       this.bloomPass.strength=0.5;this.bloomPass.threshold=0.4;
       this.renderer.toneMapping=THREE.ACESFilmicToneMapping;
