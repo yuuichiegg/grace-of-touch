@@ -843,14 +843,19 @@
       const sinH=Math.sin(heading),cosH=Math.cos(heading);
       const metersPerDegLat=111320;
       const metersPerDegLng=111320*Math.cos(carto.latitude);
-      // 左スティック: 前後左右移動
-      const fwdAmt=-mobileStickL.dy*moveDist;
-      const sideAmt=mobileStickL.dx*moveDist;
-      let dLat=(cosH*fwdAmt+sinH*sideAmt)/metersPerDegLat;
-      let dLng=(sinH*fwdAmt-cosH*sideAmt)/metersPerDegLng;
+      // BUG-W7 fix: 左スティック前後(Y)+左右ストレーフ(X)
+      const fwdAmt=-mobileStickL.dy*moveDist;  // Y軸: 前後
+      const sideAmt=mobileStickL.dx*moveDist;   // X軸: 左右ストレーフ
+      // 前後: heading方向に沿って移動
+      let dLat=(cosH*fwdAmt)/metersPerDegLat;
+      let dLng=(sinH*fwdAmt)/metersPerDegLng;
+      // ストレーフ: heading+90度方向（右=+dx）
+      dLat+=(sinH*sideAmt)/metersPerDegLat;
+      dLng+=(-cosH*sideAmt)/metersPerDegLng;
       const newLng=Cesium.Math.toDegrees(carto.longitude)+dLng;
       const newLat=Cesium.Math.toDegrees(carto.latitude)+dLat;
-      const newH=currentMode===MODE.FREE_FLY?carto.height:TOKYO_TOWER.height;
+      // BUG-W8 fix: WALKINGモードは地面固定（FREE_FLYのみ高度自由）
+      const newH=(currentMode===MODE.FREE_FLY&&isAdmin)?carto.height:TOKYO_TOWER.height;
       camera.setView({
         destination:Cesium.Cartesian3.fromDegrees(newLng,newLat,newH),
         orientation:{heading:camera.heading,pitch:camera.pitch,roll:camera.roll}
