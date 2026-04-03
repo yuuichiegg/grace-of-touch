@@ -2587,16 +2587,16 @@ init(){
     // スマホ（小画面+タッチのみ）はEXPLORE、PCタッチスクリーンはPILOT維持
     if(isMobileOnly)Input._stickMode=3;
     modeBtn.innerHTML='<span id="stick-mode-label">'+Input._stickModes[Input._stickMode-1]+'</span>';
-    modeBtn.style.cssText='position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:30;background:rgba(0,30,50,0.7);border:1px solid rgba(0,216,255,0.4);color:rgba(0,216,255,0.9);font-family:Courier New,monospace;font-size:11px;padding:6px 16px;border-radius:20px;cursor:pointer;backdrop-filter:blur(4px);user-select:none;letter-spacing:1px;';
+    modeBtn.style.cssText='position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:30;background:rgba(0,30,50,0.7);border:1px solid rgba(0,216,255,0.4);color:rgba(0,216,255,0.9);font-family:Courier New,monospace;font-size:11px;padding:6px 16px;border-radius:20px;cursor:pointer;backdrop-filter:blur(4px);user-select:none;letter-spacing:1px;display:none;';
     modeBtn.addEventListener('touchstart',e=>{e.stopPropagation();Input.toggleStickMode();});
     document.body.appendChild(modeBtn);
     // Stick labels
     const lblL=document.createElement('div');lblL.id='stick-lbl-L';
-    lblL.style.cssText='position:fixed;bottom:8px;left:20px;z-index:29;color:rgba(0,216,255,0.4);font-family:Courier New,monospace;font-size:9px;pointer-events:none;';
-    lblL.textContent='L STICK';
+    lblL.style.cssText='position:fixed;bottom:8px;left:20px;z-index:29;color:rgba(0,216,255,0.4);font-family:Courier New,monospace;font-size:9px;pointer-events:none;display:none;';
+    lblL.textContent='';
     const lblR=document.createElement('div');lblR.id='stick-lbl-R';
-    lblR.style.cssText='position:fixed;bottom:8px;right:20px;z-index:29;color:rgba(0,216,255,0.4);font-family:Courier New,monospace;font-size:9px;pointer-events:none;text-align:right;';
-    lblR.textContent='R STICK';
+    lblR.style.cssText='position:fixed;bottom:8px;right:20px;z-index:29;color:rgba(0,216,255,0.4);font-family:Courier New,monospace;font-size:9px;pointer-events:none;text-align:right;display:none;';
+    lblR.textContent='';
     document.body.appendChild(lblL);document.body.appendChild(lblR);
   }
 },
@@ -2758,13 +2758,9 @@ render(){
   }
 
   if(mode==='WALKING'||!isTouchDev){
-    // 歩行モード or PC: 従来のデュアルスティック
-    if(isTouchDev){
-      this._drawGhostStick(w*0.22,ghostY,'rgba(0,216,255,0.75)','MOVE');
-      this._drawGhostStick(w*0.78,ghostY,'rgba(0,255,136,0.75)','LOOK');
-    }
-    this._drawStick(stL,'rgba(0,216,255,0.75)','L');
-    this._drawStick(stR,'rgba(0,255,136,0.75)','R');
+    // 歩行モード: ゴーストスティック非表示、操作中のみ表示
+    if(stL.active)this._drawStick(stL,'rgba(0,216,255,0.75)','L');
+    if(stR.active)this._drawStick(stR,'rgba(0,255,136,0.75)','R');
   }else if(mode==='AIRCRAFT_SS'){
     // サイドスティック型（エアバス系）
     this._drawThrottle(w*0.12,ghostY,120,this._throttle,'rgba(0,255,136,0.75)',false);
