@@ -6904,6 +6904,17 @@ const VEHICLE_SPECS={
   },
 };
 
+// v76/SPEC-17追記: 4軸自由度設計
+const DOF_CONFIG={
+  WALKING:    {moveIndependent:true,  lookFree:true,  strafeEnabled:true},
+  AIRCRAFT_SS:{moveIndependent:false, lookFree:false, strafeEnabled:false},
+  AIRCRAFT_YK:{moveIndependent:false, lookFree:false, strafeEnabled:false},
+  HELICOPTER: {moveIndependent:true,  lookFree:false, strafeEnabled:true, collectiveAxis:'Y'},
+  EVTOL:      {moveIndependent:true,  lookFree:false, strafeEnabled:true, collectiveAxis:'Y'},
+  ROCKET:     {moveIndependent:false, lookFree:false, strafeEnabled:false},
+  DRONE:      {moveIndependent:true,  lookFree:true,  strafeEnabled:true, collectiveAxis:'Y'},
+};
+
 // ══════════════════════════════════════════════
 // App — v76 Main (Grace of Touch Engine)
 // ══════════════════════════════════════════════
@@ -7250,34 +7261,57 @@ const App={
       const turboScale=inp.turbo?this.turboMult:1.0;
       const currentAccel=this.accel*turboScale;
       const acc=new THREE.Vector3();
-      const moveDir=-1; // v76: FPS/third共通。三人称はカメラオフセットで対応
+      const moveDir=-1;
+      const vMode=JoyRenderer._vehicleMode||'WALKING';
+      const dof=DOF_CONFIG[vMode]||DOF_CONFIG.WALKING;
       const onGround=GROUND.ENABLE&&this.camera.position.y<=(GROUND.SURFACE_Y+GROUND.PLAYER_HEIGHT+0.5);
-      if(onGround&&USER_PERMISSION>=PERMISSION.VISITOR){
-        // v76: 地上重力モード — 徒歩移動（Y軸は重力で制御）
+
+      if(onGround&&vMode==='WALKING'){
+        // 歩行モード: 移動と視点が独立、ストレーフ可能
         const groundFwd=new THREE.Vector3(this._fwd.x,0,this._fwd.z).normalize();
         const groundRgt=new THREE.Vector3(this._rgt.x,0,this._rgt.z).normalize();
         acc.addScaledVector(groundFwd,moveDir*inp.move.y);
-        acc.addScaledVector(groundRgt,inp.move.x);
+        if(dof.strafeEnabled)acc.addScaledVector(groundRgt,inp.move.x);
         if(acc.length()>0)acc.normalize();
-        this.velocity.x+=acc.x*currentAccel*0.4; // 地上は遅め
+        this.velocity.x+=acc.x*currentAccel*0.4;
         this.velocity.z+=acc.z*currentAccel*0.4;
-        // 重力適用
+        // 重力
         if(this.camera.position.y>(GROUND.SURFACE_Y+GROUND.PLAYER_HEIGHT)){
           this.velocity.y+=GROUND.GRAVITY*dt*0.01;
         }else{
           this.camera.position.y=GROUND.SURFACE_Y+GROUND.PLAYER_HEIGHT;
           if(this.velocity.y<0)this.velocity.y=0;
-          // ジャンプ（Spaceキー = upDown > 0）
           if(inp.upDown>0)this.velocity.y=GROUND.JUMP_VELOCITY*0.02;
         }
-        // Admin/Premiumは飛行可能
         if(USER_PERMISSION<=PERMISSION.PREMIUM&&inp.upDown>0){
           this.velocity.y+=currentAccel*0.5;
         }
         this.velocity.x*=GROUND.GROUND_FRICTION;
         this.velocity.z*=GROUND.GROUND_FRICTION;
+      }else if(dof.collectiveAxis==='Y'){
+        // ヘリ/eVTOL/ドローン: 移動と向き独立、コレクティブで高度制御
+        const groundFwd=new THREE.Vector3(this._fwd.x,0,this._fwd.z).normalize();
+        const groundRgt=new THREE.Vector3(this._rgt.x,0,this._rgt.z).normalize();
+        acc.addScaledVector(groundFwd,moveDir*inp.move.y);
+        if(dof.strafeEnabled)acc.addScaledVector(groundRgt,inp.move.x);
+        if(acc.length()>0)acc.normalize();
+        this.velocity.x+=acc.x*currentAccel;
+        this.velocity.z+=acc.z*currentAccel;
+        // コレクティブ: upDown = 高度
+        this.velocity.y+=inp.upDown*currentAccel*0.8;
+        // 軽い重力（ホバリング抵抗）
+        if(inp.upDown===0)this.velocity.y*=0.95;
+        this.velocity.x*=this.friction;
+        this.velocity.z*=this.friction;
+      }else if(!dof.moveIndependent){
+        // 飛行機/ロケット: 移動=向き連動、ストレーフ不可
+        acc.addScaledVector(this._fwd,moveDir*inp.move.y);
+        // ピッチ/ロール入力で方向変更（機首=進行方向）
+        acc.addScaledVector(this._up,inp.upDown);
+        if(acc.length()>0)acc.normalize();
+        this.velocity.addScaledVector(acc,currentAccel);
       }else{
-        // フリーフライモード（宇宙/Admin）
+        // フリーフライ（Admin/宇宙）
         acc.addScaledVector(this._fwd,moveDir*inp.move.y);acc.addScaledVector(this._rgt,inp.move.x);acc.addScaledVector(this._up,inp.upDown);
         if(acc.length()>0)acc.normalize();
         this.velocity.addScaledVector(acc,currentAccel);
