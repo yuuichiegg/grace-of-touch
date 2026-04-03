@@ -879,13 +879,36 @@ document.getElementById('open-launcher')?.addEventListener('click', () => {
   document.body.appendChild(b);
   document.getElementById('consent-ok').addEventListener('click',(e)=>{e.stopPropagation();localStorage.setItem('grace_consent','accepted');b.remove();});
 })();
-// BUG-W17: Prevent "Proceed to Launchpad" and terminal buttons from opening launcher
-document.addEventListener('click',(e)=>{
-  const t=e.target;
-  if(t&&(t.id==='world-btn'||t.closest('#terminal-screen button')||t.closest('#flight-experience')||t.closest('.consent-banner'))){
-    e.stopPropagation();
-  }
-},{capture:true});
+// BUG-W17 comprehensive fix: Block ALL clicks from triggering launcher
+// except explicit open-launcher clicks
+(function(){
+  const origAdd=EventTarget.prototype.addEventListener;
+  const _launcherBlocked=new Set();
+  // Intercept the launcher panel open by adding a global guard
+  document.addEventListener('click',(e)=>{
+    const t=e.target;
+    // Allow only explicit launcher triggers
+    if(t&&t.id==='open-launcher')return;
+    // Block if clicking on any overlay, button, or interactive element
+    if(t&&(
+      t.closest('#terminal-screen')||
+      t.closest('#flight-experience')||
+      t.closest('#consent-overlay')||
+      t.closest('#boarding-overlay')||
+      t.closest('#voicenav-overlay')||
+      t.closest('.panel-scroll')||
+      t.closest('#launcher-panel')||
+      t.tagName==='BUTTON'||
+      t.tagName==='A'||
+      t.tagName==='INPUT'||
+      t.tagName==='LABEL'||
+      t.closest('button')||
+      t.closest('a')
+    )){
+      e.stopPropagation();
+    }
+  },{capture:true});
+})();
 </script>
 </body>
 </html>

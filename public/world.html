@@ -1222,12 +1222,20 @@
         // ロケット位置
         this.entity.position = Cesium.Cartesian3.fromDegrees(LAUNCH_PAD.lng, LAUNCH_PAD.lat, 55 + alt);
 
-        // カメラ: ロケット内部視点（窓から見える感じ）
+        // カメラ: ロケット内部視点 + タッチで視点回転可能
+        // ユーザーの視点操作を保持（heading/pitchオフセット）
+        if(!this._userHeading) this._userHeading=0;
+        if(!this._userPitch) this._userPitch=0;
+        if(typeof mobileStickR!=='undefined'&&mobileStickR.active){
+          this._userHeading+=mobileStickR.dx*0.03;
+          this._userPitch+=mobileStickR.dy*0.02;
+          this._userPitch=Math.max(-0.5,Math.min(0.5,this._userPitch));
+        }
         viewer.camera.setView({
           destination: Cesium.Cartesian3.fromDegrees(LAUNCH_PAD.lng, LAUNCH_PAD.lat, alt + 100),
           orientation: {
-            heading: Cesium.Math.toRadians(0),
-            pitch: Cesium.Math.toRadians(pitch),
+            heading: this._userHeading,
+            pitch: Cesium.Math.toRadians(pitch) + this._userPitch,
             roll: 0,
           }
         });
