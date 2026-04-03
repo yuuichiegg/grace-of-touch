@@ -632,7 +632,7 @@
     destination: Cesium.Cartesian3.fromDegrees(
       TOKYO_TOWER.lng,
       TOKYO_TOWER.lat,
-      TOKYO_TOWER.height + 1600 // 初期はやや高めで全体を確認（後でFPSに移行）
+      TOKYO_TOWER.height + 50 // BUG-W18: 地上目線に近い高度で開始
     ),
     orientation: {
       heading: Cesium.Math.toRadians(0),

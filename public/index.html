@@ -879,6 +879,13 @@ document.getElementById('open-launcher')?.addEventListener('click', () => {
   document.body.appendChild(b);
   document.getElementById('consent-ok').addEventListener('click',(e)=>{e.stopPropagation();localStorage.setItem('grace_consent','accepted');b.remove();});
 })();
+// BUG-W17: Prevent "Proceed to Launchpad" and terminal buttons from opening launcher
+document.addEventListener('click',(e)=>{
+  const t=e.target;
+  if(t&&(t.id==='world-btn'||t.closest('#terminal-screen button')||t.closest('#flight-experience')||t.closest('.consent-banner'))){
+    e.stopPropagation();
+  }
+},{capture:true});
 </script>
 </body>
 </html>
