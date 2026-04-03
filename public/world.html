@@ -1251,11 +1251,22 @@
 
         this.entity.position = Cesium.Cartesian3.fromDegrees(lng, lat, this._altitude);
 
-        // HUD
+        // HUD + アルテミス2比較メッセージ
         const rhAlt = document.getElementById('rh-alt');
         if (rhAlt) rhAlt.textContent = '400';
         const rhSpd = document.getElementById('rh-spd');
-        if (rhSpd) rhSpd.textContent = '27600'; // 軌道速度
+        if (rhSpd) rhSpd.textContent = '27600';
+        const rhPhase = document.getElementById('rh-phase');
+        if (rhPhase) {
+          const msgs = [
+            'ORBITAL FREE FLIGHT',
+            'ISS orbits at this altitude (408km)',
+            'Artemis 2 launched from here 24h ago',
+            'Earth rotation visible below',
+            'Day/night terminator line visible',
+          ];
+          rhPhase.textContent = msgs[Math.floor(orbitTime / 18) % msgs.length];
+        }
 
         // 90秒後にミッション完了
         if (orbitTime > 90) {
@@ -1284,6 +1295,13 @@
 
   // moveLoop内でロケット更新を呼ぶフック（moveLoop末尾に追加）
   const _origMoveLoop = moveLoop;
+
+  // SPEC-14 Phase C: 地球の昼夜境界線（ターミネーターライン）+ 宇宙観光演出
+  viewer.scene.globe.enableLighting = true;
+  // 大気散乱（宇宙から地球を見たときの青いリム）
+  viewer.scene.globe.showGroundAtmosphere = true;
+  // 太陽光の時刻を現在に（リアルタイム昼夜）
+  viewer.clock.shouldAnimate = true;
 
   function finishLoading() {
     setLoadingStatus('READY — DIGITAL TWIN INITIALIZED');
