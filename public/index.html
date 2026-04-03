@@ -270,8 +270,11 @@ body{margin:0;overflow:hidden;background:#020510;touch-action:none;}
     <div id="quake-feed" style="font-family:'Courier New',monospace;font-size:10px;line-height:1.8;color:rgba(0,255,255,0.5);max-height:120px;overflow:hidden;"></div>
   </div>
 
-  <a href="world.html" id="world-btn" style="display:inline-block;margin-bottom:12px;padding:10px 24px;font-family:'Courier New',monospace;font-size:12px;letter-spacing:0.15em;color:#00ff88;border:1px solid rgba(0,255,136,0.4);border-radius:20px;text-decoration:none;background:rgba(0,255,136,0.06);cursor:pointer;transition:all 0.3s;text-shadow:0 0 6px rgba(0,255,136,0.5);animation:btnPulse 3s ease-in-out infinite;" onmouseover="this.style.background='rgba(0,255,136,0.15)'" onmouseout="this.style.background='rgba(0,255,136,0.06)'">🌏 DIGITAL TWIN WORLD</a>
-  <div id="open-launcher">EXPLORE APPS</div>
+  <!-- BUG-W14: 縦並び整理 — ボタンを明確に分離 -->
+  <div style="display:flex;flex-direction:column;align-items:center;gap:10px;margin-top:16px;">
+    <a href="world.html" id="world-btn" style="display:inline-block;padding:10px 24px;font-family:'Courier New',monospace;font-size:12px;letter-spacing:0.15em;color:#00ff88;border:1px solid rgba(0,255,136,0.4);border-radius:20px;text-decoration:none;background:rgba(0,255,136,0.06);cursor:pointer;transition:all 0.3s;text-shadow:0 0 6px rgba(0,255,136,0.5);" onmouseover="this.style.background='rgba(0,255,136,0.15)'" onmouseout="this.style.background='rgba(0,255,136,0.06)'">🌏 DIGITAL TWIN WORLD</a>
+    <div id="open-launcher">EXPLORE APPS</div>
+  </div>
 </div>
 
 <!-- BUG-W13: MENU button removed (panel is always accessible) -->
