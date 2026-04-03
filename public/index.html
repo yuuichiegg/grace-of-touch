@@ -879,35 +879,26 @@ document.getElementById('open-launcher')?.addEventListener('click', () => {
   document.body.appendChild(b);
   document.getElementById('consent-ok').addEventListener('click',(e)=>{e.stopPropagation();localStorage.setItem('grace_consent','accepted');b.remove();});
 })();
-// BUG-W17 comprehensive fix: Block ALL clicks from triggering launcher
-// except explicit open-launcher clicks
+// BUG-W17 definitive fix: Override the obfuscated window click handler
+// The launcher opens on center-screen clicks when state==='terminal'
+// We intercept by monkey-patching classList.add on the panel
 (function(){
-  const origAdd=EventTarget.prototype.addEventListener;
-  const _launcherBlocked=new Set();
-  // Intercept the launcher panel open by adding a global guard
+  const panel=document.getElementById('launcher-panel');
+  if(!panel)return;
+  const origAdd=panel.classList.add.bind(panel.classList);
+  let _blockLauncher=false;
+  // Block launcher from opening for 500ms after any button/link click
   document.addEventListener('click',(e)=>{
     const t=e.target;
-    // Allow only explicit launcher triggers
-    if(t&&t.id==='open-launcher')return;
-    // Block if clicking on any overlay, button, or interactive element
-    if(t&&(
-      t.closest('#terminal-screen')||
-      t.closest('#flight-experience')||
-      t.closest('#consent-overlay')||
-      t.closest('#boarding-overlay')||
-      t.closest('#voicenav-overlay')||
-      t.closest('.panel-scroll')||
-      t.closest('#launcher-panel')||
-      t.tagName==='BUTTON'||
-      t.tagName==='A'||
-      t.tagName==='INPUT'||
-      t.tagName==='LABEL'||
-      t.closest('button')||
-      t.closest('a')
-    )){
-      e.stopPropagation();
+    if(t&&(t.tagName==='BUTTON'||t.tagName==='A'||t.tagName==='INPUT'||t.tagName==='LABEL'||t.closest('button')||t.closest('a')||t.closest('#consent-overlay')||t.closest('#boarding-overlay')||t.closest('#flight-experience'))){
+      _blockLauncher=true;
+      setTimeout(()=>{_blockLauncher=false;},500);
     }
   },{capture:true});
+  panel.classList.add=function(...args){
+    if(args[0]==='open'&&_blockLauncher)return;
+    return origAdd(...args);
+  };
 })();
 </script>
 </body>
