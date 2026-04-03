@@ -7086,9 +7086,10 @@ const App={
 
   _createEarth(){
     const R=3000,cY=-3030;
-    // Earth sphere — semi-transparent + DoubleSide so you can see continents from inside
+    // Earth sphere — FrontSide only (realistic: cannot see inside earth)
+    // Option Pack "Core Explorer" would enable DoubleSide + internal layers
     const geo=new THREE.SphereGeometry(R,128,128);
-    const earthMat=new THREE.MeshBasicMaterial({color:0x1a4a8a,transparent:true,opacity:0.85,side:THREE.DoubleSide});
+    const earthMat=new THREE.MeshBasicMaterial({color:0x1a4a8a,transparent:true,opacity:0.85,side:THREE.FrontSide});
     this.earth=new THREE.Mesh(geo,earthMat);
     this.earth.position.set(0,cY,0);
     // Rotate so offshore Chiba, Pacific (~35.4°N, 140.0°E) faces +Y
@@ -7317,7 +7318,19 @@ const App={
       this.camera.position.add(this.velocity);
     }
 
-    // Collision: planets only (Earth stays enterable)
+    // Collision: Earth surface (non-admin cannot enter Earth)
+    if(this.earth&&USER_PERMISSION>PERMISSION.ADMIN){
+      const ep=this.earth.position;
+      const er=3000+2; // Earth radius + small buffer
+      const edist=this.camera.position.distanceTo(ep);
+      if(edist<er){
+        const en=this.camera.position.clone().sub(ep).normalize();
+        this.camera.position.copy(ep).addScaledVector(en,er);
+        const evDot=this.velocity.dot(en);
+        if(evDot<0)this.velocity.addScaledVector(en,-evDot*1.2);
+      }
+    }
+    // Collision: other planets
     for(const[name,body]of Object.entries(SolarSystem.bodies)){
       const bp=body.group.position;
       const br=body.data.radius+5;
