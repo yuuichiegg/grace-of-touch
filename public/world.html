@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GRACE OF TOUCH — DIGITAL TWIN WORLD α</title>
+  <meta name="description" content="地球をリアルスケールで歩き、宇宙へ旅立つデジタルツインプラットフォーム。リアルタイム地震・船舶・フライト情報を統合。" />
+  <meta property="og:title" content="GRACE OF TOUCH — DIGITAL TWIN WORLD" />
+  <meta property="og:description" content="地球をリアルスケールで歩き、ロケットで宇宙へ。リアルタイムデータ統合デジタルツイン。" />
+  <meta property="og:url" content="https://grace-of-touch.web.app/world.html" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <!-- CesiumJS CDN -->
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
+
+  <style>
+    /* ========================================
+       グローバルスタイル
+    ======================================== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #020510;
+      color: #00d8ff;
+      font-family: 'Courier New', Courier, monospace;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* Cesiumコンテナ */
+    #cesiumContainer {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    /* Cesiumデフォルトウィジェットの一部を非表示 */
+    .cesium-widget-credits {
+      display: none !important;
+    }
+
+    /* ========================================
+       UIオーバーレイ共通
+    ======================================== */
+    .ui-overlay {
+      position: absolute;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    /* ========================================
+       左上タイトル
+    ======================================== */
+    #title-bar {
+      top: 16px;
+      left: 16px;
+    }
+
+    #title-bar h1 {
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 0.12em;
+      color: #00d8ff;
+      text-shadow: 0 0 10px #00d8ff88;
+      white-space: nowrap;
+    }
+
+    #title-bar .subtitle {
+      font-size: 10px;
+      color: #00d8ff66;
+      letter-spacing: 0.08em;
+      margin-top: 3px;
+    }
+
+    /* ========================================
+       右上 権限バッジ
+    ======================================== */
+    #auth-badge {
+      top: 16px;
+      right: 16px;
+      text-align: right;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 0.08em;
+      border: 1px solid;
+    }
+
+    .badge-admin {
+      background: rgba(255, 140, 0, 0.15);
+      border-color: #ff8c00;
+      color: #ff8c00;
+      text-shadow: 0 0 8px #ff8c0088;
+      box-shadow: 0 0 10px rgba(255, 140, 0, 0.2);
+    }
+
+    .badge-visitor {
+      background: rgba(0, 216, 255, 0.10);
+      border-color: #00d8ff;
+      color: #00d8ff;
+      text-shadow: 0 0 8px #00d8ff88;
+      box-shadow: 0 0 10px rgba(0, 216, 255, 0.15);
+    }
+
+    /* ========================================
+       左下 移動モード表示
+    ======================================== */
+    #mode-display {
+      bottom: 40px;
+      left: 16px;
+    }
+
+    #mode-display .mode-label {
+      font-size: 12px;
+      color: #00d8ff;
+      text-shadow: 0 0 8px #00d8ff66;
+      letter-spacing: 0.1em;
+      background: rgba(2, 5, 16, 0.7);
+      padding: 5px 10px;
+      border: 1px solid #00d8ff33;
+      border-radius: 3px;
+    }
+
+    /* ========================================
+       右下 キー操作ガイド
+    ======================================== */
+    #key-guide {
+      bottom: 40px;
+      right: 16px;
+      text-align: right;
+    }
+
+    #key-guide .guide-panel {
+      background: rgba(2, 5, 16, 0.75);
+      border: 1px solid #00d8ff22;
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-size: 10px;
+      color: #00d8ff88;
+      line-height: 1.7;
+    }
+
+    #key-guide .guide-panel span.key {
+      color: #00d8ff;
+      background: rgba(0, 216, 255, 0.1);
+      padding: 1px 5px;
+      border-radius: 2px;
+      border: 1px solid #00d8ff44;
+      margin-right: 4px;
+      font-size: 10px;
+    }
+
+    /* ========================================
+       中央 ローディング表示
+    ======================================== */
+    #loading-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: #020510;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      transition: opacity 0.8s ease;
+    }
+
+    #loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-title {
+      font-size: 18px;
+      letter-spacing: 0.15em;
+      color: #00d8ff;
+      text-shadow: 0 0 20px #00d8ff;
+      margin-bottom: 20px;
+    }
+
+    .loading-bar-wrap {
+      width: 280px;
+      height: 2px;
+      background: #00d8ff22;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .loading-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #00d8ff, #0088ff);
+      border-radius: 2px;
+      animation: loadAnim 2.5s ease forwards;
+      box-shadow: 0 0 10px #00d8ff;
+    }
+
+    @keyframes loadAnim {
+      0%   { width: 0%; }
+      60%  { width: 70%; }
+      100% { width: 100%; }
+    }
+
+    .loading-status {
+      margin-top: 14px;
+      font-size: 11px;
+      color: #00d8ff66;
+      letter-spacing: 0.08em;
+    }
+
+    /* ========================================
+       スキャンライン演出（軽量）
+    ======================================== */
+    #scanline {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 50;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 216, 255, 0.012) 2px,
+        rgba(0, 216, 255, 0.012) 4px
+      );
+    }
+
+    /* ========================================
+       通知トースト
+    ======================================== */
+    #toast {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(2, 5, 16, 0.9);
+      border: 1px solid #00d8ff44;
+      border-radius: 4px;
+      padding: 10px 20px;
+      font-size: 12px;
+      color: #00d8ff;
+      letter-spacing: 0.08em;
+      z-index: 150;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    #toast.visible {
+      opacity: 1;
+    }
+
+    /* ========================================
+       座標表示（下中央）
+    ======================================== */
+    #coords-display {
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+    }
+
+    #coords-display .coords-text {
+      font-size: 10px;
+      color: #00d8ff55;
+      letter-spacing: 0.06em;
+      background: rgba(2, 5, 16, 0.6);
+      padding: 4px 10px;
+      border-radius: 3px;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Cesiumビューポート -->
+  <div id="cesiumContainer"></div>
+
+  <!-- スキャンライン -->
+  <div id="scanline"></div>
+
+  <!-- ローディング画面 -->
+  <div id="loading-overlay">
+    <div class="loading-title">GRACE OF TOUCH — DIGITAL TWIN WORLD α</div>
+    <div class="loading-bar-wrap">
+      <div class="loading-bar"></div>
+    </div>
+    <div class="loading-status" id="loading-status">INITIALIZING CESIUM ENGINE...</div>
+  </div>
+
+  <!-- 通知トースト -->
+  <div id="toast"></div>
+
+  <!-- 左上タイトル -->
+  <div class="ui-overlay" id="title-bar">
+    <h1>GRACE OF TOUCH — DIGITAL TWIN WORLD α</h1>
+    <div class="subtitle">PLATEAU 3D CITY MODEL / TOKYO METROPOLITAN AREA</div>
+  </div>
+
+  <!-- 右上 権限バッジ -->
+  <div class="ui-overlay" id="auth-badge">
+    <span class="badge" id="badge-span">...</span>
+  </div>
+
+  <!-- 左下 移動モード -->
+  <div class="ui-overlay" id="mode-display">
+    <div class="mode-label" id="mode-label">🚶 WALKING</div>
+  </div>
+
+  <!-- 下中央 座標 -->
+  <div class="ui-overlay" id="coords-display">
+    <div class="coords-text" id="coords-text">LAT: -- / LNG: -- / ALT: --m</div>
+  </div>
+
+  <!-- リアルタイム統計パネル（左上タイトル下） -->
+  <div class="ui-overlay" style="top:60px;left:16px;pointer-events:auto;">
+    <div style="font-size:10px;color:rgba(0,216,255,0.7);background:rgba(2,5,16,0.75);padding:8px 12px;border-radius:6px;border:1px solid rgba(0,216,255,0.2);line-height:1.8;min-width:180px;">
+      <div>🌏 地震 (24h): <span id="quake-count" style="color:#ff6644;font-weight:bold;">--</span> 件</div>
+      <div>✈ フライト (日本上空): <span id="flight-count" style="color:#00ffcc;font-weight:bold;">--</span> 機</div>
+      <div>⚓ 船舶ホットスポット: <span style="color:#4488ff;font-weight:bold;">5</span> 海域</div>
+      <div style="margin-top:4px;font-size:9px;color:rgba(0,216,255,0.4);">LIVE — 更新中</div>
+    </div>
+  </div>
+
+  <!-- SNSシェアボタン（右上バッジ下） -->
+  <div class="ui-overlay" style="top:46px;right:16px;pointer-events:auto;display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+    <button onclick="shareToX()" style="background:rgba(0,0,0,0.7);border:1px solid rgba(255,255,255,0.3);color:#fff;font-family:'Courier New',monospace;font-size:10px;padding:6px 12px;border-radius:20px;cursor:pointer;letter-spacing:0.08em;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(0,0,0,0.7)'">𝕏 シェア</button>
+    <a href="https://grace-of-touch.web.app/rocket.html" target="_blank" style="background:rgba(0,216,255,0.1);border:1px solid rgba(0,216,255,0.4);color:#00d8ff;font-family:'Courier New',monospace;font-size:10px;padding:6px 12px;border-radius:20px;cursor:pointer;letter-spacing:0.08em;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.background='rgba(0,216,255,0.2)'" onmouseout="this.style.background='rgba(0,216,255,0.1)'">🚀 ロケットへ</a>
+  </div>
+
+  <!-- 右下 キーガイド -->
+  <div class="ui-overlay" id="key-guide">
+    <div class="guide-panel">
+      <div><span class="key">W/S</span> 前進 / 後退</div>
+      <div><span class="key">A/D</span> 左 / 右移動</div>
+      <div><span class="key">↑/↓</span> 視点上下</div>
+      <div><span class="key">V</span> 視点切替（FPS / 三人称）</div>
+      <div><span class="key">F</span> 自由飛行（ADMINのみ）</div>
+      <div><span class="key">マウス</span> ドラッグで回転</div>
+    </div>
+  </div>
+
+  <script>
+  // ========================================
+  // 初期化
+  // ========================================
+
+  // CesiumIon トークン不要（トークンなしで起動）
+  Cesium.Ion.defaultAccessToken = '';
+
+  // URLパラメータで権限判定
+  const urlParams = new URLSearchParams(window.location.search);
+  const isAdmin = urlParams.get('admin') === 'true';
+
+  // 権限バッジ設定
+  const badgeEl = document.getElementById('badge-span');
+  if (isAdmin) {
+    badgeEl.textContent = '🔑 ADMIN';
+    badgeEl.classList.add('badge-admin');
+  } else {
+    badgeEl.textContent = '👤 VISITOR';
+    badgeEl.classList.add('badge-visitor');
+  }
+
+  // ローディングステータス更新
+  function setLoadingStatus(text) {
+    const el = document.getElementById('loading-status');
+    if (el) el.textContent = text;
+  }
+
+  // トースト表示
+  function showToast(msg, duration = 2500) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('visible');
+    setTimeout(() => toast.classList.remove('visible'), duration);
+  }
+
+  // ========================================
+  // Viewer 初期化
+  // ========================================
+  let viewer;
+
+  try {
+    setLoadingStatus('CREATING VIEWER...');
+
+    viewer = new Cesium.Viewer('cesiumContainer', {
+      // 地形: WGS84楕円体（トークン不要）
+      terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+      // 標準の衛星画像は使わず、NASAの無料レイヤーを後から追加
+      baseLayer: false,
+      // デフォルトUI非表示
+      timeline: false,
+      animation: false,
+      baseLayerPicker: false,
+      geocoder: false,
+      homeButton: false,
+      sceneModePicker: false,
+      navigationHelpButton: false,
+      fullscreenButton: false,
+      infoBox: false,
+      selectionIndicator: false,
+      // 大気・空
+      skyAtmosphere: new Cesium.SkyAtmosphere(),
+      skyBox: new Cesium.SkyBox({
+        sources: {
+          // 宇宙の背景（デフォルトのCesium天球）
+          positiveX: 'https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_px.jpg',
+          negativeX: 'https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mx.jpg',
+          positiveY: 'https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_py.jpg',
+          negativeY: 'https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_my.jpg',
+          positiveZ: 'https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_pz.jpg',
+          negativeZ: 'https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Assets/Textures/SkyBox/tycho2t3_80_mz.jpg'
+        }
+      }),
+      orderIndependentTranslucency: false,
+    });
+
+    // クレジット非表示
+    viewer.cesiumWidget.creditContainer.style.display = 'none';
+
+  } catch (e) {
+    console.error('Viewer初期化失敗:', e);
+    setLoadingStatus('ERROR: ' + e.message);
+  }
+
+  // ========================================
+  // NASAのBlue Marble（無料タイル）を背景に追加
+  // ========================================
+  try {
+    setLoadingStatus('LOADING NASA IMAGERY...');
+
+    // NASA Blue Marble Next Generation（無料・トークン不要）
+    const nasaLayer = new Cesium.WebMapTileServiceImageryProvider({
+      url: 'https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/BlueMarble_ShadedRelief_Bathymetry/default/500m/{TileMatrix}/{TileRow}/{TileCol}.jpg',
+      layer: 'BlueMarble_ShadedRelief_Bathymetry',
+      style: 'default',
+      tileMatrixSetID: '500m',
+      maximumLevel: 8,
+      credit: 'NASA GIBS Blue Marble'
+    });
+
+    viewer.imageryLayers.addImageryProvider(nasaLayer);
+
+  } catch (e) {
+    console.warn('NASA imagery読み込み失敗（フォールバック）:', e);
+
+    // フォールバック: OpenStreetMap（トークン不要）
+    try {
+      const osmImagery = new Cesium.OpenStreetMapImageryProvider({
+        url: 'https://tile.openstreetmap.org/'
+      });
+      viewer.imageryLayers.addImageryProvider(osmImagery);
+    } catch (e2) {
+      console.warn('OSM imagery読み込みも失敗:', e2);
+    }
+  }
+
+  // ========================================
+  // PLATEAUの3D都市モデル（東京）
+  // ========================================
+  setLoadingStatus('LOADING PLATEAU 3D TILES...');
+
+  const plateauUrls = [
+    // 国土交通省PLATEAU公式（洪水浸水想定区域含む東京23区 notexture）
+    'https://plateau.geospatial.jp/main/data/3d-tiles/fld/13100_tokyo23ku/notexture/tileset.json',
+    // 代替: PLATEAU東京23区LOD1（建築物）
+    'https://plateau.geospatial.jp/main/data/3d-tiles/bldg/13100_tokyo23ku/notexture/tileset.json',
+  ];
+
+  async function loadPlateau() {
+    for (const url of plateauUrls) {
+      try {
+        const tileset = await Cesium.Cesium3DTileset.fromUrl(url, {
+          maximumScreenSpaceError: 16,
+        });
+
+        // 建物をグレーのスタイルに設定
+        tileset.style = new Cesium.Cesium3DTileStyle({
+          color: "color('rgba(180, 190, 200, 0.85)')",
+        });
+
+        viewer.scene.primitives.add(tileset);
+        console.log('PLATEAU読み込み成功:', url);
+        showToast('PLATEAU 3D CITY MODEL: LOADED');
+        return;
+      } catch (e) {
+        console.warn('PLATEAU URL失敗、次を試行:', url, e.message);
+      }
+    }
+    console.warn('PLATEAUの全URLが失敗しました。OSMビルのみで継続します。');
+    showToast('PLATEAU: UNAVAILABLE — USING OSM BUILDINGS');
+  }
+
+  loadPlateau();
+
+  // ========================================
+  // OSM Buildings（CesiumJSの組み込み機能）
+  // ========================================
+  setLoadingStatus('LOADING OSM BUILDINGS...');
+
+  async function loadOsmBuildings() {
+    try {
+      // createOsmBuildingsAsync はCesiumIonのアセットを使うため
+      // トークンなしだとエラーになる可能性があるが、try/catchで包む
+      const osmBuildings = await Cesium.createOsmBuildingsAsync();
+      viewer.scene.primitives.add(osmBuildings);
+      console.log('OSM Buildings読み込み成功');
+      showToast('OSM BUILDINGS: LOADED');
+    } catch (e) {
+      console.warn('OSM Buildings読み込み失敗（CesiumIonトークン必要）:', e.message);
+      // エラーは無視してUIを維持
+    }
+  }
+
+  loadOsmBuildings();
+
+  // ========================================
+  // 交通インフラ プレースホルダー（道路・電車）
+  // ========================================
+
+  // 東京タワー周辺の道路（デモ用 Polyline 2本）
+  // 第一京浜（国道15号）付近
+  viewer.entities.add({
+    name: '道路 (第一京浜付近)',
+    polyline: {
+      positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+        139.7400, 35.6530, 3,
+        139.7430, 35.6560, 3,
+        139.7454, 35.6586, 3,
+        139.7480, 35.6610, 3,
+        139.7500, 35.6640, 3,
+      ]),
+      width: 3,
+      material: new Cesium.PolylineGlowMaterialProperty({
+        glowPower: 0.2,
+        color: Cesium.Color.fromCssColorString('#00d8ff').withAlpha(0.7),
+      }),
+      clampToGround: false,
+    }
+  });
+
+  // 桜田通り付近
+  viewer.entities.add({
+    name: '道路 (桜田通り付近)',
+    polyline: {
+      positions: Cesium.Cartesian3.fromDegreesArrayHeights([
+        139.7420, 35.6620, 3,
+        139.7440, 35.6590, 3,
+        139.7454, 35.6586, 3,
+        139.7465, 35.6570, 3,
+        139.7490, 35.6540, 3,
+      ]),
+      width: 3,
+      material: new Cesium.PolylineGlowMaterialProperty({
+        glowPower: 0.2,
+        color: Cesium.Color.fromCssColorString('#00d8ff').withAlpha(0.6),
+      }),
+      clampToGround: false,
+    }
+  });
+
+  // 山手線（東側一部）: 品川〜新橋〜東京 付近
+  const yamanoteLine = [
+    // 品川
+    139.7388, 35.6284, 5,
+    // 田町
+    139.7476, 35.6459, 5,
+    // 浜松町
+    139.7568, 35.6551, 5,
+    // 新橋
+    139.7587, 35.6664, 5,
+    // 有楽町
+    139.7625, 35.6751, 5,
+    // 東京
+    139.7671, 35.6812, 5,
+    // 神田
+    139.7700, 35.6919, 5,
+    // 秋葉原
+    139.7733, 35.6984, 5,
+  ];
+
+  viewer.entities.add({
+    name: '山手線（東側）',
+    polyline: {
+      positions: Cesium.Cartesian3.fromDegreesArrayHeights(yamanoteLine),
+      width: 4,
+      material: new Cesium.PolylineGlowMaterialProperty({
+        glowPower: 0.35,
+        color: Cesium.Color.fromCssColorString('#80ff44').withAlpha(0.85),
+      }),
+      clampToGround: false,
+    }
+  });
+
+  // ========================================
+  // カメラ初期位置: 東京タワー付近（FPS視点）
+  // ========================================
+  // 初期: 地上2mで東京タワーを向く
+  const TOKYO_TOWER = {
+    lat: 35.6586,
+    lng: 139.7454,
+    height: 2.0  // 地上2m（徒歩目線）
+  };
+
+  // カメラを東京タワー地点に設置
+  viewer.camera.setView({
+    destination: Cesium.Cartesian3.fromDegrees(
+      TOKYO_TOWER.lng,
+      TOKYO_TOWER.lat,
+      TOKYO_TOWER.height + 1600 // 初期はやや高めで全体を確認（後でFPSに移行）
+    ),
+    orientation: {
+      heading: Cesium.Math.toRadians(0),
+      pitch: Cesium.Math.toRadians(-45),
+      roll: 0,
+    }
+  });
+
+  // ========================================
+  // 移動モード管理
+  // ========================================
+  const MODE = {
+    WALKING: 'walking',
+    THIRD_PERSON: 'third_person',
+    FREE_FLY: 'free_fly',
+  };
+
+  let currentMode = MODE.WALKING;
+  const WALK_SPEED = 5.0;   // 5m/s = 徒歩速度
+  const FLY_SPEED  = 200.0; // 飛行時は高速
+
+  // モードラベル更新
+  function updateModeLabel() {
+    const el = document.getElementById('mode-label');
+    if (!el) return;
+    switch (currentMode) {
+      case MODE.WALKING:
+        el.textContent = '🚶 WALKING';
+        el.style.color = '#00d8ff';
+        break;
+      case MODE.THIRD_PERSON:
+        el.textContent = '👁 THIRD PERSON';
+        el.style.color = '#88ffcc';
+        break;
+      case MODE.FREE_FLY:
+        el.textContent = '✈ FREE FLY (ADMIN)';
+        el.style.color = '#ff8c00';
+        break;
+    }
+  }
+
+  // ========================================
+  // キー入力管理
+  // ========================================
+  const keys = {};
+
+  document.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+
+    // V: 視点切替（WALKING <-> THIRD_PERSON）
+    if (e.code === 'KeyV' && !e.repeat) {
+      if (currentMode === MODE.WALKING) {
+        currentMode = MODE.THIRD_PERSON;
+        showToast('VIEW: THIRD PERSON');
+      } else if (currentMode === MODE.THIRD_PERSON) {
+        currentMode = MODE.WALKING;
+        showToast('VIEW: FIRST PERSON (WALKING)');
+      } else if (currentMode === MODE.FREE_FLY) {
+        currentMode = MODE.WALKING;
+        showToast('VIEW: FIRST PERSON (WALKING)');
+      }
+      updateModeLabel();
+    }
+
+    // F: 自由飛行（ADMINのみ）
+    if (e.code === 'KeyF' && !e.repeat) {
+      if (isAdmin) {
+        currentMode = currentMode === MODE.FREE_FLY ? MODE.WALKING : MODE.FREE_FLY;
+        showToast(currentMode === MODE.FREE_FLY
+          ? '✈ FREE FLY MODE ACTIVATED'
+          : '🚶 WALKING MODE');
+        updateModeLabel();
+      } else {
+        showToast('⚠ FREE FLY: ADMIN ACCESS REQUIRED');
+      }
+    }
+
+    // デフォルトのブラウザスクロールを防ぐ
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) {
+      e.preventDefault();
+    }
+  });
+
+  document.addEventListener('keyup', (e) => {
+    keys[e.code] = false;
+  });
+
+  // ========================================
+  // 移動ループ（requestAnimationFrame）
+  // ========================================
+  const scratchCartesian = new Cesium.Cartesian3();
+  const scratchCartographic = new Cesium.Cartographic();
+  const scratchMatrix = new Cesium.Matrix4();
+  const scratchDirection = new Cesium.Cartesian3();
+  const scratchRight = new Cesium.Cartesian3();
+  const scratchUp = new Cesium.Cartesian3();
+
+  let lastTime = performance.now();
+
+  function moveLoop() {
+    requestAnimationFrame(moveLoop);
+
+    const now = performance.now();
+    const dt = Math.min((now - lastTime) / 1000, 0.1); // 秒、最大100ms
+    lastTime = now;
+
+    if (!viewer || viewer.isDestroyed()) return;
+
+    const camera = viewer.camera;
+    const speed = currentMode === MODE.FREE_FLY ? FLY_SPEED : WALK_SPEED;
+
+    // 前後左右の入力チェック
+    const fwd  = keys['KeyW'] || keys['ArrowUp'];
+    const back = keys['KeyS'] || keys['ArrowDown'];
+    const left = keys['KeyA'];
+    const right = keys['KeyD'];
+    const arrowLeft  = keys['ArrowLeft'];
+    const arrowRight = keys['ArrowRight'];
+
+    let moved = false;
+
+    // カメラのローカル方向を取得
+    const heading = camera.heading;
+    const sinH = Math.sin(heading);
+    const cosH = Math.cos(heading);
+
+    // 地表座標系での前進ベクトル（高さ方向を無視）
+    if (fwd || back || left || right) {
+      // 現在のカメラ位置をCartographicで取得
+      const camPos = camera.position;
+      const carto = Cesium.Cartographic.fromCartesian(camPos, Cesium.Ellipsoid.WGS84, scratchCartographic);
+
+      let dLng = 0, dLat = 0;
+      const metersPerDegLat = 111320;
+      const metersPerDegLng = 111320 * Math.cos(carto.latitude);
+
+      const moveDist = speed * dt;
+
+      if (fwd) {
+        dLat += (cosH * moveDist) / metersPerDegLat;
+        dLng += (sinH * moveDist) / metersPerDegLng;
+      }
+      if (back) {
+        dLat -= (cosH * moveDist) / metersPerDegLat;
+        dLng -= (sinH * moveDist) / metersPerDegLng;
+      }
+      if (left) {
+        // headingを90度回した方向
+        dLat -= (sinH * moveDist) / metersPerDegLat;
+        dLng += (cosH * moveDist) / metersPerDegLng;
+      }
+      if (right) {
+        dLat += (sinH * moveDist) / metersPerDegLat;
+        dLng -= (cosH * moveDist) / metersPerDegLng;
+      }
+
+      // 高さの扱い
+      let newHeight;
+      if (currentMode === MODE.FREE_FLY) {
+        newHeight = carto.height;
+      } else {
+        // WALKING/THIRD_PERSON: 地上2mを維持（地形追従は簡略化）
+        newHeight = TOKYO_TOWER.height;
+      }
+
+      const newLng = Cesium.Math.toDegrees(carto.longitude) + dLng;
+      const newLat = Cesium.Math.toDegrees(carto.latitude) + dLat;
+
+      camera.setView({
+        destination: Cesium.Cartesian3.fromDegrees(newLng, newLat, newHeight),
+        orientation: {
+          heading: camera.heading,
+          pitch: camera.pitch,
+          roll: camera.roll,
+        }
+      });
+
+      moved = true;
+    }
+
+    // 上下視点（矢印キー）
+    if (arrowLeft) {
+      camera.rotateLeft(Cesium.Math.toRadians(45 * dt));
+    }
+    if (arrowRight) {
+      camera.rotateRight(Cesium.Math.toRadians(45 * dt));
+    }
+
+    // 三人称視点: 少し後ろ・上から追従（演出のみ）
+    if (currentMode === MODE.THIRD_PERSON) {
+      // カメラをやや下向きに調整（完全な三人称は複雑なので視点調整のみ）
+      // pitchが-10度より上の場合はそのまま
+    }
+
+    // 座標表示更新
+    updateCoordsDisplay();
+  }
+
+  // ========================================
+  // 座標表示更新
+  // ========================================
+  function updateCoordsDisplay() {
+    try {
+      const carto = Cesium.Cartographic.fromCartesian(
+        viewer.camera.position,
+        Cesium.Ellipsoid.WGS84,
+        scratchCartographic
+      );
+      const lat = Cesium.Math.toDegrees(carto.latitude).toFixed(5);
+      const lng = Cesium.Math.toDegrees(carto.longitude).toFixed(5);
+      const alt = carto.height.toFixed(1);
+
+      const el = document.getElementById('coords-text');
+      if (el) {
+        el.textContent = `LAT: ${lat} / LNG: ${lng} / ALT: ${alt}m`;
+      }
+    } catch (e) {
+      // エラーは無視
+    }
+  }
+
+  // ========================================
+  // ローディング完了処理
+  // ========================================
+  function finishLoading() {
+    setLoadingStatus('READY — DIGITAL TWIN INITIALIZED');
+
+    setTimeout(() => {
+      const overlay = document.getElementById('loading-overlay');
+      if (overlay) overlay.classList.add('hidden');
+
+      // FPSカメラ位置にズームイン
+      setTimeout(() => {
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(
+            TOKYO_TOWER.lng,
+            TOKYO_TOWER.lat,
+            TOKYO_TOWER.height + 5  // 地上7m
+          ),
+          orientation: {
+            heading: Cesium.Math.toRadians(30),
+            pitch: Cesium.Math.toRadians(-5),
+            roll: 0,
+          },
+          duration: 3.5,
+          easingFunction: Cesium.EasingFunction.QUADRATIC_IN_OUT,
+        });
+      }, 200);
+
+      showToast('DIGITAL TWIN WORLD — TOKYO ONLINE');
+
+    }, 2800);
+  }
+
+  // ========================================
+  // リアルタイム地震レイヤー（USGS 無料API）
+  // ========================================
+  const quakeEntities = [];
+
+  async function loadEarthquakes() {
+    try {
+      // 過去24時間のM2.5以上（日本周辺に絞らず全球）
+      const url = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson';
+      const res = await fetch(url);
+      const data = await res.json();
+
+      // 既存エンティティ削除
+      quakeEntities.forEach(e => viewer.entities.remove(e));
+      quakeEntities.length = 0;
+
+      data.features.forEach(f => {
+        const [lng, lat, depth] = f.geometry.coordinates;
+        const mag = f.properties.mag || 0;
+        const place = f.properties.place || '不明';
+        const time = new Date(f.properties.time).toLocaleString('ja-JP');
+
+        // マグニチュードに応じた色・サイズ
+        const size = Math.max(4000, mag * 12000);
+        const color = mag >= 6.0 ? Cesium.Color.RED.withAlpha(0.85)
+                    : mag >= 5.0 ? Cesium.Color.ORANGE.withAlpha(0.75)
+                    : mag >= 4.0 ? Cesium.Color.YELLOW.withAlpha(0.65)
+                    :              Cesium.Color.CYAN.withAlpha(0.5);
+
+        const e = viewer.entities.add({
+          name: `M${mag.toFixed(1)} ${place}`,
+          position: Cesium.Cartesian3.fromDegrees(lng, lat, 0),
+          ellipse: {
+            semiMinorAxis: size,
+            semiMajorAxis: size,
+            material: color,
+            outline: true,
+            outlineColor: color.brighten(0.3, new Cesium.Color()),
+            outlineWidth: 1,
+          },
+          description: `<b>M${mag.toFixed(1)}</b><br>${place}<br>深さ: ${depth}km<br>${time}`,
+        });
+        quakeEntities.push(e);
+      });
+
+      const count = data.features.length;
+      showToast(`🌏 EARTHQUAKE: ${count} EVENTS (24h)`);
+      document.getElementById('quake-count').textContent = count;
+    } catch (err) {
+      console.warn('地震データ取得失敗:', err.message);
+    }
+  }
+
+  // 起動時 + 5分ごとに更新
+  loadEarthquakes();
+  setInterval(loadEarthquakes, 5 * 60 * 1000);
+
+  // ========================================
+  // リアルタイムフライトレイヤー（OpenSky Network 無料）
+  // ========================================
+  const flightEntities = {};
+
+  async function loadFlights() {
+    try {
+      // 日本上空に絞る（負荷軽減）
+      const url = 'https://opensky-network.org/api/states/all?lamin=24&lomin=122&lamax=46&lomax=154';
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      const data = await res.json();
+      if (!data.states) return;
+
+      const activeIds = new Set();
+
+      data.states.forEach(s => {
+        const [icao24, callsign, , , , lng, lat, , , , , , , , ,] = s;
+        if (!lng || !lat) return;
+        const alt = s[7] || 1000; // barometric altitude (m)
+        const id = icao24;
+        activeIds.add(id);
+
+        const pos = Cesium.Cartesian3.fromDegrees(lng, lat, Math.max(alt, 100));
+
+        if (flightEntities[id]) {
+          // 既存エンティティを更新
+          flightEntities[id].position = pos;
+        } else {
+          flightEntities[id] = viewer.entities.add({
+            name: (callsign || icao24).trim(),
+            position: pos,
+            point: {
+              pixelSize: 6,
+              color: Cesium.Color.fromCssColorString('#00ffcc').withAlpha(0.9),
+              outlineColor: Cesium.Color.WHITE.withAlpha(0.3),
+              outlineWidth: 1,
+              scaleByDistance: new Cesium.NearFarScalar(1e3, 1.5, 8e6, 0.4),
+            },
+            label: {
+              text: (callsign || '').trim(),
+              font: '9px Courier New',
+              fillColor: Cesium.Color.fromCssColorString('#00ffcc'),
+              outlineColor: Cesium.Color.BLACK,
+              outlineWidth: 2,
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              pixelOffset: new Cesium.Cartesian2(8, -6),
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 500000),
+            },
+            description: `CALLSIGN: ${(callsign||icao24).trim()}<br>ALT: ${Math.round(alt)}m`,
+          });
+        }
+      });
+
+      // 消えたフライトを削除
+      Object.keys(flightEntities).forEach(id => {
+        if (!activeIds.has(id)) {
+          viewer.entities.remove(flightEntities[id]);
+          delete flightEntities[id];
+        }
+      });
+
+      const count = activeIds.size;
+      document.getElementById('flight-count').textContent = count;
+    } catch (err) {
+      console.warn('フライトデータ取得失敗:', err.message);
+    }
+  }
+
+  // 起動後2秒 + 15秒ごとに更新（OpenSky匿名は10s制限）
+  setTimeout(loadFlights, 2000);
+  setInterval(loadFlights, 15 * 1000);
+
+  // ========================================
+  // AIS船舶レイヤー（主要航路・地政学ホットスポット）
+  // ========================================
+  // リアルタイムAISはAPIキー必要のため、主要ホットスポットをデモ表示
+  // 将来: MarineTraffic / AISHub APIに差し替え可能
+  const shipHotspots = [
+    // ホルムズ海峡（中東石油輸送の要衝）
+    { name: 'Strait of Hormuz', lat: 26.6, lng: 56.3, vessels: 12, note: '中東石油輸送の要衝' },
+    { name: 'VESSEL: TANKER-1', lat: 26.55, lng: 56.25, type: 'tanker', course: 45 },
+    { name: 'VESSEL: CARGO-1',  lat: 26.65, lng: 56.35, type: 'cargo',  course: 220 },
+    // 台湾海峡
+    { name: 'Taiwan Strait Monitor', lat: 24.5, lng: 120.0, vessels: 28, note: '重要海上交通路' },
+    { name: 'VESSEL: CONTAINER-1', lat: 24.4, lng: 119.9, type: 'container', course: 0 },
+    // 東京湾
+    { name: 'Tokyo Bay', lat: 35.4, lng: 139.8, vessels: 45, note: '国内最大の港湾' },
+    { name: 'VESSEL: FERRY-1',   lat: 35.45, lng: 139.75, type: 'ferry', course: 330 },
+    { name: 'VESSEL: TANKER-2',  lat: 35.38, lng: 139.82, type: 'tanker', course: 90 },
+    // 横浜港
+    { name: 'Yokohama Port',     lat: 35.44, lng: 139.64, vessels: 30, note: '国際貿易港' },
+    // マラッカ海峡
+    { name: 'Malacca Strait', lat: 3.5, lng: 102.0, vessels: 35, note: '世界最大の航路' },
+    { name: 'VESSEL: VLCC-1', lat: 3.45, lng: 101.95, type: 'tanker', course: 300 },
+  ];
+
+  // ホットスポットゾーン
+  shipHotspots.filter(s => s.vessels).forEach(spot => {
+    viewer.entities.add({
+      name: spot.name,
+      position: Cesium.Cartesian3.fromDegrees(spot.lng, spot.lat, 0),
+      ellipse: {
+        semiMinorAxis: 30000,
+        semiMajorAxis: 30000,
+        material: Cesium.Color.fromCssColorString('#0088ff').withAlpha(0.12),
+        outline: true,
+        outlineColor: Cesium.Color.fromCssColorString('#0088ff').withAlpha(0.5),
+        outlineWidth: 1,
+      },
+      label: {
+        text: `⚓ ${spot.name}\n${spot.vessels} vessels`,
+        font: 'bold 11px Courier New',
+        fillColor: Cesium.Color.fromCssColorString('#88ccff'),
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        pixelOffset: new Cesium.Cartesian2(0, -20),
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 2000000),
+      },
+      description: `<b>${spot.name}</b><br>推定船舶数: ${spot.vessels}<br>${spot.note}`,
+    });
+  });
+
+  // 個別船舶（アニメーション付き）
+  const vesselIcons = { tanker: '🛢', cargo: '📦', container: '🚢', ferry: '⛴' };
+  const animatedVessels = [];
+
+  shipHotspots.filter(s => s.type).forEach(vessel => {
+    const speed = 0.00003; // 緩やかに動く
+    const data = {
+      lat: vessel.lat, lng: vessel.lng,
+      course: (vessel.course || 0) * Math.PI / 180,
+      name: vessel.name, type: vessel.type,
+    };
+
+    const entity = viewer.entities.add({
+      name: vessel.name,
+      position: Cesium.Cartesian3.fromDegrees(vessel.lng, vessel.lat, 50),
+      point: {
+        pixelSize: 8,
+        color: Cesium.Color.fromCssColorString('#4488ff').withAlpha(0.95),
+        outlineColor: Cesium.Color.WHITE.withAlpha(0.4),
+        outlineWidth: 1,
+        scaleByDistance: new Cesium.NearFarScalar(1e3, 2, 5e6, 0.5),
+      },
+      label: {
+        text: `${vesselIcons[vessel.type]||'🚢'} ${vessel.name.replace('VESSEL: ','')}`,
+        font: '9px Courier New',
+        fillColor: Cesium.Color.fromCssColorString('#88ccff'),
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        pixelOffset: new Cesium.Cartesian2(10, -8),
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 800000),
+      },
+      description: `<b>${vessel.name}</b><br>TYPE: ${vessel.type.toUpperCase()}<br>COURSE: ${vessel.course}°`,
+    });
+    animatedVessels.push({ entity, data, speed });
+  });
+
+  // 船舶アニメーション
+  viewer.clock.onTick.addEventListener(() => {
+    animatedVessels.forEach(v => {
+      v.data.lng += Math.sin(v.data.course) * v.speed;
+      v.data.lat += Math.cos(v.data.course) * v.speed;
+      // 一定範囲を超えたら折り返し
+      if (Math.random() < 0.001) v.data.course += (Math.random() - 0.5) * 0.3;
+      v.entity.position = Cesium.Cartesian3.fromDegrees(v.data.lng, v.data.lat, 50);
+    });
+  });
+
+  // ========================================
+  // 起動シーケンス
+  // ========================================
+  try {
+    // Cesium Viewerのシーン準備完了時にローディング終了
+    viewer.scene.globe.tileLoadProgressEvent.addEventListener((queuedTileCount) => {
+      if (queuedTileCount === 0) {
+        // タイル読み込み完了
+      }
+    });
+
+    // 2.5秒後にローディング画面を消す（タイルの読み込み完了を待たず）
+    setTimeout(finishLoading, 2500);
+
+  } catch (e) {
+    console.error('起動シーケンスエラー:', e);
+    finishLoading(); // エラーでもUIは出す
+  }
+
+  // 移動ループ開始
+  moveLoop();
+
+  // ========================================
+  // SNS シェア
+  // ========================================
+  function shareToX() {
+    try {
+      const carto = Cesium.Cartographic.fromCartesian(
+        viewer.camera.position, Cesium.Ellipsoid.WGS84
+      );
+      const lat = Cesium.Math.toDegrees(carto.latitude).toFixed(3);
+      const lng = Cesium.Math.toDegrees(carto.longitude).toFixed(3);
+      const alt = Math.round(carto.height);
+      const text = encodeURIComponent(
+        `🌏 地球をリアルスケールで歩いています！\n` +
+        `現在地: ${lat}°N, ${lng}°E (高度${alt}m)\n` +
+        `リアルタイム地震・フライト・船舶データ統合のデジタルツインワールド\n` +
+        `#GraceOfTouch #デジタルツイン #PLATEAU\n` +
+        `https://grace-of-touch.web.app/world.html`
+      );
+      window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
+    } catch(e) {
+      const text = encodeURIComponent(
+        `🌏 地球をリアルスケールで歩く！リアルタイムデータ統合デジタルツイン\n#GraceOfTouch #デジタルツイン\nhttps://grace-of-touch.web.app/world.html`
+      );
+      window.open(`https://twitter.com/intent/tweet?text=${text}`, '_blank');
+    }
+  }
+
+  // ========================================
+  // マウス操作（デフォルトのCesiumが処理）
+  // ========================================
+  // CesiumのScreenSpaceCameraControllerをそのまま使用
+  // ドラッグで回転、スクロールでズームはデフォルト動作
+
+  // WALKING/THIRD_PERSONモードではズームアウトを制限
+  viewer.scene.postRender.addEventListener(() => {
+    if (currentMode !== MODE.FREE_FLY) {
+      try {
+        const carto = Cesium.Cartographic.fromCartesian(
+          viewer.camera.position,
+          Cesium.Ellipsoid.WGS84,
+          scratchCartographic
+        );
+        // 地面以下にもぐりこまないよう最低高度を保証
+        if (carto.height < 1.0 && currentMode === MODE.WALKING) {
+          const lng = Cesium.Math.toDegrees(carto.longitude);
+          const lat = Cesium.Math.toDegrees(carto.latitude);
+          viewer.camera.setView({
+            destination: Cesium.Cartesian3.fromDegrees(lng, lat, 2.0),
+            orientation: {
+              heading: viewer.camera.heading,
+              pitch: viewer.camera.pitch,
+              roll: viewer.camera.roll,
+            }
+          });
+        }
+      } catch (e) {
+        // 無視
+      }
+    }
+  });
+
+  </script>
+</body>
+</html>
