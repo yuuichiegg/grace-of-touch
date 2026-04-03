@@ -867,6 +867,9 @@
       camera.lookUp(-mobileStickR.dy*1.0*dt);
     }
 
+    // ロケットシステム更新
+    if(typeof RocketSystem!=='undefined')RocketSystem.update();
+
     // 座標表示更新
     updateCoordsDisplay();
   }
@@ -948,6 +951,225 @@
   // ========================================
   // ローディング完了処理
   // ========================================
+  // ========================================
+  // SCALE_UNIFICATION Phase 1: Real-Scale Rocket Launch
+  // ========================================
+  const LAUNCH_PAD = {
+    lat: 35.35,    // 千葉沖太平洋（架空の海上発射施設）
+    lng: 140.20,
+    name: 'GRACE LAUNCH COMPLEX-1'
+  };
+
+  const RocketSystem = {
+    entity: null,
+    launchPadEntity: null,
+    _phase: 'idle', // idle, countdown, ascending, orbit, tli, lunar
+    _startTime: null,
+    _altitude: 0,
+
+    init() {
+      // 発射台マーカー
+      this.launchPadEntity = viewer.entities.add({
+        name: LAUNCH_PAD.name,
+        position: Cesium.Cartesian3.fromDegrees(LAUNCH_PAD.lng, LAUNCH_PAD.lat, 0),
+        point: { pixelSize: 12, color: Cesium.Color.ORANGE, outlineColor: Cesium.Color.WHITE, outlineWidth: 2 },
+        label: {
+          text: '🚀 ' + LAUNCH_PAD.name,
+          font: '12px Courier New',
+          fillColor: Cesium.Color.CYAN,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -20),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 500000),
+        },
+        ellipse: {
+          semiMinorAxis: 200,
+          semiMajorAxis: 200,
+          material: Cesium.Color.ORANGE.withAlpha(0.15),
+          outline: true,
+          outlineColor: Cesium.Color.ORANGE.withAlpha(0.5),
+        },
+      });
+
+      // ロケット本体（円柱+コーン for シンプルな表現）
+      this.entity = viewer.entities.add({
+        name: 'Grace Rocket GRT-001',
+        position: Cesium.Cartesian3.fromDegrees(LAUNCH_PAD.lng, LAUNCH_PAD.lat, 55),
+        orientation: Cesium.Transforms.headingPitchRollQuaternion(
+          Cesium.Cartesian3.fromDegrees(LAUNCH_PAD.lng, LAUNCH_PAD.lat, 55),
+          new Cesium.HeadingPitchRoll(0, 0, 0)
+        ),
+        cylinder: {
+          length: 110,
+          topRadius: 4.5,
+          bottomRadius: 4.5,
+          material: Cesium.Color.WHITE.withAlpha(0.95),
+          outline: true,
+          outlineColor: Cesium.Color.DARKGRAY,
+        },
+        label: {
+          text: 'GRT-001',
+          font: '10px Courier New',
+          fillColor: Cesium.Color.CYAN,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -70),
+          distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 50000),
+        },
+      });
+
+      // 搭乗ボタンUI
+      this._createLaunchUI();
+    },
+
+    _createLaunchUI() {
+      const btn = document.createElement('button');
+      btn.id = 'rocket-launch-btn';
+      btn.innerHTML = '🚀 GET BOARDING PASS';
+      btn.style.cssText = 'position:absolute;bottom:100px;left:50%;transform:translateX(-50%);z-index:50;background:rgba(255,140,0,0.15);border:1px solid rgba(255,140,0,0.5);color:#ff8c00;font-family:Courier New,monospace;font-size:12px;letter-spacing:0.15em;padding:10px 24px;border-radius:20px;cursor:pointer;display:none;pointer-events:auto;';
+      btn.addEventListener('click', () => this.startLaunchSequence());
+      document.body.appendChild(btn);
+    },
+
+    // 発射台との距離で搭乗ボタンを表示/非表示
+    updateProximity() {
+      const camPos = viewer.camera.positionCartographic;
+      const padPos = Cesium.Cartographic.fromDegrees(LAUNCH_PAD.lng, LAUNCH_PAD.lat);
+      const dist = Cesium.Cartesian3.distance(
+        Cesium.Cartesian3.fromRadians(camPos.longitude, camPos.latitude, camPos.height),
+        Cesium.Cartesian3.fromRadians(padPos.longitude, padPos.latitude, 0)
+      );
+      const btn = document.getElementById('rocket-launch-btn');
+      if (btn) btn.style.display = (dist < 5000 && this._phase === 'idle') ? 'block' : 'none';
+    },
+
+    startLaunchSequence() {
+      if (this._phase !== 'idle') return;
+      this._phase = 'countdown';
+      this._altitude = 0;
+      this._startTime = Date.now();
+      const btn = document.getElementById('rocket-launch-btn');
+      if (btn) btn.style.display = 'none';
+
+      GraceBroadcasting.pushBreaking(
+        'GRACE ROCKET GRT-001 — LAUNCH SEQUENCE INITIATED',
+        { lat: LAUNCH_PAD.lat, lon: LAUNCH_PAD.lng, severity: 'warning' }
+      );
+
+      showToast('T-10... LAUNCH SEQUENCE START');
+
+      // カメラを発射台に向ける
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(LAUNCH_PAD.lng + 0.01, LAUNCH_PAD.lat - 0.005, 500),
+        orientation: {
+          heading: Cesium.Math.toRadians(300),
+          pitch: Cesium.Math.toRadians(15),
+          roll: 0,
+        },
+        duration: 3,
+      });
+
+      // 10秒後に発射
+      setTimeout(() => this._launch(), 10000);
+    },
+
+    _launch() {
+      this._phase = 'ascending';
+      this._startTime = Date.now();
+      showToast('🔥 LIFTOFF — GRACE ROCKET GRT-001');
+      GraceBroadcasting.pushBreaking(
+        'LIFTOFF! Grace Rocket GRT-001 has cleared the tower',
+        { lat: LAUNCH_PAD.lat, lon: LAUNCH_PAD.lng, severity: 'alert' }
+      );
+    },
+
+    // 毎フレーム更新
+    update() {
+      if (this._phase === 'idle' || this._phase === 'countdown') {
+        this.updateProximity();
+        return;
+      }
+
+      const elapsed = (Date.now() - this._startTime) / 1000; // 秒
+
+      if (this._phase === 'ascending') {
+        // 上昇: 0→200km in 150秒（リアル感のある加速カーブ）
+        const t = Math.min(elapsed / 150, 1);
+        const accel = t * t; // 加速度的に上昇
+        this._altitude = accel * 200000; // 200km
+
+        // ロケット位置更新
+        this.entity.position = Cesium.Cartesian3.fromDegrees(
+          LAUNCH_PAD.lng,
+          LAUNCH_PAD.lat,
+          55 + this._altitude
+        );
+
+        // カメラ追従（徐々に引く）
+        const camDist = 500 + this._altitude * 0.5;
+        const camAlt = this._altitude + 200;
+        viewer.camera.setView({
+          destination: Cesium.Cartesian3.fromDegrees(
+            LAUNCH_PAD.lng + 0.01,
+            LAUNCH_PAD.lat - 0.005,
+            camAlt
+          ),
+          orientation: {
+            heading: Cesium.Math.toRadians(300),
+            pitch: Cesium.Math.toRadians(Math.max(-60, 15 - t * 75)),
+            roll: 0,
+          }
+        });
+
+        // HUD
+        const speedKmh = Math.round(this._altitude / elapsed * 3.6);
+        showToast(`ALT: ${Math.round(this._altitude/1000)}km | SPD: ${speedKmh}km/h`);
+
+        if (t >= 1) {
+          this._phase = 'orbit';
+          this._startTime = Date.now();
+          GraceBroadcasting.pushBreaking(
+            'GRT-001 has reached orbit — altitude 200km',
+            { lat: LAUNCH_PAD.lat, lon: LAUNCH_PAD.lng, severity: 'info' }
+          );
+          showToast('ORBIT ACHIEVED — 200km ALTITUDE');
+        }
+      }
+
+      if (this._phase === 'orbit') {
+        // 軌道周回（地球を回る）
+        const orbitTime = (Date.now() - this._startTime) / 1000;
+        const orbitSpeed = 0.001; // degree/sec
+        const lng = LAUNCH_PAD.lng + orbitTime * orbitSpeed;
+        const lat = LAUNCH_PAD.lat + Math.sin(orbitTime * 0.01) * 2;
+        this._altitude = 200000;
+
+        this.entity.position = Cesium.Cartesian3.fromDegrees(lng, lat, this._altitude);
+
+        // 30秒後にリセット（デモ用）
+        if (orbitTime > 60) {
+          this._phase = 'idle';
+          this.entity.position = Cesium.Cartesian3.fromDegrees(LAUNCH_PAD.lng, LAUNCH_PAD.lat, 55);
+          showToast('MISSION COMPLETE — GRT-001 RETURNED');
+          GraceBroadcasting.pushBreaking(
+            'GRT-001 mission complete — safe return to launch complex',
+            { lat: LAUNCH_PAD.lat, lon: LAUNCH_PAD.lng, severity: 'info' }
+          );
+        }
+      }
+    },
+  };
+
+  // ロケットシステム初期化
+  RocketSystem.init();
+
+  // moveLoop内でロケット更新を呼ぶフック（moveLoop末尾に追加）
+  const _origMoveLoop = moveLoop;
+
   function finishLoading() {
     setLoadingStatus('READY — DIGITAL TWIN INITIALIZED');
 
