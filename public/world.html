@@ -343,6 +343,22 @@
     <a href="https://grace-of-touch.web.app/rocket.html" target="_blank" style="background:rgba(0,216,255,0.1);border:1px solid rgba(0,216,255,0.4);color:#00d8ff;font-family:'Courier New',monospace;font-size:10px;padding:6px 12px;border-radius:20px;cursor:pointer;letter-spacing:0.08em;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.background='rgba(0,216,255,0.2)'" onmouseout="this.style.background='rgba(0,216,255,0.1)'">🚀 ロケットへ</a>
   </div>
 
+  <!-- SPEC-18: Breaking News Ticker -->
+  <div id="news-ticker" style="position:absolute;bottom:50px;left:0;width:100%;z-index:50;pointer-events:none;overflow:hidden;">
+    <div id="news-ticker-bar" style="display:none;background:rgba(0,0,0,0.85);border-top:2px solid #00d8ff;border-bottom:1px solid rgba(0,216,255,0.3);padding:6px 0;white-space:nowrap;">
+      <div id="news-ticker-label" style="display:inline-block;background:#cc0000;color:#fff;font-family:'Courier New',monospace;font-size:10px;font-weight:bold;letter-spacing:0.15em;padding:3px 10px;margin-right:12px;vertical-align:middle;">BREAKING</div>
+      <div id="news-ticker-text" style="display:inline-block;color:#00d8ff;font-family:'Courier New',monospace;font-size:12px;letter-spacing:0.08em;vertical-align:middle;animation:tickerScroll 20s linear infinite;"></div>
+    </div>
+  </div>
+  <style>
+    @keyframes tickerScroll{0%{transform:translateX(100vw)}100%{transform:translateX(-200%)}}
+    @keyframes alertPulse{0%,100%{border-top-color:#ff0000;background:rgba(80,0,0,0.85)}50%{border-top-color:#ff4444;background:rgba(120,0,0,0.85)}}
+    #news-ticker-bar.alert{animation:alertPulse 1s ease-in-out infinite}
+    #news-ticker-bar.alert #news-ticker-label{background:#ff0000}
+    .news-item{cursor:pointer;pointer-events:auto;padding:2px 4px;border-radius:2px;transition:background 0.2s}
+    .news-item:hover{background:rgba(0,216,255,0.2)}
+  </style>
+
   <!-- 右下 キーガイド -->
   <div class="ui-overlay" id="key-guide">
     <div class="guide-panel">
@@ -926,6 +942,10 @@
       const count = data.features.length;
       showToast(`🌏 EARTHQUAKE: ${count} EVENTS (24h)`);
       document.getElementById('quake-count').textContent = count;
+      // SPEC-18: Feed to Breaking News
+      if (typeof GraceBroadcasting !== 'undefined') {
+        GraceBroadcasting.processEarthquakes(data.features);
+      }
     } catch (err) {
       console.warn('地震データ取得失敗:', err.message);
     }
@@ -934,6 +954,122 @@
   // 起動時 + 5分ごとに更新
   loadEarthquakes();
   setInterval(loadEarthquakes, 5 * 60 * 1000);
+
+  // ========================================
+  // SPEC-18: Grace Broadcasting — Breaking News Ticker
+  // ========================================
+  const GraceBroadcasting = {
+    _headlines: [],
+    _currentIdx: 0,
+    _tickerEl: null,
+    _barEl: null,
+    _textEl: null,
+    _labelEl: null,
+
+    init() {
+      this._barEl = document.getElementById('news-ticker-bar');
+      this._textEl = document.getElementById('news-ticker-text');
+      this._labelEl = document.getElementById('news-ticker-label');
+      // Rotate headlines every 15s
+      setInterval(() => this._rotateHeadline(), 15000);
+    },
+
+    // Add a breaking news item
+    pushBreaking(text, opts = {}) {
+      const item = {
+        text,
+        lat: opts.lat || null,
+        lon: opts.lon || null,
+        severity: opts.severity || 'info', // 'info', 'warning', 'alert'
+        ts: Date.now(),
+      };
+      this._headlines.unshift(item);
+      if (this._headlines.length > 20) this._headlines.pop();
+      this._showTicker();
+      this._renderHeadline(item);
+    },
+
+    _showTicker() {
+      if (this._barEl) this._barEl.style.display = 'block';
+    },
+
+    _renderHeadline(item) {
+      if (!this._textEl || !this._barEl) return;
+      // Alert mode for severity
+      this._barEl.classList.remove('alert');
+      if (item.severity === 'alert') {
+        this._barEl.classList.add('alert');
+        this._labelEl.textContent = '🚨 ALERT';
+      } else if (item.severity === 'warning') {
+        this._labelEl.textContent = '⚠ BREAKING';
+        this._labelEl.style.background = '#cc6600';
+      } else {
+        this._labelEl.textContent = 'BREAKING';
+        this._labelEl.style.background = '#cc0000';
+      }
+
+      // Build clickable text
+      const time = new Date(item.ts).toLocaleTimeString('ja-JP', {hour:'2-digit',minute:'2-digit'});
+      const hasLocation = item.lat !== null && item.lon !== null;
+      const flyBtn = hasLocation
+        ? `<span class="news-item" onclick="GraceBroadcasting.flyToNews(${item.lat},${item.lon})" title="現場に飛ぶ">📍 現場に飛ぶ</span>`
+        : '';
+      this._textEl.innerHTML = `[${time}] ${item.text} ${flyBtn}`;
+      // Reset animation
+      this._textEl.style.animation = 'none';
+      void this._textEl.offsetHeight;
+      this._textEl.style.animation = 'tickerScroll 20s linear infinite';
+    },
+
+    // Fly to news location
+    flyToNews(lat, lon) {
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(lon, lat, 50000),
+        duration: 3,
+        orientation: {
+          heading: 0,
+          pitch: Cesium.Math.toRadians(-60),
+          roll: 0,
+        },
+      });
+    },
+
+    _rotateHeadline() {
+      if (this._headlines.length === 0) return;
+      this._currentIdx = (this._currentIdx + 1) % this._headlines.length;
+      this._renderHeadline(this._headlines[this._currentIdx]);
+    },
+
+    // Generate headlines from earthquake data
+    processEarthquakes(features) {
+      features.forEach(f => {
+        const mag = f.properties.mag || 0;
+        const place = f.properties.place || 'Unknown';
+        const [lng, lat] = f.geometry.coordinates;
+        const time = f.properties.time;
+
+        // Only push M5+ as breaking (avoid flooding)
+        if (mag >= 5.0) {
+          const severity = mag >= 6.0 ? 'alert' : 'warning';
+          const ago = Math.round((Date.now() - time) / 60000);
+          if (ago < 60) { // Only recent (within 1 hour)
+            this.pushBreaking(
+              `M${mag.toFixed(1)} EARTHQUAKE — ${place} (${ago}分前)`,
+              { lat, lon: lng, severity }
+            );
+          }
+        }
+      });
+
+      // Always show latest general headline
+      const count = features.length;
+      if (count > 0 && this._headlines.length === 0) {
+        this.pushBreaking(`🌏 過去24時間で ${count} 件の地震を検出 — USGS LIVE DATA`, {severity: 'info'});
+      }
+    },
+  };
+
+  GraceBroadcasting.init();
 
   // ========================================
   // リアルタイムフライトレイヤー（OpenSky Network 無料）
