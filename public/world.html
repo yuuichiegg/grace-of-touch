@@ -456,25 +456,17 @@
   }
 
   // ========================================
-  // NASAのBlue Marble（無料タイル）を背景に追加
+  // BUG-W4 fix: CesiumIon衛星写真（Bing Maps Aerial）
   // ========================================
   try {
-    setLoadingStatus('LOADING NASA IMAGERY...');
+    setLoadingStatus('LOADING SATELLITE IMAGERY...');
 
-    // NASA Blue Marble Next Generation（無料・トークン不要）
-    const nasaLayer = new Cesium.WebMapTileServiceImageryProvider({
-      url: 'https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/BlueMarble_ShadedRelief_Bathymetry/default/500m/{TileMatrix}/{TileRow}/{TileCol}.jpg',
-      layer: 'BlueMarble_ShadedRelief_Bathymetry',
-      style: 'default',
-      tileMatrixSetID: '500m',
-      maximumLevel: 8,
-      credit: 'NASA GIBS Blue Marble'
-    });
-
-    viewer.imageryLayers.addImageryProvider(nasaLayer);
+    // CesiumIon Bing Maps Aerial（CesiumIonトークンで利用可能）
+    const bingImagery = await Cesium.IonImageryProvider.fromAssetId(2);
+    viewer.imageryLayers.addImageryProvider(bingImagery);
 
   } catch (e) {
-    console.warn('NASA imagery読み込み失敗（フォールバック）:', e);
+    console.warn('Bing imagery読み込み失敗（フォールバック）:', e);
 
     // フォールバック: OpenStreetMap（トークン不要）
     try {
