@@ -493,10 +493,10 @@
   setLoadingStatus('LOADING PLATEAU 3D TILES...');
 
   const plateauUrls = [
-    // PLATEAU東京23区LOD1建築物（notexture → lod1 に移行済み）
+    // PLATEAU 2022 東京23区 千代田区LOD1（reearth CMS — 2026年現在の公式URL）
+    'https://assets.cms.plateau.reearth.io/assets/aa/ecf312-95c2-4e24-8351-642f27e447b6/13100_tokyo23-ku_2022_3dtiles_1_1_op_bldg_13101_chiyoda-ku_lod1/tileset.json',
+    // フォールバック: 旧geospatial.jp URL
     'https://plateau.geospatial.jp/main/data/3d-tiles/bldg/13100_tokyo23ku/lod1/tileset.json',
-    // フォールバック: notexture（旧URL）
-    'https://plateau.geospatial.jp/main/data/3d-tiles/bldg/13100_tokyo23ku/notexture/tileset.json',
   ];
 
   async function loadPlateau() {
@@ -1158,7 +1158,8 @@
   async function loadFlights() {
     try {
       // 日本上空に絞る（負荷軽減）
-      const url = 'https://opensky-network.org/api/states/all?lamin=24&lomin=122&lamax=46&lomax=154';
+      // BUG-W3: Cloud Functions proxy to avoid CORS
+      const url = 'https://us-central1-grace-of-touch.cloudfunctions.net/openskyProxy?lamin=24&lomin=122&lamax=46&lomax=154';
       const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
       const data = await res.json();
       if (!data.states) return;

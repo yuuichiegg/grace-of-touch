@@ -368,3 +368,22 @@ exports.stripeWebhook = functions.https.onRequest(async (req, res) => {
 
   res.json({ received: true });
 });
+
+// ============================================================
+// BUG-W3: OpenSky Network CORS Proxy
+// ============================================================
+exports.openskyProxy = functions.https.onRequest(async (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET');
+  if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+  try {
+    const params = new URLSearchParams(req.query);
+    const url = 'https://opensky-network.org/api/states/all?' + params.toString();
+    const resp = await fetch(url);
+    if (!resp.ok) { res.status(resp.status).json({ error: 'OpenSky returned ' + resp.status }); return; }
+    const data = await resp.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
