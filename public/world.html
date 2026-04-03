@@ -1133,82 +1133,146 @@
     _launch() {
       this._phase = 'ascending';
       this._startTime = Date.now();
-      showToast('🔥 LIFTOFF — GRACE ROCKET GRT-001');
       GraceBroadcasting.pushBreaking(
         'LIFTOFF! Grace Rocket GRT-001 has cleared the tower',
         { lat: LAUNCH_PAD.lat, lon: LAUNCH_PAD.lng, severity: 'alert' }
       );
+      // SPEC-14 Phase B: 窓枠演出
+      this._showWindowFrame(true);
+    },
+
+    _showWindowFrame(show) {
+      let frame = document.getElementById('rocket-window');
+      if (!frame) {
+        frame = document.createElement('div');
+        frame.id = 'rocket-window';
+        frame.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;z-index:55;pointer-events:none;display:none;';
+        frame.innerHTML = `
+          <div style="position:absolute;top:0;left:0;right:0;height:15%;background:linear-gradient(to bottom,rgba(10,12,20,0.95),transparent);"></div>
+          <div style="position:absolute;bottom:0;left:0;right:0;height:20%;background:linear-gradient(to top,rgba(10,12,20,0.95),transparent);"></div>
+          <div style="position:absolute;top:0;left:0;bottom:0;width:8%;background:linear-gradient(to right,rgba(10,12,20,0.9),transparent);"></div>
+          <div style="position:absolute;top:0;right:0;bottom:0;width:8%;background:linear-gradient(to left,rgba(10,12,20,0.9),transparent);"></div>
+          <div style="position:absolute;top:8px;left:50%;transform:translateX(-50%);font-family:Courier New,monospace;font-size:10px;color:rgba(0,216,255,0.5);letter-spacing:0.2em;">CABIN VIEW — GRT-001</div>
+          <div id="rocket-hud" style="position:absolute;bottom:25%;left:12%;font-family:Courier New,monospace;font-size:11px;color:#00d8ff;text-shadow:0 0 6px #00d8ff;line-height:1.8;">
+            <div>ALT: <span id="rh-alt">0</span> km</div>
+            <div>SPD: <span id="rh-spd">0</span> km/h</div>
+            <div>PHASE: <span id="rh-phase">ASCENDING</span></div>
+          </div>
+        `;
+        document.body.appendChild(frame);
+      }
+      frame.style.display = show ? 'block' : 'none';
     },
 
     // 毎フレーム更新
     update() {
       if (this._phase === 'idle' || this._phase === 'countdown') return;
 
-      const elapsed = (Date.now() - this._startTime) / 1000; // 秒
+      const elapsed = (Date.now() - this._startTime) / 1000;
 
       if (this._phase === 'ascending') {
-        // 上昇: 0→200km in 150秒（リアル感のある加速カーブ）
-        const t = Math.min(elapsed / 150, 1);
-        const accel = t * t; // 加速度的に上昇
-        this._altitude = accel * 200000; // 200km
+        // Phase B: 3段階上昇
+        let alt, pitch, phase;
+        if (elapsed < 15) {
+          // フェーズ1: 地表→50km（15秒）— 離陸・大気圏
+          const t = elapsed / 15;
+          alt = t * t * 50000;
+          pitch = 15 - t * 45;
+          phase = 'ASCENDING';
+        } else if (elapsed < 30) {
+          // フェーズ2: 50km→200km（15秒）— 大気圏突破
+          const t = (elapsed - 15) / 15;
+          alt = 50000 + t * 150000;
+          pitch = -30 - t * 30;
+          phase = 'EXOATMOSPHERE';
+          if (t < 0.1) showToast('大気圏突破中...');
+        } else if (elapsed < 45) {
+          // フェーズ3: 200km→400km（15秒）— 軌道投入
+          const t = (elapsed - 30) / 15;
+          alt = 200000 + t * 200000;
+          pitch = -60;
+          phase = 'ORBIT INSERTION';
+          if (t < 0.1) {
+            GraceBroadcasting.pushBreaking(
+              'GRT-001 — orbit insertion burn complete, altitude 200km+',
+              { lat: LAUNCH_PAD.lat, lon: LAUNCH_PAD.lng, severity: 'info' }
+            );
+          }
+        } else {
+          // 軌道到達 → 宇宙観光モード
+          this._phase = 'orbit';
+          this._startTime = Date.now();
+          this._altitude = 400000;
+          showToast('🌍 軌道投入完了 — 宇宙観光モードへ');
+          GraceBroadcasting.pushBreaking(
+            'GRT-001 in stable orbit at 400km — space tourism mode active',
+            { lat: LAUNCH_PAD.lat, lon: LAUNCH_PAD.lng, severity: 'info' }
+          );
+          // 自由飛行モード解放
+          currentMode = MODE.FREE_FLY;
+          updateModeLabel();
+          const rhPhase = document.getElementById('rh-phase');
+          if (rhPhase) rhPhase.textContent = 'ORBITAL FREE FLIGHT';
+          return;
+        }
 
-        // ロケット位置更新
-        this.entity.position = Cesium.Cartesian3.fromDegrees(
-          LAUNCH_PAD.lng,
-          LAUNCH_PAD.lat,
-          55 + this._altitude
-        );
+        this._altitude = alt;
 
-        // カメラ追従（徐々に引く）
-        const camDist = 500 + this._altitude * 0.5;
-        const camAlt = this._altitude + 200;
+        // ロケット位置
+        this.entity.position = Cesium.Cartesian3.fromDegrees(LAUNCH_PAD.lng, LAUNCH_PAD.lat, 55 + alt);
+
+        // カメラ: ロケット内部視点（窓から見える感じ）
         viewer.camera.setView({
-          destination: Cesium.Cartesian3.fromDegrees(
-            LAUNCH_PAD.lng + 0.01,
-            LAUNCH_PAD.lat - 0.005,
-            camAlt
-          ),
+          destination: Cesium.Cartesian3.fromDegrees(LAUNCH_PAD.lng, LAUNCH_PAD.lat, alt + 100),
           orientation: {
-            heading: Cesium.Math.toRadians(300),
-            pitch: Cesium.Math.toRadians(Math.max(-60, 15 - t * 75)),
+            heading: Cesium.Math.toRadians(0),
+            pitch: Cesium.Math.toRadians(pitch),
             roll: 0,
           }
         });
 
-        // HUD
-        const speedKmh = Math.round(this._altitude / elapsed * 3.6);
-        showToast(`ALT: ${Math.round(this._altitude/1000)}km | SPD: ${speedKmh}km/h`);
-
-        if (t >= 1) {
-          this._phase = 'orbit';
-          this._startTime = Date.now();
-          GraceBroadcasting.pushBreaking(
-            'GRT-001 has reached orbit — altitude 200km',
-            { lat: LAUNCH_PAD.lat, lon: LAUNCH_PAD.lng, severity: 'info' }
-          );
-          showToast('ORBIT ACHIEVED — 200km ALTITUDE');
-        }
+        // HUD更新
+        const speedKmh = elapsed > 0 ? Math.round(alt / elapsed * 3.6) : 0;
+        const rhAlt = document.getElementById('rh-alt');
+        const rhSpd = document.getElementById('rh-spd');
+        const rhPhase = document.getElementById('rh-phase');
+        if (rhAlt) rhAlt.textContent = Math.round(alt / 1000);
+        if (rhSpd) rhSpd.textContent = speedKmh;
+        if (rhPhase) rhPhase.textContent = phase;
       }
 
       if (this._phase === 'orbit') {
-        // 軌道周回（地球を回る）
         const orbitTime = (Date.now() - this._startTime) / 1000;
-        const orbitSpeed = 0.001; // degree/sec
+        const orbitSpeed = 0.003;
         const lng = LAUNCH_PAD.lng + orbitTime * orbitSpeed;
-        const lat = LAUNCH_PAD.lat + Math.sin(orbitTime * 0.01) * 2;
-        this._altitude = 200000;
+        const lat = LAUNCH_PAD.lat + Math.sin(orbitTime * 0.02) * 3;
+        this._altitude = 400000;
 
         this.entity.position = Cesium.Cartesian3.fromDegrees(lng, lat, this._altitude);
 
-        // 30秒後にリセット（デモ用）
-        if (orbitTime > 60) {
+        // HUD
+        const rhAlt = document.getElementById('rh-alt');
+        if (rhAlt) rhAlt.textContent = '400';
+        const rhSpd = document.getElementById('rh-spd');
+        if (rhSpd) rhSpd.textContent = '27600'; // 軌道速度
+
+        // 90秒後にミッション完了
+        if (orbitTime > 90) {
           this._phase = 'idle';
+          this._showWindowFrame(false);
           this.entity.position = Cesium.Cartesian3.fromDegrees(LAUNCH_PAD.lng, LAUNCH_PAD.lat, 55);
-          showToast('MISSION COMPLETE — GRT-001 RETURNED');
+          currentMode = MODE.WALKING;
+          updateModeLabel();
+          showToast('MISSION COMPLETE — GRT-001 RETURNED TO EARTH');
           GraceBroadcasting.pushBreaking(
             'GRT-001 mission complete — safe return to launch complex',
             { lat: LAUNCH_PAD.lat, lon: LAUNCH_PAD.lng, severity: 'info' }
           );
+          // カメラを東京に戻す
+          viewer.camera.flyTo({
+            destination: Cesium.Cartesian3.fromDegrees(TOKYO_TOWER.lng, TOKYO_TOWER.lat, 1000),
+            duration: 3,
+          });
         }
       }
     },
