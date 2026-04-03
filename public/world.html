@@ -360,8 +360,8 @@
   // 初期化
   // ========================================
 
-  // CesiumIon トークン不要（トークンなしで起動）
-  Cesium.Ion.defaultAccessToken = '';
+  // CesiumIon トークン（graceoftouch アカウント）
+  Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5N2UwMjQ5NS0zYmU1LTQ3NjktYWM1YS1mZjIyZDhiYjNjMTMiLCJpZCI6NDEzMTMyLCJpYXQiOjE3NzUxODIxMjl9.M47vxRJDcH2ydS7zylV14xatLo9ScCU11A5El6N9KSM';
 
   // URLパラメータで権限判定
   const urlParams = new URLSearchParams(window.location.search);
@@ -477,9 +477,9 @@
   setLoadingStatus('LOADING PLATEAU 3D TILES...');
 
   const plateauUrls = [
-    // 国土交通省PLATEAU公式（洪水浸水想定区域含む東京23区 notexture）
-    'https://plateau.geospatial.jp/main/data/3d-tiles/fld/13100_tokyo23ku/notexture/tileset.json',
-    // 代替: PLATEAU東京23区LOD1（建築物）
+    // PLATEAU東京23区LOD1建築物（notexture → lod1 に移行済み）
+    'https://plateau.geospatial.jp/main/data/3d-tiles/bldg/13100_tokyo23ku/lod1/tileset.json',
+    // フォールバック: notexture（旧URL）
     'https://plateau.geospatial.jp/main/data/3d-tiles/bldg/13100_tokyo23ku/notexture/tileset.json',
   ];
 
