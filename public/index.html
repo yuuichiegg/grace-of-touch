@@ -844,7 +844,8 @@ body{margin:0;overflow:hidden;background:#020510;touch-action:none;}
 
   <div class="panel-footer">
     <a href="about.html" style="display:inline-block;margin-bottom:10px;font-family:'Orbitron',monospace;font-size:9px;color:rgba(0,255,255,0.4);letter-spacing:0.2em;text-decoration:none;border:1px solid rgba(0,255,255,0.12);padding:6px 18px;border-radius:6px;transition:all 0.3s;" onmouseover="this.style.borderColor='rgba(0,255,255,0.35)';this.style.color='rgba(0,255,255,0.7)';this.style.background='rgba(0,255,255,0.06)'" onmouseout="this.style.borderColor='rgba(0,255,255,0.12)';this.style.color='rgba(0,255,255,0.4)';this.style.background='transparent'">ABOUT US</a>
-    <div class="panel-footer-text">&copy; 2025 GRACE OF TOUCH &middot; ALL WORLDS RESERVED</div>
+    <div class="panel-footer-text">&copy; 2024-2026 GRACE OF TOUCH &middot; ALL WORLDS RESERVED</div>
+    <div style="margin-top:6px;font-size:8px;"><a href="/terms.html" style="color:rgba(0,255,255,0.3);text-decoration:none;margin-right:12px;">利用規約</a><a href="/privacy.html" style="color:rgba(0,255,255,0.3);text-decoration:none;">プライバシーポリシー</a></div>
   </div>
 </div>
 
@@ -869,6 +870,15 @@ document.getElementById('open-launcher')?.addEventListener('click', () => {
   const panel = document.getElementById('launcher-panel');
   if (panel) panel.classList.add('open');
 });
+// SPEC-13: Cookie/利用規約 同意バナー
+(function(){
+  if(localStorage.getItem('grace_consent')==='accepted')return;
+  const b=document.createElement('div');
+  b.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9999;background:rgba(2,5,16,0.95);border-top:1px solid rgba(0,216,255,0.3);padding:12px 16px;font-family:Courier New,monospace;font-size:11px;color:rgba(0,216,255,0.8);display:flex;align-items:center;justify-content:space-between;gap:12px;backdrop-filter:blur(8px);';
+  b.innerHTML='<span>本サービスはCookie・LocalStorageを使用します。利用を続けることで<a href="/terms.html" style="color:#00d8ff;">利用規約</a>・<a href="/privacy.html" style="color:#00d8ff;">プライバシーポリシー</a>に同意したものとみなします。</span><button id="consent-ok" style="background:rgba(0,216,255,0.15);border:1px solid rgba(0,216,255,0.5);color:#00d8ff;font-family:Courier New,monospace;padding:6px 16px;border-radius:4px;cursor:pointer;white-space:nowrap;">OK</button>';
+  document.body.appendChild(b);
+  document.getElementById('consent-ok').addEventListener('click',()=>{localStorage.setItem('grace_consent','accepted');b.remove();});
+})();
 </script>
 </body>
 </html>
