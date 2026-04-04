@@ -1461,8 +1461,17 @@ const BoardingPass={
     document.getElementById('bp-board-btn').textContent='PROCEED TO LAUNCH PAD →';
     document.getElementById('bp-timer').textContent='01:00';
     Logger.log('BOARDING PASS ISSUED — FLIGHT GRT-'+String(this._flightNum).padStart(3,'0')+' TICKET #'+this._ticketNo);
-    Logger.log('CHECK DEPARTURE BOARD — YOUR TICKET NUMBER IS DISPLAYED');
-    Logger.log('PLEASE PROCEED TO GATE A-1 LAUNCH PAD');
+    // ロケットが既に飛行中なら搭乗済み扱いにしてコックピット切替ボタンを表示
+    const inFlight=LaunchSequence.phase!=='standby'&&LaunchSequence.phase!=='explore'&&LaunchSequence.phase!=='cycle_wait';
+    if(inFlight){
+      this._state='boarded';
+      const boardBtn=document.getElementById('bp-board-btn');
+      if(boardBtn){boardBtn.textContent='⬆ SWITCH TO COCKPIT VIEW';boardBtn.disabled=false;}
+      Logger.log('FLIGHT IN PROGRESS — TAP BOARD TO SWITCH TO COCKPIT VIEW');
+    }else{
+      Logger.log('CHECK DEPARTURE BOARD — YOUR TICKET NUMBER IS DISPLAYED');
+      Logger.log('PLEASE PROCEED TO GATE A-1 LAUNCH PAD');
+    }
     if(this._timer)clearInterval(this._timer);
     this._timer=setInterval(()=>this._tick(),1000);
   },
@@ -1504,8 +1513,16 @@ const BoardingPass={
     }
   },
 
-  // Step 1: Close overlay, start walking to pad
+  // Step 1: Close overlay, start walking to pad (or switch to cockpit if already in flight)
   board(){
+    const inFlight=LaunchSequence.phase!=='standby'&&LaunchSequence.phase!=='explore'&&LaunchSequence.phase!=='cycle_wait';
+    if(inFlight||this._state==='boarded'){
+      // ロケット飛行中: 即コックピット視点切替
+      document.getElementById('boarding-overlay').classList.remove('visible');
+      this._activateCockpit();
+      this._state='launching';
+      return;
+    }
     document.getElementById('boarding-overlay').classList.remove('visible');
     this._state='walking';
     this._showGuide();
@@ -1576,8 +1593,30 @@ const BoardingPass={
   close(){
     document.getElementById('boarding-overlay').classList.remove('visible');
     if(this._timer){clearInterval(this._timer);this._timer=null;}
+    // 搭乗済み or 発射中にオーバーレイを閉じたらコックピット視点へ
+    if(this._state==='boarded'||this._state==='launching'){
+      this._activateCockpit();
+    }
     this._state='idle';
     this._hideGuide();
+  },
+
+  // コックピット視点に切り替えてトースト通知を表示
+  _activateCockpit(){
+    if(App._camMode!=='cockpit'){
+      App._camMode='cockpit';
+      const cm=document.getElementById('cam-mode');if(cm)cm.textContent='CAM: COCKPIT [V/C]';
+      document.getElementById('cockpit-hud').classList.add('visible');
+      App._cockpitStartTime=performance.now()*0.001;
+    }
+    Logger.log('COCKPIT VIEW ACTIVE — PORTHOLE WINDOW MODE');
+    Logger.log('PRESS [V] TO SWITCH: FPS / 3RD PERSON / COCKPIT / CABIN');
+    // トースト通知
+    const toast=document.createElement('div');
+    toast.style.cssText='position:fixed;top:28%;left:50%;transform:translateX(-50%);z-index:75;text-align:center;pointer-events:none;font-family:"Courier New",monospace;font-size:12px;color:#00ffcc;text-shadow:0 0 10px #00ffcc;letter-spacing:0.12em;background:rgba(0,20,15,0.82);padding:10px 22px;border:1px solid rgba(0,255,200,0.3);border-radius:8px;animation:fadeInUp 0.4s ease';
+    toast.textContent='✔ ABOARD — PORTHOLE VIEW ACTIVE';
+    document.body.appendChild(toast);
+    setTimeout(()=>toast.remove(),3000);
   }
 };
 
@@ -7204,7 +7243,7 @@ const App={
     const next=modes[(idx+1)%modes.length];
     // Exit old mode
     if(this._camMode==='third'){PlayerShip.group.visible=false;}
-    if(this._camMode==='cockpit'){document.getElementById('cockpit-hud').classList.remove('visible');}
+    if(this._camMode==='cockpit'){document.getElementById('cockpit-hud').classList.remove('visible');this.camera.up.set(0,1,0);}
     if(this._camMode==='cabin'){
       RocketCabin.exit();
       // Restore bloom settings
@@ -7444,21 +7483,25 @@ const App={
         this.camera.lookAt(tpc.target);
       }
     }
-    // Cockpit mode: camera inside rocket nose during launch, or at player pos in explore
+    // Cockpit mode: porthole window — passenger looks down-back toward Earth as rocket ascends
     if(this._camMode==='cockpit'){
       if(inLaunch){
+        this._fpsCamPos.copy(this.camera.position);
         if(LaunchSequence.separated){
+          // 上段分離後: 上段のポートホールから地球を見下ろす
           const upperPos=Rocket3D.upperGroup?Rocket3D.upperGroup.position.clone():new THREE.Vector3(0,0,0);
-          this._fpsCamPos.copy(this.camera.position);
-          this.camera.position.copy(upperPos).add(new THREE.Vector3(0,48*S,0));
-          // Look forward (up along rocket axis)
-          this.camera.lookAt(upperPos.clone().add(new THREE.Vector3(0,100*S,0)));
+          this.camera.position.set(upperPos.x+2.8, upperPos.y+2.5, upperPos.z+0.8);
         }else{
+          // ブースター段: 上段キャビン横ポートホール位置
           const rocketPos=Rocket3D.fullStack?Rocket3D.fullStack.position.clone():new THREE.Vector3(0,0,0);
-          this._fpsCamPos.copy(this.camera.position);
-          this.camera.position.set(rocketPos.x,rocketPos.y+56*S,rocketPos.z);
-          this.camera.lookAt(new THREE.Vector3(rocketPos.x,rocketPos.y+100*S,rocketPos.z));
+          this.camera.position.set(rocketPos.x+2.8, rocketPos.y+5.5, rocketPos.z+0.8);
         }
+        // 常に地球中心方向（打上台付近）を向く → 上昇するほど地球が小さく見える
+        this.camera.up.set(0,0,1); // ポートホール用にup軸調整
+        this.camera.lookAt(new THREE.Vector3(0,-30,0)); // 打上台位置
+      }else{
+        // 探索モード: 通常のup軸に戻す
+        this.camera.up.set(0,1,0);
       }
     }
     if(this._exploreMode)this._applyMusicToVisuals(now);
