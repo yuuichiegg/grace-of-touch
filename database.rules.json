@@ -24,7 +24,12 @@
     },
     "rooms": {
       ".read": true,
-      ".write": true
+      ".write": true,
+      "$roomId": {
+        "chat": {
+          ".indexOn": ["ts"]
+        }
+      }
     },
     "pichan": {
       ".read": true,
