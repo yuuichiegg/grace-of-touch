@@ -14,6 +14,10 @@
   <link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+
   <style>
     /* ========================================
        グローバルスタイル
@@ -312,9 +316,11 @@
     <div class="subtitle">PLATEAU 3D CITY MODEL / TOKYO METROPOLITAN AREA</div>
   </div>
 
-  <!-- 右上 権限バッジ -->
-  <div class="ui-overlay" id="auth-badge">
+  <!-- 右上 権限バッジ + ログインボタン -->
+  <div class="ui-overlay" id="auth-badge" style="pointer-events:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
     <span class="badge" id="badge-span">...</span>
+    <button id="world-login-btn" onclick="_handleWorldLogin()" style="display:none;background:rgba(0,0,0,0.75);border:1px solid rgba(255,140,0,0.6);color:#ff8c00;font-family:'Courier New',monospace;font-size:10px;padding:5px 10px;border-radius:4px;cursor:pointer;letter-spacing:0.08em;">🔑 DEVELOPER LOGIN</button>
+    <button id="world-logout-btn" onclick="_handleWorldLogout()" style="display:none;background:rgba(0,0,0,0.75);border:1px solid rgba(255,0,0,0.4);color:#ff4444;font-family:'Courier New',monospace;font-size:10px;padding:5px 10px;border-radius:4px;cursor:pointer;letter-spacing:0.08em;">LOGOUT</button>
   </div>
 
   <!-- 左下 移動モード -->
@@ -380,18 +386,61 @@
   // CesiumIon トークン（graceoftouch アカウント）
   Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5N2UwMjQ5NS0zYmU1LTQ3NjktYWM1YS1mZjIyZDhiYjNjMTMiLCJpZCI6NDEzMTMyLCJpYXQiOjE3NzUxODIxMjl9.M47vxRJDcH2ydS7zylV14xatLo9ScCU11A5El6N9KSM';
 
-  // URLパラメータで権限判定
-  const urlParams = new URLSearchParams(window.location.search);
-  const isAdmin = urlParams.get('admin') === 'true';
+  // Firebase 初期化 + Auth
+  const _fbApp = firebase.initializeApp({
+    apiKey: "AIzaSyDYv84Q_V3fprz3D6brHC32JgRe3JJYmaE",
+    authDomain: "grace-of-touch.firebaseapp.com",
+    projectId: "grace-of-touch",
+  });
+  const _fbAuth = firebase.auth(_fbApp);
 
-  // 権限バッジ設定
+  // ログイン状態でモード決定（初期値: 未ログイン = VISITOR）
+  let isAdmin = false;
+
+  // 権限バッジ設定関数
   const badgeEl = document.getElementById('badge-span');
-  if (isAdmin) {
-    badgeEl.textContent = '🔑 ADMIN';
-    badgeEl.classList.add('badge-admin');
-  } else {
-    badgeEl.textContent = '👤 VISITOR';
-    badgeEl.classList.add('badge-visitor');
+  function _updateAuthBadge(user) {
+    const loginBtn  = document.getElementById('world-login-btn');
+    const logoutBtn = document.getElementById('world-logout-btn');
+    if (user) {
+      badgeEl.textContent = '🔑 ' + (user.displayName || user.email || 'USER');
+      badgeEl.classList.remove('badge-visitor');
+      badgeEl.classList.add('badge-admin');
+      isAdmin = true;
+      if (loginBtn)  loginBtn.style.display  = 'none';
+      if (logoutBtn) logoutBtn.style.display = 'block';
+      // ログイン済み → FREE FLY 解放 + 地球内部アクセス有効
+      viewer.scene.globe.depthTestAgainstTerrain = false;
+      currentMode = MODE.FREE_FLY;
+      updateModeLabel();
+      showToast('✅ LOGGED IN — DEVELOPER MODE UNLOCKED');
+    } else {
+      badgeEl.textContent = '👤 VISITOR';
+      badgeEl.classList.remove('badge-admin');
+      badgeEl.classList.add('badge-visitor');
+      isAdmin = false;
+      if (loginBtn)  loginBtn.style.display  = 'block';
+      if (logoutBtn) logoutBtn.style.display = 'none';
+      // 未ログイン → WALKING固定 + 地球内部不可
+      viewer.scene.globe.depthTestAgainstTerrain = true;
+      currentMode = MODE.WALKING;
+      updateModeLabel();
+    }
+  }
+
+  function _handleWorldLogin() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    _fbAuth.signInWithPopup(provider).catch(err => showToast('LOGIN ERROR: ' + err.message));
+  }
+  function _handleWorldLogout() {
+    _fbAuth.signOut().then(() => showToast('LOGGED OUT'));
+  }
+
+  // Auth監視はviewer初期化後に開始（_startAuthWatchで呼ぶ）
+  function _startAuthWatch() {
+    _fbAuth.onAuthStateChanged(user => {
+      _updateAuthBadge(user);
+    });
   }
 
   // ローディングステータス更新
@@ -627,16 +676,16 @@
     height: 2.0  // 地上2m（徒歩目線）
   };
 
-  // カメラを東京タワー地点に設置
+  // カメラを東京タワー地点に設置（地上目線）
   viewer.camera.setView({
     destination: Cesium.Cartesian3.fromDegrees(
       TOKYO_TOWER.lng,
       TOKYO_TOWER.lat,
-      TOKYO_TOWER.height + 50 // BUG-W18: 地上目線に近い高度で開始
+      TOKYO_TOWER.height // 地上2m（徒歩目線）
     ),
     orientation: {
       heading: Cesium.Math.toRadians(0),
-      pitch: Cesium.Math.toRadians(-45),
+      pitch: Cesium.Math.toRadians(-5), // ほぼ水平
       roll: 0,
     }
   });
@@ -1311,6 +1360,9 @@
   // 太陽光の時刻を現在に（リアルタイム昼夜）
   viewer.clock.shouldAnimate = true;
 
+  // Firebase Auth 監視開始（viewer初期化完了後）
+  _startAuthWatch();
+
   function finishLoading() {
     setLoadingStatus('READY — DIGITAL TWIN INITIALIZED');
 
@@ -1318,13 +1370,13 @@
       const overlay = document.getElementById('loading-overlay');
       if (overlay) overlay.classList.add('hidden');
 
-      // FPSカメラ位置にズームイン
+      // FPSカメラ位置にズームイン（地上目線）
       setTimeout(() => {
         viewer.camera.flyTo({
           destination: Cesium.Cartesian3.fromDegrees(
             TOKYO_TOWER.lng,
             TOKYO_TOWER.lat,
-            TOKYO_TOWER.height + 5  // 地上7m
+            TOKYO_TOWER.height // 地上2m（徒歩目線）
           ),
           orientation: {
             heading: Cesium.Math.toRadians(30),
