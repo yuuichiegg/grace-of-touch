@@ -88,8 +88,9 @@
   #altitude-bar-fill{position:absolute;bottom:0;left:0;width:100%;background:linear-gradient(to top,#00d8ff,#ffffff);border-radius:3px;transition:height 0.5s ease;box-shadow:0 0 8px #00d8ff;height:0%;}
   #altitude-val{font-size:10px;color:var(--term-color);letter-spacing:0.05em;}
 
-  /* Chat — hidden on mobile by default */
-  #chat-container{position:absolute;bottom:58px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:40;pointer-events:auto;background:rgba(2,5,16,0.85);padding:8px;border-radius:8px;border:1px solid var(--term-dim);backdrop-filter:blur(5px);}
+  /* Chat — hidden by default, shown for logged-in users or ADMIN */
+  #chat-container{position:absolute;bottom:58px;left:50%;transform:translateX(-50%);display:none;gap:8px;z-index:40;pointer-events:auto;background:rgba(2,5,16,0.85);padding:8px;border-radius:8px;border:1px solid var(--term-dim);backdrop-filter:blur(5px);}
+  #chat-container.auth-visible{display:flex;}
   @media(max-width:768px){#chat-container{display:none!important;}#chat-container.mobile-open{display:flex!important;}}
   #chat-input{background:rgba(0,0,0,0.5);border:1px solid var(--term-dim);color:var(--term-color);font-family:"Courier New",monospace;padding:6px 10px;border-radius:4px;width:250px;outline:none;}
   #chat-input:focus{border-color:var(--term-color);box-shadow:0 0 8px rgba(0,216,255,0.3);}
@@ -592,6 +593,7 @@
 <!-- Firebase Compat SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
 <script>
 'use strict';
@@ -2071,7 +2073,7 @@ const LaunchSequence = {
     this._handoffDone=false;
     document.getElementById('countdown-hud').classList.remove('visible');
     document.getElementById('launch-start-panel').classList.add('hidden');
-    document.getElementById('chat-container').style.display='flex';
+    document.getElementById('chat-container').classList.add('auth-visible');
     // Remove upper stage (deep space) but keep booster + pad + GraceCatcher
     if(Rocket3D.upperGroup){
       Rocket3D.upperGroup.visible=true; // restore visibility for next cycle
@@ -4514,31 +4516,71 @@ const DroneNetwork={
   },
 
   _createDispatchDrone(){
+    // DJI Matrice 300 スタイルの点検ドローン（TunnelDroneモデル移植）
     const g=new THREE.Group();
-    const frameMat=new THREE.MeshBasicMaterial({color:0xffcc00});
-    const bar1=new THREE.Mesh(new THREE.BoxGeometry(3,0.12,0.2),frameMat);
-    const bar2=new THREE.Mesh(new THREE.BoxGeometry(0.2,0.12,3),frameMat);
-    g.add(bar1,bar2);
-    const body=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.3,0.7),new THREE.MeshBasicMaterial({color:0xcc9900}));
+    const bodyMat=new THREE.MeshStandardMaterial({color:0x2a2a2a,metalness:0.8,roughness:0.3});
+    const accentMat=new THREE.MeshStandardMaterial({color:0xcc0000,metalness:0.6,roughness:0.4});
+    const armMat=new THREE.MeshStandardMaterial({color:0x222222,metalness:0.7,roughness:0.4});
+    const motorMat=new THREE.MeshStandardMaterial({color:0xcc0000,metalness:0.6,roughness:0.4});
+
+    // メインボディ
+    const body=new THREE.Mesh(new THREE.BoxGeometry(0.45,0.14,0.45),bodyMat);
     g.add(body);
-    // Camera lens (front)
-    const lens=new THREE.Mesh(new THREE.SphereGeometry(0.15,6,4),new THREE.MeshBasicMaterial({color:0x00d8ff}));
-    lens.position.set(0,-0.1,0.45);
-    g.add(lens);
-    // 4 gold rotors
-    const rotorGeo=new THREE.CircleGeometry(0.5,8);
-    const rotorMat=new THREE.MeshBasicMaterial({color:0xffdd44,transparent:true,opacity:0.6,side:THREE.DoubleSide});
+    // アクセントストライプ
+    const stripe=new THREE.Mesh(new THREE.BoxGeometry(0.46,0.042,0.135),accentMat);
+    stripe.position.set(0,0.042,0.135);g.add(stripe);
+
+    // カメラレンズ（前方）
+    const lens=new THREE.Mesh(new THREE.SphereGeometry(0.054,8,8),
+      new THREE.MeshStandardMaterial({color:0x111111,metalness:0.9,roughness:0.1}));
+    lens.position.set(0,-0.028,0.225);g.add(lens);
+    // レンズ青リング
+    const lensRing=new THREE.Mesh(new THREE.TorusGeometry(0.054,0.012,6,12),
+      new THREE.MeshBasicMaterial({color:0x00d8ff}));
+    lensRing.position.copy(lens.position);lensRing.rotation.x=Math.PI/2;g.add(lensRing);
+
+    // 4アーム + モーターハブ + プロペラ
     const rotors=[];
-    [[-1.3,0.15,0],[1.3,0.15,0],[0,0.15,-1.3],[0,0.15,1.3]].forEach(p=>{
-      const r=new THREE.Mesh(rotorGeo,rotorMat);
-      r.rotation.x=-Math.PI/2;r.position.set(p[0],p[1],p[2]);
-      g.add(r);rotors.push(r);
+    const armLen=0.38;
+    for(let i=0;i<4;i++){
+      const angle=(i/4)*Math.PI*2+Math.PI/4;
+      const ax=Math.cos(angle),az=Math.sin(angle);
+      // アーム
+      const arm=new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,armLen,8),armMat);
+      arm.rotation.z=Math.PI/2;arm.rotation.y=angle;
+      arm.position.set(ax*armLen*0.45,0,az*armLen*0.45);g.add(arm);
+      // モーターハブ
+      const motor=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.022,0.03,8),motorMat);
+      motor.position.set(ax*armLen*0.65,0.02,az*armLen*0.65);g.add(motor);
+      // プロペラ（半透明ディスク）
+      const prop=new THREE.Mesh(
+        new THREE.CylinderGeometry(0.12,0.12,0.01,16),
+        new THREE.MeshStandardMaterial({color:0x00ccff,transparent:true,opacity:0.3}));
+      prop.position.set(ax*armLen*0.65,0.04,az*armLen*0.65);
+      prop.userData.isProp=true;g.add(prop);rotors.push(prop);
+    }
+
+    // ランディングギア（脚）
+    const legMat=new THREE.MeshStandardMaterial({color:0x444444});
+    [-1,1].forEach(s=>{
+      const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,0.21,6),legMat);
+      leg.position.set(s*0.135,-0.126,0);g.add(leg);
+      const foot=new THREE.Mesh(new THREE.BoxGeometry(0.03,0.008,0.27),legMat);
+      foot.position.set(s*0.135,-0.225,0);g.add(foot);
     });
-    // Flash light for "screenshot" effect
+
+    // LEDステータスライト
+    const ledGeo=new THREE.SphereGeometry(0.015,6,6);
+    const ledG=new THREE.Mesh(ledGeo,new THREE.MeshBasicMaterial({color:0x00ff00}));
+    ledG.position.set(0,0.07,-0.18);g.add(ledG);
+    const ledR=new THREE.Mesh(ledGeo,new THREE.MeshBasicMaterial({color:0xff0000}));
+    ledR.position.set(0,0.07,0.18);g.add(ledR);
+
+    // フラッシュライト（撮影演出）
     const flash=new THREE.PointLight(0xffffff,0,30);
-    flash.position.set(0,-0.2,0.5);
-    g.add(flash);
-    g.scale.setScalar(0.45);
+    flash.position.set(0,-0.2,0.5);g.add(flash);
+
+    g.scale.setScalar(0.55);
     return {mesh:g,rotors:rotors,flash:flash,lens:lens,_flashTimer:0};
   },
 
@@ -6813,6 +6855,22 @@ function getCurrentPermission(){
   return PERMISSION.VISITOR;
 }
 const USER_PERMISSION=getCurrentPermission();
+
+// チャット表示制御: ADMIN（URLパラメータ）は即時表示、ログイン済みはAuth確認後に表示
+(function(){
+  const cc=document.getElementById('chat-container');
+  if(!cc)return;
+  if(USER_PERMISSION===PERMISSION.ADMIN){
+    cc.classList.add('auth-visible');
+    return;
+  }
+  try{
+    if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
+    firebase.auth().onAuthStateChanged(user=>{
+      if(user) cc.classList.add('auth-visible');
+    });
+  }catch(e){console.warn('chat auth check failed',e);}
+})();
 
 // v76: GROUND GRAVITY CONSTANTS
 const GROUND={

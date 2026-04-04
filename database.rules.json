@@ -19,11 +19,7 @@
     "stats": {
       ".read": true,
       "$page": {
-        "$type": {
-          "$key": {
-            ".write": true
-          }
-        }
+        ".write": true
       }
     },
     "rooms": {
