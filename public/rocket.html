@@ -455,6 +455,7 @@
 
 <!-- Camera Mode Indicator -->
 <div id="cam-mode" class="visible">CAM: FPS [V]</div>
+<button id="cam-toggle-btn" onclick="if(window.App)App.toggleCamMode()" style="position:absolute;bottom:130px;right:16px;z-index:35;pointer-events:auto;background:rgba(0,216,255,0.08);border:1px solid rgba(0,216,255,0.35);color:var(--term-color);font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.12em;padding:8px 14px;border-radius:20px;cursor:pointer;text-shadow:0 0 6px var(--term-color);transition:all 0.2s;backdrop-filter:blur(4px);">📷 CAM: FPS</button>
 
 <!-- Live Visitor Counter -->
 <div id="live-counter" style="position:absolute;top:8px;right:8px;z-index:40;font-family:'Courier New',monospace;font-size:10px;color:rgba(0,255,136,0.8);pointer-events:none;text-align:right;line-height:1.6;text-shadow:0 0 4px rgba(0,255,136,0.3);">
@@ -641,22 +642,11 @@ void main(){
   float n4=fbm3(vec2(x*2.0+time*1.5,y*5.0-time*16.0))*0.3;
   float n=(n1*0.4+n2*0.3+n3*0.15+n4*0.15)*2.0-1.0;
 
-  // ── GT-1 Engine plume shape: narrow nozzle → overexpanded bell → multiple shock diamonds ──
-  // GT-1 nozzle is optimized for sea-level: slightly overexpanded at launch
-  float nozzleW=0.12;   // very narrow at nozzle exit
-  float bellW=0.38;      // first expansion
-  float shock1W=0.22;    // first shock diamond contraction
-  float expand1W=0.34;   // re-expansion after first shock
-  float shock2W=0.26;    // second shock contraction
-  float plumeW=0.45;     // final diffuse plume
-
+  // ── Smooth bell shape — shock contractions removed (looked like 3 separate flames) ──
   float w;
-  if(y<0.06){w=mix(nozzleW,bellW,y/0.06);}              // rapid bell expansion
-  else if(y<0.14){w=mix(bellW,shock1W,smoothstep(0.06,0.14,y));}  // 1st shock contraction
-  else if(y<0.22){w=mix(shock1W,expand1W,smoothstep(0.14,0.22,y));} // 1st re-expansion
-  else if(y<0.30){w=mix(expand1W,shock2W,smoothstep(0.22,0.30,y));} // 2nd shock contraction
-  else if(y<0.42){w=mix(shock2W,plumeW*0.75,smoothstep(0.30,0.42,y));} // 2nd re-expansion
-  else{w=mix(plumeW*0.75,plumeW,(y-0.42)/0.58);}        // gradual widening + dissipation
+  if(y<0.08){w=mix(0.12,0.38,y/0.08);}
+  else if(y<0.45){w=mix(0.38,0.46,(y-0.08)/0.37);}
+  else{w=mix(0.46,0.50,(y-0.45)/0.55);}
 
   // ── Kelvin-Helmholtz instability at edges (shear layer turbulence) ──
   float khFreq=12.0+y*20.0;  // frequency increases downstream
@@ -702,19 +692,12 @@ void main(){
   float innerCore=smoothstep(coreW*0.35,0.0,x)*taper*tipFade*0.7;
   float ultraCore=smoothstep(coreW*0.15,0.0,x)*taper*smoothstep(0.35,0.0,y)*0.5; // nozzle exit: nearly white
 
-  // ── Mach diamonds — Grace signature: prominent, stationary bright shock structures ──
-  // Multiple shock diamond intervals (real spacing ~ nozzle diameter apart)
-  float mdSpacing=18.0;  // shock diamond frequency
-  float md1=pow(max(0.0,sin(y*mdSpacing)),12.0)*smoothstep(baseW*0.45,0.0,x)*(1.0-y*0.3)*tipFade;
-  float md2=pow(max(0.0,sin(y*mdSpacing+1.57)),10.0)*smoothstep(baseW*0.30,0.0,x)*(1.0-y*0.5)*tipFade*0.5;
-  // Secondary harmonic diamonds (fainter, higher frequency)
-  float md3=pow(max(0.0,sin(y*mdSpacing*2.0+0.5)),14.0)*smoothstep(baseW*0.25,0.0,x)*(1.0-y*0.6)*tipFade*0.3;
-  // Slight oscillation from flow instability (not stationary — subtle breathing)
-  float mdBreath=0.92+0.08*sin(time*6.0+y*3.0);
-  float diamond=(md1+md2+md3)*mdBreath;
+  // ── Mach diamonds — subtle only (heavy effect caused 3-section appearance) ──
+  float mdSpacing=9.0;
+  float md1=pow(max(0.0,sin(y*mdSpacing)),14.0)*smoothstep(baseW*0.35,0.0,x)*(1.0-y*0.6)*tipFade*0.18;
+  float diamond=md1;
 
-  // X-shaped shock structures at diamond intersections
-  float xShock=pow(max(0.0,sin(y*mdSpacing)),6.0)*smoothstep(baseW*0.6,baseW*0.15,x)*smoothstep(0.0,baseW*0.15,x)*(1.0-y*0.5)*tipFade*0.4;
+  float xShock=0.0;
 
   // ── Color ramp: Realistic launch plume (2026-04-02 reference: crewed lunar mission) ──
   // Based on actual launch footage: brilliant white-yellow core → orange edges → residual smoke
@@ -1609,6 +1592,8 @@ const BoardingPass={
       document.getElementById('cockpit-hud').classList.add('visible');
       App._cockpitStartTime=performance.now()*0.001;
     }
+    const camBtn=document.getElementById('cam-toggle-btn');
+    if(camBtn)camBtn.textContent='📷 CAM: COCKPIT';
     Logger.log('COCKPIT VIEW ACTIVE — PORTHOLE WINDOW MODE');
     Logger.log('PRESS [V] TO SWITCH: FPS / 3RD PERSON / COCKPIT / CABIN');
     // トースト通知
@@ -7255,9 +7240,11 @@ const App={
     document.getElementById('third-instruments').classList.remove('visible');
     // Enter new mode
     this._camMode=next;
+    const camBtn=document.getElementById('cam-toggle-btn');
     if(next==='fps'){
       PlayerShip.group.visible=false;
       document.getElementById('cam-mode').textContent='CAM: FPS [V/C]';
+      if(camBtn)camBtn.textContent='📷 CAM: FPS';
       Logger.log("CAMERA: FIRST PERSON");
     }else if(next==='third'){
       this._fpsCamPos.copy(this.camera.position);
@@ -7265,6 +7252,7 @@ const App={
       PlayerShip._smoothCamPos.copy(this.camera.position).add(PlayerShip._camOffset.clone().applyQuaternion(this.camera.quaternion));
       document.getElementById('cam-mode').textContent='CAM: 3RD PERSON [V/C]';
       document.getElementById('third-instruments').classList.add('visible');
+      if(camBtn)camBtn.textContent='📷 CAM: 3RD';
       Logger.log("CAMERA: THIRD PERSON — SPACECRAFT VIEW");
     }else if(next==='cockpit'){
       this._fpsCamPos.copy(this.camera.position);
@@ -7272,6 +7260,7 @@ const App={
       this._cockpitStartTime=performance.now()*0.001;
       document.getElementById('cockpit-hud').classList.add('visible');
       document.getElementById('cam-mode').textContent='CAM: COCKPIT [V/C]';
+      if(camBtn)camBtn.textContent='📷 CAM: COCKPIT';
       Logger.log("CAMERA: COCKPIT — AR HUD ACTIVE");
     }else if(next==='cabin'){
       this._fpsCamPos.copy(this.camera.position);
@@ -7283,6 +7272,7 @@ const App={
       this.bloomPass.strength=0.15;
       this.bloomPass.threshold=0.8;
       document.getElementById('cam-mode').textContent='CAM: CABIN [V/C]';
+      if(camBtn)camBtn.textContent='📷 CAM: CABIN';
     }
   },
 
