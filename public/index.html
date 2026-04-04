@@ -82,7 +82,8 @@ body{margin:0;overflow:hidden;background:#020510;touch-action:none;}
 #terminal-screen{position:absolute;inset:0;z-index:40;pointer-events:none;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   opacity:0;transition:opacity 2.5s ease;}
-#terminal-screen.visible{opacity:1;pointer-events:auto;}
+#terminal-screen.visible{opacity:1;pointer-events:none;}
+#terminal-screen.visible a,#terminal-screen.visible button,#terminal-screen.visible #open-launcher{pointer-events:auto;}
 #terminal-title{font-family:'Orbitron',monospace;font-weight:900;
   font-size:clamp(20px,5vw,48px);color:#00ffff;letter-spacing:0.15em;
   text-shadow:0 0 30px rgba(0,255,255,0.8),0 0 60px rgba(0,255,255,0.3);
@@ -283,10 +284,11 @@ body{margin:0;overflow:hidden;background:#020510;touch-action:none;}
 
 <!-- ======= LAUNCHER PANEL ======= -->
 <div id="launcher-panel">
-  <div class="panel-header">
+  <div class="panel-header" style="position:relative;">
     <div class="panel-brand">SPACE TERMINAL</div>
     <h2 class="panel-title">EXPERIENCE MAP</h2>
     <div class="panel-subtitle">目的地を選んでください</div>
+    <button id="launcher-close" onclick="document.getElementById('launcher-panel').classList.remove('open')" style="position:absolute;top:12px;right:12px;background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);font-family:'Courier New',monospace;font-size:16px;width:32px;height:32px;border-radius:50%;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;transition:all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)';this.style.color='#fff'" onmouseout="this.style.background='transparent';this.style.color='rgba(255,255,255,0.6)'">✕</button>
   </div>
   <div class="cat-nav">
     <div class="cat-nav-btn active" data-cat="cat-quick">QUICK</div>
@@ -880,24 +882,22 @@ document.getElementById('open-launcher')?.addEventListener('click', () => {
   document.body.appendChild(b);
   document.getElementById('consent-ok').addEventListener('click',(e)=>{e.stopPropagation();localStorage.setItem('grace_consent','accepted');b.remove();});
 })();
-// BUG-W17 definitive fix: Override the obfuscated window click handler
-// The launcher opens on center-screen clicks when state==='terminal'
-// We intercept by monkey-patching classList.add on the panel
+// BUG-W17 v2: 難読化スクリプトのクリックによる自動オープンを完全ブロック
+// launcher-panelは #open-launcher ボタン経由のみ開放（他はすべて遮断）
 (function(){
   const panel=document.getElementById('launcher-panel');
   if(!panel)return;
   const origAdd=panel.classList.add.bind(panel.classList);
-  let _blockLauncher=false;
-  // Block launcher from opening for 500ms after any button/link click
-  document.addEventListener('click',(e)=>{
-    const t=e.target;
-    if(t&&(t.tagName==='BUTTON'||t.tagName==='A'||t.tagName==='INPUT'||t.tagName==='LABEL'||t.closest('button')||t.closest('a')||t.closest('#consent-overlay')||t.closest('#boarding-overlay')||t.closest('#flight-experience'))){
-      _blockLauncher=true;
-      setTimeout(()=>{_blockLauncher=false;},500);
-    }
+  let _allowOpen=false;
+  // 明示的な EXPLORE APPS ボタンのみ許可
+  document.getElementById('open-launcher')?.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    _allowOpen=true;
+    setTimeout(()=>{_allowOpen=false;},300);
   },{capture:true});
+  // それ以外のすべてのクリックによる自動オープンをブロック
   panel.classList.add=function(...args){
-    if(args[0]==='open'&&_blockLauncher)return;
+    if(args[0]==='open'&&!_allowOpen)return; // 自動オープン禁止
     return origAdd(...args);
   };
 })();
