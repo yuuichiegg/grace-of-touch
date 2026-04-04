@@ -1002,38 +1002,7 @@ const Rocket3D = {
     this._flameGroup.add(this._exhaustHaze);
     this.boosterGroup.add(this._flameGroup);
 
-    // Smoke particle system — 80 billowing clouds (Grace-style launch pad steam)
-    this._smokeParticles=[];
-    this._smokeGroup=new THREE.Group();
-    for(let i=0;i<80;i++){
-      const isLarge=i<20; // First 20 are large ground-level billowing clouds
-      const baseR=isLarge?(4+Math.random()*6):(1.5+Math.random()*2.5);
-      const sMat=new THREE.MeshBasicMaterial({
-        color:isLarge?0xcccccc:0x999999,
-        transparent:true,opacity:0,depthWrite:false
-      });
-      const sp=new THREE.Mesh(new THREE.SphereGeometry(baseR,8,8),sMat);
-      const spreadX=(Math.random()-0.5)*(isLarge?25:12);
-      const spreadZ=(Math.random()-0.5)*(isLarge?25:12);
-      sp.userData={
-        vel:new THREE.Vector3(
-          (Math.random()-0.5)*(isLarge?0.8:0.4),
-          isLarge?(-0.1+Math.random()*0.3):(-0.6-Math.random()*0.8),
-          (Math.random()-0.5)*(isLarge?0.8:0.4)
-        ),
-        life:Math.random()*2,
-        maxLife:isLarge?(4+Math.random()*4):(1.5+Math.random()*2),
-        baseScale:isLarge?(1.5+Math.random()):( 0.6+Math.random()*0.5),
-        turbFreq:1+Math.random()*2,
-        turbAmp:isLarge?0.04:0.02,
-        isLarge:isLarge
-      };
-      sp.position.set(spreadX,isLarge?(-2-Math.random()*3):(-8-Math.random()*6),spreadZ);
-      sp.scale.setScalar(sp.userData.baseScale*0.3);
-      this._smokeGroup.add(sp);
-      this._smokeParticles.push(sp);
-    }
-    this.boosterGroup.add(this._smokeGroup);
+    // (旧80粒子システム削除 → v78 Spriteシステムに統合)
 
     // v74: Engine glow light (warm white-yellow — matching real launch footage)
     this._flameLight=new THREE.PointLight(0xffeebb,0,350);
@@ -1065,51 +1034,70 @@ const Rocket3D = {
     this._heatShimmer.rotation.x=Math.PI/2;this._heatShimmer.position.y=-2;
     this._flameGroup.add(this._heatShimmer);
 
-    // v75: Massive smoke system (300 particles — towering column + ground tsunami)
-    // Reference: 2026-04-02 crewed lunar mission launch — enormous beige smoke pillar
+    // v79: Sprite-based smoke — SpaceX/NASA参考リアル煙モデル（五角形ゼロ保証）
+    // 四層構造: steam burst(瞬間白蒸気) + ground wave(放射水平拡散) + column(立煙柱) + exhaust(橙炎トレイル)
     this._smokeParticles=[];
     this._smokeGroup=new THREE.Group();
-    // Wispy elongated smoke (not spheres — stretched ellipsoids for realistic plumes)
-    const smokeGeoColumn=new THREE.SphereGeometry(1,5,4);
-    smokeGeoColumn.scale(0.6,1.8,0.6); // tall and thin
-    const smokeGeoGround=new THREE.SphereGeometry(1,5,4);
-    smokeGeoGround.scale(1.4,0.5,1.4); // flat and wide
-    const smokeGeoExhaust=new THREE.SphereGeometry(1,4,3);
-    smokeGeoExhaust.scale(0.4,2.2,0.4); // very thin and tall
-    for(let i=0;i<300;i++){
-      const isColumn=i<100;
-      const isGround=i>=100&&i<200;
-      const isExhaust=i>=200;
-      const smokeMat=new THREE.MeshBasicMaterial({
-        color:isColumn?0xe8e0d0:isGround?0xddd4c4:0xccbbaa,
-        transparent:true,opacity:0,depthWrite:false
+    if(!Rocket3D._smokeTex){
+      const sz=256,cv=document.createElement('canvas');
+      cv.width=cv.height=sz;
+      const ctx2d=cv.getContext('2d');
+      const grad=ctx2d.createRadialGradient(sz/2,sz/2,0,sz/2,sz/2,sz/2);
+      grad.addColorStop(0,'rgba(255,255,255,1.0)');
+      grad.addColorStop(0.20,'rgba(252,250,247,0.96)');
+      grad.addColorStop(0.45,'rgba(240,235,228,0.70)');
+      grad.addColorStop(0.68,'rgba(210,202,192,0.35)');
+      grad.addColorStop(0.85,'rgba(175,165,155,0.12)');
+      grad.addColorStop(1,'rgba(140,132,122,0)');
+      ctx2d.fillStyle=grad; ctx2d.fillRect(0,0,sz,sz);
+      Rocket3D._smokeTex=new THREE.CanvasTexture(cv);
+    }
+    // 400粒子: 0-59=steam burst, 60-179=ground wave, 180-299=column, 300-399=exhaust
+    for(let i=0;i<400;i++){
+      const isBurst=i<60;       // 瞬間白蒸気（発射直後1-2秒）
+      const isGround=i>=60&&i<180;  // 放射水平拡散（水蒸気衝撃波）
+      const isColumn=i>=180&&i<300; // 立ち昇る白ベージュ煙柱
+      // i>=300: 排気トレイル（橙褐・短命）
+      const baseColor=isBurst?new THREE.Color(0.98,0.97,0.95):
+                      isGround?new THREE.Color(0.95,0.92,0.87):
+                      isColumn?new THREE.Color(0.88,0.84,0.76):
+                               new THREE.Color(0.86,0.68,0.46);
+      const smat=new THREE.SpriteMaterial({
+        map:Rocket3D._smokeTex,transparent:true,opacity:0,
+        depthWrite:false,color:baseColor,blending:THREE.NormalBlending
       });
-      const geo=isColumn?smokeGeoColumn:isGround?smokeGeoGround:smokeGeoExhaust;
-      const smoke=new THREE.Mesh(geo,smokeMat);
-      const spread=isColumn?16:isGround?35:8;
-      smoke.position.set(
-        (Math.random()-0.5)*spread,
-        isColumn?(-2-Math.random()*6):isGround?(-1-Math.random()*2):(-8-Math.random()*8),
-        (Math.random()-0.5)*spread
-      );
-      smoke.scale.setScalar(0.5);
-      // Random rotation for variety
-      smoke.rotation.set(Math.random()*0.5-0.25,Math.random()*Math.PI*2,Math.random()*0.5-0.25);
-      smoke.userData={
+      const sp=new THREE.Sprite(smat);
+      // baseSize: burst=超大, ground=大, column=中, exhaust=小
+      const baseSize=isBurst?(18+Math.random()*22):
+                     isGround?(10+Math.random()*18):
+                     isColumn?(7+Math.random()*11):
+                              (2+Math.random()*4);
+      sp.scale.set(baseSize,baseSize,1);
+      const spread=isBurst?50:isGround?55:isColumn?22:10;
+      const initY=isBurst?(-1+Math.random()*3):isGround?(-1-Math.random()*2):
+                  isColumn?(-2-Math.random()*6):(-8-Math.random()*10);
+      sp.position.set((Math.random()-0.5)*spread,initY,(Math.random()-0.5)*spread);
+      const hSpeed=isBurst?(2.5+Math.random()*2.5):isGround?(1.8+Math.random()*2.0):
+                   isColumn?(0.4+Math.random()*0.5):(0.3+Math.random()*0.4);
+      const vSpeed=isBurst?(0.1+Math.random()*0.4):isGround?(0.05+Math.random()*0.2):
+                   isColumn?(1.1+Math.random()*2.2):(-1.5-Math.random()*2.5);
+      sp.userData={
         vel:new THREE.Vector3(
-          (Math.random()-0.5)*(isGround?2.0:isColumn?0.6:0.3),
-          isColumn?(1.0+Math.random()*2.0):isGround?(-0.02+Math.random()*0.15):(-1.5-Math.random()*2.5),
-          (Math.random()-0.5)*(isGround?2.0:isColumn?0.6:0.3)
+          (Math.random()-0.5)*hSpeed*2,
+          vSpeed,
+          (Math.random()-0.5)*hSpeed*2
         ),
-        life:Math.random()*1.5,
-        maxLife:isColumn?(6+Math.random()*10):isGround?(5+Math.random()*7):(1.0+Math.random()*2.0),
-        baseScale:isColumn?(4+Math.random()*6):isGround?(5+Math.random()*8):(1.2+Math.random()*2),
-        turbFreq:0.8+Math.random()*1.5,
-        turbAmp:isColumn?0.04:isGround?0.06:0.02,
-        type:isColumn?'column':isGround?'ground':'exhaust'
+        life:Math.random()*0.8, // 初期ばらつきを抑えて一斉噴出感を出す
+        maxLife:isBurst?(1.5+Math.random()*2.0):isGround?(6+Math.random()*8):
+                isColumn?(10+Math.random()*14):(1.2+Math.random()*2.0),
+        baseSize:baseSize,
+        turbFreq:0.5+Math.random()*1.5,
+        turbAmp:isBurst?0.08:isGround?0.06:isColumn?0.035:0.012,
+        type:isBurst?'burst':isGround?'ground':isColumn?'column':'exhaust',
+        rotSpeed:(Math.random()-0.5)*0.020
       };
-      this._smokeGroup.add(smoke);
-      this._smokeParticles.push(smoke);
+      this._smokeGroup.add(sp);
+      this._smokeParticles.push(sp);
     }
     this.boosterGroup.add(this._smokeGroup);
 
@@ -1956,64 +1944,75 @@ const LaunchSequence = {
     if(Rocket3D._exhaustCone)Rocket3D._exhaustCone.material.opacity=bThrust*0.55;
     if(Rocket3D._exhaustHaze)Rocket3D._exhaustHaze.material.opacity=bThrust*0.25;
 
-    // v75: Massive smoke update — towering pillar + ground tsunami
+    // v79: Sprite smoke update — SpaceX/NASA参考4層煙モデル
     if(Rocket3D._smokeParticles){
       const st=performance.now()*0.001;
       Rocket3D._smokeParticles.forEach((s,si)=>{
         const d=s.userData;
-        const lifeSpeed=d.type==='exhaust'?0.5:d.type==='ground'?0.18:0.12;
+        // burst=高速短命, ground=中速, column=低速長命, exhaust=高速短命
+        const lifeSpeed=d.type==='burst'?0.65:d.type==='exhaust'?0.55:d.type==='ground'?0.14:0.075;
         d.life+=dt*lifeSpeed;
-        if(d.life>d.maxLife||(bThrust<0.01&&d.type==='exhaust')){
+        const expired=d.life>d.maxLife||(bThrust<0.01&&(d.type==='exhaust'||d.type==='burst'));
+        if(expired){
           d.life=0;
-          const spread=d.type==='column'?20:d.type==='ground'?40:10;
-          s.position.set(
-            (Math.random()-0.5)*spread,
-            d.type==='column'?(-2-Math.random()*6):d.type==='ground'?(-1-Math.random()*2):(-8-Math.random()*8),
-            (Math.random()-0.5)*spread
-          );
-          d.vel.set(
-            (Math.random()-0.5)*(d.type==='ground'?2.0:d.type==='column'?0.8:0.5),
-            d.type==='column'?(0.8+Math.random()*1.5):d.type==='ground'?(-0.02+Math.random()*0.2):(-1.2-Math.random()*2.0),
-            (Math.random()-0.5)*(d.type==='ground'?2.0:d.type==='column'?0.8:0.5)
-          );
-          s.scale.setScalar(d.baseScale*0.5);
+          const spread=d.type==='burst'?50:d.type==='ground'?55:d.type==='column'?22:10;
+          const initY=d.type==='burst'?(-1+Math.random()*3):d.type==='ground'?(-1-Math.random()*2):
+                      d.type==='column'?(-2-Math.random()*6):(-8-Math.random()*10);
+          s.position.set((Math.random()-0.5)*spread,initY,(Math.random()-0.5)*spread);
+          const hSpd=d.type==='burst'?(2.5+Math.random()*2.5):d.type==='ground'?(1.8+Math.random()*2.0):
+                     d.type==='column'?(0.4+Math.random()*0.5):(0.3+Math.random()*0.4);
+          const vSpd=d.type==='burst'?(0.1+Math.random()*0.4):d.type==='ground'?(0.05+Math.random()*0.2):
+                     d.type==='column'?(1.1+Math.random()*2.2):(-1.5-Math.random()*2.5);
+          d.vel.set((Math.random()-0.5)*hSpd*2,vSpd,(Math.random()-0.5)*hSpd*2);
           s.material.opacity=0;
-        }else if(bThrust>0.01||d.type!=='exhaust'){
+        }else if(bThrust>0.01||d.type==='column'||d.type==='ground'){
           const progress=d.life/d.maxLife;
           s.position.add(d.vel);
-          // Turbulence
           d.vel.x+=Math.sin(st*d.turbFreq+si*1.7)*d.turbAmp;
           d.vel.z+=Math.cos(st*d.turbFreq*0.8+si*2.3)*d.turbAmp;
-          if(d.type==='column'){
-            // Column: towering pillar — fast rise, big expansion, HIGH opacity
-            d.vel.y+=0.015;
-            d.vel.x*=1.005;d.vel.z*=1.005;
-            d.vel.x+=(Math.random()-0.5)*0.08;
-            d.vel.z+=(Math.random()-0.5)*0.08;
-            s.scale.setScalar(d.baseScale*(1+progress*8));
-            const fade=progress<0.05?progress*20:progress<0.5?1.0:Math.max(0,(1-progress)*2.0);
-            s.material.opacity=fade*Math.min(1,bThrust+0.3)*0.75;
-            const r=0.87-progress*0.12, g=0.82-progress*0.14, b=0.72-progress*0.12;
-            s.material.color.setRGB(r,g,b);
+          s.material.rotation+=d.rotSpeed;
+
+          if(d.type==='burst'){
+            // 瞬間白蒸気: 爆発的拡散→急速消滅（SpaceX水冷蒸気）
+            d.vel.x*=1.055; d.vel.z*=1.055;
+            d.vel.y+=0.025;
+            const sz=d.baseSize*(1+progress*8);
+            s.scale.set(sz,sz,1);
+            const fade=progress<0.08?progress*12.5:Math.max(0,(1-progress)*1.35);
+            s.material.opacity=fade*Math.min(1,bThrust+0.5)*0.90;
+            s.material.color.setRGB(0.98-progress*0.10,0.96-progress*0.14,0.92-progress*0.18);
+
           }else if(d.type==='ground'){
-            // Ground: tsunami spreading outward — MASSIVE expansion
-            d.vel.x*=1.018;d.vel.z*=1.018;
-            d.vel.y+=0.003;
-            d.vel.x+=(Math.random()-0.5)*0.25;
-            d.vel.z+=(Math.random()-0.5)*0.25;
-            s.scale.setScalar(d.baseScale*(1+progress*12));
-            const fade=progress<0.04?progress*25:progress<0.35?1.0:Math.max(0,(1-progress)*1.5);
-            s.material.opacity=fade*Math.min(1,bThrust+0.4)*0.65;
-            const r=0.84-progress*0.18, g=0.78-progress*0.18, b=0.66-progress*0.12;
+            // 放射水平拡散: 地表面を這う白灰蒸気→ベージュ
+            d.vel.x*=1.030; d.vel.z*=1.030;
+            d.vel.y+=0.004;
+            const sz=d.baseSize*(1+progress*12);
+            s.scale.set(sz,sz,1);
+            const fade=progress<0.04?progress*25:progress<0.40?1.0:Math.max(0,(1-progress)*1.70);
+            s.material.opacity=fade*Math.min(1,bThrust+0.5)*0.82;
+            const r=0.95-progress*0.22, g=0.90-progress*0.24, b=0.82-progress*0.20;
             s.material.color.setRGB(r,g,b);
+
+          }else if(d.type==='column'){
+            // 立ち昇る煙柱: 白→ベージュ→グレー、ゆっくり大きく膨張
+            d.vel.y+=0.010;
+            d.vel.x*=1.004; d.vel.z*=1.004;
+            const sz=d.baseSize*(1+progress*9);
+            s.scale.set(sz,sz,1);
+            const fade=progress<0.05?progress*20:progress<0.55?1.0:Math.max(0,(1-progress)*2.2);
+            s.material.opacity=fade*Math.min(1,bThrust+0.35)*0.82;
+            const r=0.92-progress*0.24, g=0.87-progress*0.28, b=0.78-progress*0.26;
+            s.material.color.setRGB(r,g,b);
+
           }else{
-            // Exhaust: hot, fast, dense plume from nozzle
-            d.vel.x*=1.004;d.vel.z*=1.004;
-            s.scale.setScalar(d.baseScale*(1+progress*6));
-            const fade=progress<0.06?progress*16:Math.max(0,1-progress*1.0);
-            s.material.opacity=fade*bThrust*0.60;
-            const r=0.75-progress*0.3, g=0.65-progress*0.35, b=0.55-progress*0.3;
-            s.material.color.setRGB(r+0.12,g,b);
+            // 排気トレイル: 高温短命・橙褐→濃煙
+            d.vel.x*=1.006; d.vel.z*=1.006;
+            const sz=d.baseSize*(1+progress*6);
+            s.scale.set(sz,sz,1);
+            const fade=progress<0.08?progress*12.5:Math.max(0,1-progress*1.15);
+            s.material.opacity=fade*bThrust*0.85;
+            const r=0.90-progress*0.32, g=0.68-progress*0.30, b=0.46-progress*0.22;
+            s.material.color.setRGB(r,g,b);
           }
         }
       });
