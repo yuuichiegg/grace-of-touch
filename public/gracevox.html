@@ -637,6 +637,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   <button class="bs-btn" id="audioRecBtn" onclick="toggleAudioRec()" title="音声録音" style="font-size:16px;">&#127908;</button>
   <button class="bs-btn" id="libToggleBtn" onclick="toggleLibraryView()" title="トラックライブラリ" style="font-size:14px;">📂</button>
   <button class="bs-btn" id="shareBtn" onclick="shareResult()" title="SNS共有" style="font-size:16px;">&#128279;</button>
+  <button class="bs-btn" id="fileTranscribeBtn" onclick="openFileTranscribe()" title="ファイル文字起こし" style="font-size:16px;">📁</button>
+  <input type="file" id="fileTranscribeInput" accept="audio/*,video/*" style="display:none">
   <div class="controls-info">
     <div class="hotkey-hint"><kbd id="hotkeyDisplay">変換</kbd> or <kbd>F2</kbd></div>
     <a href="gracevox-terms.html" style="font-size:9px;color:var(--text-dim);text-decoration:none;">Terms</a>
@@ -715,6 +717,14 @@ document.addEventListener('DOMContentLoaded',()=>{
         <option value="toggle">トグル（押して開始/押して停止）</option>
         <option value="hold">長押し（押している間だけ録音）</option>
       </select>
+    </div>
+    <div class="sep"></div>
+    <div class="setting-group">
+      <div class="setting-row">
+        <span>🍋 カスハラ連携モード</span>
+        <button class="toggle" id="kasharaToggle" onclick="toggleKashara(this)"></button>
+      </div>
+      <div id="kasharaStatus" style="font-size:10px;color:var(--text-dim);margin-top:4px;display:none;">Grace of Touch と連携中。文字起こしをリアルタイム送信しています。</div>
     </div>
     <div class="sep"></div>
     <div class="setting-group">
@@ -1286,6 +1296,30 @@ async function syncFromCloud(){
 let isRecording = false, recognition = null, audioContext = null, analyser = null, mediaStream = null;
 let _wasRecordingBeforePause = false; // PWA: pagehide時に録音中だったか記憶
 let finalTranscript = '', interimTranscript = '', sentences = [];
+
+// ── カスハラ連携モード ──
+let kasharaMode = false;
+const _kasharaChannel = new BroadcastChannel('gracevox-kashara');
+_kasharaChannel.onmessage = (e) => {
+  if (e.data?.type === 'pong' && kasharaMode) {
+    document.getElementById('kasharaStatus').style.display = 'block';
+  }
+};
+function toggleKashara(btn) {
+  kasharaMode = !kasharaMode;
+  btn.classList.toggle('on', kasharaMode);
+  const st = document.getElementById('kasharaStatus');
+  if (kasharaMode) {
+    _kasharaChannel.postMessage({ type: 'ping' });
+    st.style.display = 'block';
+  } else {
+    _kasharaChannel.postMessage({ type: 'disconnect' });
+    st.style.display = 'none';
+  }
+}
+window.addEventListener('beforeunload', () => {
+  if (kasharaMode) _kasharaChannel.postMessage({ type: 'disconnect' });
+});
 let currentLang = 'ja-JP';
 let selectedHotkey = localStorage.getItem('vt_hotkey') || 'Convert';
 let outputMode = localStorage.getItem('vt_mode') || 'clean';
@@ -1880,6 +1914,13 @@ function handleResult(event){
         _serverProofreadAsync(proofed);
       }
     }else{ interimTranscript+=t; }
+  }
+  // カスハラ連携モード: 確定テキストをGrace of Touchに送信
+  if (kasharaMode) {
+    const sent = event.results[event.results.length - 1];
+    if (sent && sent.isFinal) {
+      _kasharaChannel.postMessage({ type: 'transcript', text: sent[0].transcript.trim() });
+    }
   }
   // 録音中のリアルタイム表示（interim含めてAI校正を適用 + ハイライト）
   const el=document.getElementById('currentText');
@@ -4681,6 +4722,129 @@ function generateShareImage(text){
     });
     window.addEventListener('beforeunload',()=>myRef.remove());
   }catch(e){console.warn('LiveCounter:',e);}
+})();
+</script>
+
+<!-- ファイル文字起こし (Transformers.js / ブラウザ内Whisper) -->
+<script>
+(function(){
+  var _transcriber = null;
+
+  // プログレスオーバーレイ
+  function _showProg(msg, pct) {
+    var el = document.getElementById('_ftOverlay');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = '_ftOverlay';
+      el.style.cssText = 'position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;';
+      el.innerHTML =
+        '<div style="font-size:36px;">📁</div>' +
+        '<div id="_ftMsg" style="color:#fff;font-size:13px;font-family:\'Courier New\',monospace;text-align:center;max-width:320px;line-height:1.6;"></div>' +
+        '<div style="width:min(320px,80vw);background:rgba(255,255,255,0.1);border-radius:8px;height:6px;overflow:hidden;">' +
+          '<div id="_ftBar" style="height:100%;background:#7c6fff;transition:width 0.4s;width:0%;"></div>' +
+        '</div>' +
+        '<div style="font-size:10px;color:rgba(255,255,255,0.4);text-align:center;">初回のみモデルDL(~244MB)。以降はキャッシュ。</div>' +
+        '<button onclick="window._ftCancel()" style="margin-top:4px;background:none;border:1px solid rgba(255,255,255,0.25);color:rgba(255,255,255,0.6);padding:6px 24px;border-radius:6px;cursor:pointer;font-size:12px;">キャンセル</button>';
+      document.body.appendChild(el);
+    }
+    document.getElementById('_ftMsg').textContent = msg;
+    if (pct !== undefined) document.getElementById('_ftBar').style.width = pct + '%';
+    el.style.display = 'flex';
+  }
+
+  function _hideProg() {
+    var el = document.getElementById('_ftOverlay');
+    if (el) el.style.display = 'none';
+  }
+
+  window._ftCancel = function() { _hideProg(); };
+
+  window.openFileTranscribe = function() {
+    document.getElementById('fileTranscribeInput').click();
+  };
+
+  document.getElementById('fileTranscribeInput').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    this.value = '';
+    _transcribeFile(file);
+  });
+
+  async function _transcribeFile(file) {
+    try {
+      _showProg('Whisperモデルを準備中...', 5);
+
+      // Transformers.js (CDN) を動的インポート
+      var mod = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+      var pipeline = mod.pipeline;
+      var env = mod.env;
+      env.allowLocalModels = false;
+
+      if (!_transcriber) {
+        _transcriber = await pipeline(
+          'automatic-speech-recognition',
+          'Xenova/whisper-small',
+          {
+            progress_callback: function(p) {
+              if (p.status === 'downloading') {
+                var pct = p.total ? Math.round((p.loaded / p.total) * 75) + 5 : 10;
+                _showProg('モデルDL中: ' + (p.file||'') + '\n' +
+                  Math.round((p.loaded||0)/1048576) + ' / ' +
+                  Math.round((p.total||0)/1048576) + ' MB', pct);
+              } else if (p.status === 'done') {
+                _showProg('モデル準備完了', 82);
+              }
+            }
+          }
+        );
+      }
+
+      _showProg('音声データを読み込み中...', 85);
+
+      // ファイル → AudioBuffer → 16kHz mono Float32Array
+      var arrayBuf = await file.arrayBuffer();
+      var audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      var audioBuf = await audioCtx.decodeAudioData(arrayBuf);
+      var float32 = audioBuf.getChannelData(0);
+      audioCtx.close();
+
+      _showProg('文字起こし中... (' + Math.round(audioBuf.duration) + '秒の音声)', 88);
+
+      var result = await _transcriber(float32, {
+        language: 'japanese',
+        task: 'transcribe',
+        chunk_length_s: 30,
+        stride_length_s: 5
+      });
+
+      var text = (result.text || '').trim();
+      _showProg('完了！', 100);
+
+      setTimeout(function() {
+        _hideProg();
+        if (!text) {
+          if (typeof setStatus === 'function') setStatus('ready', '音声を認識できませんでした');
+          return;
+        }
+        // GraceVox の既存表示に流し込む
+        finalTranscript = text;
+        var el = document.getElementById('currentText');
+        el.innerHTML = typeof escapeHtml === 'function' ? escapeHtml(typeof processText === 'function' ? processText(text) : text) : text;
+        var cc = document.getElementById('charCount');
+        if (cc) cc.textContent = text.length + '文字';
+        if (typeof saveToHistory === 'function') saveToHistory(text);
+        var eb = document.getElementById('editBtn');
+        if (eb) eb.style.display = 'inline-block';
+        if (typeof setStatus === 'function') setStatus('ready', 'ファイル文字起こし完了');
+      }, 600);
+
+    } catch(err) {
+      _hideProg();
+      console.error('[FileTranscribe]', err);
+      if (typeof setStatus === 'function') setStatus('ready', 'エラー: ' + err.message);
+      alert('文字起こしエラー:\n' + err.message);
+    }
+  }
 })();
 </script>
 </body>

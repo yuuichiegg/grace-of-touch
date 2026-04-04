@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Grace of Touch</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #111118;
+  --surface2: #1a1a24;
+  --border: rgba(255,255,255,0.08);
+  --border-hi: rgba(255,255,255,0.16);
+  --text: #e8e6f0;
+  --muted: #6b6880;
+  --dim: #3d3b4a;
+  --accent: #ff3b5c;
+  --accent-glow: rgba(255,59,92,0.22);
+  --accent-dim: rgba(255,59,92,0.11);
+  --safe: #00c98d;
+  --safe-dim: rgba(0,201,141,0.12);
+  --warn: #ff9f1c;
+  --info: #4d9ef7;
+  --info-dim: rgba(77,158,247,0.12);
+  --mono: 'DM Mono', monospace;
+  --sans: 'Noto Sans JP', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-weight: 300;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0; opacity: 0.7;
+}
+
+.app {
+  position: relative; z-index: 1;
+  width: 100%; max-width: 480px;
+  padding: 18px 16px 72px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* ── Header ── */
+.header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.logo-eyebrow { font-family: var(--mono); font-size: 9px; color: var(--dim); letter-spacing: 0.14em; text-transform: uppercase; }
+.logo-name { font-size: 18px; font-weight: 500; letter-spacing: -0.02em; }
+.logo-name em { color: var(--accent); font-style: normal; }
+.rec-pill {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: 20px;
+  border: 1px solid var(--border);
+  font-family: var(--mono); font-size: 10px; color: var(--muted);
+  transition: all 0.3s;
+}
+.rec-pill.on { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.rec-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--dim); transition: all 0.3s; }
+.rec-pill.on .rec-dot { background: var(--accent); animation: blink 1s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ── TAB NAV ── */
+.tab-nav {
+  display: grid; grid-template-columns: 1fr 1fr;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px; gap: 4px;
+}
+.tab-btn {
+  padding: 9px 0;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.tab-btn.active {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border-hi);
+}
+.tab-icon { font-size: 14px; }
+
+/* ── PANELS ── */
+.panel { display: none; flex-direction: column; gap: 12px; }
+.panel.active { display: flex; }
+
+/* ══════════════════════════════
+   LAYER 1 — リアルタイム対処
+══════════════════════════════ */
+
+/* Fruit signal */
+.signal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex; flex-direction: column; gap: 12px;
+  transition: border-color 0.5s, box-shadow 0.5s;
+  position: relative; overflow: hidden;
+}
+.signal-card::before {
+  content: ''; position: absolute; inset: 0; border-radius: 14px;
+  opacity: 0; transition: opacity 0.6s; pointer-events: none;
+}
+.signal-card.lv1::before { background: radial-gradient(ellipse at 50% -20%, rgba(0,201,141,0.1) 0%, transparent 70%); opacity: 1; }
+.signal-card.lv2::before { background: radial-gradient(ellipse at 50% -20%, rgba(255,159,28,0.12) 0%, transparent 70%); opacity: 1; }
+.signal-card.lv3::before { background: radial-gradient(ellipse at 50% -20%, rgba(255,59,92,0.12) 0%, transparent 70%); opacity: 1; }
+.signal-card.lv2 { border-color: rgba(255,159,28,0.22); }
+.signal-card.lv3 { border-color: rgba(255,59,92,0.28); box-shadow: 0 0 18px rgba(255,59,92,0.07); }
+
+.signal-top { display: flex; justify-content: space-between; align-items: center; }
+.signal-label { font-family: var(--mono); font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+.signal-scanning { font-family: var(--mono); font-size: 9px; color: var(--info); display: none; }
+.signal-scanning.on { display: block; animation: fp 1.4s ease-in-out infinite; }
+@keyframes fp { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+.signal-body { display: flex; align-items: center; gap: 14px; }
+.signal-fruit {
+  font-size: 50px; line-height: 1;
+  transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+  user-select: none; flex-shrink: 0;
+}
+.signal-fruit.pop { animation: pop 0.35s ease-out; }
+@keyframes pop { 0%{transform:scale(1)} 45%{transform:scale(1.28)} 100%{transform:scale(1)} }
+
+.signal-right { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+.signal-status { font-size: 16px; font-weight: 500; transition: color 0.4s; }
+.signal-sub { font-size: 11px; color: var(--muted); line-height: 1.55; }
+
+/* tension bar */
+.tbar-row { display: flex; justify-content: space-between; }
+.tbar-lbl { font-family: var(--mono); font-size: 9px; color: var(--muted); }
+.tbar-val { font-family: var(--mono); font-size: 9px; color: var(--text); }
+.tbar-track { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.tbar-fill { height: 100%; border-radius: 2px; width: 0%; transition: width 0.9s ease, background-color 0.5s; background: var(--safe); }
+
+/* ── ADVICE BOX (核心) ── */
+.advice-box {
+  background: var(--surface2);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  display: none;
+  flex-direction: column;
+  animation: slide-in 0.3s ease;
+}
+.advice-box.show { display: flex; }
+@keyframes slide-in { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+
+.advice-now {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.advice-now-label { font-family: var(--mono); font-size: 9px; color: var(--safe); text-transform: uppercase; letter-spacing: 0.1em; }
+.advice-now-text { font-size: 13px; color: var(--text); line-height: 1.7; font-weight: 400; }
+
+.advice-script {
+  padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.advice-script-label { font-family: var(--mono); font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.advice-script-text {
+  font-size: 12px; color: var(--muted); line-height: 1.65;
+  border-left: 2px solid var(--border-hi);
+  padding-left: 10px;
+  font-style: italic;
+}
+
+/* ── REC BUTTON ── */
+.rec-area {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 16px 0 8px;
+}
+.rec-ring { position: relative; width: 128px; height: 128px; display: flex; align-items: center; justify-content: center; }
+.rec-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.ring-track { fill: none; stroke: var(--border); stroke-width: 1.5; }
+.ring-fill { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-linecap: round; stroke-dasharray: 345; stroke-dashoffset: 345; transition: stroke-dashoffset 0.2s linear; }
+.rec-main {
+  width: 100px; height: 100px; border-radius: 50%;
+  border: 1.5px solid var(--border-hi);
+  background: var(--surface2);
+  cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  transition: all 0.25s;
+  -webkit-tap-highlight-color: transparent; user-select: none;
+}
+.rec-main:active { transform: scale(0.94); }
+.rec-main.on { border-color: var(--accent); background: var(--accent-dim); box-shadow: 0 0 28px var(--accent-glow), inset 0 0 14px var(--accent-glow); }
+.rec-main-icon { font-size: 26px; line-height: 1; }
+.rec-main-lbl { font-family: var(--mono); font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.rec-main.on .rec-main-lbl { color: var(--accent); }
+.rec-timer { font-family: var(--mono); font-size: 24px; font-weight: 500; color: var(--dim); }
+.rec-timer.on { color: var(--text); }
+
+/* ── GPS / AUDIO CARDS ── */
+.cards-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mini-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; transition: border-color 0.3s; }
+.mini-card.on { border-color: var(--border-hi); }
+.mc-label { font-family: var(--mono); font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.mc-val { font-family: var(--mono); font-size: 11px; color: var(--text); word-break: break-all; }
+.mc-val.dim { color: var(--dim); font-size: 10px; }
+.mc-val.safe { color: var(--safe); }
+.gps-acc { display: inline-flex; align-items: center; padding: 1px 5px; border-radius: 4px; font-family: var(--mono); font-size: 9px; }
+.gps-acc.g { background: var(--safe-dim); color: var(--safe); }
+.gps-acc.b { background: rgba(255,159,28,0.12); color: var(--warn); }
+.gps-acc.n { background: var(--border); color: var(--dim); }
+
+/* quick actions */
+.quick-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.quick-btn {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 8px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  transition: all 0.2s; -webkit-tap-highlight-color: transparent;
+}
+.quick-btn:hover { border-color: var(--border-hi); background: var(--surface2); }
+.quick-btn:active { transform: scale(0.96); }
+.quick-btn.red { border-color: rgba(255,59,92,0.2); }
+.quick-icon { font-size: 18px; }
+.quick-lbl { font-size: 10px; color: var(--muted); text-align: center; }
+
+/* ══════════════════════════════
+   LAYER 2 — 事後記録・提出
+══════════════════════════════ */
+.layer2-header {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.l2h-title { font-size: 14px; font-weight: 500; }
+.l2h-sub { font-size: 11px; color: var(--muted); line-height: 1.6; }
+
+/* incident form */
+.form-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.form-block-title {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono); font-size: 9px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.form-field { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+.form-field:last-child { border-bottom: none; }
+.field-label { font-size: 10px; color: var(--muted); }
+.field-val { font-size: 12px; color: var(--text); line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+.field-val.dim { color: var(--dim); }
+.field-val.safe { color: var(--safe); }
+
+/* AI summary */
+.ai-summary-block {
+  background: var(--surface);
+  border: 1px solid rgba(77,158,247,0.2);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ai-sum-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono); font-size: 9px; color: var(--info);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.ai-sum-content {
+  padding: 12px 14px;
+  font-size: 12px; color: var(--text); line-height: 1.8;
+  white-space: pre-wrap;
+}
+.ai-sum-content.empty { color: var(--dim); font-style: italic; }
+
+.gen-btn {
+  width: 100%; padding: 10px;
+  background: var(--info-dim);
+  border: 1px solid rgba(77,158,247,0.25);
+  border-radius: 8px;
+  color: var(--info); font-size: 11px; font-family: var(--sans);
+  cursor: pointer; transition: all 0.2s;
+}
+.gen-btn:hover { background: rgba(77,158,247,0.2); }
+
+/* export buttons */
+.export-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.export-btn {
+  padding: 12px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text); font-size: 11px; font-family: var(--sans);
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: all 0.2s;
+}
+.export-btn:hover { border-color: var(--border-hi); background: var(--surface2); }
+.export-btn.primary { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.export-btn.primary:hover { background: rgba(255,59,92,0.18); }
+
+/* log list */
+.log-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.log-head { display: flex; justify-content: space-between; align-items: center; padding: 9px 14px; border-bottom: 1px solid var(--border); }
+.log-head-lbl { font-family: var(--mono); font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.log-head-cnt { font-family: var(--mono); font-size: 9px; color: var(--dim); }
+.log-scroller { max-height: 200px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.log-item { display: flex; gap: 8px; padding: 7px 14px; border-bottom: 1px solid var(--border); animation: slide-in 0.25s ease; }
+.log-item:last-child { border-bottom: none; }
+.log-t { font-family: var(--mono); font-size: 9px; color: var(--dim); flex-shrink: 0; padding-top: 1px; }
+.log-tx { font-size: 11px; color: var(--muted); line-height: 1.5; flex: 1; }
+.log-tx.ev { color: var(--text); }
+.log-tx.wa { color: var(--warn); }
+.log-tx.ok { color: var(--safe); }
+.log-tx.ai { color: var(--info); }
+.log-tx.tr { color: #a78bfa; } /* GraceVox 文字起こし */
+.log-tx.sh { color: #ff6b6b; font-weight: 500; } /* 衝撃検知 */
+
+/* ── ワンタップ事象ボタン ── */
+.event-section { display: flex; flex-direction: column; gap: 6px; }
+.event-label { font-family: var(--mono); font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; padding: 0 2px; }
+.event-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.event-btn {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 8px; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+  font-family: var(--sans);
+}
+.event-btn:active { transform: scale(0.94); }
+.event-btn.danger { border-color: rgba(255,59,92,0.3); background: rgba(255,59,92,0.05); }
+.event-btn.warn  { border-color: rgba(255,159,28,0.3); background: rgba(255,159,28,0.05); }
+.event-icon { font-size: 20px; }
+.event-lbl { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.3; }
+
+/* ── 衝撃センサーバッジ ── */
+.shock-badge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: 10px;
+  background: rgba(255,107,107,0.07); border: 1px solid rgba(255,107,107,0.2);
+  font-family: var(--mono); font-size: 10px; color: rgba(255,107,107,0.7);
+  transition: all 0.3s;
+}
+.shock-badge.active { background: rgba(255,107,107,0.18); border-color: rgba(255,107,107,0.5); color: #ff6b6b; }
+.shock-dot { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,107,107,0.4); }
+.shock-badge.active .shock-dot { background: #ff6b6b; animation: blink 0.8s step-end infinite; }
+.gv-badge { display: flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 10px; background: rgba(167,139,250,0.08); border: 1px solid rgba(167,139,250,0.2); font-family: var(--mono); font-size: 10px; color: #a78bfa; transition: all 0.3s; }
+.gv-badge.connected { background: rgba(167,139,250,0.14); border-color: rgba(167,139,250,0.4); }
+.gv-dot { width: 5px; height: 5px; border-radius: 50%; background: rgba(167,139,250,0.4); transition: all 0.3s; }
+.gv-badge.connected .gv-dot { background: #a78bfa; animation: blink 1.5s step-end infinite; }
+.log-empty { padding: 18px 14px; text-align: center; font-size: 10px; color: var(--dim); font-family: var(--mono); }
+
+/* perm / apikey */
+.banner { border-radius: 10px; padding: 10px 13px; font-size: 11px; line-height: 1.6; margin: 0; }
+.banner.warn { background: rgba(255,159,28,0.08); border: 1px solid rgba(255,159,28,0.25); color: var(--warn); display: none; }
+.banner.warn.show { display: block; }
+.apikey-card { background: var(--surface); border: 1px solid rgba(77,158,247,0.2); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 9px; }
+.apikey-row { display: flex; gap: 7px; }
+.apikey-input { flex: 1; background: var(--surface2); border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; font-family: var(--mono); font-size: 10px; color: var(--text); outline: none; transition: border-color 0.2s; }
+.apikey-input:focus { border-color: var(--border-hi); }
+.apikey-input::placeholder { color: var(--dim); }
+.apikey-btn { background: var(--info-dim); border: 1px solid rgba(77,158,247,0.25); border-radius: 7px; padding: 7px 13px; color: var(--info); font-size: 10px; cursor: pointer; font-family: var(--sans); white-space: nowrap; transition: all 0.2s; }
+.apikey-btn:hover { background: rgba(77,158,247,0.2); }
+.apikey-note { font-size: 10px; color: var(--muted); line-height: 1.5; }
+
+.footer { text-align: center; font-size: 9px; color: var(--dim); font-family: var(--mono); padding-top: 4px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Header -->
+<header class="header">
+  <div>
+    <div class="logo-eyebrow">Grace of Touch</div>
+    <div class="logo-name">緊急<em>記録</em> <span style="font-size:11px;color:var(--dim);font-weight:300">v0.3</span></div>
+  </div>
+  <div class="rec-pill" id="recPill">
+    <div class="rec-dot"></div>
+    <span id="recPillTxt">待機中</span>
+  </div>
+</header>
+
+<!-- API Key -->
+<div class="apikey-card" id="apikeyCard">
+  <div style="font-family:var(--mono);font-size:9px;color:var(--info);text-transform:uppercase;letter-spacing:0.1em">AI判定 — APIキー設定</div>
+  <div class="apikey-row">
+    <input class="apikey-input" id="apikeyInput" type="password" placeholder="sk-ant-..." />
+    <button class="apikey-btn" onclick="saveKey()">設定</button>
+  </div>
+  <div class="apikey-note">このブラウザのセッション内にのみ保存されます。AIによるリアルタイム状況判断が有効になります。</div>
+</div>
+
+<!-- GraceVox 接続バッジ -->
+<div class="gv-badge" id="gvBadge">
+  <div class="gv-dot"></div>
+  <span id="gvBadgeTxt">GraceVox 未接続 — <a href="https://grace-of-touch.web.app/gracevox.html" target="_blank" style="color:inherit;text-decoration:underline">別タブで開く</a></span>
+</div>
+
+<!-- Perm -->
+<div class="banner warn" id="permBanner">マイク・位置情報の許可が必要です。アドレスバーの🔒から許可してください。</div>
+
+<!-- Tab Nav -->
+<nav class="tab-nav">
+  <button class="tab-btn active" id="tab1" onclick="switchTab(1)">
+    <span class="tab-icon">🟡</span>リアルタイム対処
+  </button>
+  <button class="tab-btn" id="tab2" onclick="switchTab(2)">
+    <span class="tab-icon">📋</span>記録・提出
+  </button>
+</nav>
+
+<!-- ═══ PANEL 1: リアルタイム ═══ -->
+<div class="panel active" id="panel1">
+
+  <!-- Signal -->
+  <div class="signal-card" id="signalCard">
+    <div class="signal-top">
+      <span class="signal-label">状況シグナル</span>
+      <span class="signal-scanning" id="scanning">● AI解析中</span>
+    </div>
+    <div class="signal-body">
+      <span class="signal-fruit" id="sigFruit">🍋</span>
+      <div class="signal-right">
+        <div class="signal-status" id="sigStatus">待機中</div>
+        <div class="signal-sub" id="sigSub">録音を開始すると状況を自動判定します</div>
+      </div>
+    </div>
+    <div>
+      <div class="tbar-row" style="margin-bottom:5px">
+        <span class="tbar-lbl">緊張度</span>
+        <span class="tbar-val" id="tbarVal">—</span>
+      </div>
+      <div class="tbar-track"><div class="tbar-fill" id="tbarFill"></div></div>
+    </div>
+
+    <!-- ADVICE (核心: 今何をすべきか) -->
+    <div class="advice-box" id="adviceBox">
+      <div class="advice-now">
+        <span class="advice-now-label">▶ 今すべき対応</span>
+        <div class="advice-now-text" id="adviceNow">—</div>
+      </div>
+      <div class="advice-script">
+        <span class="advice-script-label">使える一言</span>
+        <div class="advice-script-text" id="adviceScript">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REC -->
+  <div class="rec-area">
+    <div class="rec-ring">
+      <svg viewBox="0 0 128 128">
+        <circle class="ring-track" cx="64" cy="64" r="55"/>
+        <circle class="ring-fill" cx="64" cy="64" r="55" id="ringFill"/>
+      </svg>
+      <button class="rec-main" id="recBtn" onclick="toggleRec()">
+        <span class="rec-main-icon" id="recIcon">⏺</span>
+        <span class="rec-main-lbl" id="recLbl">タップで開始</span>
+      </button>
+    </div>
+    <div class="rec-timer" id="recTimer">00:00:00</div>
+  </div>
+
+  <!-- GPS / Audio -->
+  <div class="cards-row">
+    <div class="mini-card" id="gpsCard">
+      <span class="mc-label">GPS</span>
+      <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap">
+        <span class="mc-val dim" id="gpsLat">—</span>
+        <span class="gps-acc n" id="gpsAcc">未取得</span>
+      </div>
+      <span class="mc-val dim" id="gpsLng" style="font-size:10px">位置情報なし</span>
+    </div>
+    <div class="mini-card" id="audioCard">
+      <span class="mc-label">音声</span>
+      <canvas id="wave" width="150" height="32" style="width:100%;height:32px;opacity:0.55"></canvas>
+      <span class="mc-val dim" id="audioSt">マイク未接続</span>
+    </div>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="quick-row">
+    <button class="quick-btn" onclick="forceAI()">
+      <span class="quick-icon">🔍</span>
+      <span class="quick-lbl">今すぐ判定</span>
+    </button>
+    <button class="quick-btn" onclick="addNote()">
+      <span class="quick-icon">✏️</span>
+      <span class="quick-lbl">メモ追加</span>
+    </button>
+    <button class="quick-btn red" onclick="callPolice()">
+      <span class="quick-icon">🚨</span>
+      <span class="quick-lbl">110番</span>
+    </button>
+  </div>
+
+  <!-- 衝撃センサーバッジ -->
+  <div class="shock-badge" id="shockBadge">
+    <div class="shock-dot"></div>
+    <span id="shockTxt">衝撃センサー — 録音開始で有効化</span>
+  </div>
+
+  <!-- ワンタップ事象記録 -->
+  <div class="event-section">
+    <div class="event-label">発生事象 — ワンタップで記録</div>
+    <div class="event-btns">
+      <button class="event-btn danger" onclick="logEvent('🤛 叩かれた・蹴られた（暴行の可能性）','wa')">
+        <span class="event-icon">🤛</span>
+        <span class="event-lbl">叩かれた<br>蹴られた</span>
+      </button>
+      <button class="event-btn danger" onclick="logEvent('💢 暴言・脅迫的な発言あり','wa')">
+        <span class="event-icon">💢</span>
+        <span class="event-lbl">暴言<br>脅迫</span>
+      </button>
+      <button class="event-btn warn" onclick="logEvent('🚪 降車を求めたが拒否された','wa')">
+        <span class="event-icon">🚪</span>
+        <span class="event-lbl">降車<br>拒否</span>
+      </button>
+      <button class="event-btn warn" onclick="logEvent('💴 料金の支払いを拒否・先延ばし','wa')">
+        <span class="event-icon">💴</span>
+        <span class="event-lbl">料金<br>拒否</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PANEL 2: 記録・提出 ═══ -->
+<div class="panel" id="panel2">
+
+  <div class="layer2-header">
+    <div class="l2h-title">📋 インシデント記録</div>
+    <div class="l2h-sub">録音・GPS・AI判定をまとめて警察や会社に提出できる形式で出力します。<br>話さなくていい、渡すだけの状態にします。</div>
+  </div>
+
+  <!-- Summary fields -->
+  <div class="form-block">
+    <div class="form-block-title">
+      <span>基本情報</span>
+    </div>
+    <div class="form-field">
+      <span class="field-label">発生日時</span>
+      <span class="field-val" id="r_date">未記録</span>
+    </div>
+    <div class="form-field">
+      <span class="field-label">記録時間</span>
+      <span class="field-val" id="r_dur">00:00:00</span>
+    </div>
+    <div class="form-field">
+      <span class="field-label">最終シグナル</span>
+      <span class="field-val" id="r_signal">🍋 待機中</span>
+    </div>
+    <div class="form-field">
+      <span class="field-label">GPS記録数</span>
+      <span class="field-val" id="r_gps">0 ポイント</span>
+    </div>
+  </div>
+
+  <!-- AI summary -->
+  <div class="ai-summary-block">
+    <div class="ai-sum-header">
+      <span>AI 状況サマリー（提出用）</span>
+      <button class="gen-btn" style="width:auto;padding:4px 10px;font-size:9px" onclick="genSummary()">生成</button>
+    </div>
+    <div class="ai-sum-content empty" id="aiSummary">
+      「生成」を押すと、ログをもとに警察・会社への提出用文章をAIが自動作成します。
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div class="log-card">
+    <div class="log-head">
+      <span class="log-head-lbl">インシデントログ</span>
+      <span class="log-head-cnt" id="logCnt">0 件</span>
+    </div>
+    <div class="log-scroller" id="logList">
+      <div class="log-empty" id="logEmpty">記録なし</div>
+    </div>
+  </div>
+
+  <!-- Export -->
+  <div class="export-row" style="grid-template-columns:1fr 1fr 1fr">
+    <button class="export-btn primary" onclick="dlReport()">⬇ テキスト</button>
+    <button class="export-btn" style="border-color:rgba(255,107,107,0.3);color:#ff6b6b;background:rgba(255,107,107,0.07)" onclick="dlPdf()">📄 PDF</button>
+    <button class="export-btn" onclick="shareReport()">📤 共有</button>
+  </div>
+
+  <div class="footer">Grace of Touch v0.3 · 2層構造: 即時対処 + 事後提出</div>
+</div>
+
+</div><!-- app -->
+
+<script>
+// ══════════════════════════════
+//  SIGNALS
+// ══════════════════════════════
+const SIG = {
+  0: {
+    fruit:'🍋', status:'通常', sub:'落ち着いた状況です',
+    lv:0, color:'var(--muted)', bar:'var(--safe)',
+    now: null, script: null
+  },
+  1: {
+    fruit:'🍌', status:'観察中', sub:'緊張が高まっています。注意してください',
+    lv:1, color:'var(--warn)', bar:'var(--warn)',
+    now:'相手の話をさえぎらず、うなずきながら聞き流してください。\n反論はせず、記録だけ続けてください。',
+    script:'「ご意見はよく分かりました」'
+  },
+  2: {
+    fruit:'🍎', status:'注意', sub:'カスハラのパターンが見られます',
+    lv:2, color:'var(--warn)', bar:'var(--warn)',
+    now:'境界を一度だけ明確に伝えてください。\nそれ以上の説明は不要です。感情的にならず、短く伝えるだけで十分です。',
+    script:'「その言い方はやめていただけますか」'
+  },
+  3: {
+    fruit:'🍒', status:'警戒', sub:'状況がエスカレートしています',
+    lv:3, color:'var(--accent)', bar:'var(--accent)',
+    now:'安全な場所に停車することを検討してください。\n会社への報告を準備し、必要なら警察に連絡してください。\n説明しなくていい。行動だけしてください。',
+    script:'「安全のため、一度停車します」'
+  }
+};
+
+// ══════════════════════════════
+//  State
+// ══════════════════════════════
+let isRec = false, startMs = null;
+let timerIv = null, gpsIv = null, waveIv = null, aiIv = null;
+let gpsLog = [], evLog = [];
+let curLv = 0, curScore = 0;
+let mRec = null, aChunks = [], aBlob = null;
+let actx = null, analyser = null, stream = null;
+let apiKey = '';
+
+// ══════════════════════════════
+//  API Key
+// ══════════════════════════════
+function saveKey() {
+  const v = document.getElementById('apikeyInput').value.trim();
+  if (!v.startsWith('sk-ant-')) { alert('APIキーは sk-ant- から始まります'); return; }
+  apiKey = v;
+  sessionStorage.setItem('got_k', v);
+  document.getElementById('apikeyCard').style.display = 'none';
+  addLog('AI判定: Anthropic API接続完了', 'ok');
+}
+function loadKey() {
+  const s = sessionStorage.getItem('got_k');
+  if (s) { apiKey = s; document.getElementById('apikeyCard').style.display = 'none'; }
+}
+
+// ══════════════════════════════
+//  Tabs
+// ══════════════════════════════
+function switchTab(n) {
+  document.getElementById('tab1').classList.toggle('active', n===1);
+  document.getElementById('tab2').classList.toggle('active', n===2);
+  document.getElementById('panel1').classList.toggle('active', n===1);
+  document.getElementById('panel2').classList.toggle('active', n===2);
+  if (n===2) syncReportFields();
+}
+
+function syncReportFields() {
+  const sig = SIG[Math.min(curLv,3)];
+  document.getElementById('r_date').textContent = startMs ? new Date(startMs).toLocaleString('ja-JP') : '未記録';
+  document.getElementById('r_dur').textContent = document.getElementById('recTimer').textContent;
+  document.getElementById('r_signal').textContent = `${sig.fruit} ${sig.status}（緊張度 ${curScore}/100）`;
+  document.getElementById('r_gps').textContent = `${gpsLog.length} ポイント`;
+}
+
+// ══════════════════════════════
+//  Logging
+// ══════════════════════════════
+function addLog(txt, type='ev') {
+  const now = new Date();
+  const ts = now.toLocaleTimeString('ja-JP',{hour12:false});
+  evLog.push({time:ts, text:txt, type, ts:now.toISOString()});
+  document.getElementById('logEmpty').style.display = 'none';
+  const el = document.createElement('div');
+  el.className = 'log-item';
+  el.innerHTML = `<span class="log-t">${ts}</span><span class="log-tx ${type}">${txt}</span>`;
+  document.getElementById('logList').appendChild(el);
+  document.getElementById('logList').scrollTop = 99999;
+  document.getElementById('logCnt').textContent = `${evLog.length} 件`;
+}
+
+// ══════════════════════════════
+//  Signal update
+// ══════════════════════════════
+function setSig(lv, score, nowOverride, scriptOverride) {
+  const s = SIG[Math.min(lv,3)];
+  curLv = lv; curScore = score;
+
+  const frEl = document.getElementById('sigFruit');
+  frEl.classList.remove('pop');
+  void frEl.offsetWidth;
+  frEl.textContent = s.fruit;
+  frEl.classList.add('pop');
+
+  document.getElementById('sigStatus').textContent = s.status;
+  document.getElementById('sigStatus').style.color = s.color;
+  document.getElementById('sigSub').textContent = s.sub;
+  document.getElementById('tbarFill').style.width = score + '%';
+  document.getElementById('tbarFill').style.backgroundColor = s.bar;
+  document.getElementById('tbarVal').textContent = `${score} / 100`;
+
+  const sc = document.getElementById('signalCard');
+  sc.className = 'signal-card' + (lv>0 ? ` lv${Math.min(lv,3)}` : '');
+
+  const now = nowOverride || s.now;
+  const scr = scriptOverride || s.script;
+  const ab = document.getElementById('adviceBox');
+  if (now && lv > 0) {
+    document.getElementById('adviceNow').textContent = now;
+    document.getElementById('adviceScript').textContent = scr || '—';
+    ab.classList.add('show');
+  } else {
+    ab.classList.remove('show');
+  }
+}
+
+// ══════════════════════════════
+//  AI call
+// ══════════════════════════════
+async function callAI(forReport=false) {
+  if (!apiKey || evLog.length===0) return null;
+  document.getElementById('scanning').classList.add('on');
+
+  const recent = evLog.slice(-12).map(e=>`[${e.time}] ${e.text}`).join('\n');
+  const prompt = forReport
+    ? `あなたはカスタマーハラスメント対応の専門家です。
+以下はタクシー・ライドシェアドライバーが記録したインシデントログです。
+警察や会社への提出用に、客観的な状況説明文を300字以内で作成してください。
+事実のみを記載し、感情表現は避けてください。
+
+ログ:
+${evLog.map(e=>`[${e.time}] ${e.text}`).join('\n')}
+
+出力形式: 提出用文章のみ。タイトルや見出しは不要。`
+    : `あなたはカスタマーハラスメント判定AIです。タクシー・ライドシェアドライバーを支援します。
+
+インシデントログ（直近）:
+${recent}
+
+以下のJSON形式のみで回答してください（他の文字は一切含めない）:
+{
+  "score": 数字(0-100),
+  "level": 数字(0-3),
+  "now": "ドライバーへの具体的な行動アドバイス(40字以内)",
+  "script": "今すぐ使える一言(20字以内)"
+}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body: JSON.stringify({
+        model:'claude-sonnet-4-6',
+        max_tokens: forReport ? 600 : 250,
+        messages:[{role:'user', content:prompt}]
+      })
+    });
+    const data = await res.json();
+    if (data.error) { addLog(`AI: ${data.error.message}`, 'wa'); return null; }
+    const raw = data.content?.[0]?.text || '';
+    if (forReport) return raw.trim();
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    return JSON.parse(m[0]);
+  } catch(e) {
+    addLog(`AI接続エラー: ${e.message}`, 'wa');
+    return null;
+  } finally {
+    document.getElementById('scanning').classList.remove('on');
+  }
+}
+
+async function forceAI() {
+  if (!apiKey) { alert('APIキーを設定してください'); return; }
+  if (evLog.length===0) { alert('ログがありません'); return; }
+  addLog('手動AI判定...', 'ai');
+  const r = await callAI();
+  if (r) {
+    setSig(r.level, r.score, r.now, r.script);
+    addLog(`AI: スコア${r.score} / ${['通常','注意','警戒','緊急'][r.level]} — ${r.now||''}`, 'ai');
+  }
+}
+
+async function genSummary() {
+  if (!apiKey) { alert('APIキーを設定してください'); return; }
+  if (evLog.length===0) { alert('ログがありません。録音後に生成してください。'); return; }
+  const el = document.getElementById('aiSummary');
+  el.textContent = '生成中...';
+  el.className = 'ai-sum-content';
+  const txt = await callAI(true);
+  if (txt) {
+    el.textContent = txt;
+    el.className = 'ai-sum-content';
+  } else {
+    el.textContent = '生成に失敗しました。再試行してください。';
+    el.className = 'ai-sum-content empty';
+  }
+}
+
+// ══════════════════════════════
+//  GPS
+// ══════════════════════════════
+function startGPS() {
+  if (!navigator.geolocation) { addLog('GPS: 利用不可', 'wa'); return; }
+  const opt = {enableHighAccuracy:true, maximumAge:5000};
+  const rec = pos => {
+    const lat = pos.coords.latitude.toFixed(6);
+    const lng = pos.coords.longitude.toFixed(6);
+    const acc = Math.round(pos.coords.accuracy);
+    gpsLog.push({lat,lng,acc,ts:new Date().toISOString()});
+    document.getElementById('gpsLat').textContent = lat;
+    document.getElementById('gpsLng').textContent = lng;
+    const a = document.getElementById('gpsAcc');
+    a.className = `gps-acc ${acc<30?'g':'b'}`;
+    a.textContent = `±${acc}m`;
+    document.getElementById('gpsCard').classList.add('on');
+  };
+  navigator.geolocation.getCurrentPosition(pos=>{rec(pos); addLog(`GPS: ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`, 'ok');}, ()=>addLog('GPS: 取得失敗','wa'), opt);
+  gpsIv = setInterval(()=>navigator.geolocation.getCurrentPosition(rec,()=>{},opt), 15000);
+}
+function stopGPS() { clearInterval(gpsIv); gpsIv=null; }
+
+// ══════════════════════════════
+//  Waveform
+// ══════════════════════════════
+function drawWave() {
+  if (!analyser) return;
+  const buf = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteTimeDomainData(buf);
+  const cv = document.getElementById('wave');
+  const cx = cv.getContext('2d');
+  cx.clearRect(0,0,cv.width,cv.height);
+  cx.strokeStyle='#ff3b5c'; cx.lineWidth=1.5; cx.beginPath();
+  const sl = cv.width/buf.length; let x=0;
+  for (let i=0;i<buf.length;i++) {
+    const y=(buf[i]/128)*cv.height/2;
+    i===0?cx.moveTo(x,y):cx.lineTo(x,y);
+    x+=sl;
+  }
+  cx.stroke();
+}
+
+// ══════════════════════════════
+//  Timer / Ring
+// ══════════════════════════════
+function fmt(ms) {
+  const s=Math.floor(ms/1000);
+  return [Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');
+}
+function updateRing(s) {
+  document.getElementById('ringFill').style.strokeDashoffset = 345*(1-Math.min(s/3600,1));
+}
+
+// ══════════════════════════════
+//  Recording
+// ══════════════════════════════
+async function toggleRec() { isRec ? await stopRec() : await startRec(); }
+
+async function startRec() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    document.getElementById('permBanner').classList.remove('show');
+
+    actx = new (window.AudioContext||window.webkitAudioContext)();
+    analyser = actx.createAnalyser(); analyser.fftSize=256;
+    actx.createMediaStreamSource(stream).connect(analyser);
+
+    aChunks=[]; aBlob=null;
+    mRec = new MediaRecorder(stream);
+    mRec.ondataavailable = e=>{ if(e.data.size>0) aChunks.push(e.data); };
+    mRec.onstop = ()=>{ aBlob = new Blob(aChunks,{type:'audio/webm'}); };
+    mRec.start(1000);
+
+    isRec=true; startMs=Date.now();
+
+    document.getElementById('recBtn').classList.add('on');
+    document.getElementById('recPill').classList.add('on');
+    document.getElementById('recPillTxt').textContent='記録中';
+    document.getElementById('recIcon').textContent='⏹';
+    document.getElementById('recLbl').textContent='停止';
+    document.getElementById('recTimer').classList.add('on');
+    document.getElementById('audioSt').textContent='録音中';
+    document.getElementById('audioSt').style.color='#ff3b5c';
+    document.getElementById('audioCard').classList.add('on');
+
+    timerIv = setInterval(()=>{
+      const el=Date.now()-startMs;
+      document.getElementById('recTimer').textContent=fmt(el);
+      updateRing(Math.floor(el/1000));
+    },1000);
+    waveIv = setInterval(drawWave,50);
+    startGPS();
+
+    // AI every 60s
+    if (apiKey) {
+      aiIv = setInterval(async()=>{
+        if(evLog.length===0) return;
+        const r=await callAI();
+        if(r){
+          setSig(r.level,r.score,r.now,r.script);
+          if(r.level>=2) addLog(`AI: スコア${r.score} — ${r.now}`, 'ai');
+        }
+      },60000);
+    }
+
+    setSig(0,0,null,null);
+    addLog('録音開始 — 証拠収集中', 'ok');
+    enableShockSensor();
+
+  } catch(e) {
+    document.getElementById('permBanner').classList.add('show');
+    addLog(`エラー: ${e.name==='NotAllowedError'?'マイク許可が必要':e.message}`, 'wa');
+  }
+}
+
+async function stopRec() {
+  isRec=false;
+  clearInterval(timerIv); clearInterval(waveIv); clearInterval(aiIv);
+  disableShockSensor();
+  stopGPS();
+  if(mRec?.state!=='inactive') mRec.stop();
+  stream?.getTracks().forEach(t=>t.stop());
+  if(actx){ await actx.close(); actx=null; analyser=null; }
+
+  const el=fmt(Date.now()-startMs);
+  document.getElementById('recBtn').classList.remove('on');
+  document.getElementById('recPill').classList.remove('on');
+  document.getElementById('recPillTxt').textContent='記録済み';
+  document.getElementById('recIcon').textContent='⏺';
+  document.getElementById('recLbl').textContent='再録音';
+  document.getElementById('recTimer').classList.remove('on');
+  document.getElementById('audioSt').textContent=`完了 (${el})`;
+  document.getElementById('audioSt').style.color='var(--safe)';
+  document.getElementById('wave').getContext('2d').clearRect(0,0,150,32);
+
+  addLog(`録音停止 — ${el} / GPS ${gpsLog.length}pt`, 'ok');
+
+  // Final AI
+  if(apiKey && evLog.length>0){
+    addLog('最終AI判定...','ai');
+    const r=await callAI();
+    if(r){
+      setSig(r.level,r.score,r.now,r.script);
+      addLog(`最終判定: ${['通常','注意','警戒','緊急'][r.level]} / スコア${r.score}`, 'ai');
+    }
+  }
+}
+
+// ══════════════════════════════
+//  Actions
+// ══════════════════════════════
+function addNote() {
+  const n=prompt('状況メモ:');
+  if(n?.trim()) addLog(`[メモ] ${n.trim()}`,'ev');
+}
+function callPolice() {
+  if(confirm('110番（警察）に電話しますか？\n録音は継続されます。')){
+    addLog('110番通報','wa');
+    window.location.href='tel:110';
+  }
+}
+
+// ══════════════════════════════
+//  Report
+// ══════════════════════════════
+function dlReport() {
+  syncReportFields();
+  const sig=SIG[Math.min(curLv,3)];
+  const aiTxt=document.getElementById('aiSummary').textContent;
+  const lines=[
+    '=== Grace of Touch インシデントレポート ===',
+    `作成: ${new Date().toLocaleString('ja-JP')}`,
+    `記録時間: ${document.getElementById('recTimer').textContent}`,
+    `最終判定: ${sig.fruit} ${sig.status}（緊張度スコア: ${curScore}/100）`,
+    '',
+    '--- AI状況サマリー ---',
+    aiTxt.includes('生成') ? '未生成（「記録・提出」タブの「生成」ボタンで作成）' : aiTxt,
+    '',
+    '--- GPS記録 ---',
+    gpsLog.map(g=>`[${g.ts}] ${g.lat}, ${g.lng} (±${g.acc}m)`).join('\n')||'なし',
+    '',
+    '--- インシデントログ ---',
+    evLog.map(e=>`[${e.time}] ${e.text}`).join('\n')||'なし',
+    '',
+    '==='
+  ];
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'}));
+  const d=new Date(); a.download=`incident-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.txt`;
+  a.click();
+  addLog('レポートをダウンロード','ok');
+}
+
+function shareReport() {
+  syncReportFields();
+  const sig=SIG[Math.min(curLv,3)];
+  const txt=[
+    '【Grace of Touch インシデント記録】',
+    `日時: ${startMs ? new Date(startMs).toLocaleString('ja-JP') : '未記録'}`,
+    `記録時間: ${document.getElementById('recTimer').textContent}`,
+    `判定: ${sig.fruit} スコア${curScore}/100`,
+    gpsLog.length>0?`GPS: ${gpsLog[0].lat}, ${gpsLog[0].lng}`:'GPS: 未記録',
+    `ログ: ${evLog.length}件`
+  ].join('\n');
+  if(navigator.share) navigator.share({title:'インシデントレポート',text:txt});
+  else navigator.clipboard.writeText(txt).then(()=>alert('クリップボードにコピーしました'));
+}
+
+// ══════════════════════════════
+//  ワンタップ事象記録
+// ══════════════════════════════
+function logEvent(txt, type='wa') {
+  addLog(txt, type);
+  // ビジュアルフィードバック
+  const el = document.activeElement;
+  if (el) { el.style.transform = 'scale(0.9)'; setTimeout(() => el.style.transform = '', 150); }
+}
+
+// ══════════════════════════════
+//  衝撃センサー（加速度センサー）
+// ══════════════════════════════
+let shockEnabled = false, lastShockTime = 0;
+const SHOCK_THRESHOLD = 18; // m/s² — 通常走行は~10、強い衝撃は20以上
+const SHOCK_COOLDOWN = 3000; // 3秒間は連続検知しない
+
+function enableShockSensor() {
+  if (!window.DeviceMotionEvent) return;
+  // iOS13+ requires permission
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {
+    DeviceMotionEvent.requestPermission().then(r => {
+      if (r === 'granted') _startShockListener();
+    }).catch(() => {});
+  } else {
+    _startShockListener();
+  }
+}
+
+function _startShockListener() {
+  shockEnabled = true;
+  const badge = document.getElementById('shockBadge');
+  badge.classList.add('active');
+  document.getElementById('shockTxt').textContent = '衝撃センサー 監視中';
+  window.addEventListener('devicemotion', _onMotion);
+}
+
+function _onMotion(e) {
+  if (!shockEnabled || !isRec) return;
+  const a = e.accelerationIncludingGravity;
+  if (!a) return;
+  const mag = Math.sqrt((a.x||0)**2 + (a.y||0)**2 + (a.z||0)**2);
+  const now = Date.now();
+  if (mag > SHOCK_THRESHOLD && now - lastShockTime > SHOCK_COOLDOWN) {
+    lastShockTime = now;
+    addLog(`🔴 衝撃を検知 (${mag.toFixed(1)} m/s²) — 暴行の可能性あり`, 'sh');
+    // フルーツシグナルを最低🍎に引き上げ
+    if (curLv < 2) setSig(2, Math.max(curScore, 60));
+  }
+}
+
+function disableShockSensor() {
+  shockEnabled = false;
+  window.removeEventListener('devicemotion', _onMotion);
+  const badge = document.getElementById('shockBadge');
+  badge.classList.remove('active');
+  document.getElementById('shockTxt').textContent = '衝撃センサー — 録音開始で有効化';
+}
+
+// ══════════════════════════════
+//  PDF 出力
+// ══════════════════════════════
+function dlPdf() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210, M = 15, CW = W - M * 2;
+  let y = M;
+
+  const line = (text, size=10, bold=false, color=[30,30,30]) => {
+    doc.setFontSize(size);
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setTextColor(...color);
+    const lines = doc.splitTextToSize(text, CW);
+    lines.forEach(l => {
+      if (y > 275) { doc.addPage(); y = M; }
+      doc.text(l, M, y);
+      y += size * 0.45;
+    });
+    y += 2;
+  };
+
+  const sep = () => {
+    doc.setDrawColor(200,200,200);
+    doc.line(M, y, W-M, y);
+    y += 5;
+  };
+
+  // ヘッダー
+  doc.setFillColor(10,10,15);
+  doc.rect(0, 0, W, 28, 'F');
+  doc.setFontSize(16); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
+  doc.text('Grace of Touch', M, 12);
+  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(160,160,180);
+  doc.text('Incident Report — Customer Harassment Documentation', M, 20);
+  y = 36;
+
+  // 基本情報
+  line('INCIDENT OVERVIEW', 9, true, [100,100,120]);
+  sep();
+  const startDt = document.getElementById('r_date').textContent;
+  const dur = document.getElementById('r_dur').textContent;
+  const sig = document.getElementById('r_signal').textContent;
+  const gpsCount = document.getElementById('r_gps').textContent;
+  line(`Date / Time   : ${startDt}`, 10);
+  line(`Duration      : ${dur}`, 10);
+  line(`Signal Level  : ${sig}`, 10);
+  line(`GPS Points    : ${gpsCount}`, 10);
+  line(`Generated     : ${new Date().toLocaleString('ja-JP')}`, 10);
+  y += 3;
+
+  // AI サマリー
+  const summary = document.getElementById('aiSummary').textContent;
+  if (summary && !summary.includes('「生成」')) {
+    line('AI GENERATED SUMMARY', 9, true, [100,100,120]);
+    sep();
+    line(summary, 10);
+    y += 3;
+  }
+
+  // ログ
+  line('INCIDENT LOG', 9, true, [100,100,120]);
+  sep();
+  evLog.forEach(ev => {
+    const prefix = `[${ev.time}] `;
+    line(prefix + ev.text, 9);
+  });
+  y += 3;
+
+  // GPS
+  if (gpsLog.length > 0) {
+    line('GPS TRACK', 9, true, [100,100,120]);
+    sep();
+    gpsLog.slice(0, 20).forEach(g => {
+      line(`[${g.ts ? new Date(g.ts).toLocaleTimeString('ja-JP',{hour12:false}) : '—'}] ${g.lat.toFixed(5)}, ${g.lng.toFixed(5)} (±${g.acc}m)`, 8);
+    });
+    if (gpsLog.length > 20) line(`... 他 ${gpsLog.length - 20} ポイント`, 8);
+    y += 3;
+  }
+
+  // フッター
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7); doc.setTextColor(160,160,160);
+    doc.text(`Grace of Touch v0.3  |  Page ${i} / ${pageCount}  |  本書は緊急記録アプリにより自動生成されました`, M, 290);
+  }
+
+  const fname = `incident_${new Date().toISOString().slice(0,16).replace(/[T:]/g,'-')}.pdf`;
+  doc.save(fname);
+}
+
+// ══════════════════════════════
+//  GraceVox BroadcastChannel 連携
+// ══════════════════════════════
+const gvChannel = new BroadcastChannel('gracevox-kashara');
+gvChannel.onmessage = (e) => {
+  const { type, text } = e.data || {};
+  if (type === 'transcript' && text) {
+    addLog('🎤 ' + text, 'tr');
+  } else if (type === 'ping') {
+    gvChannel.postMessage({ type: 'pong' });
+    const badge = document.getElementById('gvBadge');
+    badge.classList.add('connected');
+    document.getElementById('gvBadgeTxt').textContent = 'GraceVox 接続中 — 文字起こし連携 ON';
+  } else if (type === 'disconnect') {
+    const badge = document.getElementById('gvBadge');
+    badge.classList.remove('connected');
+    document.getElementById('gvBadgeTxt').innerHTML = 'GraceVox 未接続 — <a href="https://grace-of-touch.web.app/gracevox.html" target="_blank" style="color:inherit;text-decoration:underline">別タブで開く</a>';
+  }
+};
+
+// ══════════════════════════════
+//  Init
+// ══════════════════════════════
+loadKey();
+</script>
+</body>
+</html>
