@@ -1635,13 +1635,15 @@
       const count = activeIds.size;
       document.getElementById('flight-count').textContent = count;
     } catch (err) {
-      console.warn('フライトデータ取得失敗:', err.message);
+      // OpenSkyはGCP IPをブロックする場合あり — 表示はN/Aのまま継続
+      const el = document.getElementById('flight-count');
+      if (el && el.textContent === '--') el.textContent = 'N/A';
     }
   }
 
-  // 起動後2秒 + 15秒ごとに更新（OpenSky匿名は10s制限）
+  // 起動後2秒 + 30秒ごとに更新（匿名は10s解像度制限）
   setTimeout(loadFlights, 2000);
-  setInterval(loadFlights, 15 * 1000);
+  setInterval(loadFlights, 30 * 1000);
 
   // ========================================
   // AIS船舶レイヤー（主要航路・地政学ホットスポット）

@@ -1,5 +1,6 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+const https = require("https");
 admin.initializeApp();
 
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
@@ -372,18 +373,27 @@ exports.stripeWebhook = functions.https.onRequest(async (req, res) => {
 // ============================================================
 // BUG-W3: OpenSky Network CORS Proxy
 // ============================================================
-exports.openskyProxy = functions.https.onRequest(async (req, res) => {
+exports.openskyProxy = functions.https.onRequest((req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
-  try {
-    const params = new URLSearchParams(req.query);
-    const url = 'https://opensky-network.org/api/states/all?' + params.toString();
-    const resp = await fetch(url);
-    if (!resp.ok) { res.status(resp.status).json({ error: 'OpenSky returned ' + resp.status }); return; }
-    const data = await resp.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  const params = new URLSearchParams(req.query);
+  const path = '/api/states/all?' + params.toString();
+  const options = { hostname: 'opensky-network.org', path, method: 'GET',
+    headers: { 'User-Agent': 'GraceOfTouch/1.0' }, timeout: 8000 };
+  const proxyReq = https.request(options, proxyRes => {
+    let body = '';
+    proxyRes.on('data', chunk => body += chunk);
+    proxyRes.on('end', () => {
+      if (proxyRes.statusCode !== 200) {
+        res.status(proxyRes.statusCode).json({ error: 'OpenSky returned ' + proxyRes.statusCode });
+        return;
+      }
+      try { res.json(JSON.parse(body)); }
+      catch (e) { res.status(500).json({ error: 'Invalid JSON from OpenSky' }); }
+    });
+  });
+  proxyReq.on('error', err => res.status(500).json({ error: err.message }));
+  proxyReq.on('timeout', () => { proxyReq.destroy(); res.status(504).json({ error: 'OpenSky timeout' }); });
+  proxyReq.end();
 });

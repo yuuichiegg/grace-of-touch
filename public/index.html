@@ -44,7 +44,8 @@ body{margin:0;overflow:hidden;background:#020510;touch-action:none;}
 
 /* ===================== TITLE SCREEN ===================== */
 #title-screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;z-index:50;pointer-events:none;animation:titleFadeOut 8s ease forwards;}
+  justify-content:center;z-index:50;pointer-events:none;animation:titleFadeOut 8s ease forwards;
+  background:radial-gradient(ellipse at center,rgba(2,5,16,0.55) 0%,rgba(2,5,16,0.75) 100%);}
 #title-screen.hidden{opacity:0;pointer-events:none;}
 @keyframes titleFadeOut{0%{opacity:1}60%{opacity:1}100%{opacity:0;pointer-events:none;}}
 #title-pre{font-family:'Orbitron',monospace;font-size:clamp(9px,1.2vw,12px);
